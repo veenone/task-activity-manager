@@ -16,11 +16,7 @@ interface StepRowProps {
   isFirst: boolean;
   isLast: boolean;
   readOnly?: boolean;
-  confirm: (opts: {
-    title: string;
-    message?: string;
-    confirmLabel?: string;
-  }) => Promise<boolean>;
+  confirm: (opts: { title: string; message?: string; confirmLabel?: string }) => Promise<boolean>;
   onMove: (dir: "up" | "down") => void;
   onDuplicate: () => void;
   onLocalChange: (field: StepField, value: string) => void;
@@ -32,22 +28,7 @@ interface StepRowProps {
 // blur, mirroring the same pattern used by the Test-level field editors.
 // Dirty markers come from the pendingForTest prop — we filter to rows
 // belonging to this step's entity_key.
-export function StepRow({
-  profileId,
-  testKey,
-  step,
-  parameters = [],
-  pendingForTest,
-  isFirst,
-  isLast,
-  readOnly,
-  confirm,
-  onMove,
-  onDuplicate,
-  onLocalChange,
-  onLocalDelete,
-  onEdited,
-}: StepRowProps) {
+export function StepRow({ profileId, testKey, step, parameters = [], pendingForTest, isFirst, isLast, readOnly, confirm, onMove, onDuplicate, onLocalChange, onLocalDelete, onEdited }: StepRowProps) {
   const [action, setAction] = useState(step.action);
   const [data, setData] = useState(step.data);
   const [expected, setExpected] = useState(step.expected);
@@ -57,17 +38,13 @@ export function StepRow({
   // A step that's only queued for creation (not yet in Jira) shows a "new"
   // badge and, on delete, just cancels the queued add rather than scheduling
   // a remote removal.
-  const isNew = pendingForTest.some(
-    (p) => p.entityType === "test_step_add" && p.entityKey === entityKey,
-  );
+  const isNew = pendingForTest.some((p) => p.entityType === "test_step_add" && p.entityKey === entityKey);
 
   async function deleteStep() {
     if (readOnly) return;
     const ok = await confirm({
       title: isNew ? "Discard step" : "Delete step",
-      message: isNew
-        ? "Discard this new step? It hasn't been sent to Jira yet."
-        : "Delete this step? It will be removed from Jira on commit.",
+      message: isNew ? "Discard this new step? It hasn't been sent to Jira yet." : "Delete this step? It will be removed from Jira on commit.",
       confirmLabel: isNew ? "Discard" : "Delete",
     });
     if (!ok) return;
@@ -81,13 +58,7 @@ export function StepRow({
     }
   }
 
-  const isDirty = (field: StepField) =>
-    pendingForTest.some(
-      (p) =>
-        p.entityType === "test_step" &&
-        p.entityKey === entityKey &&
-        p.field === field,
-    );
+  const isDirty = (field: StepField) => pendingForTest.some((p) => p.entityType === "test_step" && p.entityKey === entityKey && p.field === field);
 
   async function save(field: StepField, value: string) {
     if (readOnly) return;
@@ -127,35 +98,17 @@ export function StepRow({
           {!readOnly && (
             <>
               <div className="step-move">
-                <button
-                  className="btn btn-ghost step-move-btn"
-                  onClick={() => onMove("up")}
-                  disabled={isFirst}
-                  title="Move step up"
-                >
+                <button className="btn btn-ghost step-move-btn" onClick={() => onMove("up")} disabled={isFirst} title="Move step up">
                   ▲
                 </button>
-                <button
-                  className="btn btn-ghost step-move-btn"
-                  onClick={() => onMove("down")}
-                  disabled={isLast}
-                  title="Move step down"
-                >
+                <button className="btn btn-ghost step-move-btn" onClick={() => onMove("down")} disabled={isLast} title="Move step down">
                   ▼
                 </button>
               </div>
-              <button
-                className="btn btn-ghost step-duplicate"
-                onClick={onDuplicate}
-                title="Duplicate this call"
-              >
+              <button className="btn btn-ghost step-duplicate" onClick={onDuplicate} title="Duplicate this call">
                 ⧉
               </button>
-              <button
-                className="btn btn-ghost step-delete"
-                onClick={deleteStep}
-                title={isNew ? "Discard this call" : "Delete this call"}
-               aria-label={isNew ? "Discard this call" : "Delete this call"}>
+              <button className="btn btn-ghost step-delete" onClick={deleteStep} title={isNew ? "Discard this call" : "Delete this call"} aria-label={isNew ? "Discard this call" : "Delete this call"}>
                 ✕
               </button>
             </>
@@ -174,6 +127,7 @@ export function StepRow({
         ) : (
           <DatasetMacroField
             parameters={parameters}
+            macroTarget="Action"
             className="step-edit step-edit-action"
             value={action}
             onChange={setAction}
@@ -186,35 +140,22 @@ export function StepRow({
         {!readOnly && (
           <>
             <div className="step-move">
-              <button
-                className="btn btn-ghost step-move-btn"
-                onClick={() => onMove("up")}
-                disabled={isFirst}
-                title="Move step up"
-              >
+              <button className="btn btn-ghost step-move-btn" onClick={() => onMove("up")} disabled={isFirst} title="Move step up">
                 ▲
               </button>
-              <button
-                className="btn btn-ghost step-move-btn"
-                onClick={() => onMove("down")}
-                disabled={isLast}
-                title="Move step down"
-              >
+              <button className="btn btn-ghost step-move-btn" onClick={() => onMove("down")} disabled={isLast} title="Move step down">
                 ▼
               </button>
             </div>
-            <button
-              className="btn btn-ghost step-duplicate"
-              onClick={onDuplicate}
-              title="Duplicate this step"
-            >
+            <button className="btn btn-ghost step-duplicate" onClick={onDuplicate} title="Duplicate this step">
               ⧉
             </button>
             <button
               className="btn btn-ghost step-delete"
               onClick={deleteStep}
               title={isNew ? "Discard this new step" : "Delete this step"}
-             aria-label={isNew ? "Discard this new step" : "Delete this step"}>
+              aria-label={isNew ? "Discard this new step" : "Delete this step"}
+            >
               ✕
             </button>
           </>
@@ -222,14 +163,13 @@ export function StepRow({
       </div>
       {isDirty("action") && <DirtyDot />}
       <div className="step-row">
-        <span className="step-label">
-          Data {isDirty("data") && <DirtyDot />}
-        </span>
+        <span className="step-label">Data {isDirty("data") && <DirtyDot />}</span>
         {readOnly ? (
           <p className="step-edit step-field-static">{data}</p>
         ) : (
           <DatasetMacroField
             parameters={parameters}
+            macroTarget="Data"
             className="step-edit"
             value={data}
             onChange={setData}
@@ -240,14 +180,13 @@ export function StepRow({
         )}
       </div>
       <div className="step-row">
-        <span className="step-label">
-          Expected {isDirty("expected") && <DirtyDot />}
-        </span>
+        <span className="step-label">Expected {isDirty("expected") && <DirtyDot />}</span>
         {readOnly ? (
           <p className="step-edit step-field-static">{expected}</p>
         ) : (
           <DatasetMacroField
             parameters={parameters}
+            macroTarget="Expected"
             className="step-edit"
             value={expected}
             onChange={setExpected}
@@ -317,18 +256,9 @@ export function InlineStepsEditor({
   return (
     <div className="steps-inline">
       {readOnly ? (
-        <p className="detail-input detail-input-static detail-desc-static">
-          {text || <span className="muted">No steps defined for this test.</span>}
-        </p>
+        <p className="detail-input detail-input-static detail-desc-static">{text || <span className="muted">No steps defined for this test.</span>}</p>
       ) : (
-        <MarkdownField
-          className="detail-desc-edit"
-          value={text}
-          onChange={setText}
-          onCommit={save}
-          rows={8}
-          placeholder="Steps for this test."
-        />
+        <MarkdownField className="detail-desc-edit" value={text} onChange={setText} onCommit={save} rows={8} placeholder="Steps for this test." />
       )}
       {saveError && <div className="error-text step-save-error">{saveError}</div>}
     </div>

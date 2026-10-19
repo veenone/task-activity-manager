@@ -39,16 +39,12 @@ const twoByTwo: TestDataset = {
 };
 
 function editor(initial: TestDataset, onSaved = vi.fn(), onCancel = vi.fn()) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
     <QueryClientProvider client={client}>
-      <DatasetEditor
-        profileId="p1"
-        testKey="QA-1"
-        initial={initial}
-        onSaved={onSaved}
-        onCancel={onCancel}
-      />
+      <DatasetEditor profileId="p1" testKey="QA-1" initial={initial} onSaved={onSaved} onCancel={onCancel} />
     </QueryClientProvider>,
   );
   return { onSaved, onCancel, client };
@@ -187,9 +183,7 @@ describe("DatasetEditor", () => {
     editor(listed);
 
     const cell = screen.getByRole("combobox", { name: "Row 1, TIER" });
-    expect(Array.from(cell.querySelectorAll("option")).map((option) => option.value)).toEqual(
-      ["", "gold", "silver"],
-    );
+    expect(Array.from(cell.querySelectorAll("option")).map((option) => option.value)).toEqual(["", "gold", "silver"]);
 
     await userEvent.selectOptions(cell, "silver");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -291,10 +285,7 @@ describe("DatasetEditor", () => {
     importDatasetCSV.mockResolvedValue(imported);
     editor(twoByTwo);
 
-    await userEvent.upload(
-      screen.getByLabelText("Import CSV"),
-      new File(["TIER,ROUND*\ngold,1\n"], "dataset.csv", { type: "text/csv" }),
-    );
+    await userEvent.upload(screen.getByLabelText("Import CSV"), new File(["TIER,ROUND*\ngold,1\n"], "dataset.csv", { type: "text/csv" }));
 
     expect(await screen.findByRole("columnheader", { name: /TIER/ })).toBeVisible();
     expect(screen.getByRole("columnheader", { name: /ROUND/ })).toBeVisible();
@@ -309,10 +300,7 @@ describe("DatasetEditor", () => {
     importDatasetCSV.mockRejectedValue(new Error("that file has no parameter row"));
     editor(twoByTwo);
 
-    await userEvent.upload(
-      screen.getByLabelText("Import CSV"),
-      new File([""], "empty.csv", { type: "text/csv" }),
-    );
+    await userEvent.upload(screen.getByLabelText("Import CSV"), new File([""], "empty.csv", { type: "text/csv" }));
 
     expect(await screen.findByText(/no parameter row/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /USERNAME/ })).toBeVisible();
@@ -371,5 +359,14 @@ describe("DatasetEditor", () => {
     expect(screen.getByRole("combobox", { name: "Row 1, TIER" })).toHaveValue("gold");
     expect(screen.getByRole("group", { name: "Dataset toolbar" })).toBeVisible();
     expect(screen.getByRole("group", { name: "Dataset actions" })).toBeVisible();
+  });
+
+  it("keeps parameter columns inside the editor table layout", () => {
+    editor(twoByTwo);
+
+    const table = screen.getByRole("table", { name: "Dataset editor" });
+    expect(table.querySelector("col.dataset-row-column")).not.toBeNull();
+    expect(table.querySelectorAll("col.dataset-parameter-column")).toHaveLength(2);
+    expect(table.querySelector("col.dataset-actions-column")).not.toBeNull();
   });
 });

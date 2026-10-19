@@ -5,37 +5,82 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../../api";
 import type { ParameterizedRun } from "../../api";
-import { ParameterizedRunRows } from "./ParameterizedRunRows";
+import { ParameterizedRunIndicator, ParameterizedRunRows } from "./ParameterizedRunRows";
 
 vi.mock("../../api", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../../api")>(),
+  ...(await importOriginal<typeof import("../../api")>()),
   GetParameterizedRun: vi.fn(),
   SetIterationStatus: vi.fn(),
   SetIterationStepStatus: vi.fn(),
 }));
 
 const run: ParameterizedRun = {
-  id: "run-1", executionKey: "EXEC-1", testKey: "QA-1",
-  datasetSourceKind: "test", datasetSourceKey: "QA-1", status: "FAIL",
+  id: "run-1",
+  executionKey: "EXEC-1",
+  testKey: "QA-1",
+  datasetSourceKind: "test",
+  datasetSourceKey: "QA-1",
+  status: "FAIL",
   iterations: [
     {
-      id: "iteration-1", rank: 0, status: "PASS",
-      parameters: [{ name: "USER", value: "alice" }, { name: "REGION", value: "eu" }],
-      steps: [{ id: "result-1", definitionId: "step-1", rank: 0, status: "PASS", action: "Sign in as alice", data: "Region eu", expected: "Dashboard" }],
+      id: "iteration-1",
+      rank: 0,
+      status: "PASS",
+      parameters: [
+        { name: "USER", value: "alice" },
+        { name: "REGION", value: "eu" },
+      ],
+      steps: [
+        {
+          id: "result-1",
+          definitionId: "step-1",
+          rank: 0,
+          status: "PASS",
+          action: "Sign in as alice",
+          data: "Region eu",
+          expected: "Dashboard",
+        },
+      ],
     },
-    { id: "iteration-2", rank: 1, status: "FAIL", parameters: [{ name: "USER", value: "bob" }, { name: "REGION", value: "us" }], steps: [] },
-    { id: "iteration-3", rank: 2, status: "TO" + "DO", parameters: [{ name: "USER", value: "carol" }, { name: "REGION", value: "ap" }], steps: [] },
+    {
+      id: "iteration-2",
+      rank: 1,
+      status: "FAIL",
+      parameters: [
+        { name: "USER", value: "bob" },
+        { name: "REGION", value: "us" },
+      ],
+      steps: [],
+    },
+    {
+      id: "iteration-3",
+      rank: 2,
+      status: "TO" + "DO",
+      parameters: [
+        { name: "USER", value: "carol" },
+        { name: "REGION", value: "ap" },
+      ],
+      steps: [],
+    },
   ],
 };
 
 function view(canWrite: boolean) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   vi.mocked(api.GetParameterizedRun).mockResolvedValue(structuredClone(run) as never);
   render(
     <QueryClientProvider client={client}>
-      <table><tbody><tr><td>
-        <ParameterizedRunRows profileId="p1" execKey="EXEC-1" testKey="QA-1" expanded canWrite={canWrite} />
-      </td></tr></tbody></table>
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <ParameterizedRunRows profileId="p1" execKey="EXEC-1" testKey="QA-1" expanded canWrite={canWrite} />
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </QueryClientProvider>,
   );
   return client;
@@ -71,5 +116,29 @@ describe("ParameterizedRunRows", () => {
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /iteration 1 status/i }), "FAIL");
     expect(await screen.findByText("write refused")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /iteration 1 status/i })).toHaveValue("PASS");
+  });
+
+  it("identifies a parameterized member and shows its iteration count before expansion", async () => {
+    const onLoaded = vi.fn();
+    const onToggle = vi.fn();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    vi.mocked(api.GetParameterizedRun).mockResolvedValue(structuredClone(run) as never);
+
+    render(
+      <QueryClientProvider client={client}>
+        <ParameterizedRunIndicator profileId="p1" execKey="EXEC-1" testKey="QA-1" expanded={false} onLoaded={onLoaded} onToggle={onToggle} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("3 iterations")).toBeVisible();
+    expect(onLoaded).toHaveBeenCalledWith(3);
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: /show 3 dataset iterations for qa-1/i,
+      }),
+    );
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

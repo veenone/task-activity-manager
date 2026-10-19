@@ -1,14 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import {
-  ExportDatasetCSV,
-  ImportDatasetCSV,
-  RenameDatasetPlaceholder,
-  SaveTestDataset,
-  type DatasetParameter,
-  type TestDataset,
-} from "../../api";
+import { ExportDatasetCSV, ImportDatasetCSV, RenameDatasetPlaceholder, SaveTestDataset, type DatasetParameter, type TestDataset } from "../../api";
 import { Menu } from "../Menu";
 import { Modal } from "../Modal";
 import { useConfirm } from "../useConfirm";
@@ -76,31 +69,20 @@ export function DatasetEditor({
 
   const removeParameter = (index: number) => {
     setParameters((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    setRows((current) =>
-      current.map((row) => row.filter((_, itemIndex) => itemIndex !== index)),
-    );
+    setRows((current) => current.map((row) => row.filter((_, itemIndex) => itemIndex !== index)));
   };
 
   const setCell = (rowIndex: number, columnIndex: number, value: string) =>
-    setRows((current) =>
-      current.map((row, index) =>
-        index === rowIndex
-          ? row.map((cell, cellIndex) => (cellIndex === columnIndex ? value : cell))
-          : row,
-      ),
-    );
+    setRows((current) => current.map((row, index) => (index === rowIndex ? row.map((cell, cellIndex) => (cellIndex === columnIndex ? value : cell)) : row)));
 
   const addRow = () => setRows((current) => [...current, parameters.map(() => "")]);
-  const removeRow = (rowIndex: number) =>
-    setRows((current) => current.filter((_, index) => index !== rowIndex));
+  const removeRow = (rowIndex: number) => setRows((current) => current.filter((_, index) => index !== rowIndex));
 
   const moveParameter = (index: number, direction: number) => {
     const target = index + direction;
     if (target < 0 || target >= parameters.length) return;
     setParameters((current) => swap(current, index, target));
-    setRows((current) =>
-      current.map((row) => swap(fit(row, parameters.length), index, target)),
-    );
+    setRows((current) => current.map((row) => swap(fit(row, parameters.length), index, target)));
   };
 
   const moveRow = (index: number, direction: number) => {
@@ -114,9 +96,7 @@ export function DatasetEditor({
       setParameters((current) => [...current, parameter]);
       setRows((current) => current.map((row) => [...row, ""]));
     } else if (parameterEdit) {
-      setParameters((current) =>
-        current.map((item, index) => (index === parameterEdit.index ? parameter : item)),
-      );
+      setParameters((current) => current.map((item, index) => (index === parameterEdit.index ? parameter : item)));
     }
     setParameterEdit(null);
   };
@@ -141,7 +121,10 @@ export function DatasetEditor({
     if (!file) return;
     setError("");
     try {
-      const table = await ImportDatasetCSV(await file.text(), { parameters, rows });
+      const table = await ImportDatasetCSV(await file.text(), {
+        parameters,
+        rows,
+      });
       setParameters(table.parameters);
       setRows(table.rows);
     } catch (caught) {
@@ -180,18 +163,15 @@ export function DatasetEditor({
   const creating = initial.parameters.length === 0;
 
   return (
-    <Modal
-      initialFocus={addParameterRef}
-      onClose={onCancel}
-      className="modal dataset-editor-modal"
-      labelledBy={titleId}
-    >
+    <Modal initialFocus={addParameterRef} onClose={onCancel} className="modal dataset-editor-modal" labelledBy={titleId}>
       <div className="pending-head dataset-editor-head">
         <div>
           <h2 id={titleId}>{creating ? "Create dataset" : "Edit dataset"}</h2>
           <p>Parameters become reusable macros in the test steps.</p>
         </div>
-        <button className="btn btn-ghost" onClick={onCancel} aria-label="Close">×</button>
+        <button className="btn btn-ghost" onClick={onCancel} aria-label="Close">
+          ×
+        </button>
       </div>
 
       <div className="bulk-body dataset-editor-body">
@@ -215,12 +195,7 @@ export function DatasetEditor({
             </button>
             <label className="btn dataset-import">
               Import CSV
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                aria-label="Import CSV"
-                onChange={(event) => void importFile(event)}
-              />
+              <input type="file" accept=".csv,text/csv" aria-label="Import CSV" onChange={(event) => void importFile(event)} />
             </label>
           </div>
         ) : (
@@ -240,115 +215,149 @@ export function DatasetEditor({
               </button>
               <label className="btn dataset-import">
                 Import CSV
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  aria-label="Import CSV"
-                  onChange={(event) => void importFile(event)}
-                />
+                <input type="file" accept=".csv,text/csv" aria-label="Import CSV" onChange={(event) => void importFile(event)} />
               </label>
-              <button className="btn" onClick={() => void exportFile()}>Export CSV</button>
+              <button className="btn" onClick={() => void exportFile()}>
+                Export CSV
+              </button>
             </div>
 
             <div className="dataset-scroll dataset-editor-scroll">
               <table className="dataset-table dataset-editor-table" aria-label="Dataset editor">
-          <thead>
-            <tr>
-              <th scope="col" className="dataset-row-heading">Row</th>
-              {parameters.map((parameter, index) => (
-                <th key={parameter.id ?? `${parameter.name}:${index}`} scope="col">
-                  <div className="dataset-parameter-heading">
-                    <span>
-                      <strong>{parameter.name}</strong>
-                      <small>{isList(parameter) ? "List" : "Text"}</small>
-                    </span>
-                    {parameter.combinatorial && (
-                      <span className="dataset-combinatorial" title="Combinatorial parameter">*</span>
-                    )}
-                    <Menu
-                      label="Actions"
-                      triggerClassName="btn btn-ghost dataset-parameter-menu"
-                      triggerLabel={`Actions for parameter ${index + 1}`}
-                      align="right"
-                      items={[
-                        { key: "edit", label: "Edit parameter", onClick: () => setParameterEdit({ index, parameter }) },
-                        { key: "left", label: "Move left", onClick: () => moveParameter(index, -1), disabled: index === 0 },
-                        { key: "right", label: "Move right", onClick: () => moveParameter(index, 1), disabled: index === parameters.length - 1 },
-                        { key: "divider", divider: true },
-                        { key: "remove", label: "Remove parameter", onClick: () => removeParameter(index), disabled: parameters.length === 1, danger: true },
-                      ]}
-                    />
-                  </div>
-                </th>
-              ))}
-              <th scope="col" className="dataset-row-actions-heading">Row actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                <th scope="row" className="dataset-row-number">{rowIndex + 1}</th>
-                {parameters.map((parameter, columnIndex) => (
-                  <td key={parameter.id ?? `${parameter.name}:${columnIndex}`}>
-                    {isList(parameter) ? (
-                      <select
-                        className="dataset-cell-control"
-                        value={row[columnIndex] ?? ""}
-                        aria-label={`Row ${rowIndex + 1}, ${parameter.name}`}
-                        onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)}
-                      >
-                        <option value="">Select an option</option>
-                        {(parameter.options ?? []).map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        className="dataset-cell-control"
-                        value={row[columnIndex] ?? ""}
-                        aria-label={`Row ${rowIndex + 1}, ${parameter.name}`}
-                        onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)}
-                      />
-                    )}
-                  </td>
-                ))}
-                <td>
-                  <div className="dataset-row-actions">
-                    <button className="btn btn-ghost" aria-label={`Move row ${rowIndex + 1} up`} onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}>↑</button>
-                    <button className="btn btn-ghost" aria-label={`Move row ${rowIndex + 1} down`} onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === rows.length - 1}>↓</button>
-                    <button className="btn btn-ghost" aria-label={`Remove row ${rowIndex + 1}`} onClick={() => removeRow(rowIndex)} disabled={rows.length === 1}>Remove</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+                <colgroup>
+                  <col className="dataset-row-column" />
+                  {parameters.map((parameter, index) => (
+                    <col className="dataset-parameter-column" key={parameter.id ?? `${parameter.name}:${index}`} />
+                  ))}
+                  <col className="dataset-actions-column" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" className="dataset-row-heading">
+                      Row
+                    </th>
+                    {parameters.map((parameter, index) => (
+                      <th key={parameter.id ?? `${parameter.name}:${index}`} scope="col">
+                        <div className="dataset-parameter-heading">
+                          <span>
+                            <strong>{parameter.name}</strong>
+                            <small>{isList(parameter) ? "List" : "Text"}</small>
+                          </span>
+                          {parameter.combinatorial && (
+                            <span className="dataset-combinatorial" title="Combinatorial parameter">
+                              *
+                            </span>
+                          )}
+                          <Menu
+                            label="Actions"
+                            triggerClassName="btn btn-ghost dataset-parameter-menu"
+                            triggerLabel={`Actions for parameter ${index + 1}`}
+                            align="right"
+                            items={[
+                              {
+                                key: "edit",
+                                label: "Edit parameter",
+                                onClick: () => setParameterEdit({ index, parameter }),
+                              },
+                              {
+                                key: "left",
+                                label: "Move left",
+                                onClick: () => moveParameter(index, -1),
+                                disabled: index === 0,
+                              },
+                              {
+                                key: "right",
+                                label: "Move right",
+                                onClick: () => moveParameter(index, 1),
+                                disabled: index === parameters.length - 1,
+                              },
+                              { key: "divider", divider: true },
+                              {
+                                key: "remove",
+                                label: "Remove parameter",
+                                onClick: () => removeParameter(index),
+                                disabled: parameters.length === 1,
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        </div>
+                      </th>
+                    ))}
+                    <th scope="col" className="dataset-row-actions-heading">
+                      Row actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      <th scope="row" className="dataset-row-number">
+                        {rowIndex + 1}
+                      </th>
+                      {parameters.map((parameter, columnIndex) => (
+                        <td key={parameter.id ?? `${parameter.name}:${columnIndex}`}>
+                          {isList(parameter) ? (
+                            <select
+                              className="dataset-cell-control"
+                              value={row[columnIndex] ?? ""}
+                              aria-label={`Row ${rowIndex + 1}, ${parameter.name}`}
+                              onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)}
+                            >
+                              <option value="">Select an option</option>
+                              {(parameter.options ?? []).map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              className="dataset-cell-control"
+                              value={row[columnIndex] ?? ""}
+                              aria-label={`Row ${rowIndex + 1}, ${parameter.name}`}
+                              onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)}
+                            />
+                          )}
+                        </td>
+                      ))}
+                      <td>
+                        <div className="dataset-row-actions">
+                          <button className="btn btn-ghost" aria-label={`Move row ${rowIndex + 1} up`} onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}>
+                            ↑
+                          </button>
+                          <button className="btn btn-ghost" aria-label={`Move row ${rowIndex + 1} down`} onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === rows.length - 1}>
+                            ↓
+                          </button>
+                          <button className="btn btn-ghost" aria-label={`Remove row ${rowIndex + 1}`} onClick={() => removeRow(rowIndex)} disabled={rows.length === 1}>
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </>
         )}
 
-      {error && <p className="dataset-error" role="alert">{error}</p>}
+        {error && (
+          <p className="dataset-error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
-      <div
-        className="pending-actions dataset-editor-actions"
-        role="group"
-        aria-label="Dataset actions"
-      >
-        <button
-          className="btn"
-          onClick={addRow}
-          disabled={parameters.length === 0 || saving}
-        >
+      <div className="pending-actions dataset-editor-actions" role="group" aria-label="Dataset actions">
+        <button className="btn" onClick={addRow} disabled={parameters.length === 0 || saving}>
           Add row
         </button>
         <div className="dataset-primary-actions">
-          <button className="btn" onClick={onCancel} disabled={saving}>Cancel</button>
-          <button
-            className="btn btn-primary"
-            onClick={() => void save()}
-            disabled={saving || parameters.length === 0}
-          >
+          <button className="btn" onClick={onCancel} disabled={saving}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={() => void save()} disabled={saving || parameters.length === 0}>
             {saving ? "Saving…" : "Save"}
           </button>
         </div>
@@ -357,11 +366,7 @@ export function DatasetEditor({
       {parameterEdit && (
         <DatasetParameterDialog
           parameter={parameterEdit.parameter}
-          usedValues={
-            parameterEdit.index === null
-              ? []
-              : rows.map((row) => row[parameterEdit.index ?? 0] ?? "")
-          }
+          usedValues={parameterEdit.index === null ? [] : rows.map((row) => row[parameterEdit.index ?? 0] ?? "")}
           onSave={applyParameter}
           onCancel={() => setParameterEdit(null)}
         />

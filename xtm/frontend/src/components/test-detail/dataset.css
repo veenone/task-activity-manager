@@ -154,7 +154,22 @@
 
 .dataset-editor-table {
   width: 100%;
-  min-width: max-content;
+  table-layout: fixed;
+}
+
+.dataset-row-column {
+  width: 48px;
+}
+
+.dataset-actions-column {
+  width: 124px;
+}
+
+.dataset-editor-table th,
+.dataset-editor-table td {
+  min-width: 0;
+  overflow: hidden;
+  white-space: normal;
 }
 
 .dataset-row-heading,
@@ -170,7 +185,7 @@
 
 .dataset-parameter-heading {
   display: flex;
-  min-width: 180px;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
@@ -178,6 +193,7 @@
 .dataset-parameter-heading > span:first-child {
   display: grid;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dataset-parameter-heading small {
@@ -191,7 +207,7 @@
 
 .dataset-cell-control {
   width: 100%;
-  min-width: 160px;
+  min-width: 0;
 }
 
 .dataset-row-actions .btn {

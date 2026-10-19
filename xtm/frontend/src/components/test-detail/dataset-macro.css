@@ -18,9 +18,18 @@
 }
 
 .dataset-macro-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   flex: 0 0 auto;
   font-family: var(--font-mono);
   font-weight: 700;
+}
+
+.dataset-macro-trigger-label {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  font-weight: 600;
 }
 
 .dataset-macro-menu {

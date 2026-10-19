@@ -13,6 +13,7 @@ interface TriggerRange {
 
 type Props = Omit<ComponentProps<typeof MarkdownField>, "ref"> & {
   parameters: DatasetParameter[];
+  macroTarget?: string;
 };
 
 function activeTrigger(value: string, caret: number): TriggerRange | null {
@@ -30,10 +31,7 @@ function undefinedReferences(value: string, parameterNames: Set<string>): string
   return Array.from(missing);
 }
 
-export function renderDatasetReferences(
-  value: string,
-  parameterNames: Iterable<string>,
-): ReactNode {
+export function renderDatasetReferences(value: string, parameterNames: Iterable<string>): ReactNode {
   const missing = undefinedReferences(value, new Set(parameterNames));
   if (missing.length === 0) return null;
   return (
@@ -43,14 +41,7 @@ export function renderDatasetReferences(
   );
 }
 
-export function DatasetMacroField({
-  parameters,
-  value,
-  onChange,
-  onCommit,
-  className,
-  ...fieldProps
-}: Props) {
+export function DatasetMacroField({ parameters, value, onChange, onCommit, className, macroTarget = "field", ...fieldProps }: Props) {
   const fieldRef = useRef<MarkdownFieldHandle>(null);
   const [open, setOpen] = useState(false);
   const [trigger, setTrigger] = useState<TriggerRange | null>(null);
@@ -72,7 +63,10 @@ export function DatasetMacroField({
   function insert(name: string) {
     const macro = `\${${name}}`;
     if (trigger) {
-      fieldRef.current?.insertText(macro, { start: trigger.start, end: trigger.end });
+      fieldRef.current?.insertText(macro, {
+        start: trigger.start,
+        end: trigger.end,
+      });
     } else {
       fieldRef.current?.insertText(macro);
     }
@@ -119,10 +113,10 @@ export function DatasetMacroField({
         <button
           type="button"
           className="btn btn-ghost dataset-macro-trigger"
-          aria-label="Insert dataset parameter"
+          aria-label={`Insert dataset parameter into ${macroTarget}`}
           aria-haspopup="listbox"
           aria-expanded={open}
-          disabled={names.length === 0}
+          title={`Insert a dataset parameter into ${macroTarget}`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             setTrigger(null);
@@ -131,6 +125,9 @@ export function DatasetMacroField({
           }}
         >
           <span aria-hidden="true">{"${"}</span>
+          <span aria-hidden="true" className="dataset-macro-trigger-label">
+            Parameter
+          </span>
         </button>
       </div>
       {open && (
@@ -138,21 +135,25 @@ export function DatasetMacroField({
           <div className="dataset-macro-menu-head" aria-hidden="true">
             Insert parameter
           </div>
-          {filtered.length > 0 ? filtered.map((name, index) => (
-            <button
-              type="button"
-              key={name}
-              role="option"
-              aria-selected={index === activeIndex}
-              className={`dataset-macro-option${index === activeIndex ? " dataset-macro-option-active" : ""}`}
-              aria-label={name}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => insert(name)}
-            >
-              <code>{`\${${name}}`}</code>
-              <span>{parameters.find((parameter) => parameter.name === name)?.type === "LIST" ? "List" : "Text"}</span>
-            </button>
-          )) : <p className="dataset-macro-empty">No matching parameters</p>}
+          {filtered.length > 0 ? (
+            filtered.map((name, index) => (
+              <button
+                type="button"
+                key={name}
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`dataset-macro-option${index === activeIndex ? " dataset-macro-option-active" : ""}`}
+                aria-label={name}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => insert(name)}
+              >
+                <code>{`\${${name}}`}</code>
+                <span>{parameters.find((parameter) => parameter.name === name)?.type === "LIST" ? "List" : "Text"}</span>
+              </button>
+            ))
+          ) : (
+            <p className="dataset-macro-empty">{names.length === 0 ? "Create a dataset parameter before inserting a macro." : "No matching parameters"}</p>
+          )}
         </div>
       )}
       {renderDatasetReferences(value, names)}

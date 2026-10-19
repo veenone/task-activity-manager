@@ -14,15 +14,7 @@ const parameters: DatasetParameter[] = [
 
 function Harness({ initial = "Use old value", onCommit = vi.fn() }) {
   const [value, setValue] = useState(initial);
-  return (
-    <DatasetMacroField
-      parameters={parameters}
-      value={value}
-      onChange={setValue}
-      onCommit={onCommit}
-      placeholder="Action"
-    />
-  );
+  return <DatasetMacroField parameters={parameters} value={value} onChange={setValue} onCommit={onCommit} placeholder="Action" />;
 }
 
 describe("DatasetMacroField", () => {
@@ -34,7 +26,11 @@ describe("DatasetMacroField", () => {
     await user.click(screen.getByRole("textbox"));
     const editor = screen.getByRole("textbox") as HTMLTextAreaElement;
     editor.setSelectionRange(4, 7);
-    await user.click(screen.getByRole("button", { name: "Insert dataset parameter" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Insert dataset parameter into field",
+      }),
+    );
     await user.click(screen.getByRole("option", { name: "ACCOUNT REGION" }));
 
     expect(editor).toHaveValue("Use ${ACCOUNT REGION} value");
@@ -48,7 +44,9 @@ describe("DatasetMacroField", () => {
     const user = userEvent.setup();
     render(<Harness initial="" />);
     await user.click(screen.getByRole("textbox"));
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "${ACCOUNT " } });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "${ACCOUNT " },
+    });
 
     expect(screen.queryByRole("option", { name: "USERNAME" })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: "ACCOUNT REGION" })).toBeVisible();
