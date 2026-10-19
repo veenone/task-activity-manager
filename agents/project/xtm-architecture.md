@@ -164,6 +164,19 @@ a backend refusal keeps only that row pending. Detail and write capabilities
 are separate. Demo2 advertises both for its deterministic fixture; live Xray
 and Kiwi keep both false until fixture-backed endpoints prove their contracts.
 
+**A JUnit result for a newly created execution resolves after allocation.**
+The preview matches a testcase's complete ordered property signature against
+the cached test-level dataset. Existing parameterized Tests retain that
+signature; a newly created Test remains an overall run because it has no
+dataset. Apply journals the retained result as
+`test_run_iteration_import`, keyed by temporary execution key, Test key and a
+signature hash. The container-create rename rewrites that pending key. After
+membership commit, `commit_junit_iteration.go` fetches the new parameterized
+run, verifies the dataset source, requires exactly one signature match, and
+writes by the stable iteration ID returned by the backend. Source drift and
+zero or multiple matches produce a conflict that keeps the pending row. The
+deferred payload does not treat a preview-only signature hash as a server ID.
+
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then
 rewrites dependent pending rows (e.g. associations) to the real key before the

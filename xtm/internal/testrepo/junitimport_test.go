@@ -713,6 +713,53 @@ func TestApplyJUnitImportNewExec(t *testing.T) {
 	}
 }
 
+func TestJUnitNewExecKeepsParameterizedSignatureAndDefersItsResult(t *testing.T) {
+	repo := seedJUnitNewExecRepo(t)
+	if err := repo.SaveTestDataset("p1", "TC-1", "", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USER", Type: "TEXT"}},
+		Rows:       [][]string{{"alice"}, {"bob"}},
+	}); err != nil {
+		t.Fatalf("seed dataset: %v", err)
+	}
+	if err := repo.SaveTestDataset("p1", "TC-3", "", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USER", Type: "TEXT"}},
+		Rows:       [][]string{{"alice"}, {"bob"}},
+	}); err != nil {
+		t.Fatalf("seed skipped dataset: %v", err)
+	}
+	xml := base64.StdEncoding.EncodeToString([]byte(buildJUnitXML([]string{
+		`<testcase name="Pass Test"><properties><property name="USER" value="bob"/></properties></testcase>`,
+		`<testcase name="Brand New"><failure/></testcase>`,
+		`<testcase name="Skipped Test"><skipped/></testcase>`,
+	})))
+	preview, err := repo.AnalyzeJUnitImportNewExec("p1", xml, true)
+	if err != nil || len(preview.Rows) != 3 {
+		t.Fatalf("preview=%+v err=%v", preview, err)
+	}
+	if preview.Rows[0].TargetKind != testrepo.JUnitTargetIteration || len(preview.Rows[0].Parameters) != 1 || preview.Rows[0].Parameters[0].Value != "bob" {
+		t.Fatalf("existing parameterized row = %+v", preview.Rows[0])
+	}
+	if preview.Rows[1].TargetKind != testrepo.JUnitTargetRun || !preview.Rows[1].Create {
+		t.Fatalf("new test row = %+v, want overall run", preview.Rows[1])
+	}
+	if preview.Rows[2].TargetKind != testrepo.JUnitTargetRun || preview.Rows[2].Result != "" {
+		t.Fatalf("skipped parameterized row = %+v, want allocation without an iteration target", preview.Rows[2])
+	}
+
+	result, err := repo.ApplyJUnitImportNewExec("p1", "QA", "Imported", preview.Rows)
+	if err != nil || result.ResultsSet != 2 {
+		t.Fatalf("apply=%+v err=%v", result, err)
+	}
+	pending, _ := repo.ListPendingChanges("p1")
+	types := map[string]int{}
+	for _, change := range pending {
+		types[change.EntityType]++
+	}
+	if types["test_run_iteration_import"] != 1 || types["test_run"] != 1 {
+		t.Fatalf("pending types = %v, want deferred iteration plus overall new-test result", types)
+	}
+}
+
 func TestApplyJUnitImportNewExec_blankSummary(t *testing.T) {
 	repo := seedJUnitNewExecRepo(t)
 	_, err := repo.ApplyJUnitImportNewExec("p1", "PROJ", "", []testrepo.JUnitNewExecRow{})

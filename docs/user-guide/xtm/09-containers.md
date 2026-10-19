@@ -106,16 +106,27 @@ On a demo profile, **Regenerate sample data** and **Clean sample data…** reset
 
    ![The new execution dialog](images/containers-09-junit-new-exec.png)
 
-5. Check the preview. The summary line says how many tests the execution will hold and how many results of each kind it carries. New tests are marked NEW. **Skipped** lists the testcases XTM could not use and why, for example a name that matches several tests.
+5. Check the preview. New tests are marked NEW. An existing parameterized test
+   shows the dataset iteration that its JUnit properties identify, such as
+   `USER=bob`. If the properties do not identify one iteration exactly, choose
+   the intended iteration or exclude the testcase. New tests use an overall
+   run result because they do not have a dataset yet. **Skipped testcases**
+   lists names XTM could not match to one test.
 
    ![The preview, with three testcases skipped as ambiguous](images/containers-10-junit-preview.png)
 
-6. Click **Create execution & apply**.
+6. Click **Create execution and apply N results**.
 
-XTM matches each testcase to a test by its summary. Dataset-aware reports can
-also identify a specific iteration; check the preview before applying so you
-can confirm each testcase maps to the intended parameter combination. Both
-imports end as pending changes, so commit them from the Pending list.
+XTM matches each testcase to a test by its summary. For an existing
+parameterized test, add one JUnit `<property>` for every dataset parameter.
+Property names and values must match the complete parameter combination. The
+new execution does not have server run IDs until it is created, so XTM keeps
+the parameter signature as a pending result. During commit it creates the
+execution, allocates the tests, resolves the signature to the server's stable
+iteration ID, and then writes the result. A changed dataset or an ambiguous
+signature is retained as a conflict instead of writing to the wrong
+iteration. Both import flows end as pending changes, so commit them from the
+Pending list.
 
 ## Work with bugs
 

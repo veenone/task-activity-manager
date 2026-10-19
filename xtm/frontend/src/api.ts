@@ -215,8 +215,6 @@ export {
   GetRunRollup,
   GetRunRollupBreakdown,
   GetExecutionMembersWithRuns,
-  AnalyzeJUnitImportNewExec,
-  ApplyJUnitImportNewExec,
   AnalyzeRequirementImport,
   ExportRequirementImportTemplate,
   ExportPreconditionImportTemplate,
@@ -285,6 +283,8 @@ import {
   GetParameterizedRun as getParameterizedRunBinding,
   AnalyzeJUnitImport as analyzeJUnitImportBinding,
   ApplyJUnitImport as applyJUnitImportBinding,
+  AnalyzeJUnitImportNewExec as analyzeJUnitImportNewExecBinding,
+  ApplyJUnitImportNewExec as applyJUnitImportNewExecBinding,
 } from "../wailsjs/go/main/App";
 import { testrepo } from "../wailsjs/go/models";
 
@@ -372,6 +372,30 @@ export async function ApplyJUnitImport(
     execKey,
     matches.map((match) => testrepo.JUnitMatch.createFrom(match)),
   ) as Promise<BulkEditResult>;
+}
+
+export async function AnalyzeJUnitImportNewExec(
+  profileId: string,
+  xmlBase64: string,
+  createMissing: boolean,
+): Promise<JUnitNewExecPreview> {
+  return analyzeJUnitImportNewExecBinding(
+    profileId,
+    xmlBase64,
+    createMissing,
+  ) as unknown as Promise<JUnitNewExecPreview>;
+}
+
+export async function ApplyJUnitImportNewExec(
+  profileId: string,
+  summary: string,
+  rows: JUnitNewExecRow[],
+): Promise<JUnitNewExecResult> {
+  return applyJUnitImportNewExecBinding(
+    profileId,
+    summary,
+    rows.map((row) => testrepo.JUnitNewExecRow.createFrom(row)),
+  ) as Promise<JUnitNewExecResult>;
 }
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -1877,6 +1901,12 @@ export interface JUnitNewExecRow {
   summary: string;
   result: string;
   create: boolean;
+  targetKind: "run" | "iteration";
+  parameters: IterationParameter[];
+  datasetSourceKind: "test" | "plan" | "execution" | "";
+  datasetSourceKey: string;
+  reason: string;
+  candidateIterations: JUnitIterationCandidate[];
 }
 
 // JUnitNewExecPreview mirrors testrepo.JUnitNewExecPreview -- the analysis of

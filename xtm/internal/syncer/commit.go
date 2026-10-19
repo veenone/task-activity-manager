@@ -252,6 +252,9 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	datasetRows := make([]testrepo.PendingChange, 0)
 	// Parameterized results use stable run, iteration and step-result ids.
 	iterationRows := make([]testrepo.PendingChange, 0)
+	// New-execution JUnit imports resolve a parameter signature only after the
+	// backend has created the execution and allocated its test runs.
+	deferredIterationRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -324,6 +327,10 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "test_run_iteration" || c.EntityType == "test_run_iteration_step" {
 			iterationRows = append(iterationRows, c)
+			continue
+		}
+		if c.EntityType == "test_run_iteration_import" {
+			deferredIterationRows = append(deferredIterationRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -868,6 +875,11 @@ testLoop:
 	// gated inside commitMemberships). Comments post as issue comments, so they
 	// need the same issue-backed write surface as reviews.
 	e.commitMemberships(ctx, profileID, membershipRows, caps, &result)
+	if caps.SupportsParameterizedRunWrites {
+		e.commitDeferredJUnitIterations(ctx, profileID, deferredIterationRows, &result)
+	} else {
+		e.skipRows(deferredIterationRows, skipReasonIterationWrites, &result)
+	}
 	if caps.SupportsPreconditionObjects {
 		e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
 		e.commitPreconditionDeletes(ctx, profileID, preconditionDeleteRows, &result)

@@ -2306,7 +2306,7 @@ func (r *Repository) RenameContainer(profileID, oldKey, newKey string) error {
 	}
 	if _, err := tx.Exec(
 		`UPDATE pending_change SET entity_key = ? || substr(entity_key, ?)
-		 WHERE profile_id = ? AND entity_type = 'test_run' AND entity_key LIKE ?`,
+		 WHERE profile_id = ? AND entity_type IN ('test_run','test_run_iteration_import') AND entity_key LIKE ?`,
 		newKey, len(oldKey)+1, profileID, oldKey+":%",
 	); err != nil {
 		return fmt.Errorf("rewrite run-status pending rows: %w", err)
@@ -4244,6 +4244,9 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("remove container: %w", err)
 		}
+	case entityTestRunIterationImport:
+		// A deferred JUnit result has no local materialized value to restore.
+		// Discarding it only removes the queued instruction below.
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
 	}
@@ -4802,40 +4805,41 @@ func applyBulkOperation(op BulkEdit, current string) (string, error) {
 // Entity types for pending_change / audit_log rows. New ones get added
 // here so the switch/lookup code stays grep-friendly.
 const (
-	entityTestCase           = "test_case"
-	entityTestStep           = "test_step"
-	entityTestStepDelete     = "test_step_delete"
-	entityTestStepAdd        = "test_step_add"
-	entityTestStepOrder      = "test_step_order"
-	entityMembershipAdd      = "test_membership_add"
-	entityMembershipRemove   = "test_membership_remove"
-	entityContainerAdd       = "test_container_add"
-	entityContainerEdit      = "container_edit"
-	entityContainerDelete    = "container_delete"
-	entityContainerEnv       = "container_env"
-	entityPreconditionSet    = "precondition_set"
-	entityPreconditionEdit   = "precondition_edit"
-	entityPreconditionAdd    = "precondition_add"
-	entityPreconditionDelete = "precondition_delete"
-	entityCustomField        = "custom_field"
-	entityTestDataset        = "test_dataset"
-	entityFolderCreate       = "folder_create"
-	entityFolderRename       = "folder_rename"
-	entityFolderDelete       = "folder_delete"
-	entityTestCreate         = "test_create"
-	entityTestReview         = "test_review"
-	entityIssueComment       = "issue_comment"
-	entityTestRun            = "test_run"
-	entityTestRunIteration   = "test_run_iteration"
-	entityTestRunIterStep    = "test_run_iteration_step"
-	entityTestRunDefect      = "test_run_defect"
-	entityTestRunComment     = "test_run_comment"
-	entityRequirementSet     = "requirement_set"
-	entityRequirementEdit    = "requirement_edit"
-	entityRequirementDelete  = "requirement_delete"
-	entityRequirementCreate  = "requirement_create"
-	entityBugCreate          = "bug_create"
-	entityReqReqLinkSet      = "req_req_link_set"
+	entityTestCase               = "test_case"
+	entityTestStep               = "test_step"
+	entityTestStepDelete         = "test_step_delete"
+	entityTestStepAdd            = "test_step_add"
+	entityTestStepOrder          = "test_step_order"
+	entityMembershipAdd          = "test_membership_add"
+	entityMembershipRemove       = "test_membership_remove"
+	entityContainerAdd           = "test_container_add"
+	entityContainerEdit          = "container_edit"
+	entityContainerDelete        = "container_delete"
+	entityContainerEnv           = "container_env"
+	entityPreconditionSet        = "precondition_set"
+	entityPreconditionEdit       = "precondition_edit"
+	entityPreconditionAdd        = "precondition_add"
+	entityPreconditionDelete     = "precondition_delete"
+	entityCustomField            = "custom_field"
+	entityTestDataset            = "test_dataset"
+	entityFolderCreate           = "folder_create"
+	entityFolderRename           = "folder_rename"
+	entityFolderDelete           = "folder_delete"
+	entityTestCreate             = "test_create"
+	entityTestReview             = "test_review"
+	entityIssueComment           = "issue_comment"
+	entityTestRun                = "test_run"
+	entityTestRunIteration       = "test_run_iteration"
+	entityTestRunIterStep        = "test_run_iteration_step"
+	entityTestRunIterationImport = "test_run_iteration_import"
+	entityTestRunDefect          = "test_run_defect"
+	entityTestRunComment         = "test_run_comment"
+	entityRequirementSet         = "requirement_set"
+	entityRequirementEdit        = "requirement_edit"
+	entityRequirementDelete      = "requirement_delete"
+	entityRequirementCreate      = "requirement_create"
+	entityBugCreate              = "bug_create"
+	entityReqReqLinkSet          = "req_req_link_set"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via

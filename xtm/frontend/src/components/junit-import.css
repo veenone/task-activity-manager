@@ -55,3 +55,22 @@
 .junit-apply-error {
   margin-top: 0.5rem;
 }
+
+.junit-new-exec-picker {
+  align-self: flex-start;
+}
+
+.junit-skipped {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin-top: 0.75rem;
+}
+
+.junit-skipped summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.junit-skipped p {
+  margin: 0.35rem 0 0;
+}

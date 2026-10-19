@@ -34,7 +34,7 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--r-2);
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--modal-shadow);
 }
 
 .dataset-macro-option {
