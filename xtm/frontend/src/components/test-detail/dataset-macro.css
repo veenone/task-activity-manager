@@ -1,0 +1,76 @@
+.dataset-macro-field {
+  position: relative;
+  min-width: 0;
+}
+
+.dataset-macro-editor {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.dataset-macro-editor > .md-view,
+.dataset-macro-editor > textarea,
+.dataset-macro-editor > input {
+  min-width: 0;
+  flex: 1;
+}
+
+.dataset-macro-trigger {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+}
+
+.dataset-macro-menu {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: 100%;
+  right: 0;
+  display: grid;
+  min-width: 220px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.dataset-macro-option {
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dataset-macro-option:hover,
+.dataset-macro-option-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dataset-macro-option:focus-visible,
+.dataset-macro-trigger:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.dataset-macro-empty,
+.dataset-macro-warning {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.dataset-macro-empty {
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.dataset-macro-warning {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger-fg);
+}

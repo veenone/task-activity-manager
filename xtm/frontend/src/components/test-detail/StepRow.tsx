@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { EditTestStepField, DeleteTestStep, AddTestStep, errMsg } from "../../api";
-import type { PendingChange, Step } from "../../api";
+import type { DatasetParameter, PendingChange, Step } from "../../api";
 import { MarkdownField } from "../MarkdownField";
+import { DatasetMacroField } from "./DatasetMacroField";
 import { DirtyDot } from "./rows";
 
 type StepField = "action" | "data" | "expected";
@@ -10,6 +11,7 @@ interface StepRowProps {
   profileId: string;
   testKey: string;
   step: Step;
+  parameters?: DatasetParameter[];
   pendingForTest: PendingChange[];
   isFirst: boolean;
   isLast: boolean;
@@ -34,6 +36,7 @@ export function StepRow({
   profileId,
   testKey,
   step,
+  parameters = [],
   pendingForTest,
   isFirst,
   isLast,
@@ -169,7 +172,8 @@ export function StepRow({
         {readOnly ? (
           <p className="step-edit step-edit-action step-field-static">{action}</p>
         ) : (
-          <MarkdownField
+          <DatasetMacroField
+            parameters={parameters}
             className="step-edit step-edit-action"
             value={action}
             onChange={setAction}
@@ -224,7 +228,8 @@ export function StepRow({
         {readOnly ? (
           <p className="step-edit step-field-static">{data}</p>
         ) : (
-          <MarkdownField
+          <DatasetMacroField
+            parameters={parameters}
             className="step-edit"
             value={data}
             onChange={setData}
@@ -241,7 +246,8 @@ export function StepRow({
         {readOnly ? (
           <p className="step-edit step-field-static">{expected}</p>
         ) : (
-          <MarkdownField
+          <DatasetMacroField
+            parameters={parameters}
             className="step-edit"
             value={expected}
             onChange={setExpected}
