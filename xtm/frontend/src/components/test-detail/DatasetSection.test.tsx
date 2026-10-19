@@ -162,8 +162,8 @@ describe("DatasetSection", () => {
     await screen.findByText("USERNAME");
 
     await userEvent.click(screen.getByRole("button", { name: /^edit$/i }));
-    await userEvent.clear(screen.getByLabelText("Row 1, parameter 1"));
-    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "carol");
+    await userEvent.clear(screen.getByLabelText("Row 1, USERNAME"));
+    await userEvent.type(screen.getByLabelText("Row 1, USERNAME"), "carol");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     // Back to the table, showing the edit without a re-fetch.
