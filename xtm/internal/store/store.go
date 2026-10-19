@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 54
+const schemaVersion = 55
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -673,6 +673,38 @@ CREATE TABLE IF NOT EXISTS dataset_catalog_exec_plan (
 	exec_key   TEXT NOT NULL,
 	plan_key   TEXT NOT NULL,
 	PRIMARY KEY (profile_id, generation, exec_key, plan_key)
+);
+`
+
+const parameterizedRunSchema = `
+CREATE TABLE IF NOT EXISTS test_run_iteration (
+	profile_id         TEXT NOT NULL,
+	exec_key           TEXT NOT NULL,
+	test_key           TEXT NOT NULL,
+	iteration_id       TEXT NOT NULL,
+	run_id             TEXT NOT NULL,
+	rank               INTEGER NOT NULL,
+	status             TEXT NOT NULL,
+	run_status         TEXT NOT NULL,
+	dataset_source_kind TEXT NOT NULL,
+	dataset_source_key TEXT NOT NULL,
+	parameters_json    TEXT NOT NULL DEFAULT '[]',
+	PRIMARY KEY (profile_id, exec_key, test_key, iteration_id)
+);
+
+CREATE TABLE IF NOT EXISTS test_run_iteration_step (
+	profile_id        TEXT NOT NULL,
+	exec_key          TEXT NOT NULL,
+	test_key          TEXT NOT NULL,
+	iteration_id      TEXT NOT NULL,
+	step_result_id    TEXT NOT NULL,
+	step_definition_id TEXT NOT NULL,
+	rank              INTEGER NOT NULL,
+	status            TEXT NOT NULL,
+	action            TEXT NOT NULL DEFAULT '',
+	data              TEXT NOT NULL DEFAULT '',
+	expected          TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, exec_key, test_key, iteration_id, step_result_id)
 );
 `
 
@@ -1453,6 +1485,11 @@ func applyMigrations(db *sql.DB) error {
 	if current < 54 {
 		if _, err := db.Exec(datasetCatalogSchema); err != nil {
 			return fmt.Errorf("v54 create dataset catalog: %w", err)
+		}
+	}
+	if current < 55 {
+		if _, err := db.Exec(parameterizedRunSchema); err != nil {
+			return fmt.Errorf("v55 create parameterized run cache: %w", err)
 		}
 	}
 	return nil

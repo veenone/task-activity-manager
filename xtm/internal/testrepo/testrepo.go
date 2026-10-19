@@ -4826,6 +4826,8 @@ const (
 	entityTestReview         = "test_review"
 	entityIssueComment       = "issue_comment"
 	entityTestRun            = "test_run"
+	entityTestRunIteration   = "test_run_iteration"
+	entityTestRunIterStep    = "test_run_iteration_step"
 	entityTestRunDefect      = "test_run_defect"
 	entityTestRunComment     = "test_run_comment"
 	entityRequirementSet     = "requirement_set"

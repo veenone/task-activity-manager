@@ -66,6 +66,8 @@ func TestPurgeProfileLeavesNoProfileRowBehind(t *testing.T) {
 		"dataset_catalog_definition",
 		"dataset_catalog_usage",
 		"dataset_catalog_exec_plan",
+		"test_run_iteration",
+		"test_run_iteration_step",
 	} {
 		if !containsTable(tables, want) {
 			t.Errorf("profile-keyed tables missing %s", want)

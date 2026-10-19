@@ -52,6 +52,8 @@ var profileScopedTables = []string{
 	// Execution data pulled back from the backend.
 	"external_test",
 	"test_run",
+	"test_run_iteration",
+	"test_run_iteration_step",
 	"exec_plan",
 
 	// Coverage parameters, their values and what they publish to.
