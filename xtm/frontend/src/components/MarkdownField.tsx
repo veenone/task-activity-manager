@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { Markdown } from "./Markdown";
 
@@ -17,21 +24,45 @@ interface Props {
   className?: string;
 }
 
+export interface MarkdownFieldHandle {
+  insertText(text: string, range?: { start: number; end: number }): void;
+  focus(): void;
+}
+
 // MarkdownField shows its value as rendered markdown, and switches to a raw
 // editor when the user clicks or tabs into it — committing on blur. This keeps
 // editing exactly as it was (plain text, save-on-blur) while giving readers a
 // formatted view of descriptions and step text.
-export function MarkdownField({
-  value,
-  onChange,
-  onCommit,
-  placeholder,
-  rows = 4,
-  multiline = true,
-  className,
-}: Props) {
+export const MarkdownField = forwardRef<MarkdownFieldHandle, Props>(function MarkdownField(
+  {
+    value,
+    onChange,
+    onCommit,
+    placeholder,
+    rows = 4,
+    multiline = true,
+    className,
+  },
+  handleRef,
+) {
   const [editing, setEditing] = useState(false);
-  const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  const ref = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
+  const pendingCaret = useRef<number | null>(null);
+
+  useImperativeHandle(handleRef, () => ({
+    insertText(text, range) {
+      const editor = ref.current;
+      const start = range?.start ?? editor?.selectionStart ?? value.length;
+      const end = range?.end ?? editor?.selectionEnd ?? start;
+      pendingCaret.current = start + text.length;
+      setEditing(true);
+      onChange(value.slice(0, start) + text + value.slice(end));
+    },
+    focus() {
+      setEditing(true);
+      ref.current?.focus();
+    },
+  }), [onChange, value]);
 
   // On entering edit mode, focus the editor and drop the caret at the end.
   useEffect(() => {
@@ -43,6 +74,15 @@ export function MarkdownField({
     }
   }, [editing]);
 
+  useLayoutEffect(() => {
+    const caret = pendingCaret.current;
+    const editor = ref.current;
+    if (!editing || caret === null || !editor) return;
+    editor.focus();
+    editor.setSelectionRange(caret, caret);
+    pendingCaret.current = null;
+  }, [editing, value]);
+
   function finishEditing() {
     setEditing(false);
     onCommit();
@@ -50,11 +90,13 @@ export function MarkdownField({
 
   if (editing) {
     const shared = {
-      ref,
+      ref: (element: HTMLTextAreaElement | HTMLInputElement | null) => {
+        ref.current = element;
+      },
       value,
       className,
       placeholder,
-      onChange: (e: React.ChangeEvent<HTMLTextAreaElement & HTMLInputElement>) =>
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) =>
         onChange(e.target.value),
       onBlur: finishEditing,
     };
@@ -95,4 +137,5 @@ export function MarkdownField({
       )}
     </div>
   );
-}
+  },
+);
