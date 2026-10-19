@@ -14,8 +14,9 @@ nothing reaches it until you press Commit.
 TAM shares its connection profiles with Xray Test Manager, so a project set up
 in one app is already set up in the other.
 
-> **About the figures in this guide.** There are none yet. Where a section
-> names a button or a column, the name is the one on screen.
+> **About the figures in this guide.** They are captured from a demo profile,
+> so the keys start with `DEMO-` and the data is generated. Your field set and
+> issue types will differ.
 >
 > **Reading this on screen.** The same material is split one page per view in
 > [this folder](README.md), which is easier to navigate and is where edits are
@@ -146,6 +147,8 @@ When there is uncommitted work, a **N pending** button appears in the top bar.
 3. **Discard all** reverts everything, after a confirmation.
 4. **Commit (N)** sends what can be sent. The number is what Commit will push.
 
+![The Pending changes dialog over the board, holding one status move](images/getting-started-01-pending.png)
+
 A banner afterwards says what went, what failed and what was held back.
 Commit again to retry the failures.
 
@@ -165,6 +168,8 @@ Changes to other issues in the same commit still go.
 
 The project's whole issue list: a filter bar, a grid in rank order, and a
 detail panel for whatever is selected.
+
+![The Backlog: filter bar, grid and pager](images/backlog-01-grid.png)
 
 ### Finding issues
 
@@ -277,6 +282,8 @@ The bar above the board carries **Board**, **Filter** (a key, an assignee or a
 type), **Sprint** on a scrum board, and **Swimlanes** (None, Assignee or
 Epic). **Refresh** re-reads the board from Jira.
 
+![A board with its columns, cards and limits](images/boards-01-view.png)
+
 ### Moving a card
 
 Drag it to another column, to another place in the same column, or onto a
@@ -377,10 +384,13 @@ line, because the numbers mean nothing without it:
 leaves no trace to count. Where Jira returned only part of a card's history,
 the report names the cards and says those figures are not exact.
 
-Three charts, each with its numbers written beside it: **burndown** over the
-sprint's days, **outcome** (completed against carried over), and **velocity**
-across recent closed sprints. A velocity table lists those sprints with what
-each committed and completed.
+![A closed sprint's report, with its figures and burndowns](images/reports-01-sprint.png)
+
+Four charts, each with its numbers written beside it: **burndown** over the
+sprint's days in points, **burndown in hours** against logged and remaining
+time, **sprint outcome** as bars, and **velocity** across recent closed
+sprints. A velocity table lists those sprints with what each committed and
+completed, and a column capacity table follows it.
 
 A stored report opens instantly, including with Jira unreachable. **Rebuild
 from Jira** reconstructs it from the changelog, holds the profile's lock while
@@ -403,9 +413,11 @@ Settings…**. None of them touches Jira.
 A dashboard is one of your saved Jira filters, counted and kept.
 
 Pick a filter from **Saved filter** and add it. Each panel shows **Issues**,
-**Points**, **Estimated** and **Logged**, rankings **By status** and **By
-assignee**, and when it was last counted. A panel that has never run says
-**Not counted yet**.
+**Points**, **Estimated** and **Logged**, rankings **By status**, **By type**
+and **By assignee**, and when it was last counted. A panel that has never run
+says **Not counted yet**.
+
+![Two dashboards, each counting one saved filter](images/dashboards-01-view.png)
 
 The figures are a snapshot, not a live query, so a dashboard says the same
 thing with Jira unreachable and the same thing again a week later. **Refresh**
@@ -422,6 +434,8 @@ Pick a **Board** and a **Sprint** and the documents appear: **Overview**, and
 beneath it **Planning**, **Standup**, **Review** and **Retrospective**.
 Alongside them is the **Done agreement**, the team's definition of done, kept
 at board level with any additions this sprint made.
+
+![The Rituals view: the sprint's pages and the editor](images/rituals-01-view.png)
 
 The editor has headings, bullet and numbered lists, tables and links. A
 Confluence macro the editor cannot safely change, such as a Jira issue list, is

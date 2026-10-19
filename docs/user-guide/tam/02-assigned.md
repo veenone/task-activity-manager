@@ -4,6 +4,8 @@ The same grid the [Backlog](01-backlog.md) uses, narrowed to the issues assigned
 
 The line above the grid names the account it matched and counts what it found, for example `Assigned to jsmith (Jane Smith) · 14 issues`.
 
+![Assigned to me, with the header naming the matched account](images/assigned-01-view.png)
+
 ## Two things this view does differently
 
 **It knows who you are from the connection, not from a setting.** TAM learns your Jira username when it syncs or when you test the connection. Before that it cannot narrow anything, so the view says so and offers **Sync** and **Test connection** rather than listing the whole project.

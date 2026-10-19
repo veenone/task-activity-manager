@@ -2,6 +2,8 @@
 
 The Epics view is the project as a tree: each epic with the issues that hang off it, and the issues that hang off nothing. It answers how much of a piece of work has landed, which the flat backlog cannot show.
 
+![The Epics tree, with progress per epic](images/epics-01-tree.png)
+
 ## The tree
 
 Each epic is a row with its key, its summary and its progress: a bar and a count, for example `7 of 12 done, 21 of 34 pts`. The points half only appears when the issues carry estimates. Open an epic to see its children; a child with subtasks opens again.

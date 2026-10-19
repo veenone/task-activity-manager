@@ -2,6 +2,8 @@
 
 A dashboard is one of your saved Jira filters, counted and kept. The view holds as many as you pin, and each panel says what its filter matched the last time it was run.
 
+![Two dashboards, each counting one saved filter](images/dashboards-01-view.png)
+
 ## Add one
 
 Pick a filter from **Saved filter** and add it. The list is the filters your Jira account can see; TAM does not create or edit them.
@@ -9,7 +11,7 @@ Pick a filter from **Saved filter** and add it. The list is the filters your Jir
 ## What a panel shows
 
 - **Issues**, **Points**, **Estimated** and **Logged** for everything the filter matched.
-- **By status** and **By assignee**, as rankings. A panel draws the top few rows rather than every status a large filter touches, which would stop it being a ranking.
+- **By status**, **By type** and **By assignee**, as rankings. A panel draws the top few rows rather than every status a large filter touches, which would stop it being a ranking.
 - When it was last counted. A panel that has never run says **Not counted yet**.
 
 ## Refresh is yours to press

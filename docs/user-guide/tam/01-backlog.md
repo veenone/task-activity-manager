@@ -2,6 +2,8 @@
 
 The Backlog is the project's whole issue list: a filter bar, a grid in rank order, and a detail panel for whatever is selected. It is where issues are created, edited, imported and exported.
 
+![The Backlog: filter bar, grid and pager](images/backlog-01-grid.png)
+
 ## Find issues
 
 The filter bar sits above the grid, and every control in it narrows the same query.
@@ -27,6 +29,8 @@ The page size is a reading preference and survives a profile switch; the filters
 ## Read and edit an issue
 
 Click a row and the detail panel opens on the right. Drag its left edge to resize it.
+
+![The detail panel open beside the grid](images/backlog-02-detail.png)
 
 The top of the panel carries the key, the type, the status, the sprint, the reporter and the updated date, with the time tracking figures under them: estimated, logged and remaining, with a bar. An issue Jira does not track time on says so rather than showing zeros.
 

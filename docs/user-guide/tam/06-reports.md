@@ -4,6 +4,8 @@ The Reports view is what a sprint review starts with: how much the team committe
 
 Pick a **Board** and a **Sprint**. A board defaults to its most recently closed sprint, which is the report you want the morning after a sprint ends, or to the active one when nothing has closed yet.
 
+![A closed sprint's report, with its figures and burndowns](images/reports-01-sprint.png)
+
 ## The sprint report
 
 The summary sentence names the sprint and gives the figures: committed, added, removed, completed and carried over, in points or in cards, with the completion rate.
@@ -16,15 +18,18 @@ Two more qualifications appear when they apply. **Committed is a minimum**, beca
 
 ### The charts
 
-Three, each with its numbers written beside it so no figure is only available as a picture:
+Four, each with its numbers written beside it so no figure is only available as a picture:
 
-- **Burndown** over the sprint's days.
-- **Outcome**: completed against carried over.
+- **Burndown** over the sprint's days, in points.
+- **Burndown in hours**, the same days against logged and remaining time.
+- **Sprint outcome**: committed, added, removed, completed and carried over as bars.
 - **Velocity** across the last closed sprints.
 
-### Velocity
+### Velocity and capacity
 
 A table of the recent closed sprints with what each committed and completed. Committed is a minimum in every row, for the same reason it is in the summary, and the table says so.
+
+**Column capacity** follows: the board's columns against their limits, with each limit attributed to Jira or to this team, and a line naming any column over its limit.
 
 ### Rebuilding
 
@@ -36,7 +41,9 @@ The same sprint, by person: who carried what, with the time bars, opening to the
 
 ## Boards with no sprints
 
-A kanban board has no sprint to report on, so this view shows its columns against their limits instead, and the open work per assignee. The limits carry the same attribution the board uses: **from Jira** for the board's own configuration, **set in TAM** for one this team set.
+A kanban board has no sprint to report on, so this view shows its columns against their limits instead, and the open work per assignee: cards, points, estimate, actual and remaining, with a bar per person. The limits carry the same attribution the board uses: **from Jira** for the board's own configuration, **set in TAM** for one this team set.
+
+![A kanban board's report: column capacity and board allocation](images/reports-02-kanban.png)
 
 ## Publishing
 

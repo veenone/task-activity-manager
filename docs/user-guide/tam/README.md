@@ -43,4 +43,4 @@ Everything else in these guides assumes that loop. [Getting started](00-getting-
 
 ## About the figures
 
-These pages have no screenshots yet. Where a guide names a button or a column, the name is the one on screen.
+The screenshots come from a demo profile, so the keys start with `DEMO-` and the data is generated. See [Demo mode](00-getting-started.md#3-demo-mode-try-it-without-jira) for how to get the same window.

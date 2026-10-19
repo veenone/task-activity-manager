@@ -2,6 +2,8 @@
 
 The Boards view is your Jira board: its columns, the cards in them, and the sprint ceremonies. Moving a card here changes the local cache and queues a pending change, so a board can be rearranged as often as you like and only the result is sent to Jira.
 
+![A board with its columns, cards and limits](images/boards-01-view.png)
+
 ## Choose what you are looking at
 
 The bar above the board carries:
@@ -63,5 +65,7 @@ All three are queued, not sent. Nothing reaches Jira until Commit, which is also
 The list of unfinished cards in the Complete dialog is a preview built from the cache. Commit reads Jira again and moves whatever is unfinished then, so the two can differ if somebody closed a card in the meantime. Where the board is not drawing every card, the dialog says how many it cannot name.
 
 ## While work is pending
+
+![A card moved to another column, waiting for a commit](images/boards-02-pending-move.png)
 
 A card with an uncommitted move carries a pending mark, and a banner above the board says how much is waiting. Completing a sprint while other changes are pending asks you to commit first, because the completion is read against what Jira holds rather than what your screen shows.

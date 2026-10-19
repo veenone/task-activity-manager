@@ -2,6 +2,8 @@
 
 The Boards view answers where a card is. This one answers what is in a sprint and what happens to it next: every sprint a board has, the work each one carries, and every action a sprint has, on one screen.
 
+![The Sprints view: a board's sprints with the work in each](images/sprints-01-view.png)
+
 ## The list
 
 Pick a **Board** and the sprints appear as a tree: a sprint, and the issues in it beneath. The board's unassigned work is folded in as a row of its own, so nothing on the board is missing from this page.

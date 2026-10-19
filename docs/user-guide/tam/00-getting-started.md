@@ -52,6 +52,8 @@ The status bar at the bottom shows progress while it runs, then the issue count 
 When you have uncommitted work, a **N pending** button appears in the top bar.
 
 1. Press it to open **Pending changes (N)**. Rows are grouped by issue, and each shows the field, the value before and the value after. A sprint drafted here, a card moved between columns and a sprint waiting to be completed all appear as rows of their own.
+
+   ![The Pending changes dialog over the board, holding one status move](images/getting-started-01-pending.png)
 2. **Discard** on a row throws that one change away. Nothing in Jira is touched.
 3. **Discard all** reverts everything, after a confirmation.
 4. **Commit (N)** sends everything that can be sent. The number is what Commit will actually push.

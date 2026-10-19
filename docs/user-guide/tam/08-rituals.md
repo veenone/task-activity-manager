@@ -4,6 +4,8 @@ A team's ceremonies usually leave a trail of Confluence pages: planning notes, a
 
 It needs the **Confluence Rituals** settings on the profile. Without them the view says so and does nothing else.
 
+![The Rituals view: the sprint's pages and the editor](images/rituals-01-view.png)
+
 ## What a sprint has
 
 Pick a **Board** and a **Sprint**, and the documents appear:
