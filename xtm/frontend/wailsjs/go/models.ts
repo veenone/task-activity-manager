@@ -2791,56 +2791,20 @@ export namespace testrepo {
 		    return a;
 		}
 	}
-	export class JUnitSkip {
-	    testcase: string;
-	    reason: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new JUnitSkip(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.testcase = source["testcase"];
-	        this.reason = source["reason"];
-	    }
-	}
-	export class JUnitMatch {
-	    testcase: string;
-	    testKey: string;
-	    summary: string;
-	    result: string;
+	export class JUnitIterationCandidate {
+	    iterationId: string;
+	    parameters: backend.IterationParameter[];
 	    currentRun: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new JUnitMatch(source);
+	        return new JUnitIterationCandidate(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.testcase = source["testcase"];
-	        this.testKey = source["testKey"];
-	        this.summary = source["summary"];
-	        this.result = source["result"];
+	        this.iterationId = source["iterationId"];
+	        this.parameters = this.convertValues(source["parameters"], backend.IterationParameter);
 	        this.currentRun = source["currentRun"];
-	    }
-	}
-	export class JUnitImportPreview {
-	    execKey: string;
-	    total: number;
-	    matched: JUnitMatch[];
-	    skipped: JUnitSkip[];
-	
-	    static createFrom(source: any = {}) {
-	        return new JUnitImportPreview(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.execKey = source["execKey"];
-	        this.total = source["total"];
-	        this.matched = this.convertValues(source["matched"], JUnitMatch);
-	        this.skipped = this.convertValues(source["skipped"], JUnitSkip);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2861,6 +2825,146 @@ export namespace testrepo {
 		    return a;
 		}
 	}
+	export class JUnitMapping {
+	    testcase: string;
+	    included: boolean;
+	    reason: string;
+	    candidateIterations: JUnitIterationCandidate[];
+	    match?: JUnitMatch;
+	
+	    static createFrom(source: any = {}) {
+	        return new JUnitMapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testcase = source["testcase"];
+	        this.included = source["included"];
+	        this.reason = source["reason"];
+	        this.candidateIterations = this.convertValues(source["candidateIterations"], JUnitIterationCandidate);
+	        this.match = this.convertValues(source["match"], JUnitMatch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class JUnitSkip {
+	    testcase: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new JUnitSkip(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testcase = source["testcase"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class JUnitMatch {
+	    testcase: string;
+	    testKey: string;
+	    summary: string;
+	    result: string;
+	    currentRun: string;
+	    targetKind: string;
+	    iterationId: string;
+	    parameters: backend.IterationParameter[];
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new JUnitMatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testcase = source["testcase"];
+	        this.testKey = source["testKey"];
+	        this.summary = source["summary"];
+	        this.result = source["result"];
+	        this.currentRun = source["currentRun"];
+	        this.targetKind = source["targetKind"];
+	        this.iterationId = source["iterationId"];
+	        this.parameters = this.convertValues(source["parameters"], backend.IterationParameter);
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class JUnitImportPreview {
+	    execKey: string;
+	    total: number;
+	    matched: JUnitMatch[];
+	    skipped: JUnitSkip[];
+	    mappings: JUnitMapping[];
+	
+	    static createFrom(source: any = {}) {
+	        return new JUnitImportPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.execKey = source["execKey"];
+	        this.total = source["total"];
+	        this.matched = this.convertValues(source["matched"], JUnitMatch);
+	        this.skipped = this.convertValues(source["skipped"], JUnitSkip);
+	        this.mappings = this.convertValues(source["mappings"], JUnitMapping);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	
 	export class JUnitNewExecRow {
 	    testcase: string;

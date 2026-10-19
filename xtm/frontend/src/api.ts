@@ -215,8 +215,6 @@ export {
   GetRunRollup,
   GetRunRollupBreakdown,
   GetExecutionMembersWithRuns,
-  AnalyzeJUnitImport,
-  ApplyJUnitImport,
   AnalyzeJUnitImportNewExec,
   ApplyJUnitImportNewExec,
   AnalyzeRequirementImport,
@@ -285,6 +283,8 @@ import {
   ListDatasetCatalog as listDatasetCatalogBinding,
   GetDatasetCatalogDetail as getDatasetCatalogDetailBinding,
   GetParameterizedRun as getParameterizedRunBinding,
+  AnalyzeJUnitImport as analyzeJUnitImportBinding,
+  ApplyJUnitImport as applyJUnitImportBinding,
 } from "../wailsjs/go/main/App";
 import { testrepo } from "../wailsjs/go/models";
 
@@ -352,6 +352,26 @@ export async function GetParameterizedRun(
     testKey,
     forceRefresh,
   ) as Promise<ParameterizedRun>;
+}
+
+export async function AnalyzeJUnitImport(
+  profileId: string,
+  execKey: string,
+  xmlBase64: string,
+): Promise<JUnitImportPreview> {
+  return analyzeJUnitImportBinding(profileId, execKey, xmlBase64) as unknown as Promise<JUnitImportPreview>;
+}
+
+export async function ApplyJUnitImport(
+  profileId: string,
+  execKey: string,
+  matches: JUnitMatch[],
+): Promise<BulkEditResult> {
+  return applyJUnitImportBinding(
+    profileId,
+    execKey,
+    matches.map((match) => testrepo.JUnitMatch.createFrom(match)),
+  ) as Promise<BulkEditResult>;
 }
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -1806,6 +1826,25 @@ export interface JUnitMatch {
   summary: string;
   result: string; // "PASS" | "FAIL"
   currentRun: string;
+  targetKind: "run" | "iteration";
+  iterationId: string;
+  parameters: IterationParameter[];
+  datasetSourceKind: "test" | "plan" | "execution" | "";
+  datasetSourceKey: string;
+}
+
+export interface JUnitIterationCandidate {
+  iterationId: string;
+  parameters: IterationParameter[];
+  currentRun: string;
+}
+
+export interface JUnitMapping {
+  testcase: string;
+  included: boolean;
+  reason: string;
+  candidateIterations: JUnitIterationCandidate[];
+  match?: JUnitMatch;
 }
 
 // JUnitSkip mirrors testrepo.JUnitSkip -- a testcase skipped with a reason.
@@ -1820,6 +1859,7 @@ export interface JUnitImportPreview {
   total: number;
   matched: JUnitMatch[];
   skipped: JUnitSkip[];
+  mappings: JUnitMapping[];
 }
 
 // JUnitNewExecRow mirrors testrepo.JUnitNewExecRow -- one testcase row in a

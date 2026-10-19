@@ -3362,6 +3362,19 @@ func (a *App) ApplyJUnitImport(profileID, execKey string, matches []testrepo.JUn
 	if err := a.requireStore(); err != nil {
 		return testrepo.BulkEditResult{}, err
 	}
+	for _, match := range matches {
+		if match.TargetKind != testrepo.JUnitTargetIteration {
+			continue
+		}
+		b, backendErr := a.backendFor(profileID)
+		if backendErr != nil {
+			return testrepo.BulkEditResult{}, backendErr
+		}
+		if !b.Capabilities().SupportsParameterizedRunWrites {
+			return testrepo.BulkEditResult{}, backend.ErrUnsupported
+		}
+		break
+	}
 	return a.repo.ApplyJUnitImport(profileID, execKey, matches)
 }
 

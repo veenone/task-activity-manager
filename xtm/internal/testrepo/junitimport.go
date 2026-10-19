@@ -27,14 +27,30 @@ type JUnitProperty struct {
 // JUnitMatch is one testcase matched to a single member test of the execution,
 // with the run result it will set.
 type JUnitMatch struct {
-	Testcase    string                       `json:"testcase"`
-	TestKey     string                       `json:"testKey"`
-	Summary     string                       `json:"summary"`
-	Result      string                       `json:"result"`     // "PASS" or "FAIL"
-	CurrentRun  string                       `json:"currentRun"` // the test's current run status in this execution
-	TargetKind  JUnitTargetKind              `json:"targetKind"`
+	Testcase          string                       `json:"testcase"`
+	TestKey           string                       `json:"testKey"`
+	Summary           string                       `json:"summary"`
+	Result            string                       `json:"result"`     // "PASS" or "FAIL"
+	CurrentRun        string                       `json:"currentRun"` // the test's current run status in this execution
+	TargetKind        JUnitTargetKind              `json:"targetKind"`
+	IterationID       string                       `json:"iterationId"`
+	Parameters        []backend.IterationParameter `json:"parameters"`
+	DatasetSourceKind backend.DatasetSourceKind    `json:"datasetSourceKind"`
+	DatasetSourceKey  string                       `json:"datasetSourceKey"`
+}
+
+type JUnitIterationCandidate struct {
 	IterationID string                       `json:"iterationId"`
 	Parameters  []backend.IterationParameter `json:"parameters"`
+	CurrentRun  string                       `json:"currentRun"`
+}
+
+type JUnitMapping struct {
+	Testcase            string                    `json:"testcase"`
+	Included            bool                      `json:"included"`
+	Reason              string                    `json:"reason"`
+	CandidateIterations []JUnitIterationCandidate `json:"candidateIterations"`
+	Match               *JUnitMatch               `json:"match,omitempty"`
 }
 
 // JUnitSkip is a testcase that will not be applied, with the reason.
@@ -46,10 +62,11 @@ type JUnitSkip struct {
 // JUnitImportPreview is the result of analyzing a JUnit report against an
 // execution.
 type JUnitImportPreview struct {
-	ExecKey string       `json:"execKey"`
-	Total   int          `json:"total"`
-	Matched []JUnitMatch `json:"matched"`
-	Skipped []JUnitSkip  `json:"skipped"`
+	ExecKey  string         `json:"execKey"`
+	Total    int            `json:"total"`
+	Matched  []JUnitMatch   `json:"matched"`
+	Skipped  []JUnitSkip    `json:"skipped"`
+	Mappings []JUnitMapping `json:"mappings"`
 }
 
 // junitTestSuites is the root element when the XML wraps suites inside
@@ -243,9 +260,10 @@ func isExecMember(db *sql.DB, profileID, execKey, testKey string) (bool, error) 
 // in the report). The caller can then pass Matched to ApplyJUnitImport.
 func (r *Repository) AnalyzeJUnitImport(profileID, execKey, xmlBase64 string) (JUnitImportPreview, error) {
 	preview := JUnitImportPreview{
-		ExecKey: execKey,
-		Matched: []JUnitMatch{},
-		Skipped: []JUnitSkip{},
+		ExecKey:  execKey,
+		Matched:  []JUnitMatch{},
+		Skipped:  []JUnitSkip{},
+		Mappings: []JUnitMapping{},
 	}
 
 	xmlBytes, err := base64.StdEncoding.DecodeString(xmlBase64)
@@ -278,22 +296,26 @@ func (r *Repository) AnalyzeJUnitImport(profileID, execKey, xmlBase64 string) (J
 		result, skipped := junitResult(tc)
 
 		if skipped {
-			preview.Skipped = append(preview.Skipped, JUnitSkip{
+			skip := JUnitSkip{
 				Testcase: tc.Name,
 				Reason:   "skipped in the report; run left unchanged",
-			})
+			}
+			preview.Skipped = append(preview.Skipped, skip)
+			preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: false, Reason: skip.Reason, CandidateIterations: []JUnitIterationCandidate{}})
 			continue
 		}
 
 		hits := byName[strings.ToLower(strings.TrimSpace(tc.Name))]
 		switch len(hits) {
 		case 0:
-			preview.Skipped = append(preview.Skipped, JUnitSkip{
+			skip := JUnitSkip{
 				Testcase: tc.Name,
 				Reason:   "no matching test in this execution",
-			})
+			}
+			preview.Skipped = append(preview.Skipped, skip)
+			preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: false, Reason: skip.Reason, CandidateIterations: []JUnitIterationCandidate{}})
 		case 1:
-			preview.Matched = append(preview.Matched, JUnitMatch{
+			match := JUnitMatch{
 				Testcase:   tc.Name,
 				TestKey:    hits[0].testKey,
 				Summary:    hits[0].summary,
@@ -301,16 +323,56 @@ func (r *Repository) AnalyzeJUnitImport(profileID, execKey, xmlBase64 string) (J
 				CurrentRun: hits[0].runStatus,
 				TargetKind: JUnitTargetRun,
 				Parameters: []backend.IterationParameter{},
-			})
+			}
+			if run, found, readErr := r.ParameterizedRun(profileID, execKey, hits[0].testKey); readErr != nil {
+				return preview, readErr
+			} else if found {
+				candidates := junitIterationCandidates(run)
+				iterationID, signature, reason := matchIteration(tc.Properties, run)
+				if reason != "" {
+					preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: true, Reason: reason, CandidateIterations: candidates})
+					continue
+				}
+				match.TargetKind = JUnitTargetIteration
+				match.IterationID = iterationID
+				match.Parameters = signature
+				match.DatasetSourceKind = run.DatasetSourceKind
+				match.DatasetSourceKey = run.DatasetSourceKey
+				for _, candidate := range candidates {
+					if candidate.IterationID == iterationID {
+						match.CurrentRun = candidate.CurrentRun
+						break
+					}
+				}
+				preview.Matched = append(preview.Matched, match)
+				preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: true, CandidateIterations: candidates, Match: &match})
+				continue
+			}
+			preview.Matched = append(preview.Matched, match)
+			preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: true, CandidateIterations: []JUnitIterationCandidate{}, Match: &match})
 		default:
-			preview.Skipped = append(preview.Skipped, JUnitSkip{
+			skip := JUnitSkip{
 				Testcase: tc.Name,
 				Reason:   fmt.Sprintf("ambiguous: %d tests share this summary", len(hits)),
-			})
+			}
+			preview.Skipped = append(preview.Skipped, skip)
+			preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: false, Reason: skip.Reason, CandidateIterations: []JUnitIterationCandidate{}})
 		}
 	}
 
 	return preview, nil
+}
+
+func junitIterationCandidates(run backend.ParameterizedRun) []JUnitIterationCandidate {
+	candidates := make([]JUnitIterationCandidate, len(run.Iterations))
+	for index, iteration := range run.Iterations {
+		candidates[index] = JUnitIterationCandidate{
+			IterationID: iteration.ID,
+			Parameters:  append([]backend.IterationParameter(nil), iteration.Parameters...),
+			CurrentRun:  iteration.Status,
+		}
+	}
+	return candidates
 }
 
 // JUnitNewExecRow is one testcase mapped to a test that will be placed in the
@@ -533,6 +595,21 @@ func (r *Repository) ApplyJUnitImportNewExec(profileID, projectKey, summary stri
 // execution is reported as failed.
 func (r *Repository) ApplyJUnitImport(profileID, execKey string, matches []JUnitMatch) (BulkEditResult, error) {
 	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
+	seenTargets := make(map[string]struct{}, len(matches))
+	for _, match := range matches {
+		kind := match.TargetKind
+		if kind == "" {
+			kind = JUnitTargetRun
+		}
+		target := string(kind) + ":" + match.TestKey
+		if kind == JUnitTargetIteration {
+			target += ":" + match.IterationID
+		}
+		if _, duplicate := seenTargets[target]; duplicate {
+			return result, fmt.Errorf("duplicate JUnit target %s", target)
+		}
+		seenTargets[target] = struct{}{}
+	}
 
 	for _, m := range matches {
 		switch m.Result {
@@ -559,6 +636,22 @@ func (r *Repository) ApplyJUnitImport(profileID, execKey string, matches []JUnit
 			continue
 		}
 
+		kind := m.TargetKind
+		if kind == "" {
+			kind = JUnitTargetRun
+		}
+		if kind == JUnitTargetIteration {
+			if err := r.applyJUnitIteration(profileID, execKey, m); err != nil {
+				result.Failed = append(result.Failed, BulkFailure{TestKey: m.TestKey, Error: err.Error()})
+				continue
+			}
+			result.Succeeded = append(result.Succeeded, m.TestKey)
+			continue
+		}
+		if kind != JUnitTargetRun {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: m.TestKey, Error: fmt.Sprintf("invalid JUnit target kind %q", kind)})
+			continue
+		}
 		if err := r.SetTestRunStatus(profileID, execKey, m.TestKey, m.Result); err != nil {
 			result.Failed = append(result.Failed, BulkFailure{TestKey: m.TestKey, Error: err.Error()})
 			continue
@@ -567,4 +660,39 @@ func (r *Repository) ApplyJUnitImport(profileID, execKey string, matches []JUnit
 	}
 
 	return result, nil
+}
+
+func (r *Repository) applyJUnitIteration(profileID, execKey string, match JUnitMatch) error {
+	run, found, err := r.ParameterizedRun(profileID, execKey, match.TestKey)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("parameterized run is no longer available")
+	}
+	if run.DatasetSourceKind != match.DatasetSourceKind || run.DatasetSourceKey != match.DatasetSourceKey {
+		return fmt.Errorf("dataset source changed after preview")
+	}
+	for _, iteration := range run.Iterations {
+		if iteration.ID != match.IterationID {
+			continue
+		}
+		if !sameIterationParameters(iteration.Parameters, match.Parameters) {
+			return fmt.Errorf("dataset signature changed after preview")
+		}
+		return r.SetIterationStatus(profileID, execKey, match.TestKey, match.IterationID, match.Result)
+	}
+	return fmt.Errorf("dataset iteration is no longer available")
+}
+
+func sameIterationParameters(left, right []backend.IterationParameter) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index].Name != right[index].Name || left[index].Value != right[index].Value {
+			return false
+		}
+	}
+	return true
 }
