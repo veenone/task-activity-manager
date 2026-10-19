@@ -1841,8 +1841,13 @@ export interface JUnitIterationCandidate {
 
 export interface JUnitMapping {
   testcase: string;
+  testKey: string;
+  summary: string;
+  result: string;
   included: boolean;
   reason: string;
+  datasetSourceKind: "test" | "plan" | "execution" | "";
+  datasetSourceKey: string;
   candidateIterations: JUnitIterationCandidate[];
   match?: JUnitMatch;
 }

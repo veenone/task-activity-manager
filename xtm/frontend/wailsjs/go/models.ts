@@ -2827,8 +2827,13 @@ export namespace testrepo {
 	}
 	export class JUnitMapping {
 	    testcase: string;
+	    testKey: string;
+	    summary: string;
+	    result: string;
 	    included: boolean;
 	    reason: string;
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
 	    candidateIterations: JUnitIterationCandidate[];
 	    match?: JUnitMatch;
 	
@@ -2839,8 +2844,13 @@ export namespace testrepo {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.testcase = source["testcase"];
+	        this.testKey = source["testKey"];
+	        this.summary = source["summary"];
+	        this.result = source["result"];
 	        this.included = source["included"];
 	        this.reason = source["reason"];
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
 	        this.candidateIterations = this.convertValues(source["candidateIterations"], JUnitIterationCandidate);
 	        this.match = this.convertValues(source["match"], JUnitMatch);
 	    }

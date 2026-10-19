@@ -47,8 +47,13 @@ type JUnitIterationCandidate struct {
 
 type JUnitMapping struct {
 	Testcase            string                    `json:"testcase"`
+	TestKey             string                    `json:"testKey"`
+	Summary             string                    `json:"summary"`
+	Result              string                    `json:"result"`
 	Included            bool                      `json:"included"`
 	Reason              string                    `json:"reason"`
+	DatasetSourceKind   backend.DatasetSourceKind `json:"datasetSourceKind"`
+	DatasetSourceKey    string                    `json:"datasetSourceKey"`
 	CandidateIterations []JUnitIterationCandidate `json:"candidateIterations"`
 	Match               *JUnitMatch               `json:"match,omitempty"`
 }
@@ -330,7 +335,11 @@ func (r *Repository) AnalyzeJUnitImport(profileID, execKey, xmlBase64 string) (J
 				candidates := junitIterationCandidates(run)
 				iterationID, signature, reason := matchIteration(tc.Properties, run)
 				if reason != "" {
-					preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: true, Reason: reason, CandidateIterations: candidates})
+					preview.Mappings = append(preview.Mappings, JUnitMapping{
+						Testcase: tc.Name, TestKey: hits[0].testKey, Summary: hits[0].summary, Result: result,
+						Included: true, Reason: reason, CandidateIterations: candidates,
+						DatasetSourceKind: run.DatasetSourceKind, DatasetSourceKey: run.DatasetSourceKey,
+					})
 					continue
 				}
 				match.TargetKind = JUnitTargetIteration
@@ -345,11 +354,18 @@ func (r *Repository) AnalyzeJUnitImport(profileID, execKey, xmlBase64 string) (J
 					}
 				}
 				preview.Matched = append(preview.Matched, match)
-				preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: true, CandidateIterations: candidates, Match: &match})
+				preview.Mappings = append(preview.Mappings, JUnitMapping{
+					Testcase: tc.Name, TestKey: match.TestKey, Summary: match.Summary, Result: match.Result,
+					Included: true, CandidateIterations: candidates, Match: &match,
+					DatasetSourceKind: run.DatasetSourceKind, DatasetSourceKey: run.DatasetSourceKey,
+				})
 				continue
 			}
 			preview.Matched = append(preview.Matched, match)
-			preview.Mappings = append(preview.Mappings, JUnitMapping{Testcase: tc.Name, Included: true, CandidateIterations: []JUnitIterationCandidate{}, Match: &match})
+			preview.Mappings = append(preview.Mappings, JUnitMapping{
+				Testcase: tc.Name, TestKey: match.TestKey, Summary: match.Summary, Result: match.Result,
+				Included: true, CandidateIterations: []JUnitIterationCandidate{}, Match: &match,
+			})
 		default:
 			skip := JUnitSkip{
 				Testcase: tc.Name,
