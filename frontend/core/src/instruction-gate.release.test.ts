@@ -6,8 +6,9 @@
  * only `read` and the list of buildable apps.
  *
  * These checks exist because what they check failed silently. A version
- * resource a reader cannot read still builds, so the first report comes from
- * whoever opened the properties dialog months later.
+ * resource a reader cannot read still builds, and a release script that skips
+ * an app's guide still finishes, so the first report comes from whoever opened
+ * the properties dialog or the zip months later.
  */
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -56,5 +57,26 @@ describe('instruction gate: release packaging', () => {
       broken,
       `version strings filed under the neutral language, or with no FileVersion to find them by: ${broken.join(', ')}`,
     ).toEqual([]);
+  });
+
+  // release-app.ps1 bundles a guide from the folder $guideDirs names for the
+  // app, and tells an app that names none that it ships no guide. TAM named
+  // none for weeks after #302 wrote it one, so a TAM release would have said
+  // so and shipped the binaries alone. The other half is worse: a folder that
+  // is named but holds no USER_GUIDE.md throws, after the binaries are built.
+  it('every app names a guide folder that holds a guide', () => {
+    const table = read('scripts/release-app.ps1').match(/\$guideDirs = @\{([^}]*)\}/);
+    expect(table, 'release-app.ps1 no longer declares $guideDirs').not.toBeNull();
+    const dirs = new Map(
+      [...table![1].matchAll(/(\w+)\s*=\s*"([^"]+)"/g)].map(([, app, dir]) => [
+        app,
+        dir.replace(/\\/g, '/'),
+      ]),
+    );
+    const missing = apps().filter((app) => {
+      const dir = dirs.get(app);
+      return dir === undefined || !fs.existsSync(path.join(repoRoot, dir, 'USER_GUIDE.md'));
+    });
+    expect(missing, `named no guide folder, or named one with no guide in it: ${missing.join(', ')}`).toEqual([]);
   });
 });
