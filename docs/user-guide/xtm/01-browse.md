@@ -81,33 +81,33 @@ Each step has an action, optional data, and an expected result. Type in a box to
 - **Clone from…** copies the steps of another test.
 - **Refresh** reloads the steps from Jira.
 
-When the test has a dataset, its Action, Data and Expected fields include a
-**${** button. Click it, or type `${` in the field, then choose a parameter
-with the mouse or the arrow keys and Enter. XTM inserts the complete
-`${PARAMETER}` macro at the caret. A reference with no matching dataset
-parameter stays visible and shows an error below the field.
+When the test has a dataset, its Action, Data and Expected fields have a
+**${** button. Click it, or type `${` in the field. Pick a parameter with the
+mouse, or with the arrow keys and Enter, and XTM inserts the full
+`${PARAMETER}` macro at the caret. A reference that matches no dataset
+parameter stays in the text, with an error below the field.
 
 Cucumber tests show a **Cucumber scenario** box instead of steps, and Generic tests show a **Generic definition** box.
 
 ### Give a test a dataset
 
-A dataset is the table a test's `${placeholder}` references resolve against: one column per parameter, one row per iteration. It sits below the steps.
+A dataset is the table that a test's `${placeholder}` references read their values from. It has one column per parameter and one row per iteration, and it sits below the steps.
 
-- **Create dataset** shows on a test that has none. **Edit** shows on a test that has one. Both open the dataset dialog, with parameters and file actions above the table and Save and Cancel in the footer.
-- A column is a parameter. Click **Add parameter**, or open **Actions** in an existing column header, to configure its name, type and combinatorial behavior. The same menu moves or removes the column with its values.
+- A test with no dataset shows **Create dataset**, and a test with one shows **Edit**. Both open the dataset dialog. Parameter and file actions sit above the table, and Save and Cancel are in the footer.
+- Each column is a parameter. Click **Add parameter**, or open **Actions** in an existing column header, to set its name, type and combinatorial behavior. The same menu moves or removes the column along with its values.
 - Choose **Text** for free-form values. Choose **List** to enter an ordered set of options, one per line. List cells become dropdowns, and XTM refuses to remove an option while a row still uses it.
 - **Add row** adds an iteration, and **Remove** at the end of a row deletes that row.
-- Opening a test from a Test Execution shows the dataset that will run there, and says whether it is the test's own or one the execution defines. An execution's own dataset is read-only in XTM.
-- XTM preserves a parameter that uses a predefined Jira list. Its binding and options are read-only until you explicitly convert it to an ad-hoc list. XTM does not administer project lists.
-- Below it, **Iterations** shows how each row went in that execution: the values it ran with, its own result, and how many of them passed. A test with a dataset runs once per row, and the run's single result is derived from those, so this is where you see which values failed. It appears only when the run has iterations.
+- When you open a test from a Test Execution, you see the dataset that will run there and whether it belongs to the test or the execution. XTM shows an execution's own dataset as read-only.
+- XTM keeps a parameter that uses a predefined Jira list as it is. Its binding and options stay read-only until you convert it to an ad-hoc list. XTM does not manage project lists.
+- Below the dataset, **Iterations** shows how each row did in that execution: the values it ran with, its result, and how many rows passed. A test with a dataset runs once per row, and the run's overall result comes from those row results. Look here to see which values failed. The section appears only when the run has iterations.
 - The arrows at the end of a row move that row up or down. Row order is the order the iterations run in.
-- **Export CSV** saves names and values in Xray's CSV layout. **Import CSV** replaces the table on screen, but stores nothing until **Save**. CSV has no field for parameter type, options or Jira ids: a column matched by name keeps its existing List metadata, while a new column becomes Text.
-- Renaming a parameter asks whether to rewrite `${OLD}` to `${NEW}` in the test's steps and definition. Say yes and each rewritten field becomes its own pending change, so you can see them before they go. Say no and the text is left exactly as it was, which is the right answer when a reference was never pointing at this parameter.
+- **Export CSV** saves names and values in Xray's CSV layout. **Import CSV** replaces the table on screen but stores nothing until **Save**. CSV has no field for parameter type, options or Jira ids. A column that matches an existing parameter by name keeps its List metadata, and a new column becomes Text.
+- When you rename a parameter, XTM asks whether to rewrite `${OLD}` to `${NEW}` in the test's steps and definition. Yes turns each rewritten field into its own pending change, so you can review them before they go to Jira. No leaves the text as it was. Choose no when the existing references never pointed at this parameter.
 - **Save** stores the table locally and counts it in **N pending**, like every other edit. Jira gets it on the next commit.
 
-Xray's own limits are checked when you save: at most 20 parameters, 100 characters in a value, no two parameters with the same name, no two identical rows, and a name that starts with a letter or underscore. A List also needs unique options and every cell must use one of them. A table that breaks a rule is refused with the reason and stays on screen for you to fix.
+XTM checks Xray's limits when you save: at most 20 parameters, at most 100 characters in a value, no two parameters with the same name, no two identical rows, and names that start with a letter or underscore. A List also needs unique options, and every cell must use one of them. If the table breaks a rule, XTM refuses it, gives the reason, and leaves the table on screen for you to fix.
 
-A dataset write replaces the whole table, so if someone changed it in Jira after you loaded the test, the commit stops and asks which version to keep instead of overwriting theirs.
+Saving a dataset to Jira replaces the whole table. If someone changed it in Jira after you loaded the test, the commit stops and asks which version to keep, so their change is not overwritten.
 
 ## Create a test
 
