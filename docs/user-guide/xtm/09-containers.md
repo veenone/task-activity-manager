@@ -39,13 +39,13 @@ In the same row you can:
 - On a FAIL row, click the bug button to create a bug for the failed test.
 - Click **✕** to remove the test from the execution.
 
-When a test uses a dataset, expand its row to see one result for each resolved
-parameter combination. Each iteration shows the values used and its resolved
-steps. On the Demo2 profile, you can change an iteration or step result and
-commit it from the Pending list. Live Xray connections currently show these
-controls only when the connected backend advertises verified parameterized-run
-write support. Unsupported connections keep the results read-only and do not
-discard local pending data.
+When a test uses a dataset, expand its row to see one result for each
+parameter combination. Each iteration shows the values it used and its steps
+with those values filled in. On the Demo2 profile, you can change an iteration
+or step result and commit it from the Pending list. On a live Xray connection,
+these controls appear only when the backend reports verified write support for
+parameterized runs. Other connections show the results as read-only and keep
+any local pending data.
 
 ### Many tests at once
 
@@ -107,10 +107,10 @@ On a demo profile, **Regenerate sample data** and **Clean sample data…** reset
    ![The new execution dialog](images/containers-09-junit-new-exec.png)
 
 5. Check the preview. New tests are marked NEW. An existing parameterized test
-   shows the dataset iteration that its JUnit properties identify, such as
-   `USER=bob`. If the properties do not identify one iteration exactly, choose
-   the intended iteration or exclude the testcase. New tests use an overall
-   run result because they do not have a dataset yet. **Skipped testcases**
+   shows the dataset iteration its JUnit properties point to, such as
+   `USER=bob`. If the properties do not match exactly one iteration, choose
+   the right iteration or exclude the testcase. New tests get one overall
+   run result, because they have no dataset yet. **Skipped testcases**
    lists names XTM could not match to one test.
 
    ![The preview, with three testcases skipped as ambiguous](images/containers-10-junit-preview.png)
@@ -119,13 +119,13 @@ On a demo profile, **Regenerate sample data** and **Clean sample data…** reset
 
 XTM matches each testcase to a test by its summary. For an existing
 parameterized test, add one JUnit `<property>` for every dataset parameter.
-Property names and values must match the complete parameter combination. The
-new execution does not have server run IDs until it is created, so XTM keeps
-the parameter signature as a pending result. During commit it creates the
-execution, allocates the tests, resolves the signature to the server's stable
-iteration ID, and then writes the result. A changed dataset or an ambiguous
-signature is retained as a conflict instead of writing to the wrong
-iteration. Both import flows end as pending changes, so commit them from the
+The property names and values must match the full parameter combination.
+The new execution has no server run IDs until it exists, so XTM stores the
+parameter values (the signature) as a pending result. On commit, XTM creates
+the execution, adds the tests, looks up the server's stable iteration ID for
+the signature, and then writes the result. If the dataset changed or the
+signature matches more than one iteration, XTM keeps the result as a conflict
+so it never writes to the wrong iteration. Both import flows end as pending changes, so commit them from the
 Pending list.
 
 ## Work with bugs

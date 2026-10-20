@@ -74,9 +74,9 @@ view appears only when the selected profile's backend supports it. Coverage
 also needs to be enabled from the **More** menu.
 
 Datasets has its own **Scan datasets** action. The normal **Sync** command does
-not build that catalog because a complete dataset scan makes additional Jira
-requests for each Test and container relationship. See [Datasets](13-datasets.md)
-for the inventory and override model.
+not build the dataset catalog, because a full scan makes extra Jira requests
+for every Test and container relationship. See [Datasets](13-datasets.md) for
+how the catalog and overrides work.
 
 ## Review and commit your changes
 

@@ -18,34 +18,30 @@ export function DatasetsView(props: Props) {
 
   return (
     <section className="dataset-page" aria-labelledby="datasets-heading">
-      <header className="dataset-heading">
-        <div>
-          <h2 id="datasets-heading">Datasets</h2>
-          <p>
-            Test defaults and the Plan or Execution overrides that change them.
-          </p>
-        </div>
-      </header>
+      {/* Like every other view, this one opens on its filters; the name is
+          in the view tabs above, and here for a screen reader. */}
+      <h2 id="datasets-heading" className="sr-only">Datasets</h2>
       <DatasetCatalogToolbar state={state} />
+      <p className="muted dataset-intro">Test defaults and the Plan or Execution overrides that change them.</p>
       {(state.syncError || loadError) && (
         <div className="error-text" role="alert">
           {state.syncError || loadError}
         </div>
       )}
       {!page && state.catalog.isLoading ? (
-        <p className="dataset-empty muted">Loading dataset catalog…</p>
+        <p className="dataset-empty muted">Loading datasets…</p>
       ) : !page?.state ? (
         <div className="dataset-empty">
-          <h3>This project has not been scanned for datasets.</h3>
+          <h3>This project has not been scanned for datasets yet.</h3>
           <p className="muted">
-            Run a scan to build the local inventory without changing Jira.
+            Scan to list this project's datasets. Jira is not changed.
           </p>
         </div>
       ) : page.total === 0 ? (
         <div className="dataset-empty">
           <h3>No Tests with datasets match these filters.</h3>
           <p className="muted">
-            Change the filters or scan again after datasets change in Jira.
+            Change the filters, or scan again if datasets changed in Jira.
           </p>
         </div>
       ) : (

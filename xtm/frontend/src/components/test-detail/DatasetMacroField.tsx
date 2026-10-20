@@ -152,7 +152,7 @@ export function DatasetMacroField({ parameters, value, onChange, onCommit, class
               </button>
             ))
           ) : (
-            <p className="dataset-macro-empty">{names.length === 0 ? "Create a dataset parameter before inserting a macro." : "No matching parameters"}</p>
+            <p className="dataset-macro-empty">{names.length === 0 ? "Add a parameter to the dataset first." : "No matching parameters"}</p>
           )}
         </div>
       )}

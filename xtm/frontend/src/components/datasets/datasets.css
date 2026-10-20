@@ -15,48 +15,20 @@
   padding: 20px 24px;
 }
 
-.dataset-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+/* The filter row takes its layout from the shared board-head and
+   board-picker rules; only the search box's width is its own. */
+.dataset-toolbar {
+  margin-bottom: 0;
 }
 
-.dataset-heading h2,
-.dataset-heading p {
+.dataset-search {
+  width: 280px;
   margin: 0;
 }
 
-.dataset-heading p {
-  margin-top: 4px;
-  color: var(--text-muted);
-}
-
-.dataset-toolbar {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto minmax(240px, auto);
-  gap: 12px;
-  align-items: end;
-  padding: 12px;
-  background: var(--surface);
-  border-radius: var(--r-2);
-}
-
-.dataset-toolbar label {
-  display: grid;
-  gap: 4px;
-  color: var(--text-muted);
-}
-
-.dataset-toolbar input,
-.dataset-toolbar select {
-  min-height: 34px;
-}
-
-.dataset-toolbar-sync {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+.dataset-intro {
+  margin: 0;
+  font-size: var(--fs-sm);
 }
 
 .dataset-empty {
@@ -74,23 +46,30 @@
   margin-top: 8px;
 }
 
-.dataset-table-scroll {
+.dataset-catalog-scroll {
   min-height: 0;
   flex: 1;
   overflow: auto;
   background: var(--surface);
+  border-radius: var(--r-2);
 }
 
-.dataset-table {
+.dataset-catalog-table {
   width: 100%;
+  border-collapse: collapse;
 }
 
-.dataset-table th:first-child {
+.dataset-catalog-table th:first-child {
   width: 46%;
 }
 
-.dataset-table td {
+.dataset-catalog-table td {
   vertical-align: top;
+}
+
+.dataset-toggle {
+  width: 12px;
+  color: var(--text-muted);
 }
 
 .dataset-expand {
@@ -234,12 +213,8 @@
 }
 
 @media (max-width: 900px) {
-  .dataset-toolbar {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .dataset-toolbar-sync {
-    grid-column: 1 / -1;
+  .dataset-search {
+    width: 100%;
   }
 
   .dataset-detail-grid {
