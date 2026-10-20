@@ -59,7 +59,9 @@ Click **Columns** to choose which columns the grid shows and in what order. Tick
    ![The summary edited, with the dot on the field, the row and the pending count](images/browse-08-edited-field.png)
 
 3. Scroll down for the rest of the test:
-   - **Custom fields**.
+   - **Custom fields**. On a Jira that will not say which custom fields the
+     Test create screen carries, this lists every custom field on the
+     instance instead.
    - **Preconditions**: **+ Add precondition…** links one, **+ New** creates one.
    - **Memberships**: the sets, plans and executions the test belongs to.
    - **Requirements**.

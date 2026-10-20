@@ -20,6 +20,10 @@ import (
 // nothing in that call asked about an issue, so the reader goes looking for a
 // missing test instead of a wrong URL (#170).
 //
+// Each sentence says what Jira did and what to do about it, in that order,
+// and talks to the reader rather than about the app: "the address XTM asked
+// for" is not how a person describes a wrong URL (#313).
+//
 // Only the status is used. Jira's own message is deliberately dropped,
 // because the cases where it is specific enough to help are the cases where
 // the status already says the same thing, and the cases where it is wrong
@@ -36,15 +40,15 @@ func Humanize(err error) string {
 	}
 	switch {
 	case he.Code == http.StatusUnauthorized:
-		return "Jira did not accept this profile's token. Check the token in the profile's connection settings; it may have expired or been revoked."
+		return "Jira rejected this profile's token. It may have expired or been revoked, so re-enter it in the profile's connection settings."
 	case he.Code == http.StatusForbidden:
-		return "Jira accepted the token but refused the request. The account needs permission for this project in Jira."
+		return "The token works, but this account has no permission for that project in Jira. A Jira administrator can grant it."
 	case he.Code == http.StatusNotFound:
-		return "Jira has nothing at the address XTM asked for. Check the Jira URL and the project key in the profile's connection settings."
+		return "Jira found nothing at that address. Check the Jira URL and the project key in the profile's connection settings."
 	case he.Code == http.StatusRequestTimeout, he.Code == http.StatusTooManyRequests:
-		return "Jira is busy and asked XTM to slow down. Try again in a moment."
+		return "Jira is busy and is turning requests away. Wait a moment and sync again."
 	case he.Code >= 500:
-		return "Jira reported a problem on its own side. Nothing here needs changing; try again, and if it keeps happening the instance may be down."
+		return "Jira failed on its own side. Nothing in the profile needs changing. Sync again, and if it keeps failing the instance may be down."
 	}
 	return ""
 }
