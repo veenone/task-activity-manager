@@ -3,7 +3,7 @@
 **The figures in `images/` are already captured** from a live demo profile
 (`wails dev` + the headless `browse` tool). This file documents how they were
 made and how to refresh or re-shoot any of them — the filenames are the contract
-with [`USER_GUIDE.md`](USER_GUIDE.md), so keep them identical and a replacement
+with [`USER_GUIDE.md`](../USER_GUIDE.md), so keep them identical and a replacement
 renders automatically.
 
 Figure 29 (commit conflict) is intentionally omitted — a conflict can't be
@@ -39,7 +39,7 @@ columns: date / tester / environment), **44** (Plan / Set run roll-up), **45**
    then **Sync** once. A yellow `DEMO` chip confirms you are in demo mode.
 2. Use Windows **Snipping Tool** (`Win+Shift+S`) to capture. Prefer **window**
    or a tight **rectangular** crop over full-screen.
-3. Save as **PNG** into `docs/user-guide/images/` with the filename in the table.
+3. Save as **PNG** into `docs/user-guide/xtm/images/` with the filename in the table.
 4. Recommended width **1280–1600 px**; enable a light theme unless the figure is
    specifically the dark-theme shot (Fig 33).
 5. Avoid real secrets — demo data is safe; if you capture a live profile, blur

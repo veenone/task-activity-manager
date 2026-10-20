@@ -252,7 +252,7 @@ Version 1.8.0 is a major feature release. Highlights:
 
 Earlier releases added commit **conflict management** (three-way merge),
 **macOS** support, and the **Test Calls** view (1.3.0–1.4.0). See
-[`CHANGELOG.md`](../../CHANGELOG.md) for the full history.
+[`CHANGELOG.md`](../../../xtm/CHANGELOG.md) for the full history.
 
 ---
 

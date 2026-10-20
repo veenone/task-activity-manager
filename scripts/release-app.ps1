@@ -169,12 +169,11 @@ if (-not $NoInstaller) {
 # it ships alongside the binaries. The generated docs/user-guide/dist build
 # output and the images/.gitkeep placeholder are deliberately excluded.
 #
-# docs/user-guide is XTM's guide, titled for it and versioned with it. TAM's
-# documentation is kept outside this repository, so TAM ships no guide and the
-# step is skipped rather than failing a release over a file that was never
-# meant to be here. An app that declares a guide must still ship it: a missing
-# file for XTM is an error, not a skip.
-$guideDirs = @{ xtm = "docs\user-guide" }
+# Each app's guide is the folder named here, holding its USER_GUIDE.md and the
+# images beside it. An app that names a folder must ship what is in it, so a
+# missing guide is an error rather than a skip; an app named nowhere here
+# ships no guide and says so.
+$guideDirs = @{ xtm = "docs\user-guide\xtm"; tam = "docs\user-guide\tam" }
 if ($guideDirs.ContainsKey($App)) {
   Step "Bundling user guide"
   $guideSrc = Join-Path $repoRoot $guideDirs[$App]
