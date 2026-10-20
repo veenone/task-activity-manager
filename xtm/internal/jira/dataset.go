@@ -63,7 +63,7 @@ type Dataset struct {
 // agents/project/domain-context.md.
 func (c *Client) GetDataset(ctx context.Context, testKey string) (Dataset, error) {
 	if isDemoURL(c.baseURL) {
-		return demoDataset(testKey), nil
+		return demoCurrentDataset(c.baseURL, testKey), nil
 	}
 	id, err := c.issueID(ctx, testKey)
 	if err != nil {
@@ -287,12 +287,10 @@ type datasetValue struct {
 // A successful write answers with a plain sentence under a JSON content type,
 // so the response is deliberately not decoded.
 func (c *Client) SetDataset(ctx context.Context, testKey string, d Dataset) error {
-	// A demo profile has no instance to write to, and reports success so the
-	// pending change clears on a demo commit, as every other write here does
-	// (#295). The edit stays visible because the store keeps it; a refresh
-	// reads the demo fixture again, exactly as a refresh on a real profile
-	// reads the server again.
+	// A demo profile keeps the write for the app session instead, so a
+	// refresh or the catalog's scan sees it as a server would (#295, #307).
 	if isDemoURL(c.baseURL) {
+		storeDemoDataset(c.baseURL, testKey, d)
 		return nil
 	}
 	id, err := c.issueID(ctx, testKey)
