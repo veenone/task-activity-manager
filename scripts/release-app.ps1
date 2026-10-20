@@ -173,7 +173,7 @@ if (-not $NoInstaller) {
 # images beside it. An app that names a folder must ship what is in it, so a
 # missing guide is an error rather than a skip; an app named nowhere here
 # ships no guide and says so.
-$guideDirs = @{ xtm = "docs\user-guide"; tam = "docs\user-guide\tam" }
+$guideDirs = @{ xtm = "docs\user-guide\xtm"; tam = "docs\user-guide\tam" }
 if ($guideDirs.ContainsKey($App)) {
   Step "Bundling user guide"
   $guideSrc = Join-Path $repoRoot $guideDirs[$App]

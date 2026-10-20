@@ -39,7 +39,7 @@ columns: date / tester / environment), **44** (Plan / Set run roll-up), **45**
    then **Sync** once. A yellow `DEMO` chip confirms you are in demo mode.
 2. Use Windows **Snipping Tool** (`Win+Shift+S`) to capture. Prefer **window**
    or a tight **rectangular** crop over full-screen.
-3. Save as **PNG** into `docs/user-guide/images/` with the filename in the table.
+3. Save as **PNG** into `docs/user-guide/xtm/images/` with the filename in the table.
 4. Recommended width **1280–1600 px**; enable a light theme unless the figure is
    specifically the dark-theme shot (Fig 33).
 5. Avoid real secrets — demo data is safe; if you capture a live profile, blur
