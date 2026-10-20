@@ -43,8 +43,11 @@ docs/.env
 docs/Makefile
 docs/user_doc_config.yml
 
-# Generated user-guide build output
+# Generated user-guide build output. The toolkit writes dist/ beside the
+# config it was run with, and build/<version>/ for the rendered PDF, so each
+# app's guide folder has both.
 docs/user-guide/dist/
+docs/user-guide/*/build/
 
 eslint-report.json
 

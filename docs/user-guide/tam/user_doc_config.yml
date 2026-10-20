@@ -1,22 +1,22 @@
 ---
 # General document metadata (user-defined)
-title: "Xray Test Manager"
-title-prefix: "A fast, local‑first desktop tool for managing Xray testcases at scale"
+title: "Task Activity Manager"
+title-prefix: "A local‑first desktop tool for planning Jira work: backlog, boards, sprints and reports"
 subtitle: "User Guide"
-author: 
+author:
 - name : Achmad Fienan Rahardianto
   affiliation: IST R&D
   email: achmad-fienan.rahardianto@idemia.com
 subject: "Markdown"
-keywords: [Markdown, Xray, Jira]
-version: "1.8.0"
+keywords: [Markdown, Jira, Agile]
+version: "0.1.0"
 
 # Document numbering (optional)
-fqr: 
-ed: 
+fqr:
+ed:
 
 # Output file naming
-doc_name: XrayTestManager_User_Guide
+doc_name: TaskActivityManager_User_Guide
 
 header-includes:
   - \setlength{\footheight}{33pt}
