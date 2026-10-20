@@ -159,6 +159,8 @@ When an endpoint moves or a field is renamed, the same wrong text sits in the st
 5. The list shows one row per matching step field: the test key, the step number, the field, the text now and the text after. Untick any row you want left alone. Tests with no match are counted below the list and are never written to.
 6. Click **Replace**. Each row you kept becomes one pending step edit.
 
+   ![Eighteen matches found across six tests](images/browse-13-step-replace.png)
+
 The scan reads the steps of every selected test, and a test whose detail panel has never been opened has its steps fetched from Jira first, so a large selection takes a moment. Steps you have already edited without committing are searched as you last left them, not as Jira still holds them.
 
 Changing the search or the replacement after a scan clears the list, because the replacement is worked out again when you apply it. Find the matches again and the list comes back.
@@ -167,21 +169,21 @@ Changing the search or the replacement after a scan clears the list, because the
 
 1. Choose **More → Import tests…** (or **File → Import Tests…**).
 
-   ![The Import tests dialog](images/browse-13-import.png)
+   ![The Import tests dialog](images/browse-14-import.png)
 
 2. Click **Choose File** and pick a CSV or XLSX file. **Download template** saves a sample file with every column XTM understands.
 
 3. Check the mapping. XTM matches columns whose header is the field name, such as `Summary`, `Priority` or `Folder`. Pick a column for any field it did not match, or leave it as **(not mapped)**. Summary is required.
 
-   ![Columns mapped to fields](images/browse-14-import-mapping.png)
+   ![Columns mapped to fields](images/browse-15-import-mapping.png)
 
 4. Click **Validate**. XTM reports how many rows are valid and lists any problems.
 
-   ![The validation result](images/browse-15-import-validated.png)
+   ![The validation result](images/browse-16-import-validated.png)
 
 5. Click **Import**. The tests become pending creates. Commit them from the Pending list.
 
-   ![The import result](images/browse-16-import-done.png)
+   ![The import result](images/browse-17-import-done.png)
 
 ## Troubleshooting
 
