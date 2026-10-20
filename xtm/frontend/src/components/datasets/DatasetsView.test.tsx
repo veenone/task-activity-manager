@@ -234,7 +234,7 @@ describe("DatasetsView", () => {
     await user.click(screen.getByRole("button", { name: /expand QA-1/i }));
     expect(await screen.findByRole("heading", { name: "Default dataset" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plan overrides" })).toBeVisible();
-    expect(screen.getByText(/parameter metadata unknown/i)).toBeVisible();
+    expect(screen.getByText(/do not say what type each parameter is/)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Used by" })).toBeVisible();
     expect(screen.getByText("Inherited default")).toBeVisible();
   });

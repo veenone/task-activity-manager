@@ -66,7 +66,7 @@ describe("StepRow dataset macros", () => {
     });
     expect(helper).toBeEnabled();
     await userEvent.click(helper);
-    expect(screen.getByText("Create a dataset parameter before inserting a macro.")).toBeVisible();
+    expect(screen.getByText("Add a parameter to the dataset first.")).toBeVisible();
   });
 
   it("does not add helpers to read-only or call-test rows", () => {

@@ -31,7 +31,7 @@ function Definition({
         </div>
       )}
       {!definition.metadataComplete && (
-        <p className="dataset-unknown">Parameter metadata unknown for Plan datasets.</p>
+        <p className="dataset-unknown">Plan datasets do not say what type each parameter is.</p>
       )}
       <div className="dataset-parameter-list">
         {definition.parameters.map((parameter) => (
@@ -90,8 +90,8 @@ export function DatasetCatalogDetail({
 }: Props) {
   const query = useDatasetCatalogDetail(profileId, testKey, open);
   if (!open) return null;
-  if (query.isLoading) return <p className="muted">Loading dataset details…</p>;
-  if (query.error) return <p className="error-text">Unable to load dataset details.</p>;
+  if (query.isLoading) return <p className="muted">Loading the dataset…</p>;
+  if (query.error) return <p className="error-text">Could not load the dataset.</p>;
   const detail = query.data;
   if (!detail) return null;
 

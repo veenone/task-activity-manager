@@ -62,7 +62,7 @@ export function DatasetParameterDialog({
     const ok = await confirm({
       title: "Convert this list?",
       message:
-        "This parameter will stop using its predefined Jira list and keep a private copy of the current options.",
+        "This parameter will stop using the shared Jira list and keep its own copy of the current options.",
       confirmLabel: "Convert",
       cancelLabel: "Keep predefined list",
     });
@@ -120,7 +120,7 @@ export function DatasetParameterDialog({
       <div className="pending-head dataset-dialog-head">
         <div>
           <h2 id={titleId}>{title}</h2>
-          <p id={descriptionId}>Configure the column used by test step dataset macros.</p>
+          <p id={descriptionId}>Set up the column the step macros use.</p>
         </div>
         <button className="btn btn-ghost" onClick={onCancel} aria-label="Close">×</button>
       </div>
@@ -160,7 +160,7 @@ export function DatasetParameterDialog({
               <div className="dataset-binding">
                 <span>
                   <strong>{bindingLabel}</strong>
-                  <small>Managed by Jira and preserved when this dataset is saved.</small>
+                  <small>Set in Jira. Saving the dataset keeps it.</small>
                 </span>
                 <button className="btn" onClick={() => void convertList()}>
                   Convert to ad-hoc list
@@ -179,7 +179,7 @@ export function DatasetParameterDialog({
                   setError("");
                 }}
               />
-              <small>Enter one option per line. Order is preserved.</small>
+              <small>One option per line, in the order you want.</small>
             </label>
           </div>
         )}

@@ -17,19 +17,25 @@
   flex: 1;
 }
 
+/* A quiet inline action, like the panel's other ones: muted until hovered.
+   The ${ stays in the mono face because it is the macro's own syntax. */
 .dataset-macro-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex: 0 0 auto;
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.dataset-macro-trigger:hover {
+  color: var(--text);
 }
 
 .dataset-macro-trigger-label {
   font-family: var(--font-sans);
   font-size: var(--fs-xs);
-  font-weight: 600;
 }
 
 .dataset-macro-menu {
