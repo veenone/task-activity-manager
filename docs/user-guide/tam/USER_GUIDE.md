@@ -1,6 +1,6 @@
 # Task Activity Manager — User Guide
 
-**Version:** 0.1.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** scrum
+**Version:** 1.0.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** scrum
 masters, product owners, and anyone planning work in Jira Data Center.
 
 Task Activity Manager (TAM) is a Windows desktop app for planning and tracking
