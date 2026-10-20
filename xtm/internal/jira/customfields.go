@@ -285,8 +285,12 @@ type createmetaFieldDef struct {
 // projects.issuetypes.fields expansion scoped to the Test issue type, emitting
 // one CustomFieldDef per "customfield_*" field (Type taken from the field's
 // schema type, falling back to the custom-renderer key). When createmeta yields
-// no Test fields (older or locked-down instances that restrict createmeta), it
-// falls back to GET /rest/api/2/field and emits every entry marked custom.
+// no Test fields (older or locked-down instances that restrict createmeta), or
+// the instance no longer has the endpoint at all (Jira 9 removed it, see
+// getCreatemeta), it falls back to GET /rest/api/2/field and emits every entry
+// marked custom. That fallback is the whole instance's custom fields rather
+// than the Test create screen's, which is wider than it should be but is what
+// keeps the sync running (#313).
 //
 // NOTE(xtm): the createmeta projects.issuetypes.fields shape and the schema
 // type / custom keys, plus the /field fallback, follow Jira DC conventions and
@@ -301,15 +305,17 @@ func (c *Client) ListCustomFields(ctx context.Context, projectKey string) ([]Cus
 	path := "/rest/api/2/issue/createmeta?projectKeys=" + projectKey +
 		"&issuetypeNames=Test&expand=projects.issuetypes.fields"
 	var meta createmetaResponse
-	if err := c.get(ctx, path, &meta); err != nil {
+	ok, err := c.getCreatemeta(ctx, path, &meta)
+	if err != nil {
 		return nil, err
 	}
-	defs := defsFromCreatemeta(meta)
-	if len(defs) > 0 {
-		return defs, nil
+	if ok {
+		if defs := defsFromCreatemeta(meta); len(defs) > 0 {
+			return defs, nil
+		}
 	}
-	// Fallback: createmeta returned no Test fields, so list every custom field
-	// on the instance.
+	// Fallback: this instance has no createmeta, or it answered with no Test
+	// fields. Either way, list every custom field on the instance.
 	return c.listAllCustomFields(ctx)
 }
 

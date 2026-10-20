@@ -19,7 +19,9 @@ import (
 // NOTE(xtm): the createmeta fields expansion (required flag, allowedValues
 // shape) follows Jira DC REST v2 conventions and must be verified against the
 // live Xray Server/DC 8.4.0 instance. Some instances disable the expansion,
-// and then this returns an empty slice without an error.
+// and then this returns an empty slice without an error. An instance that no
+// longer has the endpoint at all (Jira 9 removed it, see getCreatemeta) is
+// read the same way, so the form opens without the extra fields (#313).
 func (c *Client) GetCreateScreenFields(ctx context.Context, projectKey, issueTypeID, issueTypeName string, skip []string) ([]FieldDef, error) {
 	if (issueTypeID == "") == (issueTypeName == "") {
 		return nil, errors.New("create screen fields: give an issue type id or a name, not both")
@@ -51,8 +53,15 @@ func (c *Client) GetCreateScreenFields(ctx context.Context, projectKey, issueTyp
 			} `json:"issuetypes"`
 		} `json:"projects"`
 	}
-	if err := c.get(ctx, path, &meta); err != nil {
+	ok, err := c.getCreatemeta(ctx, path, &meta)
+	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		// No createmeta on this instance, which reads the same as an instance
+		// with the expansion disabled: no extra required fields to collect.
+		// The form then opens without them rather than not at all.
+		return nil, nil
 	}
 
 	skipped := make(map[string]bool, len(skip))
