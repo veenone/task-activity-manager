@@ -18,15 +18,11 @@ export function DatasetsView(props: Props) {
 
   return (
     <section className="dataset-page" aria-labelledby="datasets-heading">
-      <header className="dataset-heading">
-        <div>
-          <h2 id="datasets-heading">Datasets</h2>
-          <p>
-            Test defaults and the Plan or Execution overrides that change them.
-          </p>
-        </div>
-      </header>
+      {/* Like every other view, this one opens on its filters; the name is
+          in the view tabs above, and here for a screen reader. */}
+      <h2 id="datasets-heading" className="sr-only">Datasets</h2>
       <DatasetCatalogToolbar state={state} />
+      <p className="muted dataset-intro">Test defaults and the Plan or Execution overrides that change them.</p>
       {(state.syncError || loadError) && (
         <div className="error-text" role="alert">
           {state.syncError || loadError}

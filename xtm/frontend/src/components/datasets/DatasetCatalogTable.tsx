@@ -41,8 +41,8 @@ export function DatasetCatalogTable({
   const total = state.catalog.data?.total ?? 0;
   return (
     <>
-      <div className="dataset-table-scroll">
-        <table className="board-table dataset-table" aria-label="Dataset catalog">
+      <div className="dataset-catalog-scroll">
+        <table className="board-table dataset-catalog-table" aria-label="Dataset catalog">
           <thead>
             <tr>
               <th scope="col">Test</th>
@@ -66,9 +66,9 @@ export function DatasetCatalogTable({
                         aria-controls={detailId}
                         onClick={() => state.toggleExpanded(test.testKey)}
                       >
-                        <span aria-hidden="true">{open ? "−" : "+"}</span>
+                        <span className="dataset-toggle" aria-hidden="true">{open ? "▾" : "▸"}</span>
                         <span className="dataset-test-copy">
-                          <strong>{test.testKey}</strong>
+                          <span className="mono">{test.testKey}</span>
                           <span>{test.summary}</span>
                         </span>
                       </button>
