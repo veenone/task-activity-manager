@@ -157,6 +157,8 @@ export {
   BulkEditTests,
   BulkEditLabels,
   BulkRenameTests,
+  ScanTestStepText,
+  ReplaceTestStepText,
   GetTestSummaries,
   GetTestTransitions,
   TransitionTest,
@@ -1428,6 +1430,39 @@ export interface BulkEditResult {
 export interface BulkFailure {
   testKey: string;
   error: string;
+}
+
+// Bulk step find and replace (#311). The query is sent twice: once to scan,
+// once to apply, because the backend recomputes each replacement from the step
+// text the store holds rather than trusting the preview's after text.
+export interface StepTextQuery {
+  find: string;
+  replace: string;
+  fields: string[];
+  matchCase: boolean;
+  wholeWord: boolean;
+}
+
+export interface StepTextMatch {
+  testKey: string;
+  xrayId: string;
+  index: number;
+  field: string;
+  before: string;
+  after: string;
+  hits: number;
+}
+
+export interface StepTextScan {
+  matches: StepTextMatch[];
+  skipped: string[];
+  failed: BulkFailure[];
+}
+
+export interface StepTextTarget {
+  testKey: string;
+  xrayId: string;
+  field: string;
 }
 
 // Transition is one workflow move available from a Test's current status

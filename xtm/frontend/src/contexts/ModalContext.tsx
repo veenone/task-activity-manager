@@ -20,6 +20,7 @@ export type ModalId =
   | "bulkLabels"
   | "bulkComponents"
   | "bulkRename"
+  | "bulkStepReplace"
   | "bulkTransition"
   | "bulkAllocate"
   | "bulkMove"

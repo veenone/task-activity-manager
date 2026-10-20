@@ -10,6 +10,24 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Bulk step find and replace**
+- **Replace step text…** in the Browse bulk toolbar finds a string in the
+  steps of every selected test and replaces it across them (#311). Action,
+  Data and Expected are each switchable, with optional case sensitivity and
+  whole-word matching.
+- The scan writes nothing. It lists every match as the test key, the step
+  number, the field, the text now and the text after, and any row can be
+  excluded before applying. Tests with no match are counted and left alone.
+- Each kept row becomes one pending step edit through the same path a step
+  edited in the detail panel takes, so coalescing, conflict detection, the
+  audit log and discard all behave as they already do.
+- A test whose steps have never been loaded has them fetched for the scan. A
+  test holding uncommitted step edits is searched as the store has it, so the
+  replacement applies to the text on screen rather than to what Jira still
+  holds.
+- The replacement is worked out from the stored step text at apply time, so a
+  preview left open while something else changes cannot write stale text.
+
 **Transition field metadata**
 - Workflow transitions now carry the fields their screen asks for, fetched in
   the same request as the transitions themselves, and a queued transition

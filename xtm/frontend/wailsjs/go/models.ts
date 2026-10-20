@@ -3984,6 +3984,100 @@ export namespace testrepo {
 	        this.expected = source["expected"];
 	    }
 	}
+	export class StepTextMatch {
+	    testKey: string;
+	    xrayId: string;
+	    index: number;
+	    field: string;
+	    before: string;
+	    after: string;
+	    hits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StepTextMatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.xrayId = source["xrayId"];
+	        this.index = source["index"];
+	        this.field = source["field"];
+	        this.before = source["before"];
+	        this.after = source["after"];
+	        this.hits = source["hits"];
+	    }
+	}
+	export class StepTextQuery {
+	    find: string;
+	    replace: string;
+	    fields: string[];
+	    matchCase: boolean;
+	    wholeWord: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new StepTextQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.find = source["find"];
+	        this.replace = source["replace"];
+	        this.fields = source["fields"];
+	        this.matchCase = source["matchCase"];
+	        this.wholeWord = source["wholeWord"];
+	    }
+	}
+	export class StepTextScan {
+	    matches: StepTextMatch[];
+	    skipped: string[];
+	    failed: BulkFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StepTextScan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.matches = this.convertValues(source["matches"], StepTextMatch);
+	        this.skipped = source["skipped"];
+	        this.failed = this.convertValues(source["failed"], BulkFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class StepTextTarget {
+	    testKey: string;
+	    xrayId: string;
+	    field: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StepTextTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.xrayId = source["xrayId"];
+	        this.field = source["field"];
+	    }
+	}
 	export class SyncLogEntry {
 	    id: number;
 	    startedAt: string;

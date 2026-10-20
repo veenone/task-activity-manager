@@ -441,6 +441,8 @@ export function RenameVersion(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
+export function ReplaceTestStepText(arg1:string,arg2:Array<testrepo.StepTextTarget>,arg3:testrepo.StepTextQuery):Promise<testrepo.BulkEditResult>;
+
 export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveConflictMerge(arg1:string,arg2:string,arg3:string,arg4:Array<testrepo.ConflictDecision>):Promise<void>;
@@ -462,6 +464,8 @@ export function ScanDuplicateGroupSteps(arg1:string,arg2:string):Promise<testrep
 export function ScanDuplicates(arg1:string):Promise<testrepo.DuplicateReport>;
 
 export function ScanPreconditionDuplicates(arg1:string):Promise<testrepo.PreconditionDuplicateReport>;
+
+export function ScanTestStepText(arg1:string,arg2:Array<string>,arg3:testrepo.StepTextQuery):Promise<testrepo.StepTextScan>;
 
 export function SearchPreconditionsCrossProject(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<main.CrossProjectPreconditionPage>;
 
