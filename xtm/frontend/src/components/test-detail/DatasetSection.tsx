@@ -157,7 +157,7 @@ export function DatasetSection({
           className="link-btn dataset-refresh"
           onClick={() => void refresh()}
           disabled={loading}
-          title="Re-fetch the dataset from Jira"
+          title="Read the dataset from Jira again"
         >
           {loading ? "Loading…" : "Refresh"}
         </button>
@@ -181,7 +181,7 @@ export function DatasetSection({
                   {p.combinatorial && (
                     <span
                       className="dataset-combinatorial"
-                      title="Combinatorial parameter: Xray expands it into extra iterations"
+                      title="Combinatorial: Xray turns its values into extra iterations"
                     >
                       *
                     </span>

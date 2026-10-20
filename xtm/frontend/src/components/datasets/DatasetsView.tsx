@@ -29,19 +29,19 @@ export function DatasetsView(props: Props) {
         </div>
       )}
       {!page && state.catalog.isLoading ? (
-        <p className="dataset-empty muted">Loading dataset catalog…</p>
+        <p className="dataset-empty muted">Loading datasets…</p>
       ) : !page?.state ? (
         <div className="dataset-empty">
-          <h3>This project has not been scanned for datasets.</h3>
+          <h3>This project has not been scanned for datasets yet.</h3>
           <p className="muted">
-            Run a scan to build the local inventory without changing Jira.
+            Scan to list this project's datasets. Jira is not changed.
           </p>
         </div>
       ) : page.total === 0 ? (
         <div className="dataset-empty">
           <h3>No Tests with datasets match these filters.</h3>
           <p className="muted">
-            Change the filters or scan again after datasets change in Jira.
+            Change the filters, or scan again if datasets changed in Jira.
           </p>
         </div>
       ) : (

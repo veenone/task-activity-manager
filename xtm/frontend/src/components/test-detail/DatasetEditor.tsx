@@ -185,7 +185,7 @@ export function DatasetEditor({
           <div className="dataset-editor-empty">
             <div>
               <strong>Start with a parameter</strong>
-              <p>Add a text or list parameter, then enter one row for each test iteration.</p>
+              <p>Add a text or list parameter, then add one row per iteration.</p>
             </div>
             <button
               ref={addParameterRef}
