@@ -2723,6 +2723,70 @@ func (a *App) BulkEditTests(profileID string, testKeys []string, op testrepo.Bul
 	return a.repo.BulkEditTests(profileID, testKeys, op)
 }
 
+// ScanTestStepText finds every occurrence of a search term in the steps of the
+// selected Tests and reports what each match would become (#311). It writes
+// nothing: the Bulk step replace modal shows the matches so the user can
+// exclude some before applying.
+//
+// Steps load lazily, so a Test whose detail panel has never been opened has no
+// cached steps and this is where they get fetched. The fetch forces a refresh,
+// which is safe only because the repository asks for it on a Test with an
+// empty cache alone: forcing one on a Test holding uncommitted local step
+// edits would overwrite the edited text while its pending row survived.
+func (a *App) ScanTestStepText(profileID string, testKeys []string, q testrepo.StepTextQuery) (scan testrepo.StepTextScan, err error) {
+	defer recoverToError("ScanTestStepText", &err)
+	empty := testrepo.StepTextScan{
+		Matches: []testrepo.StepTextMatch{},
+		Skipped: []string{},
+		Failed:  []testrepo.BulkFailure{},
+	}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	scan, err = a.repo.ScanStepText(profileID, testKeys, q,
+		func(key string) ([]testrepo.Step, error) { return a.GetTestSteps(profileID, key, true) },
+	)
+	if err != nil {
+		return empty, err
+	}
+	if scan.Matches == nil {
+		scan.Matches = []testrepo.StepTextMatch{}
+	}
+	if scan.Skipped == nil {
+		scan.Skipped = []string{}
+	}
+	if scan.Failed == nil {
+		scan.Failed = []testrepo.BulkFailure{}
+	}
+	return scan, nil
+}
+
+// ReplaceTestStepText rewrites the step fields the user kept in the preview,
+// queuing one pending step edit each (#311). The replacement is recomputed
+// from the text the store holds now, so the matches the frontend sends back
+// name what to rewrite without deciding what it becomes.
+func (a *App) ReplaceTestStepText(profileID string, targets []testrepo.StepTextTarget, q testrepo.StepTextQuery) (result testrepo.BulkEditResult, err error) {
+	defer recoverToError("ReplaceTestStepText", &err)
+	empty := testrepo.BulkEditResult{
+		Succeeded: []string{},
+		Failed:    []testrepo.BulkFailure{},
+	}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	result, err = a.repo.ReplaceStepText(profileID, targets, q)
+	if err != nil {
+		return empty, err
+	}
+	if result.Succeeded == nil {
+		result.Succeeded = []string{}
+	}
+	if result.Failed == nil {
+		result.Failed = []testrepo.BulkFailure{}
+	}
+	return result, nil
+}
+
 // BulkEditLabels adds and removes labels across a batch of Tests, queueing one
 // labels edit per Test that changes. The Bulk Labels modal calls it.
 func (a *App) BulkEditLabels(profileID string, testKeys, add, remove []string) (result testrepo.BulkEditResult, err error) {

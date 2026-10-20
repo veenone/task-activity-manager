@@ -134,6 +134,7 @@ The new test gets a temporary key such as `NEW-5`, and a banner says it has not 
    - **Bulk edit…** sets one field on every selected test.
    - **Labels…** and **Components…** add or remove values.
    - **Rename summaries…** finds and replaces text in the summaries.
+   - **Replace step text…** finds and replaces text in the steps.
    - **Bulk transition…** moves every selected test through a workflow transition.
    - **Allocate…** adds the tests to a Test Set, Plan or Execution.
    - **Move to folder…** moves them to another folder.
@@ -146,6 +147,21 @@ The new test gets a temporary key such as `NEW-5`, and a banner says it has not 
    ![Bulk edit for three tests](images/browse-12-bulk-edit.png)
 
 **Clear** in the toolbar deselects everything. Bulk changes are pending changes, so you review and commit them like any other edit.
+
+### Replace text in the steps of many tests
+
+When an endpoint moves or a field is renamed, the same wrong text sits in the steps of dozens of tests. **Replace step text…** fixes them together.
+
+1. Type what to find and what to put in its place. An empty replacement deletes the text it finds.
+2. Tick which of Action, Data and Expected to search. All three are searched unless you untick one.
+3. **Match case** and **Whole word** narrow the search. Whole word is ignored at an end of the term that is not a letter, a digit or an underscore, so searching for `/rest/` still matches.
+4. Click **Find matches**. Nothing is changed yet.
+5. The list shows one row per matching step field: the test key, the step number, the field, the text now and the text after. Untick any row you want left alone. Tests with no match are counted below the list and are never written to.
+6. Click **Replace**. Each row you kept becomes one pending step edit.
+
+The scan reads the steps of every selected test, and a test whose detail panel has never been opened has its steps fetched from Jira first, so a large selection takes a moment. Steps you have already edited without committing are searched as you last left them, not as Jira still holds them.
+
+Changing the search or the replacement after a scan clears the list, because the replacement is worked out again when you apply it. Find the matches again and the list comes back.
 
 ## Import tests from CSV or XLSX
 

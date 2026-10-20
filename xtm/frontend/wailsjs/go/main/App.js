@@ -854,6 +854,10 @@ export function ReorderTestSteps(arg1, arg2, arg3) {
   return window['go']['main']['App']['ReorderTestSteps'](arg1, arg2, arg3);
 }
 
+export function ReplaceTestStepText(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ReplaceTestStepText'](arg1, arg2, arg3);
+}
+
 export function ResolveConflictKeepRemote(arg1, arg2) {
   return window['go']['main']['App']['ResolveConflictKeepRemote'](arg1, arg2);
 }
@@ -896,6 +900,10 @@ export function ScanDuplicates(arg1) {
 
 export function ScanPreconditionDuplicates(arg1) {
   return window['go']['main']['App']['ScanPreconditionDuplicates'](arg1);
+}
+
+export function ScanTestStepText(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ScanTestStepText'](arg1, arg2, arg3);
 }
 
 export function SearchPreconditionsCrossProject(arg1, arg2, arg3, arg4, arg5) {

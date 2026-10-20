@@ -8,6 +8,7 @@ import { BulkReviewModal } from "../components/BulkReviewModal";
 import { REVIEW_ENABLED } from "../features";
 import { BulkEditModal } from "../components/BulkEditModal";
 import { BulkLabelsModal } from "../components/BulkLabelsModal";
+import { BulkStepReplaceModal } from "../components/BulkStepReplaceModal";
 import { BulkComponentsModal } from "../components/BulkComponentsModal";
 import { BulkRenameModal } from "../components/BulkRenameModal";
 import { BulkTransitionModal } from "../components/BulkTransitionModal";
@@ -119,6 +120,14 @@ export function DialogHost({ s, a }: { s: AppState; a: AppActions }) {
 
       {isOpen("bulkComponents") && (
         <BulkComponentsModal
+          testKeys={[...selectedSet]}
+          onComplete={() => afterMutation({ clearSelection: true })}
+          onCancel={() => afterMutation()}
+        />
+      )}
+
+      {isOpen("bulkStepReplace") && (
+        <BulkStepReplaceModal
           testKeys={[...selectedSet]}
           onComplete={() => afterMutation({ clearSelection: true })}
           onCancel={() => afterMutation()}

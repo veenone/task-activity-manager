@@ -34,6 +34,12 @@ export function BulkToolbar({ s }: { s: AppState }) {
           >
             Rename summaries…
           </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => openModal("bulkStepReplace")}
+          >
+            Replace step text…
+          </button>
           {caps.supportsWorkflowTransitions && (
             <button
               className="btn btn-primary"
