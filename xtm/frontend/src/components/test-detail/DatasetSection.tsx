@@ -28,6 +28,7 @@ export function DatasetSection({
   supported,
   canEdit = false,
   containerKey = "",
+  onEdited,
 }: {
   profileId: string;
   testKey: string;
@@ -37,6 +38,7 @@ export function DatasetSection({
   // execution can define its own dataset for a test, and that is what runs
   // there (#277 W3).
   containerKey?: string;
+  onEdited?: () => void;
 }) {
   const [override, setOverride] = useState<TestDataset | null>(null);
   const [overrideError, setOverrideError] = useState("");
@@ -112,7 +114,10 @@ export function DatasetSection({
           profileId={profileId}
           testKey={testKey}
           initial={dataset ?? { parameters: [], rows: [] }}
-          onSaved={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            onEdited?.();
+          }}
           onCancel={() => setEditing(false)}
         />
         <div className="dataset-section">

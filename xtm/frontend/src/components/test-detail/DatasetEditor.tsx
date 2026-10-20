@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ExportDatasetCSV, ImportDatasetCSV, RenameDatasetPlaceholder, SaveTestDataset, type DatasetParameter, type TestDataset } from "../../api";
@@ -6,6 +6,12 @@ import { Menu } from "../Menu";
 import { Modal } from "../Modal";
 import { useConfirm } from "../useConfirm";
 import { DatasetParameterDialog } from "./DatasetParameterDialog";
+import {
+  DATASET_ACTIONS_COLUMN_WIDTH,
+  DATASET_PARAMETER_COLUMN_WIDTH,
+  DATASET_ROW_COLUMN_WIDTH,
+  datasetEditorMinWidth,
+} from "./datasetLayout";
 import { keys } from "../../queries/keys";
 
 interface Rename {
@@ -223,7 +229,16 @@ export function DatasetEditor({
             </div>
 
             <div className="dataset-scroll dataset-editor-scroll">
-              <table className="dataset-table dataset-editor-table" aria-label="Dataset editor">
+              <table
+                className="dataset-table dataset-editor-table"
+                aria-label="Dataset editor"
+                style={{
+                  "--dataset-row-column-width": `${DATASET_ROW_COLUMN_WIDTH}px`,
+                  "--dataset-parameter-column-width": `${DATASET_PARAMETER_COLUMN_WIDTH}px`,
+                  "--dataset-actions-column-width": `${DATASET_ACTIONS_COLUMN_WIDTH}px`,
+                  "--dataset-editor-min-width": `${datasetEditorMinWidth(parameters.length)}px`,
+                } as CSSProperties}
+              >
                 <colgroup>
                   <col className="dataset-row-column" />
                   {parameters.map((parameter, index) => (

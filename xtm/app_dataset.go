@@ -23,7 +23,8 @@ import (
 // twenty that are not parameterized each pay for a Jira round trip on every
 // single open, to be told again that there is nothing.
 //
-// forceRefresh is the panel's Refresh: skip the cache and overwrite it.
+// forceRefresh is the panel's Refresh: skip the cache and overwrite it unless
+// that would discard an uncommitted local dataset edit.
 func (a *App) GetTestDataset(profileID, testKey string, forceRefresh bool) (testrepo.Dataset, error) {
 	if err := a.requireStore(); err != nil {
 		return testrepo.Dataset{}, err
@@ -33,6 +34,16 @@ func (a *App) GetTestDataset(profileID, testKey string, forceRefresh bool) (test
 	if isLocalTestKey(testKey) {
 		ds, _, err := a.repo.GetTestDataset(profileID, testKey, "")
 		return ds, err
+	}
+	if forceRefresh {
+		pending, err := a.repo.HasPendingDatasetChange(profileID, testKey)
+		if err != nil {
+			return testrepo.Dataset{}, err
+		}
+		if pending {
+			ds, _, err := a.repo.GetTestDataset(profileID, testKey, "")
+			return ds, err
+		}
 	}
 	if !forceRefresh {
 		cached, found, err := a.repo.GetTestDataset(profileID, testKey, "")

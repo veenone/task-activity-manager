@@ -32,6 +32,7 @@
 }
 
 .dataset-table {
+  width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-sm);
 }
@@ -154,15 +155,20 @@
 
 .dataset-editor-table {
   width: 100%;
+  min-width: var(--dataset-editor-min-width);
   table-layout: fixed;
 }
 
 .dataset-row-column {
-  width: 48px;
+  width: var(--dataset-row-column-width);
 }
 
 .dataset-actions-column {
-  width: 150px;
+  width: var(--dataset-actions-column-width);
+}
+
+.dataset-parameter-column {
+  width: var(--dataset-parameter-column-width);
 }
 
 .dataset-editor-table th,

@@ -307,6 +307,41 @@ func TestGetTestDatasetRefreshBypassesTheCache(t *testing.T) {
 	}
 }
 
+// Refresh must not replace a local edit that is still waiting for Commit.
+// The journal's after value and the cache must describe the same table, or a
+// user can see their new parameters disappear while Pending still offers to
+// push them.
+func TestGetTestDatasetRefreshPreservesPendingLocalEdit(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+
+	if _, err := a.GetTestDataset(profileID, "QA-1", false); err != nil {
+		t.Fatalf("prime dataset: %v", err)
+	}
+	local := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "LOCAL_PARAMETER"}},
+		Rows:       [][]string{{"kept"}},
+	}
+	if err := a.SaveTestDataset(profileID, "QA-1", local); err != nil {
+		t.Fatalf("edit dataset: %v", err)
+	}
+
+	got, err := a.GetTestDataset(profileID, "QA-1", true)
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if len(got.Parameters) != 1 || got.Parameters[0].Name != "LOCAL_PARAMETER" {
+		t.Fatalf("refresh returned %+v, want the pending local table", got)
+	}
+
+	cached, _, err := a.repo.GetTestDataset(profileID, "QA-1", "")
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if len(cached.Parameters) != 1 || cached.Parameters[0].Name != "LOCAL_PARAMETER" {
+		t.Fatalf("refresh overwrote the pending cache with %+v", cached)
+	}
+}
+
 // An uncommitted local test has a placeholder key Jira would reject, so it is
 // answered from the store alone, the same rule GetTestSteps follows.
 func TestGetTestDatasetNeverCallsJiraForALocalTest(t *testing.T) {

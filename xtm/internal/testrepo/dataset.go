@@ -115,6 +115,25 @@ func saveTestDataset(ex journal.Execer, profileID, testKey, contextKey string, d
 // cell would make the Pending changes dialog unreadable.
 const datasetField = "dataset"
 
+// HasPendingDatasetChange reports whether a test's dataset has a local edit
+// still waiting to be committed. A refresh must not overwrite that cached
+// table with the remote one while its journal row is pending.
+func (r *Repository) HasPendingDatasetChange(profileID, testKey string) (bool, error) {
+	var one int
+	err := r.db.QueryRow(
+		`SELECT 1 FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ? LIMIT 1`,
+		profileID, entityTestDataset, testKey, datasetField,
+	).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check pending dataset change: %w", err)
+	}
+	return true, nil
+}
+
 // EditTestDataset replaces a test's own dataset locally and queues it for
 // commit (#277 W1). Jira is the system of record, so nothing is sent here.
 //

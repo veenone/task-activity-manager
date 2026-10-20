@@ -365,6 +365,7 @@ describe("DatasetEditor", () => {
     editor(twoByTwo);
 
     const table = screen.getByRole("table", { name: "Dataset editor" });
+    expect(table).toHaveStyle({ "--dataset-editor-min-width": "558px" });
     expect(table.querySelector("col.dataset-row-column")).not.toBeNull();
     expect(table.querySelectorAll("col.dataset-parameter-column")).toHaveLength(2);
     expect(table.querySelector("col.dataset-actions-column")).not.toBeNull();

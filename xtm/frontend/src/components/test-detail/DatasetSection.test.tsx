@@ -183,7 +183,10 @@ describe("DatasetSection", () => {
   });
 
   it("opens the editor on an existing dataset and shows what it saved", async () => {
-    const { client } = render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+    const onEdited = vi.fn();
+    const { client } = render(
+      <DatasetSection profileId="p1" testKey="QA-1" supported canEdit onEdited={onEdited} />,
+    );
     await screen.findByText("USERNAME");
 
     await userEvent.click(screen.getByRole("button", { name: /^edit$/i }));
@@ -196,6 +199,7 @@ describe("DatasetSection", () => {
     expect(screen.queryByLabelText("Dataset editor")).not.toBeInTheDocument();
     expect(getTestDataset).toHaveBeenCalledTimes(1);
     expect(client.getQueryData<TestDataset>(keys.testDataset("p1", "QA-1"))?.rows[0][0]).toBe("carol");
+    expect(onEdited).toHaveBeenCalledTimes(1);
   });
 
   it("does not offer the editor on a backend that cannot write", async () => {
