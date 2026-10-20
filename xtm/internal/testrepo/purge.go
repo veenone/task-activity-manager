@@ -16,6 +16,11 @@ var profileScopedTables = []string{
 	"audit_log",
 	"test_step",
 	"test_dataset",
+	"dataset_catalog_state",
+	"dataset_catalog_test",
+	"dataset_catalog_definition",
+	"dataset_catalog_usage",
+	"dataset_catalog_exec_plan",
 	"test_container",
 	"test_container_test",
 	"saved_view",
@@ -47,6 +52,8 @@ var profileScopedTables = []string{
 	// Execution data pulled back from the backend.
 	"external_test",
 	"test_run",
+	"test_run_iteration",
+	"test_run_iteration_step",
 	"exec_plan",
 
 	// Coverage parameters, their values and what they publish to.

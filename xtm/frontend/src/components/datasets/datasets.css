@@ -1,0 +1,249 @@
+.content-datasets {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.dataset-page {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  padding: 20px 24px;
+}
+
+.dataset-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.dataset-heading h2,
+.dataset-heading p {
+  margin: 0;
+}
+
+.dataset-heading p {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.dataset-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto minmax(240px, auto);
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: var(--r-2);
+}
+
+.dataset-toolbar label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+.dataset-toolbar input,
+.dataset-toolbar select {
+  min-height: 34px;
+}
+
+.dataset-toolbar-sync {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dataset-empty {
+  margin: auto;
+  max-width: 520px;
+  text-align: center;
+}
+
+.dataset-empty h3,
+.dataset-empty p {
+  margin: 0;
+}
+
+.dataset-empty p {
+  margin-top: 8px;
+}
+
+.dataset-table-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.dataset-table {
+  width: 100%;
+}
+
+.dataset-table th:first-child {
+  width: 46%;
+}
+
+.dataset-table td {
+  vertical-align: top;
+}
+
+.dataset-expand {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dataset-expand:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.dataset-test-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.dataset-test-copy > span {
+  color: var(--text-muted);
+}
+
+.dataset-labels {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 28px;
+  margin-top: 6px;
+}
+
+.dataset-label,
+.dataset-override,
+.dataset-parameter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+}
+
+.dataset-override {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dataset-detail-row > td {
+  padding: 0;
+  background: var(--surface-2);
+}
+
+.dataset-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 18px 24px 20px 52px;
+}
+
+.dataset-detail-grid section,
+.dataset-scope-group {
+  min-width: 0;
+}
+
+.dataset-detail-grid h3,
+.dataset-definition p {
+  margin: 0;
+}
+
+.dataset-definition {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-2);
+  background: var(--surface);
+}
+
+.dataset-definition-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dataset-definition-title span,
+.dataset-unknown {
+  color: var(--text-muted);
+}
+
+.dataset-parameter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.dataset-usages {
+  grid-column: 1 / -1;
+}
+
+.dataset-usages-scroll {
+  max-width: 100%;
+  margin: 10px 0 0;
+  overflow-x: auto;
+}
+
+.dataset-usage-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+
+.dataset-usage-table th,
+.dataset-usage-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.dataset-usage-table th {
+  color: var(--text-muted);
+}
+
+.dataset-usage-summary {
+  min-width: 180px;
+  overflow-wrap: anywhere;
+}
+
+.dataset-detail-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .dataset-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dataset-toolbar-sync {
+    grid-column: 1 / -1;
+  }
+
+  .dataset-detail-grid {
+    grid-template-columns: 1fr;
+    padding-left: 24px;
+  }
+}

@@ -60,6 +60,19 @@ func TestPurgeProfileLeavesNoProfileRowBehind(t *testing.T) {
 	repo, st := newRepoAndStore(t)
 	db := st.DB()
 	tables := profileKeyedTables(t, db)
+	for _, want := range []string{
+		"dataset_catalog_state",
+		"dataset_catalog_test",
+		"dataset_catalog_definition",
+		"dataset_catalog_usage",
+		"dataset_catalog_exec_plan",
+		"test_run_iteration",
+		"test_run_iteration_step",
+	} {
+		if !containsTable(tables, want) {
+			t.Errorf("profile-keyed tables missing %s", want)
+		}
+	}
 	if len(tables) < 30 {
 		t.Fatalf("found %d profile-keyed tables, want the whole schema", len(tables))
 	}
@@ -85,6 +98,15 @@ func TestPurgeProfileLeavesNoProfileRowBehind(t *testing.T) {
 		t.Errorf("purge left rows in %d of %d tables: %s",
 			len(left), len(tables), strings.Join(left, ", "))
 	}
+}
+
+func containsTable(tables []string, want string) bool {
+	for _, table := range tables {
+		if table == want {
+			return true
+		}
+	}
+	return false
 }
 
 // profileKeyedTables names every table in the open database that carries a

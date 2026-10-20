@@ -225,11 +225,49 @@ func TestEditTestDatasetAcceptsTheLimits(t *testing.T) {
 	}
 }
 
+func TestValidateDatasetAcceptsAdHocList(t *testing.T) {
+	ds := Dataset{
+		Parameters: []DatasetParameter{{
+			Name: "TIER", Type: "LIST", Options: []string{"gold", "silver"},
+			ListScope: "PARAMETER_AD_HOC",
+		}},
+		Rows: [][]string{{"gold"}, {"silver"}},
+	}
+	if err := ValidateDataset(ds); err != nil {
+		t.Fatalf("valid ad-hoc list was refused: %v", err)
+	}
+}
+
+func TestValidateDatasetRejectsUnknownListValue(t *testing.T) {
+	ds := Dataset{
+		Parameters: []DatasetParameter{{
+			Name: "TIER", Type: "LIST", Options: []string{"gold", "silver"},
+			ListScope: "PARAMETER_AD_HOC",
+		}},
+		Rows: [][]string{{"bronze"}},
+	}
+	err := ValidateDataset(ds)
+	if err == nil || !strings.Contains(err.Error(), `row 1, TIER`) || !strings.Contains(err.Error(), `"bronze"`) {
+		t.Fatalf("error = %v, want the row, parameter, and unknown value", err)
+	}
+}
+
+func TestValidateDatasetRejectsDuplicateAdHocListOptions(t *testing.T) {
+	ds := Dataset{Parameters: []DatasetParameter{{
+		Name: "TIER", Type: "LIST", Options: []string{"gold", "gold"},
+		ListScope: "PARAMETER_AD_HOC",
+	}}}
+	err := ValidateDataset(ds)
+	if err == nil || !strings.Contains(err.Error(), `option "gold" appears more than once`) {
+		t.Fatalf("error = %v, want the duplicate option", err)
+	}
+}
+
 // A CSV carries names and values and nothing else. Importing one over an
 // existing dataset must not throw away what the table already knows about
 // its parameters, or the write that follows rebuilds every one of them and a
 // list parameter comes back as free text (#283, through a different door).
-func TestMergeDatasetParametersKeepsWhatTheTableKnows(t *testing.T) {
+func TestMergeDatasetParametersKeepsMatchedListAndDefaultsNewColumnToText(t *testing.T) {
 	current := Dataset{
 		Parameters: []DatasetParameter{
 			{Name: "TIER", ID: 2741, Type: "LIST", Options: []string{"gold", "silver"},
@@ -257,10 +295,10 @@ func TestMergeDatasetParametersKeepsWhatTheTableKnows(t *testing.T) {
 	if len(tier.Options) != 2 {
 		t.Errorf("TIER kept %d allowed values, want 2", len(tier.Options))
 	}
-	// A column the table has never seen is new, and carries nothing.
+	// A column the table has never seen is new text with no server identity.
 	round := merged.Parameters[1]
-	if round.ID != 0 || round.Type != "" || round.ListID != 0 {
-		t.Errorf("ROUND = %+v, want a parameter with no server identity", round)
+	if round.ID != 0 || round.Type != "TEXT" || round.ListID != 0 {
+		t.Errorf("ROUND = %+v, want a text parameter with no server identity", round)
 	}
 	if !round.Combinatorial {
 		t.Error("the imported combinatorial flag was dropped")

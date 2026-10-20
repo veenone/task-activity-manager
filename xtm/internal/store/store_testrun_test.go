@@ -62,3 +62,23 @@ func TestSchemaTestRunHasTimestamps(t *testing.T) {
 		t.Errorf("updated_at = %q, want 2026-01-02T00:00:00Z", updatedAt)
 	}
 }
+
+func TestSchemaHasParameterizedRunTablesAtVersion55(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer s.Close()
+
+	if schemaVersion < 55 {
+		t.Fatalf("schemaVersion = %d, want at least 55", schemaVersion)
+	}
+	for _, table := range []string{"test_run_iteration", "test_run_iteration_step"} {
+		var name string
+		if err := s.db.QueryRow(
+			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table,
+		).Scan(&name); err != nil || name != table {
+			t.Fatalf("table %q missing: name=%q err=%v", table, name, err)
+		}
+	}
+}

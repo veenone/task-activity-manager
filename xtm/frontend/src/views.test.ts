@@ -6,6 +6,7 @@ const all: ViewContext = {
   supportsPreconditionObjects: true,
   supportsRequirementObjects: true,
   supportsComponentAdmin: true,
+  supportsDatasets: true,
   showCoverage: true,
 };
 
@@ -13,6 +14,7 @@ const none: ViewContext = {
   supportsPreconditionObjects: false,
   supportsRequirementObjects: false,
   supportsComponentAdmin: false,
+  supportsDatasets: false,
   showCoverage: false,
 };
 
@@ -30,6 +32,7 @@ describe("the view list", () => {
     expect(ids).not.toContain("preconditions");
     expect(ids).not.toContain("requirements");
     expect(ids).not.toContain("components");
+    expect(ids).not.toContain("datasets");
     expect(ids).not.toContain("coverage");
     // The unconditional ones are still there, so the filter is not just
     // emptying the list.
@@ -60,6 +63,14 @@ describe("the view list", () => {
 
   it("keeps Browse first, because that is where the app opens", () => {
     expect(visibleViews(none)[0].id).toBe("browse");
+  });
+
+  it("places the capability-gated Datasets view after Containers", () => {
+    const ids = visibleViews(all).map((view) => view.id);
+    expect(ids[ids.indexOf("plans") + 1]).toBe("datasets");
+    expect(
+      visibleViews({ ...all, supportsDatasets: false }).map((view) => view.id),
+    ).not.toContain("datasets");
   });
 
   // The tour points at tabs by this hook, so a duplicate would make its

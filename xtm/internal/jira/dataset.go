@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // DatasetParameter is one column of a test's dataset: a parameter a
@@ -100,6 +102,66 @@ func (c *Client) GetRunDataset(ctx context.Context, execKey, testKey string) (Da
 	return c.datasetModel(ctx, runID, datasetEntityRun)
 }
 
+// GetPlanDataset returns only the dataset a Test Plan defines for one Test.
+// resolved=false is deliberate: the default would return an inherited Test
+// dataset and make an ordinary Plan membership look like an override.
+func (c *Client) GetPlanDataset(ctx context.Context, planKey, testKey string) (Dataset, error) {
+	if isDemoURL(c.baseURL) {
+		return Dataset{}, nil
+	}
+	q := url.Values{}
+	q.Set("contextIssueKey", planKey)
+	q.Set("resolved", "false")
+	q.Set("testIssueKey", testKey)
+	path := datasetExportPath + "?" + q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return Dataset{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/octet-stream")
+	resp, err := c.do(req)
+	if err != nil {
+		return Dataset{}, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, datasetExportMaxBytes+1))
+	if err != nil {
+		return Dataset{}, fmt.Errorf("read Plan dataset export: %w", err)
+	}
+	if len(body) > datasetExportMaxBytes {
+		return Dataset{}, fmt.Errorf("Plan dataset export exceeds %d bytes", datasetExportMaxBytes)
+	}
+	if resp.StatusCode == http.StatusOK {
+		return ParseDatasetCSV(body), nil
+	}
+	if resp.StatusCode == http.StatusNotFound && isDatasetNotFound(body) {
+		return Dataset{}, nil
+	}
+	return Dataset{}, datasetExportHTTPError(path, resp, body)
+}
+
+func isDatasetNotFound(body []byte) bool {
+	var out struct {
+		Error string `json:"error"`
+	}
+	return json.Unmarshal(body, &out) == nil && out.Error == "Dataset not found"
+}
+
+func datasetExportHTTPError(path string, resp *http.Response, body []byte) *HTTPError {
+	var out struct {
+		Error string `json:"error"`
+	}
+	_ = json.Unmarshal(body, &out)
+	return &HTTPError{
+		Method:  http.MethodGet,
+		Path:    path,
+		Code:    resp.StatusCode,
+		Status:  resp.Status,
+		Message: strings.TrimSpace(out.Error),
+	}
+}
+
 // datasetModel reads what one entity defines, a test or a test run, from the
 // JSON resource. It returns entityDataset: what this level defines, not what
 // it inherits.
@@ -139,7 +201,7 @@ func datasetRows(cols []datasetColumn) Dataset {
 			Name:          col.Param.Name,
 			Combinatorial: col.Param.Combinatorial,
 			ID:            col.Param.ID,
-			Type:          col.Param.Info.Type,
+			Type:          normalizedDatasetParameterType(col.Param.Info.Type),
 			Options:       col.Param.Info.Options,
 			ListScope:     col.Param.Info.ListScope,
 			ListID:        col.Param.Info.ListID,
@@ -163,6 +225,11 @@ func datasetRows(cols []datasetColumn) Dataset {
 // #277 W0 spike confirmed every operation against a live instance; see the
 // Xray datasets section of agents/project/domain-context.md.
 const datasetWritePath = "/rest/raven/1.0/dataset"
+
+const (
+	datasetExportPath     = "/rest/raven/2.0/api/dataset/export"
+	datasetExportMaxBytes = 16 << 20
+)
 
 // newParameterID is the id a parameter Xray does not yet own must carry. Any
 // negative value works; omitting the id or sending zero is refused with
@@ -310,8 +377,9 @@ func parameterID(p DatasetParameter) int {
 	return newParameterID
 }
 
-// parameterInfo hands back what the read found. A parameter the editor just
-// added has none, and is written as text; nothing in XTM creates a list.
+// parameterInfo hands back what the read found. A parameter with no type is a
+// legacy text parameter. A new ad-hoc list carries its options and scope but
+// no server-owned list id; existing list bindings keep every positive id.
 func parameterInfo(p DatasetParameter) datasetParamInfo {
 	info := datasetParamInfo{
 		Type:      p.Type,
@@ -322,12 +390,11 @@ func parameterInfo(p DatasetParameter) datasetParamInfo {
 	if info.Type == "" {
 		info.Type = datasetParamText
 	}
+	if p.ID <= 0 && info.Type == datasetParamList && info.ListScope == datasetListScopeAdHoc {
+		info.ListID = 0
+	}
 	if info.Options == nil {
 		info.Options = []string{}
 	}
 	return info
 }
-
-// datasetParamText is the type of an ordinary parameter, and the only type
-// XTM writes for one it has just been given.
-const datasetParamText = "TEXT"

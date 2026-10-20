@@ -12,7 +12,7 @@ describe("invalidateProfileData", () => {
       (c) => (c[0] as { queryKey: readonly unknown[] }).queryKey,
     );
     const seconds = invalidated.map((k) => k[1]);
-    // The 11 list/dashboard families the counter used to bridge.
+    // Every list/dashboard family the counter used to bridge.
     expect(new Set(seconds)).toEqual(
       new Set([
         "tests",
@@ -22,6 +22,7 @@ describe("invalidateProfileData", () => {
         "components",
         "labels",
         "containers",
+        "datasets",
         "preconditions",
         "requirements",
         "duplicates",

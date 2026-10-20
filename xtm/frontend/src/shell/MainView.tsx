@@ -7,6 +7,7 @@ import { ComponentList } from "../components/ComponentList";
 import { Dashboard } from "../components/Dashboard";
 import { TraceabilityTabs } from "../components/TraceabilityTabs";
 import { ContainersView } from "../components/ContainersView";
+import { DatasetsView } from "../components/datasets/DatasetsView";
 import { ComponentsView } from "../components/components-admin/ComponentsView";
 import { PreconditionsView } from "../components/PreconditionsView";
 import { RequirementsView } from "../components/RequirementsView";
@@ -21,7 +22,7 @@ import type { AppActions } from "./useAppActions";
 // MainView renders the chosen view. Browse, the fallback, is the grouped
 // sidebar, the test table, and the detail or New Test panel beside it.
 export function MainView({ s, a }: { s: AppState; a: AppActions }) {
-  const { activeProfile, pulling, view, setView, groupBy, setGroupBy, selectedFolder, setSelectedFolder, selectedContainer, setSelectedContainer, selectedComponent, setSelectedComponent, showNewTest, setShowNewTest, newTestFolder, selectedKey, setSelectedKey, detailVersion, sidebarWidth, syncState, folders, groupContainers, components, pendingByTestKey, reloadPending, refreshProfileData, isDemo, demoVar, caps, startSidebarResize } = s;
+  const { activeProfile, pulling, view, setView, groupBy, setGroupBy, selectedFolder, setSelectedFolder, selectedContainer, setSelectedContainer, selectedComponent, setSelectedComponent, showNewTest, setShowNewTest, newTestFolder, openContainer, selectedKey, setSelectedKey, detailVersion, sidebarWidth, syncState, folders, groupContainers, components, pendingByTestKey, reloadPending, refreshProfileData, isDemo, demoVar, caps, startSidebarResize } = s;
   const { createFolder, renameFolder, deleteFolder, syncTests, handleEdited, openNewTest, handleTestCreated } = a;
   return (
     <>
@@ -93,6 +94,20 @@ export function MainView({ s, a }: { s: AppState; a: AppActions }) {
             onChanged={() => {
               refreshProfileData();
               reloadPending();
+            }}
+          />
+        </main>
+      ) : view === "datasets" && caps.supportsDatasets ? (
+        <main className="content content-datasets">
+          <DatasetsView
+            jiraUrl={activeProfile?.jiraUrl ?? ""}
+            onOpenTest={(key) => {
+              setSelectedKey(key);
+              setView("browse");
+            }}
+            onOpenContainer={(target) => {
+              openContainer(target);
+              setView("plans");
             }}
           />
         </main>

@@ -117,7 +117,16 @@ combinatorial asterisk and values, and has nowhere to put a parameter's id or
 the list behind it, so an import matches those back by name from the table it
 replaces (`testrepo.MergeDatasetParameters`). Skipping that would rebuild
 every parameter on the next write, which is #283 again through a different
-door.
+door. A column with no match is normalized to `TEXT`.
+
+**Dataset parameter configuration is separate from cell editing.**
+`DatasetParameterDialog` returns one complete parameter to `DatasetEditor`.
+Text parameters accept free-form cells. An ad-hoc List carries `type=LIST`,
+ordered unique `options` and `paramTestListScope=PARAMETER_AD_HOC`; a new List
+has no positive `listId`. Existing predefined bindings stay read-only and are
+sent back with their ids and scope unless the user confirms conversion. XTM
+does not administer project lists. `testrepo.ValidateDataset` checks this
+contract before the whole table can enter the journal.
 
 **Iterations are read fresh, never cached.** How each dataset row went in an
 execution comes from the 2.0 run resource when the panel opens, and goes
@@ -147,6 +156,35 @@ commit through. The comparison looks at names, combinatorial flags and rows
 only: Xray reissues parameter and list ids whenever it rebuilds a parameter,
 and a conflict over bookkeeping nobody changed would be a dead end. The write
 takes its ids from the table Jira holds at commit time for the same reason.
+The frontend call flow remains `DatasetEditor` to `SaveTestDataset`, then
+`testrepo.EditTestDataset` validates, caches and journals the full table in one
+transaction. Commit later maps the stored parameter metadata to Xray's
+column-major JSON payload.
+
+**Parameterized Test Runs are cached and committed by stable result ids.** A
+Test remains one execution member; `test_run_iteration` and
+`test_run_iteration_step` hold its nested result tree. The frontend loads that
+tree lazily with the full profile, execution and test identity in its query
+key. Status edits journal `test_run_iteration` or
+`test_run_iteration_step` rows. Before a write, `commit_iteration.go` reads the
+remote tree and compares the targeted stable id with `before_val`: a different
+remote status becomes a conflict, an already-applied value clears locally, and
+a backend refusal keeps only that row pending. Detail and write capabilities
+are separate. Demo2 advertises both for its deterministic fixture; live Xray
+and Kiwi keep both false until fixture-backed endpoints prove their contracts.
+
+**A JUnit result for a newly created execution resolves after allocation.**
+The preview matches a testcase's complete ordered property signature against
+the cached test-level dataset. Existing parameterized Tests retain that
+signature; a newly created Test remains an overall run because it has no
+dataset. Apply journals the retained result as
+`test_run_iteration_import`, keyed by temporary execution key, Test key and a
+signature hash. The container-create rename rewrites that pending key. After
+membership commit, `commit_junit_iteration.go` fetches the new parameterized
+run, verifies the dataset source, requires exactly one signature match, and
+writes by the stable iteration ID returned by the backend. Source drift and
+zero or multiple matches produce a conflict that keeps the pending row. The
+deferred payload does not treat a preview-only signature hash as a server ID.
 
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then

@@ -118,6 +118,13 @@ export const keys = {
   coverageMap: (profileId: string) =>
     [profileId, "canonicalRequirements", "map"] as const,
   containers: (profileId: string) => [profileId, "containers"] as const,
+  datasets: (profileId: string) => [profileId, "datasets"] as const,
+  testDataset: (profileId: string, testKey: string) =>
+    ["test-dataset", profileId, testKey] as const,
+  datasetCatalog: <T extends object>(profileId: string, query: T) =>
+    [profileId, "datasets", "catalog", query] as const,
+  datasetDetail: (profileId: string, testKey: string) =>
+    [profileId, "datasets", "detail", testKey] as const,
   // Per-container detail reads for ContainersView, nested under the
   // "containers" prefix so invalidateProfileData refreshes them with the list.
   containerBoard: (profileId: string, key: string) =>
@@ -128,6 +135,8 @@ export const keys = {
     [profileId, "containers", "members", key] as const,
   containerRollup: (profileId: string, key: string) =>
     [profileId, "containers", "rollup", key] as const,
+  parameterizedRun: (profileId: string, execKey: string, testKey: string) =>
+    ["parameterized-run", profileId, execKey, testKey] as const,
   // TraceabilityTabs' reads, all under one prefix so invalidateProfileData
   // refreshes the whole view.
   traceabilityStats: (profileId: string) =>

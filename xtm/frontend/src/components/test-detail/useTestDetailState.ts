@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTest, useTestBugs, useTestContainers, useTestMeta, useTestPreconditions, useTestRequirements, useTestReview, useTestRunHistory, useAllPreconditions, useRequirementCoverage } from "../../queries/testDetail";
 import type { TestDetailProps } from "./types";
 import { REVIEWER_KEY } from "./types";
+import { useTestDataset } from "../../queries/datasets";
 
 // useTestDetailState holds what the panel knows about one test: the queries
 // behind each section, the draft buffers the fields edit, the steps and custom
@@ -22,6 +23,8 @@ export function useTestDetailState(p: TestDetailProps) {
   // type, folder) to what the active profile's backend actually supports
   // (P6.2a). Status/step editing is left un-gated here — that's P6.2b.
   const caps = useCapabilities(profileId);
+  const datasetQuery = useTestDataset(profileId, testKey, caps.supportsDatasets);
+  const dataset = datasetQuery.data ?? { parameters: [], rows: [] };
 
   // The test key links to its real Jira issue, opened in the system browser
   // (RND_P_4TFINT_05-211). Suppressed for demo profiles and for uncommitted
@@ -245,7 +248,7 @@ export function useTestDetailState(p: TestDetailProps) {
   const isDirty = (field: string) =>
     pendingForTest.some((p) => p.field === field);
 
-  return { profileId, activeProfile, prompt, confirm, width, setWidth, precondLoading, setPrecondLoading, precondError, setPrecondError, showCrossPrecond, setShowCrossPrecond, swapKind, setSwapKind, customFields, setCustomFields, reviewer, setReviewer, reviewNote, setReviewNote, transitions, setTransitions, allStatuses, setAllStatuses, steps, setSteps, stepsLoading, setStepsLoading, stepsError, setStepsError, customFieldsOpen, setCustomFieldsOpen, showCloneSteps, setShowCloneSteps, showCallPicker, setShowCallPicker, crossProjectSources, setCrossProjectSources, showCrossCall, setShowCrossCall, showCrossClone, setShowCrossClone, cloning, setCloning, jiraStepInfo, setJiraStepInfo, runHistorySort, setRunHistorySort, saveError, setSaveError, summary, setSummary, description, setDescription, priority, setPriority, labels, setLabels, execType, setExecType, cucumberScenario, setCucumberScenario, cucumberType, setCucumberType, genericDefinition, setGenericDefinition, prefillNotice, setPrefillNotice, localReloadKey, setLocalReloadKey, caps, isDemoProfile, canLinkToJira, crossProjectSourceList, crossProjectEnabled, reloadSig, metaQuery, meta, runHistoryQuery, runHistory, runHistoryLoading, runHistoryError, queryClient, testQuery, test, reviewQuery, review, containersQuery, containers, requirementsQuery, requirements, preconditionsQuery, preconditions, allPreconditions, panelLoading, displayError, bugs, allRequirements, isDirty, openInJira, openBugInJira, startResize, toggleRunHistorySort, sortedRunHistory };
+  return { profileId, activeProfile, prompt, confirm, width, setWidth, precondLoading, setPrecondLoading, precondError, setPrecondError, showCrossPrecond, setShowCrossPrecond, swapKind, setSwapKind, customFields, setCustomFields, reviewer, setReviewer, reviewNote, setReviewNote, transitions, setTransitions, allStatuses, setAllStatuses, steps, setSteps, stepsLoading, setStepsLoading, stepsError, setStepsError, customFieldsOpen, setCustomFieldsOpen, showCloneSteps, setShowCloneSteps, showCallPicker, setShowCallPicker, crossProjectSources, setCrossProjectSources, showCrossCall, setShowCrossCall, showCrossClone, setShowCrossClone, cloning, setCloning, jiraStepInfo, setJiraStepInfo, runHistorySort, setRunHistorySort, saveError, setSaveError, summary, setSummary, description, setDescription, priority, setPriority, labels, setLabels, execType, setExecType, cucumberScenario, setCucumberScenario, cucumberType, setCucumberType, genericDefinition, setGenericDefinition, prefillNotice, setPrefillNotice, localReloadKey, setLocalReloadKey, caps, datasetQuery, dataset, isDemoProfile, canLinkToJira, crossProjectSourceList, crossProjectEnabled, reloadSig, metaQuery, meta, runHistoryQuery, runHistory, runHistoryLoading, runHistoryError, queryClient, testQuery, test, reviewQuery, review, containersQuery, containers, requirementsQuery, requirements, preconditionsQuery, preconditions, allPreconditions, panelLoading, displayError, bugs, allRequirements, isDirty, openInJira, openBugInJira, startResize, toggleRunHistorySort, sortedRunHistory };
 }
 
 export type TestDetailState = ReturnType<typeof useTestDetailState>;

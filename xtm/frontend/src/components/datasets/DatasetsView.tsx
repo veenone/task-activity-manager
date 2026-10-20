@@ -1,0 +1,56 @@
+import { errMsg } from "../../api";
+import { DatasetCatalogTable } from "./DatasetCatalogTable";
+import type { ContainerNavigationTarget } from "../../contexts/NavContext";
+import { DatasetCatalogToolbar } from "./DatasetCatalogToolbar";
+import { useDatasetCatalogState } from "./useDatasetCatalogState";
+import "./datasets.css";
+
+interface Props {
+  jiraUrl: string;
+  onOpenTest: (key: string) => void;
+  onOpenContainer: (target: ContainerNavigationTarget) => void;
+}
+
+export function DatasetsView(props: Props) {
+  const state = useDatasetCatalogState();
+  const page = state.catalog.data;
+  const loadError = state.catalog.error ? errMsg(state.catalog.error) : "";
+
+  return (
+    <section className="dataset-page" aria-labelledby="datasets-heading">
+      <header className="dataset-heading">
+        <div>
+          <h2 id="datasets-heading">Datasets</h2>
+          <p>
+            Test defaults and the Plan or Execution overrides that change them.
+          </p>
+        </div>
+      </header>
+      <DatasetCatalogToolbar state={state} />
+      {(state.syncError || loadError) && (
+        <div className="error-text" role="alert">
+          {state.syncError || loadError}
+        </div>
+      )}
+      {!page && state.catalog.isLoading ? (
+        <p className="dataset-empty muted">Loading dataset catalog…</p>
+      ) : !page?.state ? (
+        <div className="dataset-empty">
+          <h3>This project has not been scanned for datasets.</h3>
+          <p className="muted">
+            Run a scan to build the local inventory without changing Jira.
+          </p>
+        </div>
+      ) : page.total === 0 ? (
+        <div className="dataset-empty">
+          <h3>No Tests with datasets match these filters.</h3>
+          <p className="muted">
+            Change the filters or scan again after datasets change in Jira.
+          </p>
+        </div>
+      ) : (
+        <DatasetCatalogTable state={state} {...props} />
+      )}
+    </section>
+  );
+}

@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { GetContainerDataset, GetTestDataset, type TestDataset } from "../../api";
+import { GetContainerDataset, GetTestDataset, errMsg, type TestDataset } from "../../api";
+import { useTestDataset } from "../../queries/datasets";
+import { keys } from "../../queries/keys";
 import { DatasetEditor } from "./DatasetEditor";
+import "./dataset.css";
 
 // DATASET_ROW_CAP is how many rows the panel draws.
 //
@@ -24,6 +28,7 @@ export function DatasetSection({
   supported,
   canEdit = false,
   containerKey = "",
+  onEdited,
 }: {
   profileId: string;
   testKey: string;
@@ -33,39 +38,61 @@ export function DatasetSection({
   // execution can define its own dataset for a test, and that is what runs
   // there (#277 W3).
   containerKey?: string;
+  onEdited?: () => void;
 }) {
-  const [dataset, setDataset] = useState<TestDataset | null>(null);
   const [override, setOverride] = useState<TestDataset | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [overrideError, setOverrideError] = useState("");
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
-
-  const load = useCallback(
-    async (forceRefresh: boolean) => {
-      if (!supported || !testKey) return;
-      setLoading(true);
-      setError("");
-      try {
-        setDataset(await GetTestDataset(profileId, testKey, forceRefresh));
-        setOverride(
-          containerKey
-            ? await GetContainerDataset(profileId, containerKey, testKey, forceRefresh)
-            : null,
-        );
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [profileId, testKey, supported, containerKey],
-  );
+  const queryClient = useQueryClient();
+  const datasetQuery = useTestDataset(profileId, testKey, supported);
+  const dataset = datasetQuery.data ?? null;
 
   useEffect(() => {
-    void load(false);
-  }, [load]);
+    if (!supported || !testKey || !containerKey) {
+      setOverride(null);
+      setOverrideError("");
+      return;
+    }
+    let cancelled = false;
+    setOverrideLoading(true);
+    setOverrideError("");
+    GetContainerDataset(profileId, containerKey, testKey, false)
+      .then((next) => {
+        if (!cancelled) setOverride(next);
+      })
+      .catch((caught) => {
+        if (!cancelled) setOverrideError(errMsg(caught));
+      })
+      .finally(() => {
+        if (!cancelled) setOverrideLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, testKey, supported, containerKey]);
+
+  async function refresh() {
+    setRefreshing(true);
+    setOverrideError("");
+    try {
+      const next = await GetTestDataset(profileId, testKey, true);
+      queryClient.setQueryData(keys.testDataset(profileId, testKey), next);
+      setOverride(
+        containerKey
+          ? await GetContainerDataset(profileId, containerKey, testKey, true)
+          : null,
+      );
+    } catch (caught) {
+      setOverrideError(errMsg(caught));
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (!supported) return null;
+  const error = overrideError || (datasetQuery.error ? errMsg(datasetQuery.error) : "");
   if (error) {
     return (
       <div className="dataset-section">
@@ -78,22 +105,25 @@ export function DatasetSection({
   const overridden = (override?.parameters.length ?? 0) > 0;
   const shown = overridden ? override : dataset;
   const level = !containerKey ? "" : overridden ? `defined in ${containerKey}` : "from the test";
+  const loading = datasetQuery.isFetching || overrideLoading || refreshing;
 
   if (editing) {
     return (
-      <div className="dataset-section">
-        <h4 className="dataset-head">Dataset</h4>
+      <>
         <DatasetEditor
           profileId={profileId}
           testKey={testKey}
           initial={dataset ?? { parameters: [], rows: [] }}
-          onSaved={(saved) => {
-            setDataset(saved);
+          onSaved={() => {
             setEditing(false);
+            onEdited?.();
           }}
           onCancel={() => setEditing(false)}
         />
-      </div>
+        <div className="dataset-section">
+          <h4 className="dataset-head">Dataset</h4>
+        </div>
+      </>
     );
   }
   // A test with no dataset shows nothing at all, so an ordinary test's panel
@@ -125,7 +155,7 @@ export function DatasetSection({
         {level && <span className="dataset-level">{level}</span>}
         <button
           className="link-btn dataset-refresh"
-          onClick={() => void load(true)}
+          onClick={() => void refresh()}
           disabled={loading}
           title="Re-fetch the dataset from Jira"
         >

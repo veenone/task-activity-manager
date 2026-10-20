@@ -166,6 +166,8 @@ export {
   GetTestSteps,
   GetTestDataset,
   GetContainerDataset,
+  SetIterationStatus,
+  SetIterationStepStatus,
   GetRunIterations,
   RenameDatasetPlaceholder,
   CheckJiraTestSteps,
@@ -214,10 +216,6 @@ export {
   GetRunRollup,
   GetRunRollupBreakdown,
   GetExecutionMembersWithRuns,
-  AnalyzeJUnitImport,
-  ApplyJUnitImport,
-  AnalyzeJUnitImportNewExec,
-  ApplyJUnitImportNewExec,
   AnalyzeRequirementImport,
   ExportRequirementImportTemplate,
   ExportPreconditionImportTemplate,
@@ -280,6 +278,14 @@ import {
   SaveTestDataset as saveTestDatasetBinding,
   ImportDatasetCSV as importDatasetCSVBinding,
   ExportDatasetCSV as exportDatasetCSVBinding,
+  SyncDatasetCatalog as syncDatasetCatalogBinding,
+  ListDatasetCatalog as listDatasetCatalogBinding,
+  GetDatasetCatalogDetail as getDatasetCatalogDetailBinding,
+  GetParameterizedRun as getParameterizedRunBinding,
+  AnalyzeJUnitImport as analyzeJUnitImportBinding,
+  ApplyJUnitImport as applyJUnitImportBinding,
+  AnalyzeJUnitImportNewExec as analyzeJUnitImportNewExecBinding,
+  ApplyJUnitImportNewExec as applyJUnitImportNewExecBinding,
 } from "../wailsjs/go/main/App";
 import { testrepo } from "../wailsjs/go/models";
 
@@ -309,6 +315,88 @@ export async function SaveTestDataset(
   dataset: TestDataset,
 ): Promise<void> {
   await saveTestDatasetBinding(profileId, testKey, testrepo.Dataset.createFrom(dataset));
+}
+
+export async function SyncDatasetCatalog(profileId: string): Promise<void> {
+  await syncDatasetCatalogBinding(profileId);
+}
+
+export async function ListDatasetCatalog(
+  profileId: string,
+  query: DatasetCatalogQuery,
+): Promise<DatasetCatalogPage> {
+  return listDatasetCatalogBinding(
+    profileId,
+    testrepo.DatasetCatalogQuery.createFrom(query),
+  ) as Promise<DatasetCatalogPage>;
+}
+
+export async function GetDatasetCatalogDetail(
+  profileId: string,
+  testKey: string,
+): Promise<DatasetCatalogDetail> {
+  return getDatasetCatalogDetailBinding(
+    profileId,
+    testKey,
+  ) as Promise<DatasetCatalogDetail>;
+}
+
+export async function GetParameterizedRun(
+  profileId: string,
+  execKey: string,
+  testKey: string,
+  forceRefresh: boolean,
+): Promise<ParameterizedRun> {
+  return getParameterizedRunBinding(
+    profileId,
+    execKey,
+    testKey,
+    forceRefresh,
+  ) as Promise<ParameterizedRun>;
+}
+
+export async function AnalyzeJUnitImport(
+  profileId: string,
+  execKey: string,
+  xmlBase64: string,
+): Promise<JUnitImportPreview> {
+  return analyzeJUnitImportBinding(profileId, execKey, xmlBase64) as unknown as Promise<JUnitImportPreview>;
+}
+
+export async function ApplyJUnitImport(
+  profileId: string,
+  execKey: string,
+  matches: JUnitMatch[],
+): Promise<BulkEditResult> {
+  return applyJUnitImportBinding(
+    profileId,
+    execKey,
+    matches.map((match) => testrepo.JUnitMatch.createFrom(match)),
+  ) as Promise<BulkEditResult>;
+}
+
+export async function AnalyzeJUnitImportNewExec(
+  profileId: string,
+  xmlBase64: string,
+  createMissing: boolean,
+): Promise<JUnitNewExecPreview> {
+  return analyzeJUnitImportNewExecBinding(
+    profileId,
+    xmlBase64,
+    createMissing,
+  ) as unknown as Promise<JUnitNewExecPreview>;
+}
+
+export async function ApplyJUnitImportNewExec(
+  profileId: string,
+  summary: string,
+  rows: JUnitNewExecRow[],
+): Promise<JUnitNewExecResult> {
+  return applyJUnitImportNewExecBinding(
+    profileId,
+    summary,
+    rows.map((row) => testrepo.JUnitNewExecRow.createFrom(row)),
+  ) as Promise<JUnitNewExecResult>;
 }
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -630,6 +718,8 @@ export interface Capabilities {
   // from supportsDatasets so a read-only backend still shows the table while
   // the editor stays away.
   supportsDatasetWrites: boolean;
+  supportsParameterizedRunDetail: boolean;
+  supportsParameterizedRunWrites: boolean;
 }
 
 // DatasetParameter mirrors testrepo.DatasetParameter: one column of a
@@ -658,16 +748,103 @@ export interface TestDataset {
   rows: string[][];
 }
 
-// RunIteration mirrors backend.RunIteration: one run of a parameterized test
-// inside an execution, with the values it ran with and how it went. A test
-// with a dataset runs once per row, and the run's own status is derived from
-// these.
-export interface RunIteration {
-  // The iteration's id in Xray, 0 where it has none: a dataset of one row is
-  // reported by Xray as a run without iterations of its own.
-  id: number;
+export interface IterationParameter {
+  name: string;
+  value: string;
+}
+
+export interface IterationStep {
+  id: string;
+  definitionId: string;
+  rank: number;
   status: string;
-  parameters: { name: string; value: string }[];
+  action: string;
+  data: string;
+  expected: string;
+}
+
+export interface RunIteration {
+  id: string;
+  rank: number;
+  status: string;
+  parameters: IterationParameter[];
+  steps: IterationStep[];
+}
+
+export interface ParameterizedRun {
+  id: string;
+  executionKey: string;
+  testKey: string;
+  datasetSourceKind: "test" | "plan" | "execution";
+  datasetSourceKey: string;
+  status: string;
+  iterations: RunIteration[];
+}
+
+export interface DatasetCatalogQuery {
+  search: string;
+  scope: string;
+  ownership: string;
+  limit: number;
+  offset: number;
+}
+
+export interface DatasetCatalogState {
+  activeGeneration: number;
+  lastSyncedAt: string;
+  ownedTestCount: number;
+  externalTestCount: number;
+  relationshipCount: number;
+  testGroupCount: number;
+  definitionCount: number;
+}
+
+export interface DatasetCatalogTestSummary {
+  testKey: string;
+  summary: string;
+  projectKey: string;
+  external: boolean;
+  internalOpenable: boolean;
+  defaultParameterCount: number;
+  defaultRowCount: number;
+  planCount: number;
+  executionCount: number;
+  overrideCount: number;
+}
+
+export interface DatasetCatalogDefinition {
+  testKey: string;
+  scopeKind: string;
+  contextKey: string;
+  contextSummary: string;
+  parameters: DatasetParameter[];
+  rows: string[][];
+  metadataComplete: boolean;
+}
+
+export interface DatasetCatalogUsage {
+  testKey: string;
+  containerKind: string;
+  containerKey: string;
+  containerSummary: string;
+}
+
+export interface DatasetCatalogExecPlan {
+  execKey: string;
+  planKey: string;
+}
+
+export interface DatasetCatalogPage {
+  state: DatasetCatalogState | null;
+  tests: DatasetCatalogTestSummary[];
+  total: number;
+}
+
+export interface DatasetCatalogDetail {
+  test: DatasetCatalogTestSummary;
+  definitions: DatasetCatalogDefinition[];
+  usages: DatasetCatalogUsage[];
+  execPlans: DatasetCatalogExecPlan[];
 }
 
 // ProjectComponent mirrors backend.Component: one Jira project component.
@@ -1674,6 +1851,30 @@ export interface JUnitMatch {
   summary: string;
   result: string; // "PASS" | "FAIL"
   currentRun: string;
+  targetKind: "run" | "iteration";
+  iterationId: string;
+  parameters: IterationParameter[];
+  datasetSourceKind: "test" | "plan" | "execution" | "";
+  datasetSourceKey: string;
+}
+
+export interface JUnitIterationCandidate {
+  iterationId: string;
+  parameters: IterationParameter[];
+  currentRun: string;
+}
+
+export interface JUnitMapping {
+  testcase: string;
+  testKey: string;
+  summary: string;
+  result: string;
+  included: boolean;
+  reason: string;
+  datasetSourceKind: "test" | "plan" | "execution" | "";
+  datasetSourceKey: string;
+  candidateIterations: JUnitIterationCandidate[];
+  match?: JUnitMatch;
 }
 
 // JUnitSkip mirrors testrepo.JUnitSkip -- a testcase skipped with a reason.
@@ -1688,6 +1889,7 @@ export interface JUnitImportPreview {
   total: number;
   matched: JUnitMatch[];
   skipped: JUnitSkip[];
+  mappings: JUnitMapping[];
 }
 
 // JUnitNewExecRow mirrors testrepo.JUnitNewExecRow -- one testcase row in a
@@ -1700,6 +1902,12 @@ export interface JUnitNewExecRow {
   summary: string;
   result: string;
   create: boolean;
+  targetKind: "run" | "iteration";
+  parameters: IterationParameter[];
+  datasetSourceKind: "test" | "plan" | "execution" | "";
+  datasetSourceKey: string;
+  reason: string;
+  candidateIterations: JUnitIterationCandidate[];
 }
 
 // JUnitNewExecPreview mirrors testrepo.JUnitNewExecPreview -- the analysis of

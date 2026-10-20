@@ -454,6 +454,10 @@ export function GetCoverageReport(arg1, arg2) {
   return window['go']['main']['App']['GetCoverageReport'](arg1, arg2);
 }
 
+export function GetDatasetCatalogDetail(arg1, arg2) {
+  return window['go']['main']['App']['GetDatasetCatalogDetail'](arg1, arg2);
+}
+
 export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
@@ -476,6 +480,10 @@ export function GetIgnoreWords() {
 
 export function GetParamModel(arg1, arg2) {
   return window['go']['main']['App']['GetParamModel'](arg1, arg2);
+}
+
+export function GetParameterizedRun(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetParameterizedRun'](arg1, arg2, arg3, arg4);
 }
 
 export function GetPreconditionCreateFields(arg1) {
@@ -676,6 +684,10 @@ export function ListCoverageGaps(arg1, arg2) {
 
 export function ListCoverageProjects(arg1) {
   return window['go']['main']['App']['ListCoverageProjects'](arg1);
+}
+
+export function ListDatasetCatalog(arg1, arg2) {
+  return window['go']['main']['App']['ListDatasetCatalog'](arg1, arg2);
 }
 
 export function ListFolders(arg1) {
@@ -934,6 +946,14 @@ export function SetDefaultProfile(arg1) {
   return window['go']['main']['App']['SetDefaultProfile'](arg1);
 }
 
+export function SetIterationStatus(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetIterationStatus'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function SetIterationStepStatus(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['SetIterationStepStatus'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function SetMemberVersion(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SetMemberVersion'](arg1, arg2, arg3, arg4);
 }
@@ -1008,6 +1028,10 @@ export function SyncBugs(arg1) {
 
 export function SyncContainers(arg1) {
   return window['go']['main']['App']['SyncContainers'](arg1);
+}
+
+export function SyncDatasetCatalog(arg1) {
+  return window['go']['main']['App']['SyncDatasetCatalog'](arg1);
 }
 
 export function SyncPreconditions(arg1) {

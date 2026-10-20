@@ -50,6 +50,7 @@ eslint-report.json
 
 # local agent work notes (briefs, reports, ledgers)
 .work/
+.worktrees/
 
 # slop-mop working directory (machine-local state)
 .slopmop/

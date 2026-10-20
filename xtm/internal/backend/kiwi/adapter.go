@@ -602,6 +602,18 @@ func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Data
 	return backend.ErrUnsupported
 }
 
+func (a *Adapter) GetParameterizedRun(ctx context.Context, execKey, testKey string) (backend.ParameterizedRun, error) {
+	return backend.ParameterizedRun{}, backend.ErrUnsupported
+}
+
+func (a *Adapter) SetIterationStatus(ctx context.Context, execKey, testKey, iterationID, status string) error {
+	return backend.ErrUnsupported
+}
+
+func (a *Adapter) SetIterationStepStatus(ctx context.Context, execKey, testKey, iterationID, stepResultID, status string) error {
+	return backend.ErrUnsupported
+}
+
 func (a *Adapter) UpdateTestStep(ctx context.Context, key, stepID string, fields map[string]string) error {
 	return backend.ErrUnsupported // P4.2 (write)
 }

@@ -23,6 +23,8 @@ export namespace backend {
 	    supportsTags: boolean;
 	    supportsDatasets: boolean;
 	    supportsDatasetWrites: boolean;
+	    supportsParameterizedRunDetail: boolean;
+	    supportsParameterizedRunWrites: boolean;
 	    supportsComponentAdmin: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -53,6 +55,8 @@ export namespace backend {
 	        this.supportsTags = source["supportsTags"];
 	        this.supportsDatasets = source["supportsDatasets"];
 	        this.supportsDatasetWrites = source["supportsDatasetWrites"];
+	        this.supportsParameterizedRunDetail = source["supportsParameterizedRunDetail"];
+	        this.supportsParameterizedRunWrites = source["supportsParameterizedRunWrites"];
 	        this.supportsComponentAdmin = source["supportsComponentAdmin"];
 	    }
 	}
@@ -112,12 +116,12 @@ export namespace backend {
 	        this.outward = source["outward"];
 	    }
 	}
-	export class RunIterationParam {
+	export class IterationParameter {
 	    name: string;
 	    value: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new RunIterationParam(source);
+	        return new IterationParameter(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -126,10 +130,36 @@ export namespace backend {
 	        this.value = source["value"];
 	    }
 	}
-	export class RunIteration {
-	    id: number;
+	export class IterationStep {
+	    id: string;
+	    definitionId: string;
+	    rank: number;
 	    status: string;
-	    parameters: RunIterationParam[];
+	    action: string;
+	    data: string;
+	    expected: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IterationStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.definitionId = source["definitionId"];
+	        this.rank = source["rank"];
+	        this.status = source["status"];
+	        this.action = source["action"];
+	        this.data = source["data"];
+	        this.expected = source["expected"];
+	    }
+	}
+	export class RunIteration {
+	    id: string;
+	    rank: number;
+	    status: string;
+	    parameters: IterationParameter[];
+	    steps: IterationStep[];
 	
 	    static createFrom(source: any = {}) {
 	        return new RunIteration(source);
@@ -138,8 +168,52 @@ export namespace backend {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.rank = source["rank"];
 	        this.status = source["status"];
-	        this.parameters = this.convertValues(source["parameters"], RunIterationParam);
+	        this.parameters = this.convertValues(source["parameters"], IterationParameter);
+	        this.steps = this.convertValues(source["steps"], IterationStep);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ParameterizedRun {
+	    id: string;
+	    executionKey: string;
+	    testKey: string;
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
+	    status: string;
+	    iterations: RunIteration[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ParameterizedRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.executionKey = source["executionKey"];
+	        this.testKey = source["testKey"];
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
+	        this.status = source["status"];
+	        this.iterations = this.convertValues(source["iterations"], RunIteration);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2138,6 +2212,228 @@ export namespace testrepo {
 		    return a;
 		}
 	}
+	export class DatasetCatalogDefinition {
+	    testKey: string;
+	    scopeKind: string;
+	    contextKey: string;
+	    contextSummary: string;
+	    parameters: DatasetParameter[];
+	    rows: string[][];
+	    metadataComplete: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogDefinition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.scopeKind = source["scopeKind"];
+	        this.contextKey = source["contextKey"];
+	        this.contextSummary = source["contextSummary"];
+	        this.parameters = this.convertValues(source["parameters"], DatasetParameter);
+	        this.rows = source["rows"];
+	        this.metadataComplete = source["metadataComplete"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DatasetCatalogExecPlan {
+	    execKey: string;
+	    planKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogExecPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.execKey = source["execKey"];
+	        this.planKey = source["planKey"];
+	    }
+	}
+	export class DatasetCatalogUsage {
+	    testKey: string;
+	    containerKind: string;
+	    containerKey: string;
+	    containerSummary: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.containerKind = source["containerKind"];
+	        this.containerKey = source["containerKey"];
+	        this.containerSummary = source["containerSummary"];
+	    }
+	}
+	export class DatasetCatalogTestSummary {
+	    testKey: string;
+	    summary: string;
+	    projectKey: string;
+	    external: boolean;
+	    internalOpenable: boolean;
+	    defaultParameterCount: number;
+	    defaultRowCount: number;
+	    planCount: number;
+	    executionCount: number;
+	    overrideCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogTestSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.summary = source["summary"];
+	        this.projectKey = source["projectKey"];
+	        this.external = source["external"];
+	        this.internalOpenable = source["internalOpenable"];
+	        this.defaultParameterCount = source["defaultParameterCount"];
+	        this.defaultRowCount = source["defaultRowCount"];
+	        this.planCount = source["planCount"];
+	        this.executionCount = source["executionCount"];
+	        this.overrideCount = source["overrideCount"];
+	    }
+	}
+	export class DatasetCatalogDetail {
+	    test: DatasetCatalogTestSummary;
+	    definitions: DatasetCatalogDefinition[];
+	    usages: DatasetCatalogUsage[];
+	    execPlans: DatasetCatalogExecPlan[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.test = this.convertValues(source["test"], DatasetCatalogTestSummary);
+	        this.definitions = this.convertValues(source["definitions"], DatasetCatalogDefinition);
+	        this.usages = this.convertValues(source["usages"], DatasetCatalogUsage);
+	        this.execPlans = this.convertValues(source["execPlans"], DatasetCatalogExecPlan);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class DatasetCatalogState {
+	    activeGeneration: number;
+	    lastSyncedAt: string;
+	    ownedTestCount: number;
+	    externalTestCount: number;
+	    relationshipCount: number;
+	    testGroupCount: number;
+	    definitionCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.activeGeneration = source["activeGeneration"];
+	        this.lastSyncedAt = source["lastSyncedAt"];
+	        this.ownedTestCount = source["ownedTestCount"];
+	        this.externalTestCount = source["externalTestCount"];
+	        this.relationshipCount = source["relationshipCount"];
+	        this.testGroupCount = source["testGroupCount"];
+	        this.definitionCount = source["definitionCount"];
+	    }
+	}
+	export class DatasetCatalogPage {
+	    state?: DatasetCatalogState;
+	    tests: DatasetCatalogTestSummary[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = this.convertValues(source["state"], DatasetCatalogState);
+	        this.tests = this.convertValues(source["tests"], DatasetCatalogTestSummary);
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DatasetCatalogQuery {
+	    search: string;
+	    scope: string;
+	    ownership: string;
+	    limit: number;
+	    offset: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.search = source["search"];
+	        this.scope = source["scope"];
+	        this.ownership = source["ownership"];
+	        this.limit = source["limit"];
+	        this.offset = source["offset"];
+	    }
+	}
+	
+	
+	
 	
 	export class DeallocateResult {
 	    removed: string[];
@@ -2495,6 +2791,88 @@ export namespace testrepo {
 		    return a;
 		}
 	}
+	export class JUnitIterationCandidate {
+	    iterationId: string;
+	    parameters: backend.IterationParameter[];
+	    currentRun: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new JUnitIterationCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.iterationId = source["iterationId"];
+	        this.parameters = this.convertValues(source["parameters"], backend.IterationParameter);
+	        this.currentRun = source["currentRun"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class JUnitMapping {
+	    testcase: string;
+	    testKey: string;
+	    summary: string;
+	    result: string;
+	    included: boolean;
+	    reason: string;
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
+	    candidateIterations: JUnitIterationCandidate[];
+	    match?: JUnitMatch;
+	
+	    static createFrom(source: any = {}) {
+	        return new JUnitMapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testcase = source["testcase"];
+	        this.testKey = source["testKey"];
+	        this.summary = source["summary"];
+	        this.result = source["result"];
+	        this.included = source["included"];
+	        this.reason = source["reason"];
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
+	        this.candidateIterations = this.convertValues(source["candidateIterations"], JUnitIterationCandidate);
+	        this.match = this.convertValues(source["match"], JUnitMatch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class JUnitSkip {
 	    testcase: string;
 	    reason: string;
@@ -2515,6 +2893,11 @@ export namespace testrepo {
 	    summary: string;
 	    result: string;
 	    currentRun: string;
+	    targetKind: string;
+	    iterationId: string;
+	    parameters: backend.IterationParameter[];
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new JUnitMatch(source);
@@ -2527,13 +2910,37 @@ export namespace testrepo {
 	        this.summary = source["summary"];
 	        this.result = source["result"];
 	        this.currentRun = source["currentRun"];
+	        this.targetKind = source["targetKind"];
+	        this.iterationId = source["iterationId"];
+	        this.parameters = this.convertValues(source["parameters"], backend.IterationParameter);
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class JUnitImportPreview {
 	    execKey: string;
 	    total: number;
 	    matched: JUnitMatch[];
 	    skipped: JUnitSkip[];
+	    mappings: JUnitMapping[];
 	
 	    static createFrom(source: any = {}) {
 	        return new JUnitImportPreview(source);
@@ -2545,6 +2952,7 @@ export namespace testrepo {
 	        this.total = source["total"];
 	        this.matched = this.convertValues(source["matched"], JUnitMatch);
 	        this.skipped = this.convertValues(source["skipped"], JUnitSkip);
+	        this.mappings = this.convertValues(source["mappings"], JUnitMapping);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2566,12 +2974,20 @@ export namespace testrepo {
 		}
 	}
 	
+	
+	
 	export class JUnitNewExecRow {
 	    testcase: string;
 	    testKey: string;
 	    summary: string;
 	    result: string;
 	    create: boolean;
+	    targetKind: string;
+	    parameters: backend.IterationParameter[];
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
+	    reason: string;
+	    candidateIterations: JUnitIterationCandidate[];
 	
 	    static createFrom(source: any = {}) {
 	        return new JUnitNewExecRow(source);
@@ -2584,7 +3000,31 @@ export namespace testrepo {
 	        this.summary = source["summary"];
 	        this.result = source["result"];
 	        this.create = source["create"];
+	        this.targetKind = source["targetKind"];
+	        this.parameters = this.convertValues(source["parameters"], backend.IterationParameter);
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
+	        this.reason = source["reason"];
+	        this.candidateIterations = this.convertValues(source["candidateIterations"], JUnitIterationCandidate);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class JUnitNewExecPreview {
 	    total: number;

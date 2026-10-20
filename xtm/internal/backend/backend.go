@@ -20,6 +20,13 @@ const (
 // runtime backstop.
 var ErrUnsupported = errors.New("backend: operation not supported")
 
+// PlanDatasetReader is the optional capability for reading what a Test Plan
+// itself defines for one Test. It stays outside Backend because not every
+// test-management system models Plan-level dataset overrides.
+type PlanDatasetReader interface {
+	GetPlanDataset(ctx context.Context, planKey, testKey string) (Dataset, error)
+}
+
 // VersionToken is an opaque per-entity version marker used for optimistic
 // concurrency. Each backend owns both how it produces a token
 // (RemoteVersion) and how it orders two tokens (RemoteAhead) — for Xray this
@@ -105,6 +112,9 @@ type Capabilities struct {
 	// change rather than failing it (#277 W1).
 	SupportsDatasetWrites bool `json:"supportsDatasetWrites"`
 
+	SupportsParameterizedRunDetail bool `json:"supportsParameterizedRunDetail"`
+	SupportsParameterizedRunWrites bool `json:"supportsParameterizedRunWrites"`
+
 	// SupportsComponentAdmin: the backend can create, edit and delete project
 	// components (it implements ComponentManager).
 	SupportsComponentAdmin bool `json:"supportsComponentAdmin"`
@@ -181,6 +191,9 @@ type Backend interface {
 	// parameter no caller can set would be a promise this makes good on
 	// nowhere.
 	SetDataset(ctx context.Context, testKey string, d Dataset) error
+	GetParameterizedRun(ctx context.Context, execKey, testKey string) (ParameterizedRun, error)
+	SetIterationStatus(ctx context.Context, execKey, testKey, iterationID, status string) error
+	SetIterationStepStatus(ctx context.Context, execKey, testKey, iterationID, stepResultID, status string) error
 
 	// --- custom fields ---
 	ListCustomFields(ctx context.Context, projectKey string) ([]CustomFieldDef, error)

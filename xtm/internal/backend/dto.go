@@ -301,21 +301,11 @@ type DatasetParameter struct {
 	ListID    int      `json:"listId,omitempty"`
 }
 
-// RunIteration is one run of a parameterized test inside an execution: the
-// values it ran with and how it went. A test with a dataset runs once per
-// row, and the run's own status is derived from these (#267 Phase 4).
-type RunIteration struct {
-	// ID is the iteration's own id in the backend, zero where it has none.
-	ID         int                 `json:"id"`
-	Status     string              `json:"status"`
-	Parameters []RunIterationParam `json:"parameters"`
-}
-
-// RunIterationParam is one parameter value an iteration ran with.
-type RunIterationParam struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
+const (
+	DatasetParameterText  = "TEXT"
+	DatasetParameterList  = "LIST"
+	DatasetListScopeAdHoc = "PARAMETER_AD_HOC"
+)
 
 // Dataset is a test's parameter table: parameters as columns, one row per
 // iteration. Rows are rectangular, each the length of Parameters. An empty

@@ -1,9 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import React from "react";
+import { render as testingRender, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DatasetSection, DATASET_ROW_CAP } from "./DatasetSection";
 import type { TestDataset } from "../../api";
+import { keys } from "../../queries/keys";
 
 const getTestDataset = vi.fn();
 const getContainerDataset = vi.fn();
@@ -38,6 +41,14 @@ function dataset(over: Partial<TestDataset> = {}): TestDataset {
 
 function rowsOf(n: number, cols = 1): string[][] {
   return Array.from({ length: n }, (_, i) => Array.from({ length: cols }, () => `v${i}`));
+}
+
+function render(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const result = testingRender(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+  return { ...result, client };
 }
 
 beforeEach(() => {
@@ -149,6 +160,20 @@ describe("DatasetSection", () => {
     expect(await screen.findByRole("button", { name: /create dataset/i })).toBeInTheDocument();
   });
 
+  it("opens dataset creation in the shared modal and closes without changing the test", async () => {
+    getTestDataset.mockResolvedValue({ parameters: [], rows: [] });
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /create dataset/i }));
+    expect(screen.getByRole("dialog", { name: "Create dataset" })).toBeVisible();
+    expect(screen.getByText(/parameters become reusable macros/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add parameter" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Create dataset" })).not.toBeInTheDocument();
+    expect(saveTestDataset).not.toHaveBeenCalled();
+  });
+
   it("offers nothing on a backend that cannot write datasets", async () => {
     getTestDataset.mockResolvedValue({ parameters: [], rows: [] });
     const { container } = render(<DatasetSection profileId="p1" testKey="QA-1" supported />);
@@ -158,18 +183,23 @@ describe("DatasetSection", () => {
   });
 
   it("opens the editor on an existing dataset and shows what it saved", async () => {
-    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+    const onEdited = vi.fn();
+    const { client } = render(
+      <DatasetSection profileId="p1" testKey="QA-1" supported canEdit onEdited={onEdited} />,
+    );
     await screen.findByText("USERNAME");
 
     await userEvent.click(screen.getByRole("button", { name: /^edit$/i }));
-    await userEvent.clear(screen.getByLabelText("Row 1, parameter 1"));
-    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "carol");
+    await userEvent.clear(screen.getByLabelText("Row 1, USERNAME"));
+    await userEvent.type(screen.getByLabelText("Row 1, USERNAME"), "carol");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     // Back to the table, showing the edit without a re-fetch.
     expect(await screen.findByText("carol")).toBeInTheDocument();
     expect(screen.queryByLabelText("Dataset editor")).not.toBeInTheDocument();
     expect(getTestDataset).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData<TestDataset>(keys.testDataset("p1", "QA-1"))?.rows[0][0]).toBe("carol");
+    expect(onEdited).toHaveBeenCalledTimes(1);
   });
 
   it("does not offer the editor on a backend that cannot write", async () => {

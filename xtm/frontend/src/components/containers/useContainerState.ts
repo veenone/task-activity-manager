@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../../contexts/ProfileContext";
+import { useNav } from "../../contexts/NavContext";
 import { useViewState } from "../../lib/viewState";
 import { errMsg } from "../../api";
 import type { ExecMemberRun, RollupMember } from "../../api";
@@ -15,6 +16,7 @@ import { KINDS } from "./constants";
 // state when the kind or the container changes.
 export function useContainerState() {
   const { activeId: profileId } = useProfile();
+  const { containerTarget, consumeContainerTarget } = useNav();
   // Gates the Test Execution environment controls to what the active
   // profile's backend actually supports (P6.2a).
   const caps = useCapabilities(profileId);
@@ -75,6 +77,8 @@ export function useContainerState() {
   // Bulk execution-result selection: the set of Test keys checked in the board
   // (Test Execution only).
   const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
+  const [parameterizedTests, setParameterizedTests] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("PASS");
   const [editingName, setEditingName] = useState(false);
   const focusRef = useFocusWhen<HTMLInputElement>(editingName);
@@ -183,12 +187,38 @@ export function useContainerState() {
   }, [containers]);
 
   useEffect(() => {
+    if (containerTarget) return;
     if (viewContainers.length === 0) return;
     setSelected((cur) => {
       if (viewContainers.some((c) => c.key === cur)) return cur;
       return viewContainers[0].key;
     });
-  }, [viewContainers]);
+  }, [containerTarget, viewContainers]);
+
+  useEffect(() => {
+    if (!containerTarget) return;
+    setMode("containers");
+    if (kind !== containerTarget.kind) {
+      setKind(containerTarget.kind);
+      return;
+    }
+    if (containersQuery.isPlaceholderData) return;
+    const rows = containersQuery.data;
+    if (!rows) return;
+    if (rows.some((container) => container.key === containerTarget.key)) {
+      setSelected(containerTarget.key);
+    }
+    consumeContainerTarget();
+  }, [
+    containerTarget,
+    consumeContainerTarget,
+    containersQuery.data,
+    containersQuery.isPlaceholderData,
+    kind,
+    setKind,
+    setMode,
+    setSelected,
+  ]);
 
   useEffect(() => {
     setBugFor(null);
@@ -218,12 +248,13 @@ export function useContainerState() {
   }, [selected]);
 
   useEffect(() => {
+    if (containerTarget) return;
     const rows = containersQuery.data;
     if (!rows) return;
     setSelected((cur) =>
       cur && rows.some((c) => c.key === cur) ? cur : rows.length > 0 ? rows[0].key : "",
     );
-  }, [containersQuery.data]);
+  }, [containerTarget, containersQuery.data]);
 
   useEffect(() => {
     setBoardPage(0);
@@ -236,6 +267,8 @@ export function useContainerState() {
     setError("");
     setBoardPage(0);
     setSelectedRuns(new Set());
+    setExpandedRuns(new Set());
+    setParameterizedTests(new Set());
     setMemberFvFilter("");
     setMemberRunFilter("");
   }, [selected]);
@@ -306,7 +339,7 @@ export function useContainerState() {
     (safePage + 1) * pageSize,
   );
 
-  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
+  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
 }
 
 export type ContainerState = ReturnType<typeof useContainerState>;

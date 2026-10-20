@@ -65,6 +65,19 @@ Sync only fetches what changed since the last run. If the folder structure looks
 
 ![The Full resync confirmation](images/getting-started-12-full-resync.png)
 
+## Move between views
+
+Use the tabs below the top bar or the **View** menu to move between Browse,
+Preconditions, Requirements, Duplicates, Gap Analysis, Test Calls, Dashboard,
+Traceability, Containers, Datasets, Components, Coverage and Spellcheck. A
+view appears only when the selected profile's backend supports it. Coverage
+also needs to be enabled from the **More** menu.
+
+Datasets has its own **Scan datasets** action. The normal **Sync** command does
+not build that catalog because a complete dataset scan makes additional Jira
+requests for each Test and container relationship. See [Datasets](13-datasets.md)
+for the inventory and override model.
+
 ## Review and commit your changes
 
 When you have pending changes, a yellow **N pending** button appears in the top bar, with a dot in front of the count.

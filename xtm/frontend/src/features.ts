@@ -28,6 +28,8 @@ export const defaultCapabilities: Capabilities = {
   supportsComponentAdmin: true,
   supportsDatasets: true,
   supportsDatasetWrites: true,
+  supportsParameterizedRunDetail: false,
+  supportsParameterizedRunWrites: false,
   supportsPreconditionObjects: true,
   supportsRequirementObjects: true,
   supportsIssueLinkTypes: true,

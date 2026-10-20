@@ -61,6 +61,7 @@ export function TestDetail(p: TestDetailProps) {
             supported={s.caps.supportsDatasets}
             canEdit={s.caps.supportsDatasetWrites}
             containerKey={p.containerKey ?? ""}
+            onEdited={p.onEdited}
           />
 
           <IterationsSection

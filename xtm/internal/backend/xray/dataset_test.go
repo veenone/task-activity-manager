@@ -2,6 +2,7 @@ package xray
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,23 @@ func TestXrayReportsDatasetSupport(t *testing.T) {
 func TestXrayReportsDatasetWrites(t *testing.T) {
 	if !(&Adapter{}).Capabilities().SupportsDatasetWrites {
 		t.Fatal("Xray must report SupportsDatasetWrites")
+	}
+}
+
+func TestXrayKeepsLiveParameterizedRunsUnsupportedWithoutTransportEvidence(t *testing.T) {
+	a := &Adapter{}
+	capabilities := a.Capabilities()
+	if capabilities.SupportsParameterizedRunDetail || capabilities.SupportsParameterizedRunWrites {
+		t.Fatalf("parameterized run capabilities = (%v, %v), want both false", capabilities.SupportsParameterizedRunDetail, capabilities.SupportsParameterizedRunWrites)
+	}
+	if _, err := a.GetParameterizedRun(context.Background(), "QA-EXEC-1", "QA-1"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("GetParameterizedRun err = %v, want ErrUnsupported", err)
+	}
+	if err := a.SetIterationStatus(context.Background(), "QA-EXEC-1", "QA-1", "iteration-1", "PASS"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("SetIterationStatus err = %v, want ErrUnsupported", err)
+	}
+	if err := a.SetIterationStepStatus(context.Background(), "QA-EXEC-1", "QA-1", "iteration-1", "step-1", "PASS"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("SetIterationStepStatus err = %v, want ErrUnsupported", err)
 	}
 }
 
@@ -104,7 +122,7 @@ func TestXrayGetRunIterationsReadsThemFromTheRun(t *testing.T) {
 	if len(iters) != 2 {
 		t.Fatalf("read %d iterations, want 2", len(iters))
 	}
-	if iters[1].ID != 8 || iters[1].Status != "FAIL" {
+	if iters[1].ID != "8" || iters[1].Status != "FAIL" {
 		t.Errorf("second iteration = %+v, want id 8 with FAIL", iters[1])
 	}
 	if len(iters[0].Parameters) != 1 || iters[0].Parameters[0].Value != "gold" {
@@ -129,5 +147,32 @@ func TestXrayDemoReturnsADatasetForEveryTwentiethTest(t *testing.T) {
 	}
 	if len(none.Parameters) != 0 {
 		t.Fatalf("QA-2 should carry no dataset, got %+v", none)
+	}
+}
+
+func TestAdapterGetPlanDatasetMapsCSVMetadataAsIncomplete(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write([]byte("USER,REGION*\nalice,eu\n"))
+	}))
+	defer srv.Close()
+
+	dataset, err := New(jira.NewClient(srv.URL, "tok")).GetPlanDataset(context.Background(), "QA-PLAN-1", "QA-1")
+	if err != nil {
+		t.Fatalf("GetPlanDataset: %v", err)
+	}
+	if len(dataset.Parameters) != 2 || dataset.Parameters[0].Name != "USER" {
+		t.Fatalf("parameters = %+v, want the CSV names", dataset.Parameters)
+	}
+	if !dataset.Parameters[1].Combinatorial {
+		t.Errorf("second parameter = %+v, want combinatorial", dataset.Parameters[1])
+	}
+	for _, parameter := range dataset.Parameters {
+		if parameter.Type != "" || parameter.ID != 0 || parameter.ListID != 0 || parameter.ListScope != "" || len(parameter.Options) != 0 {
+			t.Errorf("parameter = %+v, want CSV-only metadata with unknown type", parameter)
+		}
+	}
+	if len(dataset.Rows) != 1 || dataset.Rows[0][0] != "alice" || dataset.Rows[0][1] != "eu" {
+		t.Fatalf("rows = %+v, want mapped CSV values", dataset.Rows)
 	}
 }

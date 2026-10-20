@@ -241,6 +241,8 @@ export function GetCoverageRelationSankey(arg1:string):Promise<testrepo.Sankey>;
 
 export function GetCoverageReport(arg1:string,arg2:string):Promise<coverage.CoverageReport>;
 
+export function GetDatasetCatalogDetail(arg1:string,arg2:string):Promise<testrepo.DatasetCatalogDetail>;
+
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function GetExecutionMembersWithRuns(arg1:string,arg2:string):Promise<Array<testrepo.ExecMemberRun>>;
@@ -252,6 +254,8 @@ export function GetFieldDefs(arg1:string):Promise<Array<jira.FieldDef>>;
 export function GetIgnoreWords():Promise<Array<string>>;
 
 export function GetParamModel(arg1:string,arg2:string):Promise<coverage.ParamModel>;
+
+export function GetParameterizedRun(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<backend.ParameterizedRun>;
 
 export function GetPreconditionCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
 
@@ -352,6 +356,8 @@ export function ListCoverageCandidateTests(arg1:string,arg2:string):Promise<Arra
 export function ListCoverageGaps(arg1:string,arg2:string):Promise<Array<coverage.Gap>>;
 
 export function ListCoverageProjects(arg1:string):Promise<Array<coverage.ProjectConfig>>;
+
+export function ListDatasetCatalog(arg1:string,arg2:testrepo.DatasetCatalogQuery):Promise<testrepo.DatasetCatalogPage>;
 
 export function ListFolders(arg1:string):Promise<Array<testrepo.Folder>>;
 
@@ -481,6 +487,10 @@ export function SetCoverageProjects(arg1:string,arg2:Array<coverage.ProjectConfi
 
 export function SetDefaultProfile(arg1:string):Promise<void>;
 
+export function SetIterationStatus(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
+
+export function SetIterationStepStatus(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
+
 export function SetMemberVersion(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
@@ -518,6 +528,8 @@ export function SetVersionStatus(arg1:string,arg2:string,arg3:string):Promise<vo
 export function SyncBugs(arg1:string):Promise<void>;
 
 export function SyncContainers(arg1:string):Promise<void>;
+
+export function SyncDatasetCatalog(arg1:string):Promise<void>;
 
 export function SyncPreconditions(arg1:string):Promise<void>;
 

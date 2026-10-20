@@ -13,7 +13,9 @@ vi.mock("../../api", async () => {
 function iterations(): RunIteration[] {
   return [
     {
-      id: 11868,
+      id: "11868",
+	  rank: 0,
+	  steps: [],
       status: "PASS",
       parameters: [
         { name: "TIER", value: "gold" },
@@ -21,7 +23,9 @@ function iterations(): RunIteration[] {
       ],
     },
     {
-      id: 11869,
+      id: "11869",
+	  rank: 1,
+	  steps: [],
       status: "FAIL",
       parameters: [
         { name: "TIER", value: "silver" },
@@ -29,7 +33,9 @@ function iterations(): RunIteration[] {
       ],
     },
     {
-      id: 11870,
+      id: "11870",
+	  rank: 2,
+	  steps: [],
       status: "TODO",
       parameters: [
         { name: "TIER", value: "bronze" },

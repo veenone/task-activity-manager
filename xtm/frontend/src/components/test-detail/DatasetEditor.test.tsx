@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,16 +39,29 @@ const twoByTwo: TestDataset = {
 };
 
 function editor(initial: TestDataset, onSaved = vi.fn(), onCancel = vi.fn()) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
-    <DatasetEditor
-      profileId="p1"
-      testKey="QA-1"
-      initial={initial}
-      onSaved={onSaved}
-      onCancel={onCancel}
-    />,
+    <QueryClientProvider client={client}>
+      <DatasetEditor profileId="p1" testKey="QA-1" initial={initial} onSaved={onSaved} onCancel={onCancel} />
+    </QueryClientProvider>,
   );
-  return { onSaved, onCancel };
+  return { onSaved, onCancel, client };
+}
+
+async function addParameter(name: string) {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Add parameter" }));
+  await user.type(screen.getByLabelText("Parameter name"), name);
+  await user.click(screen.getByRole("button", { name: "Save parameter" }));
+}
+
+async function openParameter(index: number) {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: `Actions for parameter ${index}` }));
+  await user.click(screen.getByRole("menuitem", { name: "Edit parameter" }));
+  return user;
 }
 
 beforeEach(() => {
@@ -66,17 +80,17 @@ describe("DatasetEditor", () => {
   it("saves the parameter and row the user typed", async () => {
     const { onSaved } = editor(empty);
 
-    await userEvent.type(screen.getByLabelText("Parameter 1 name"), "USERNAME");
-    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "alice");
+    await addParameter("USERNAME");
+    await userEvent.type(screen.getByLabelText("Row 1, USERNAME"), "alice");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(saveTestDataset).toHaveBeenCalledWith("p1", "QA-1", {
-      parameters: [{ name: "USERNAME", combinatorial: false }],
+      parameters: [{ name: "USERNAME", combinatorial: false, type: "TEXT" }],
       rows: [["alice"]],
     });
     await vi.waitFor(() =>
       expect(onSaved).toHaveBeenCalledWith({
-        parameters: [{ name: "USERNAME", combinatorial: false }],
+        parameters: [{ name: "USERNAME", combinatorial: false, type: "TEXT" }],
         rows: [["alice"]],
       }),
     );
@@ -85,9 +99,8 @@ describe("DatasetEditor", () => {
   it("adds a parameter as a column on every existing row", async () => {
     editor(twoByTwo);
 
-    await userEvent.click(screen.getByRole("button", { name: "Add parameter" }));
-    await userEvent.type(screen.getByLabelText("Parameter 3 name"), "TIER");
-    await userEvent.type(screen.getByLabelText("Row 2, parameter 3"), "gold");
+    await addParameter("TIER");
+    await userEvent.type(screen.getByLabelText("Row 2, TIER"), "gold");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
@@ -103,7 +116,8 @@ describe("DatasetEditor", () => {
   it("removes a parameter with the whole column of values under it", async () => {
     editor(twoByTwo);
 
-    await userEvent.click(screen.getByRole("button", { name: "Remove parameter 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Actions for parameter 1" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Remove parameter" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
@@ -124,11 +138,17 @@ describe("DatasetEditor", () => {
   it("marks a parameter combinatorial, which is what makes Xray expand it", async () => {
     editor(twoByTwo);
 
-    await userEvent.click(screen.getByLabelText("Parameter 2 is combinatorial"));
+    const user = await openParameter(2);
+    await user.click(screen.getByLabelText("Generate combinations from this parameter"));
+    await user.click(screen.getByRole("button", { name: "Save parameter" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
-    expect(saved.parameters[1]).toEqual({ name: "REGION", combinatorial: true });
+    expect(saved.parameters[1]).toEqual({
+      name: "REGION",
+      combinatorial: true,
+      type: "TEXT",
+    });
   });
 
   it("shows why a save was refused and keeps the table to fix", async () => {
@@ -139,7 +159,7 @@ describe("DatasetEditor", () => {
 
     expect(await screen.findByText(/appears more than once/)).toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Parameter 1 name")).toHaveValue("USERNAME");
+    expect(screen.getByRole("columnheader", { name: /USERNAME/ })).toBeVisible();
   });
 
   // Xray's own bookkeeping comes back with the dataset and has to go back
@@ -162,17 +182,10 @@ describe("DatasetEditor", () => {
     };
     editor(listed);
 
-    // The cell offers what the list allows, rather than leaving the user to
-    // remember it.
-    const cell = screen.getByLabelText("Row 1, parameter 1");
-    const list = document.getElementById(cell.getAttribute("list") ?? "");
-    expect(list).not.toBeNull();
-    expect(Array.from(list!.querySelectorAll("option")).map((o) => o.getAttribute("value"))).toEqual(
-      ["gold", "silver"],
-    );
+    const cell = screen.getByRole("combobox", { name: "Row 1, TIER" });
+    expect(Array.from(cell.querySelectorAll("option")).map((option) => option.value)).toEqual(["", "gold", "silver"]);
 
-    await userEvent.clear(cell);
-    await userEvent.type(cell, "silver");
+    await userEvent.selectOptions(cell, "silver");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
@@ -183,7 +196,8 @@ describe("DatasetEditor", () => {
   it("moves a parameter and the values under it", async () => {
     editor(twoByTwo);
 
-    await userEvent.click(screen.getByRole("button", { name: "Move parameter 1 right" }));
+    await userEvent.click(screen.getByRole("button", { name: "Actions for parameter 1" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Move right" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
@@ -217,9 +231,11 @@ describe("DatasetEditor", () => {
     };
     editor(existing);
 
-    const name = screen.getByLabelText("Parameter 1 name");
+    const user = await openParameter(1);
+    const name = screen.getByLabelText("Parameter name");
     await userEvent.clear(name);
     await userEvent.type(name, "ACCOUNT");
+    await user.click(screen.getByRole("button", { name: "Save parameter" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await vi.waitFor(() => expect(renamePlaceholder).toHaveBeenCalled());
@@ -235,9 +251,11 @@ describe("DatasetEditor", () => {
     };
     const { onSaved } = editor(existing);
 
-    const name = screen.getByLabelText("Parameter 1 name");
+    const user = await openParameter(1);
+    const name = screen.getByLabelText("Parameter name");
     await userEvent.clear(name);
     await userEvent.type(name, "ACCOUNT");
+    await user.click(screen.getByRole("button", { name: "Save parameter" }));
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -248,8 +266,7 @@ describe("DatasetEditor", () => {
   it("asks nothing when a parameter is added rather than renamed", async () => {
     const { onSaved } = editor(twoByTwo);
 
-    await userEvent.click(screen.getByRole("button", { name: "Add parameter" }));
-    await userEvent.type(screen.getByLabelText("Parameter 3 name"), "TIER");
+    await addParameter("TIER");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
@@ -268,15 +285,12 @@ describe("DatasetEditor", () => {
     importDatasetCSV.mockResolvedValue(imported);
     editor(twoByTwo);
 
-    await userEvent.upload(
-      screen.getByLabelText("Import CSV"),
-      new File(["TIER,ROUND*\ngold,1\n"], "dataset.csv", { type: "text/csv" }),
-    );
+    await userEvent.upload(screen.getByLabelText("Import CSV"), new File(["TIER,ROUND*\ngold,1\n"], "dataset.csv", { type: "text/csv" }));
 
-    expect(await screen.findByDisplayValue("TIER")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("ROUND")).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: /TIER/ })).toBeVisible();
+    expect(screen.getByRole("columnheader", { name: /ROUND/ })).toBeVisible();
     // The file replaces the table, so what was there is gone.
-    expect(screen.queryByDisplayValue("USERNAME")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: /USERNAME/ })).not.toBeInTheDocument();
     // The table the file replaced goes with it, so the parameters it still
     // has keep their identity.
     expect(importDatasetCSV).toHaveBeenCalledWith(expect.any(String), twoByTwo);
@@ -286,20 +300,17 @@ describe("DatasetEditor", () => {
     importDatasetCSV.mockRejectedValue(new Error("that file has no parameter row"));
     editor(twoByTwo);
 
-    await userEvent.upload(
-      screen.getByLabelText("Import CSV"),
-      new File([""], "empty.csv", { type: "text/csv" }),
-    );
+    await userEvent.upload(screen.getByLabelText("Import CSV"), new File([""], "empty.csv", { type: "text/csv" }));
 
     expect(await screen.findByText(/no parameter row/)).toBeInTheDocument();
-    expect(screen.getByDisplayValue("USERNAME")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /USERNAME/ })).toBeVisible();
   });
 
   it("exports the table on screen, not the one it started with", async () => {
     editor(twoByTwo);
 
-    await userEvent.clear(screen.getByLabelText("Row 1, parameter 1"));
-    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "carol");
+    await userEvent.clear(screen.getByLabelText("Row 1, USERNAME"));
+    await userEvent.type(screen.getByLabelText("Row 1, USERNAME"), "carol");
     await userEvent.click(screen.getByRole("button", { name: "Export CSV" }));
 
     await vi.waitFor(() => expect(exportDatasetCSV).toHaveBeenCalled());
@@ -311,10 +322,52 @@ describe("DatasetEditor", () => {
   it("leaves the dataset alone on cancel", async () => {
     const { onCancel } = editor(twoByTwo);
 
-    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "typo");
+    await userEvent.type(screen.getByLabelText("Row 1, USERNAME"), "typo");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onCancel).toHaveBeenCalled();
     expect(saveTestDataset).not.toHaveBeenCalled();
+  });
+
+  it("opens parameter configuration from a compact header menu", async () => {
+    editor(twoByTwo);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Actions for parameter 1" }));
+    await user.click(screen.getByRole("menuitem", { name: "Edit parameter" }));
+
+    expect(screen.getByRole("dialog", { name: "Edit parameter" })).toBeVisible();
+    expect(screen.getByLabelText("Parameter name")).toHaveValue("USERNAME");
+  });
+
+  it("uses semantic row numbers and selects for List values", () => {
+    const listed: TestDataset = {
+      parameters: [
+        {
+          name: "TIER",
+          combinatorial: false,
+          type: "LIST",
+          options: ["gold", "silver"],
+          listScope: "PARAMETER_AD_HOC",
+        },
+      ],
+      rows: [["gold"]],
+    };
+    editor(listed);
+
+    expect(screen.getByRole("rowheader", { name: "1" })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Row 1, TIER" })).toHaveValue("gold");
+    expect(screen.getByRole("group", { name: "Dataset toolbar" })).toBeVisible();
+    expect(screen.getByRole("group", { name: "Dataset actions" })).toBeVisible();
+  });
+
+  it("keeps parameter columns inside the editor table layout", () => {
+    editor(twoByTwo);
+
+    const table = screen.getByRole("table", { name: "Dataset editor" });
+    expect(table).toHaveStyle({ "--dataset-editor-min-width": "558px" });
+    expect(table.querySelector("col.dataset-row-column")).not.toBeNull();
+    expect(table.querySelectorAll("col.dataset-parameter-column")).toHaveLength(2);
+    expect(table.querySelector("col.dataset-actions-column")).not.toBeNull();
   });
 });

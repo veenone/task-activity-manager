@@ -105,6 +105,7 @@ describe("App shell", () => {
   it("asks for a first profile when none exist", async () => {
     mock(ListProfiles).mockResolvedValueOnce([]);
     renderApp();
+    await waitFor(() => expect(ListProfiles).toHaveBeenCalled());
     expect(
       await screen.findByText("Connect to your Jira Data Center project to get started."),
     ).toBeInTheDocument();

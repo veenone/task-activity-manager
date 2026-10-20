@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/testrepo"
 )
 
@@ -200,6 +201,104 @@ func TestApplyJUnitImport(t *testing.T) {
 		if got[key] != want {
 			t.Errorf("%s run status = %q, want %q", key, got[key], want)
 		}
+	}
+}
+
+func seedJUnitParameterizedRun(t *testing.T, repo *testrepo.Repository) backend.ParameterizedRun {
+	t.Helper()
+	run := backend.ParameterizedRun{
+		ID: "run-TC-1", ExecutionKey: "TE-1", TestKey: "TC-1",
+		DatasetSourceKind: backend.DatasetSourceTest, DatasetSourceKey: "TC-1", Status: "PASS",
+		Iterations: []backend.RunIteration{
+			{ID: "iteration-alice", Rank: 0, Status: "PASS", Parameters: []backend.IterationParameter{{Name: "USER", Value: "alice"}}, Steps: []backend.IterationStep{}},
+			{ID: "iteration-bob", Rank: 1, Status: "FAIL", Parameters: []backend.IterationParameter{{Name: "USER", Value: "bob"}}, Steps: []backend.IterationStep{}},
+		},
+	}
+	if err := repo.ReplaceParameterizedRun("p1", run); err != nil {
+		t.Fatalf("seed parameterized run: %v", err)
+	}
+	return run
+}
+
+func junitReportWithProperties(properties string) string {
+	xml := buildJUnitXML([]string{`<testcase name="Pass Test"><properties>` + properties + `</properties></testcase>`})
+	return base64.StdEncoding.EncodeToString([]byte(xml))
+}
+
+func TestAnalyzeJUnitImportMapsCompleteSignatureAndKeepsIncompleteMapping(t *testing.T) {
+	repo := seedJUnitRepo(t)
+	seedJUnitParameterizedRun(t, repo)
+
+	preview, err := repo.AnalyzeJUnitImport("p1", "TE-1", junitReportWithProperties(`<property name="USER" value="bob"/>`))
+	if err != nil || len(preview.Mappings) != 1 || preview.Mappings[0].Match == nil {
+		t.Fatalf("resolved preview = %+v, err=%v", preview, err)
+	}
+	match := preview.Mappings[0].Match
+	if match.TargetKind != testrepo.JUnitTargetIteration || match.IterationID != "iteration-bob" || match.CurrentRun != "FAIL" {
+		t.Fatalf("match = %+v, want iteration-bob", match)
+	}
+
+	unresolved, err := repo.AnalyzeJUnitImport("p1", "TE-1", junitReportWithProperties(`<property name="build" value="42"/>`))
+	if err != nil || len(unresolved.Mappings) != 1 {
+		t.Fatalf("unresolved preview = %+v, err=%v", unresolved, err)
+	}
+	mapping := unresolved.Mappings[0]
+	if !mapping.Included || mapping.Match != nil || len(mapping.CandidateIterations) != 2 || !strings.Contains(mapping.Reason, "missing") {
+		t.Fatalf("unresolved mapping = %+v", mapping)
+	}
+}
+
+func TestApplyJUnitImportRevalidatesIterationAndRejectsDuplicateTarget(t *testing.T) {
+	repo := seedJUnitRepo(t)
+	run := seedJUnitParameterizedRun(t, repo)
+	match := testrepo.JUnitMatch{
+		Testcase: "Pass Test", TestKey: "TC-1", Result: "FAIL",
+		TargetKind: testrepo.JUnitTargetIteration, IterationID: "iteration-alice",
+		Parameters:        run.Iterations[0].Parameters,
+		DatasetSourceKind: run.DatasetSourceKind, DatasetSourceKey: run.DatasetSourceKey,
+	}
+
+	if _, err := repo.ApplyJUnitImport("p1", "TE-1", []testrepo.JUnitMatch{match, match}); err == nil || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("duplicate target error = %v", err)
+	}
+	if pending, _ := repo.ListPendingChanges("p1"); len(pending) != 0 {
+		t.Fatalf("duplicate apply wrote pending rows: %+v", pending)
+	}
+
+	result, err := repo.ApplyJUnitImport("p1", "TE-1", []testrepo.JUnitMatch{match})
+	if err != nil || len(result.Succeeded) != 1 || len(result.Failed) != 0 {
+		t.Fatalf("apply result=%+v err=%v", result, err)
+	}
+	pending, _ := repo.ListPendingChanges("p1")
+	if len(pending) != 1 || pending[0].EntityType != "test_run_iteration" {
+		t.Fatalf("pending = %+v, want one iteration result", pending)
+	}
+}
+
+func TestApplyJUnitImportRejectsChangedDatasetSourceAndRemovedMembership(t *testing.T) {
+	repo := seedJUnitRepo(t)
+	run := seedJUnitParameterizedRun(t, repo)
+	match := testrepo.JUnitMatch{
+		TestKey: "TC-1", Result: "FAIL", TargetKind: testrepo.JUnitTargetIteration,
+		IterationID: "iteration-alice", Parameters: run.Iterations[0].Parameters,
+		DatasetSourceKind: run.DatasetSourceKind, DatasetSourceKey: run.DatasetSourceKey,
+	}
+	run.DatasetSourceKind = backend.DatasetSourceExecution
+	run.DatasetSourceKey = "TE-1"
+	if err := repo.ReplaceParameterizedRun("p1", run); err != nil {
+		t.Fatal(err)
+	}
+	result, err := repo.ApplyJUnitImport("p1", "TE-1", []testrepo.JUnitMatch{match})
+	if err != nil || len(result.Failed) != 1 || !strings.Contains(result.Failed[0].Error, "dataset source changed") {
+		t.Fatalf("changed-source result=%+v err=%v", result, err)
+	}
+
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = repo.ApplyJUnitImport("p1", "TE-1", []testrepo.JUnitMatch{match})
+	if err != nil || len(result.Failed) != 1 || !strings.Contains(result.Failed[0].Error, "not a member") {
+		t.Fatalf("removed-member result=%+v err=%v", result, err)
 	}
 }
 
@@ -611,6 +710,53 @@ func TestApplyJUnitImportNewExec(t *testing.T) {
 	}
 	if !foundCreated {
 		t.Error("created test for 'No Match Test' not found in board")
+	}
+}
+
+func TestJUnitNewExecKeepsParameterizedSignatureAndDefersItsResult(t *testing.T) {
+	repo := seedJUnitNewExecRepo(t)
+	if err := repo.SaveTestDataset("p1", "TC-1", "", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USER", Type: "TEXT"}},
+		Rows:       [][]string{{"alice"}, {"bob"}},
+	}); err != nil {
+		t.Fatalf("seed dataset: %v", err)
+	}
+	if err := repo.SaveTestDataset("p1", "TC-3", "", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USER", Type: "TEXT"}},
+		Rows:       [][]string{{"alice"}, {"bob"}},
+	}); err != nil {
+		t.Fatalf("seed skipped dataset: %v", err)
+	}
+	xml := base64.StdEncoding.EncodeToString([]byte(buildJUnitXML([]string{
+		`<testcase name="Pass Test"><properties><property name="USER" value="bob"/></properties></testcase>`,
+		`<testcase name="Brand New"><failure/></testcase>`,
+		`<testcase name="Skipped Test"><skipped/></testcase>`,
+	})))
+	preview, err := repo.AnalyzeJUnitImportNewExec("p1", xml, true)
+	if err != nil || len(preview.Rows) != 3 {
+		t.Fatalf("preview=%+v err=%v", preview, err)
+	}
+	if preview.Rows[0].TargetKind != testrepo.JUnitTargetIteration || len(preview.Rows[0].Parameters) != 1 || preview.Rows[0].Parameters[0].Value != "bob" {
+		t.Fatalf("existing parameterized row = %+v", preview.Rows[0])
+	}
+	if preview.Rows[1].TargetKind != testrepo.JUnitTargetRun || !preview.Rows[1].Create {
+		t.Fatalf("new test row = %+v, want overall run", preview.Rows[1])
+	}
+	if preview.Rows[2].TargetKind != testrepo.JUnitTargetRun || preview.Rows[2].Result != "" {
+		t.Fatalf("skipped parameterized row = %+v, want allocation without an iteration target", preview.Rows[2])
+	}
+
+	result, err := repo.ApplyJUnitImportNewExec("p1", "QA", "Imported", preview.Rows)
+	if err != nil || result.ResultsSet != 2 {
+		t.Fatalf("apply=%+v err=%v", result, err)
+	}
+	pending, _ := repo.ListPendingChanges("p1")
+	types := map[string]int{}
+	for _, change := range pending {
+		types[change.EntityType]++
+	}
+	if types["test_run_iteration_import"] != 1 || types["test_run"] != 1 {
+		t.Fatalf("pending types = %v, want deferred iteration plus overall new-test result", types)
 	}
 }
 
