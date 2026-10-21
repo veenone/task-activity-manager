@@ -451,6 +451,12 @@ beneath it **Planning**, **Standup**, **Review** and **Retrospective**.
 Alongside them is the **Done agreement**, the team's definition of done, kept
 at board level with any additions this sprint made.
 
+Each document in the sidebar carries its name, whether it is synced and when
+it last was, so what Confluence has and what it does not is readable at a
+glance. One TAM has created but never pushed says **Not synced yet**.
+**Filter documents** narrows the list by name and nothing else: the page you
+are reading stays open.
+
 ![The Rituals view: the sprint's pages and the editor](images/rituals-01-view.png)
 
 The editor has headings, bullet and numbered lists, tables and links. A
