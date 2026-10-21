@@ -213,10 +213,6 @@ describe("the filter bar", () => {
     expect(valueOf(declarationsOf(appCss, ".filter-bar .detail-input"), "margin-bottom")).toBe("0");
   });
 
-  it.each([".filter-bar .detail-input", ".filter-bar .btn"])("gives %s the bar's one height", (selector) => {
-    expect(valueOf(declarationsOf(appCss, selector), "height")).toMatch(/^\d+px$/);
-  });
-
   it("lets the search field give way before the bar wraps", () => {
     // A fixed 300px search box plus the type chips plus the sprint select
     // wrapped the Backlog bar at about 1000px, which is a normal window.

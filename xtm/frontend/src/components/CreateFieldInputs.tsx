@@ -6,7 +6,7 @@ import {
   initCreateFieldDefaults,
 } from "./createFields";
 import type { RawFieldValue } from "./createFields";
-import { MultiSelect } from "./MultiSelect";
+import { MultiSelect } from "@agile-suite/core";
 
 // useCreateScreenFields loads the required fields a create screen adds to a
 // form, and holds what the user enters for them. load runs again whenever

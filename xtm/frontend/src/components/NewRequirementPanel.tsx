@@ -11,8 +11,8 @@ import {
 } from "../api";
 import type { FieldDef, RequirementSource } from "../api";
 import { MarkdownField } from "./MarkdownField";
-import { MultiSelect } from "./MultiSelect";
-import type { MultiOption } from "./MultiSelect";
+import { MultiSelect } from "@agile-suite/core";
+import type { MultiOption } from "@agile-suite/core";
 import {
   buildCreateFieldsPayload,
   createFieldsValid,

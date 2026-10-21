@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useFocusWhen } from "@agile-suite/core";
+import { useFocusWhen } from "./useFocusWhen";
 
 export interface MultiOption {
   value: string;
@@ -16,9 +16,13 @@ interface Props {
 }
 
 // MultiSelect is a compact checkbox dropdown: a button shows the selection
-// summary ("All …" / one label / "N selected") and opens a checkbox list. Used
-// for the dashboard Sankey filters where several requirements / plans /
-// executions can be picked at once.
+// summary ("All …" / one label / "N selected") and opens a checkbox list.
+//
+// It lives here rather than in one app because both pick several values from
+// one control: XTM's Sankey filters since it was written, and TAM's issue
+// type filter since #323, which could not import it while it sat in
+// xtm/frontend. The panel anchors right; a caller whose control sits near
+// the left edge overrides that in its own stylesheet, as both apps do.
 export function MultiSelect({
   options,
   selected,

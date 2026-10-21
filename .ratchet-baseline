@@ -8,7 +8,7 @@ eslint_no_console 23
 eslint_problems 86
 hardcoded_hex 30
 hardcoded_px_font 0
-raw_radius 269
+raw_radius 267
 raw_shadow 7
 bare_focus 0
 outline_none 0

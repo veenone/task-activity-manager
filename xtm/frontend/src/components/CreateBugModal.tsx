@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { CreateBugForTest, GetFieldDefs, errMsg } from "../api";
 import type { FieldDef } from "../api";
-import { MultiSelect } from "./MultiSelect";
-import type { MultiOption } from "./MultiSelect";
+import { MultiSelect } from "@agile-suite/core";
+import type { MultiOption } from "@agile-suite/core";
 import {
   buildCreateFieldsPayload,
   createFieldsValid,
