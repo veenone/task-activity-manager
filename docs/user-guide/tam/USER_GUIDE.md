@@ -177,6 +177,9 @@ detail panel for whatever is selected.
   typing before it runs.
 - The **type chips** are one per issue type the project has, in Jira's order.
   Press one to include that type, press it again to drop it.
+- **Status** narrows to one workflow status, and **Assignee** to one person.
+  Both lists are read from this project's cached issues, so neither offers a
+  value the grid has nothing for. **Unassigned** is its own choice.
 - **Sprint** narrows to one sprint, or stays on **All sprints**.
 
 Changing any filter returns to page one.
@@ -265,9 +268,12 @@ The line above the tree counts epics, issues and issues without an epic. A
 project larger than 5,000 issues is cut off there, with a note asking you to
 narrow the filter.
 
-**Search** matches across epics and children, **Sprint** narrows to one sprint,
-and **Show done** includes completed work, which is off by default. **Expand
-all** and **Collapse all** work on everything listed.
+**Search** matches across epics and children, **Type**, **Status** and
+**Assignee** narrow the children the same way the Backlog's do, **Sprint**
+narrows to one sprint, and **Show done** includes completed work, which is off
+by default. An epic the filter leaves nothing under drops out of the tree
+rather than sitting there empty. **Expand all** and **Collapse all** work on
+everything listed.
 
 Selecting any row opens the same detail panel the Backlog uses. Changing an
 issue's **Epic** moves it in the tree as soon as the change is saved, and the
@@ -280,7 +286,10 @@ Your Jira board: its columns, the cards in them, and the sprint ceremonies.
 
 The bar above the board carries **Board**, **Filter** (a key, an assignee or a
 type), **Sprint** on a scrum board, and **Swimlanes** (None, Assignee or
-Epic). **Refresh** re-reads the board from Jira.
+Epic). **Refresh** re-reads the board from Jira. Under it is the same
+**Type**, **Status** and **Assignee** row the Backlog has, so narrowing the
+board needs no guessing at a substring. It and the Filter box both have to
+match, and neither takes a column or a lane off the board.
 
 ![A board with its columns, cards and limits](images/boards-01-view.png)
 
@@ -349,6 +358,13 @@ sprint's name, state, dates and what it holds: how many issues are done and how
 many points have landed. A closed sprint whose figures have not been rebuilt
 says so rather than drawing a bar at zero. **Show closed** brings closed
 sprints back.
+
+The **Type**, **Status** and **Assignee** row below the board picker narrows
+the cards drawn under every sprint at once, which is how you read what one
+person is carrying across a release. Every sprint stays listed whether or not
+the filter left it anything, and each sprint's own figures go on describing the
+sprint rather than this view of it. A checked card the filter hides leaves the
+selection with it, so a move can never touch a card you cannot see.
 
 Select issues with **Space** or the checkbox, extend with **Shift** and an
 arrow, and a bar offers a destination: another sprint, or the backlog. An issue

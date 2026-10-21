@@ -5,6 +5,8 @@ import type { Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
 import { useSyncState } from "../queries/issues";
 import { filterBoard, groupBoard } from "../lib/boardFilter";
+import { NO_FILTER } from "../lib/issueFilter";
+import type { IssueFilter } from "../lib/issueFilter";
 import { useSync } from "../contexts/SyncContext";
 import { cardAtPos, cardKeys, findCard, posId } from "../lib/boardCells";
 import { BoardBody } from "./BoardBody";
@@ -56,6 +58,11 @@ export function BoardsView() {
   // and New board does not even need a board, already picked.
   const [creatingBoard, setCreatingBoard] = useState(false);
   const [addingIssues, setAddingIssues] = useState(false);
+  // The type, status and assignee bar. It filters the drawn board rather than
+  // the query, so it costs no refetch, but it is declared up here with the
+  // rest of the view state because unlike the free-text box below it holds
+  // the project's own status and people and has to be cleared on a switch.
+  const [issueFilter, setIssueFilter] = useState<IssueFilter>(NO_FILTER);
 
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
@@ -66,6 +73,7 @@ export function BoardsView() {
   const [filtersFor, setFiltersFor] = useState(activeId);
   if (filtersFor !== activeId) {
     setFiltersFor(activeId);
+    setIssueFilter(NO_FILTER);
     setBoardId(0);
     setSprintId("");
     setSwimlane("none");
@@ -107,7 +115,10 @@ export function BoardsView() {
 
   // Filtered before anything reads it, so the cells, the counts, the
   // keyboard walk, and the drop targets all agree about which cards exist.
-  const data = useMemo(() => (view.data ? groupBoard(filterBoard(view.data, filter)) : view.data), [view.data, filter]);
+  const data = useMemo(
+    () => (view.data ? groupBoard(filterBoard(view.data, filter, issueFilter)) : view.data),
+    [view.data, filter, issueFilter],
+  );
   // The board in reading order, which is what a shift gesture measures a run
   // against and the order a bulk move sends its keys in. It is the drawn
   // board, filter and all, so the selection can only ever hold cards the
@@ -237,6 +248,8 @@ export function BoardsView() {
         onRefresh={() => sync.mutate()}
         filter={filter}
         onFilter={setFilter}
+        issueFilter={issueFilter}
+        onIssueFilter={setIssueFilter}
         onStart={() => setCeremony("start")}
         onComplete={() => {
           if (!sprint) return;

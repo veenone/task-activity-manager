@@ -18,6 +18,9 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 import { SprintFillBar } from "./SprintFillBar";
 import { SprintList } from "./SprintList";
 import { issueOrder, rowIdOf } from "../lib/sprintRows";
+import { IssueFilters } from "./IssueFilters";
+import { NO_FILTER, filterIssues } from "../lib/issueFilter";
+import type { IssueFilter } from "../lib/issueFilter";
 import { StartSprintModal } from "./StartSprintModal";
 import { useSprintSelection } from "./useSprintSelection";
 
@@ -32,6 +35,7 @@ export function SprintsView() {
   const { notice } = useNotice();
   const [boardId, setBoardId] = useState(0);
   const [showClosed, setShowClosed] = useState(false);
+  const [issueFilter, setIssueFilter] = useState<IssueFilter>(NO_FILTER);
   const [selectedKey, setSelectedKey] = useState("");
   const [collapsedIssues, setCollapsedIssues] = useState(new Set<string>());
   // The sentence the last sprint write left behind. The dialog that made it
@@ -63,6 +67,7 @@ export function SprintsView() {
     setCollapsedIssues(new Set());
     setBoardId(0);
     setShowClosed(false);
+    setIssueFilter(NO_FILTER);
     setSelectedKey("");
     setLine("");
     setMovedRowId("");
@@ -98,10 +103,27 @@ export function SprintsView() {
     [all, showClosed],
   );
   const visibleSprints = visible.filter((d) => d.state !== UNASSIGNED_SPRINT_STATE);
+  // What the tree draws: each sprint with the cards the bar kept. The whole
+  // list is filtered here rather than in SprintList so that the subtask
+  // counts, the column widths and the keyboard walk all read the same rows.
+  // Every sprint stays, filtered or not, the way a filtered board keeps every
+  // column: a missing sprint would read as one the board lost.
+  const shown = useMemo(
+    () => visible.map((d) => ({ ...d, issues: filterIssues(d.issues, issueFilter) })),
+    [visible, issueFilter],
+  );
+  // What each sprint held before that, which only the card-budget line reads.
+  const drawn = useMemo(
+    () => new Map(visible.map((d) => [rowIdOf(d), d.issues.length])),
+    [visible],
+  );
 
   // One list of issue keys per sprint, which is what a shift gesture is
-  // measured inside and what the fill sends.
-  const order = useMemo(() => issueOrder(visible, collapsedIssues), [visible, collapsedIssues]);
+  // measured inside and what the fill sends. It is the drawn tree, filter and
+  // all, so the selection can only ever hold cards the reader can see: a card
+  // the filter hides leaves the count with it rather than being swept into the
+  // next fill with nothing on screen saying so.
+  const order = useMemo(() => issueOrder(shown, collapsedIssues), [shown, collapsedIssues]);
   const selection = useSprintSelection(order, activeId);
   const fill = useJournalSprintMoves(activeId);
   // The profile's journal, read here for two things: the delete
@@ -309,7 +331,8 @@ export function SprintsView() {
         key={`${activeId}:${board?.id ?? 0}`}
         collapsedIssues={collapsedIssues}
         onCollapsedIssuesChange={setCollapsedIssues}
-        details={visible}
+        details={shown}
+        drawn={drawn}
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
         checked={selection.checked}
@@ -366,6 +389,10 @@ export function SprintsView() {
           {details.isFetching && !details.isLoading && <span className="muted small">Refreshing</span>}
           <button type="button" className="btn" disabled={!board} onClick={() => setCreating(true)}>New sprint</button>
         </div>
+      </div>
+
+      <div className="filter-bar">
+        <IssueFilters value={issueFilter} onChange={setIssueFilter} />
       </div>
 
       {/* Named, because the sentence is announced through the shared live

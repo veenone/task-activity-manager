@@ -169,6 +169,20 @@ export interface IssueQuery {
   text: string;
   types: string[];
   sprintId: string;
+  // The filter bar's own two lists. Empty is no filter, several entries
+  // are an OR inside the field, and the fields are an AND. Both hold the
+  // names the sync stored, which is what the grid shows and what
+  // ListFilterOptions offers.
+  //
+  // assignees holds display names, so it is a different filter from
+  // assigneeName below. An empty entry means unassigned, which is why it
+  // is a list: "" on its own would read as no filter at all, and
+  // ASSIGNEE_NONE is what the select uses for that choice. Both are
+  // optional for the same reason assigneeName is: only a view with a
+  // filter bar drives them, and the store reads a missing list as no
+  // filter.
+  statuses?: string[];
+  assignees?: string[];
   offset: number;
   limit: number;
   // "" is the store's default rank order. Sorting is a backend concern
@@ -225,6 +239,11 @@ export interface TreeQuery {
   text: string;
   sprintId: string;
   showDone: boolean;
+  // The same three lists IssueQuery carries, read the same way. They
+  // narrow the children, and an epic the filter leaves no child is dropped.
+  types?: string[];
+  statuses?: string[];
+  assignees?: string[];
 }
 
 export interface EpicNode {
@@ -249,6 +268,22 @@ export interface SprintRef {
   id: string;
   name: string;
 }
+
+// FilterOptions is what the filter bar offers for the two fields whose
+// values are the project's own: the statuses and the assignee names this
+// profile's cached issues carry. Issue types come from ListProjectTypes.
+// Neither list holds an empty entry, so the bar adds its All and
+// Unassigned options itself.
+export interface FilterOptions {
+  statuses: string[];
+  assignees: string[];
+}
+
+// ASSIGNEE_NONE is the assignee select's value for Unassigned. The query
+// sends assignees as a list, where [] is no filter and [""] is nobody, so
+// the select needs a value for nobody that is not the empty string its All
+// option already uses. It is mapped back to "" before the query goes out.
+export const ASSIGNEE_NONE = "__unassigned__";
 
 export interface SyncState {
   lastSynced: string;
@@ -299,6 +334,8 @@ export const GetIssueDetail: (profileId: string, key: string) => Promise<IssueDe
 export const ListLinkedTests: (profileId: string, key: string) => Promise<LinkedTest[]> =
   App.ListLinkedTests;
 export const ListSprints: (profileId: string) => Promise<SprintRef[]> = App.ListSprints;
+export const ListFilterOptions: (profileId: string) => Promise<FilterOptions> =
+  App.ListFilterOptions;
 export const GetEpicTree = (profileId: string, q: TreeQuery): Promise<EpicTreeData> =>
   App.GetEpicTree(profileId, issuerepo.TreeQuery.createFrom(q)) as Promise<EpicTreeData>;
 export const ListEpics: (profileId: string) => Promise<Issue[]> = App.ListEpics as (profileId: string) => Promise<Issue[]>;

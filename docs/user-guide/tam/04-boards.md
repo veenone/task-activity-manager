@@ -10,6 +10,8 @@ The bar above the board carries:
 
 - **Board**: the boards this project has.
 - **Filter**: narrows the cards to a key, an assignee or a type. The board keeps its columns; only the cards thin out.
+
+Under the pickers is the same **Type**, **Status** and **Assignee** row the [Backlog](01-backlog.md#find-issues) has, for narrowing without having to guess a substring. It works alongside the Filter box rather than instead of it: both have to match. Like the box, it thins the cards and leaves every column and lane standing.
 - **Sprint**: on a scrum board, which sprint's cards to draw. A board with no open sprint says so.
 - **Swimlanes**: **None**, **Assignee** or **Epic**, which splits the board into horizontal lanes.
 

@@ -1,19 +1,37 @@
+import type { ReactElement } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ProfileProvider, createQueryClient } from "@agile-suite/core";
 import type { Board, Sprint } from "../api";
+import { profileBackend } from "../profileBackend";
 import { BoardsToolbar, sprintOption } from "./BoardsToolbar";
+
+// The toolbar carries the type, status and assignee bar on a second row, and
+// that bar reads the project's types and the cached statuses itself, so the
+// toolbar needs both providers now. No profile is loaded here: the bar then
+// draws its All options and the types TAM models, which is all these tests
+// need it to do without asserting on it.
+function wrap(ui: ReactElement) {
+  return render(
+    <QueryClientProvider client={createQueryClient()}>
+      <ProfileProvider backend={profileBackend}>{ui}</ProfileProvider>
+    </QueryClientProvider>,
+  );
+}
 
 const board: Board = { id: 1, name: "PLAT Scrum", type: "scrum" };
 const draft: Sprint = { id: -1, boardId: 1, name: "Sprint 15", state: "future", startDate: "", endDate: "", goal: "", draft: true };
 
 function renderToolbar(sprint: Sprint, over: { boards?: Board[]; board?: Board; onNewBoard?: () => void; onAddIssues?: () => void } = {}) {
-  render(
+  wrap(
     <BoardsToolbar
       boards={over.boards ?? [board]} board={over.board ?? board} onBoard={vi.fn()}
       sprints={[sprint]} sprint={sprint} onSprint={vi.fn()}
       swimlane="none" onSwimlane={vi.fn()}
       refreshing={false} canRefresh onRefresh={vi.fn()}
       filter="" onFilter={vi.fn()}
+      issueFilter={{ types: [], status: "", assignee: "" }} onIssueFilter={vi.fn()}
       onStart={vi.fn()} onComplete={vi.fn()} onCreate={vi.fn()}
       onNewBoard={over.onNewBoard ?? vi.fn()} onAddIssues={over.onAddIssues ?? vi.fn()}
     />,
@@ -42,13 +60,14 @@ describe("BoardsToolbar", () => {
   });
 
   it("offers New board with no board on screen, and holds Add issues back until one is", () => {
-    render(
+    wrap(
       <BoardsToolbar
         boards={[]} board={undefined} onBoard={vi.fn()}
         sprints={[]} sprint={undefined} onSprint={vi.fn()}
         swimlane="none" onSwimlane={vi.fn()}
         refreshing={false} canRefresh onRefresh={vi.fn()}
         filter="" onFilter={vi.fn()}
+        issueFilter={{ types: [], status: "", assignee: "" }} onIssueFilter={vi.fn()}
         onStart={vi.fn()} onComplete={vi.fn()} onCreate={vi.fn()}
         onNewBoard={vi.fn()} onAddIssues={vi.fn()}
       />,

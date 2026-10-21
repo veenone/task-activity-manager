@@ -12,6 +12,8 @@ Each sprint row carries its name, its state, its dates and a line saying what it
 
 **Show closed** brings closed sprints back into the list. They are hidden by default.
 
+Below the board picker is the same **Type**, **Status** and **Assignee** row the [Backlog](01-backlog.md#find-issues) has. It narrows the cards drawn under each sprint, which is how you read what one person is carrying across several sprints at once. Every sprint stays in the list whether or not the filter left it anything, and each sprint's own figures go on describing the sprint rather than the filtered view of it. A checked card that the filter hides leaves the selection with it, so a move can never touch a card you cannot see.
+
 ## Move work between sprints
 
 Select issues with **Space**, or with the checkbox, and extend the selection with **Shift** and an arrow. A bar appears with the count and a destination: another sprint, or **The backlog**. Moving them is an ordinary queued change, exactly like dragging a card on the board.

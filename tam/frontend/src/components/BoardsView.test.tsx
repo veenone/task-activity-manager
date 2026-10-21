@@ -21,6 +21,8 @@ vi.mock("../api", async () => {
     ListBoards: vi.fn(),
     ListBoardSprints: vi.fn(),
     GetBoard: vi.fn(),
+    ListProjectTypes: vi.fn(),
+    ListFilterOptions: vi.fn(),
     SyncBoards: vi.fn(),
     GetProfileSetting: vi.fn(),
     GetSyncState: vi.fn(),
@@ -190,6 +192,14 @@ beforeEach(() => {
   ]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue(SPRINTS);
   vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS], [PROMO], [RETRO]]));
+  vi.mocked(api.ListProjectTypes).mockResolvedValue([
+    { id: "1", name: "Task", subtask: false, logical: "task" },
+    { id: "2", name: "Story", subtask: false, logical: "story" },
+  ]);
+  vi.mocked(api.ListFilterOptions).mockResolvedValue({
+    statuses: ["To Do", "In Progress", "Done"],
+    assignees: ["M. Ortiz", "R. Anand"],
+  });
   vi.mocked(api.SyncBoards).mockResolvedValue({
     boards: 2, columns: 6, sprints: 3, cards: 40, dropped: [], unavailable: false, elapsed: "2s",
   });
@@ -355,7 +365,11 @@ describe("BoardsView board", () => {
   });
   it("renders the columns with their card counts and point sums", async () => {
     renderView();
-    expect(await screen.findByText("To Do")).toBeInTheDocument();
+    // By role, because "To Do" is also one of the statuses the filter bar
+    // above offers, and a column name matching a status name is the ordinary
+    // case. Waiting on the text alone resolved on that option before the
+    // board had loaded.
+    expect(await screen.findByRole("columnheader", { name: /To Do/ })).toBeInTheDocument();
     expect(screen.getByText("4 cards, 20 pts")).toBeInTheDocument();
     // A column with no points prints the cards alone rather than "0 pts".
     expect(screen.getByText("2 cards")).toBeInTheDocument();
@@ -578,6 +592,32 @@ describe("BoardsView board", () => {
     for (const name of ["To Do", "In Progress", "Done"]) {
       expect(screen.getByRole("columnheader", { name: new RegExp(name) })).toBeInTheDocument();
     }
+  });
+
+  // The board had the text box and nothing else, so narrowing it meant
+  // guessing a substring the cards happened to share (#321). The bar filters
+  // the drawn board rather than the query, so a choice costs no refetch, and
+  // the column heads recount from what survives, the way the text box already
+  // made them.
+  it("filters the cards by type and assignee", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText(PROMO.key);
+
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Assignee" }), "M. Ortiz");
+    await waitFor(() => expect(screen.queryByText(PROMO.key)).not.toBeInTheDocument());
+    expect(screen.getByText(KEYS.key)).toBeInTheDocument();
+    // Every column head stays, so a filter never reads as a lost column.
+    for (const name of ["To Do", "In Progress", "Done"]) {
+      expect(screen.getByRole("columnheader", { name: new RegExp(name) })).toBeInTheDocument();
+    }
+
+    // A type chip and the assignee select narrow together, so the board ends
+    // up empty rather than showing whichever of the two was set last.
+    const types = screen.getByRole("group", { name: "Issue types" });
+    await user.click(within(types).getByRole("button", { name: "Story" }));
+    await waitFor(() => expect(screen.queryByText(KEYS.key)).not.toBeInTheDocument());
+    expect(screen.queryByText(PROMO.key)).not.toBeInTheDocument();
   });
 
   it("shows a capped cell's overflow while its column head still reads the true total", async () => {

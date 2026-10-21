@@ -23,6 +23,12 @@ interface Props {
   collapsedIssues?: Set<string>;
   onCollapsedIssuesChange?: (updater: (prev: Set<string>) => Set<string>) => void;
   details: SprintDetail[];
+  // drawn is how many cards each sprint held before the view filtered it,
+  // by row id. Only the "more cards are in this list than the view draws"
+  // line reads it: that line is about the read stopping at its card budget,
+  // so counting the rows a filter removed into it would blame the cap for
+  // the user's own choice. Absent, every detail is taken as unfiltered.
+  drawn?: ReadonlyMap<string, number>;
   selectedKey: string;
   onSelect: (key: string) => void;
   checked: ReadonlySet<string>;
@@ -55,7 +61,7 @@ interface Props {
 // "checked" is already what says "selected" and amber is already what says
 // "waiting for Commit".
 export function SprintList({
-  details, selectedKey, onSelect, checked, onCheck, onExtend, onClearTo,
+  details, drawn, selectedKey, onSelect, checked, onCheck, onExtend, onClearTo,
   movedRowId, busyRowId, waiting, onStart, onComplete, onEdit, onDelete,
   collapsedIssues, onCollapsedIssuesChange,
 }: Props) {
@@ -300,7 +306,7 @@ export function SprintList({
     // read spends one card budget across every sprint and the unassigned
     // node together, so a node whose share ran out draws fewer cards than
     // it counted. Every other number on this screen comes from total.
-    const notDrawn = detail.total - detail.issues.length;
+    const notDrawn = detail.total - (drawn?.get(id) ?? detail.issues.length);
     return (
       <div className="folder-children sprint-children" role="group">
         {isSprint && (

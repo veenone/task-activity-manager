@@ -20,6 +20,7 @@ vi.mock("../api", async () => {
     ListOpenSprints: vi.fn(),
     GetSubtaskTypeName: vi.fn(),
     ListProjectTypes: vi.fn(),
+    ListFilterOptions: vi.fn(),
     ExportBacklog: vi.fn(),
   };
 });
@@ -65,6 +66,10 @@ beforeEach(() => {
   });
   vi.mocked(api.ExportBacklog).mockResolvedValue("C:/exports/tam-backlog.xlsx");
   vi.mocked(api.ListSprints).mockResolvedValue([]);
+  vi.mocked(api.ListFilterOptions).mockResolvedValue({
+    statuses: ["In Progress", "To Do"],
+    assignees: ["R. Anand", "S. Kim"],
+  });
   vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
   // PLAT's own types: the task level under a name of its own as well as the
@@ -155,5 +160,55 @@ describe("IssueListView's export", () => {
     await screen.findByText("Apply promo");
     await user.click(screen.getByRole("button", { name: /Export/ }));
     expect(await screen.findByText(/the drive is full/)).toBeInTheDocument();
+  });
+});
+
+describe("IssueListView's status and assignee filters", () => {
+  // The options are the profile's own, read from the cache, so the bar never
+  // offers a status or a person this project has no work in. Both reach the
+  // query, which is what makes them filters rather than decoration: the grid
+  // is paged, so a client-side narrowing would filter one page of many.
+  it("offers what the cache holds and sends the choice to the query", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Apply promo");
+
+    const status = await screen.findByRole("combobox", { name: "Status" });
+    expect(within(status).getByRole("option", { name: "In Progress" })).toBeInTheDocument();
+    expect(within(status).queryByRole("option", { name: "Blocked" })).toBeNull();
+    await user.selectOptions(status, "In Progress");
+    await waitFor(() => expect(lastQuery()?.statuses).toEqual(["In Progress"]));
+
+    const assignee = screen.getByRole("combobox", { name: "Assignee" });
+    await user.selectOptions(assignee, "S. Kim");
+    await waitFor(() => expect(lastQuery()?.assignees).toEqual(["S. Kim"]));
+    // The two narrow together, the way the store ANDs them.
+    expect(lastQuery()?.statuses).toEqual(["In Progress"]);
+  });
+
+  // Nobody is a choice of its own. The query carries assignees as a list so
+  // that the empty name can mean unassigned, because an empty string on its
+  // own would read as no filter at all.
+  it("asks for unassigned work as its own choice", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Apply promo");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Assignee" }), api.ASSIGNEE_NONE);
+    await waitFor(() => expect(lastQuery()?.assignees).toEqual([""]));
+  });
+
+  // Page four of an unfiltered backlog is almost never page four of a
+  // filtered one, so a filter that left the offset alone would show an empty
+  // grid over a non-zero total.
+  it("returns to the first page when a filter changes", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 400 });
+    renderView();
+    await waitFor(() => expect(api.ListIssues).toHaveBeenCalled());
+    await user.click(await screen.findByRole("button", { name: "Next page" }));
+    await waitFor(() => expect(lastQuery()?.offset).toBe(25));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "To Do");
+    await waitFor(() => expect(lastQuery()?.statuses).toEqual(["To Do"]));
+    expect(lastQuery()?.offset).toBe(0);
   });
 });

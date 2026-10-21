@@ -11,6 +11,9 @@ import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
 import { useDebounced } from "../lib/useDebounced";
 import { useSubtaskType } from "../queries/people";
+import { IssueFilters } from "./IssueFilters";
+import { NO_FILTER, isFiltered, queryFields } from "../lib/issueFilter";
+import type { IssueFilter } from "../lib/issueFilter";
 
 const SEARCH_DELAY_MS = 250;
 
@@ -32,6 +35,7 @@ export function EpicsView() {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const [text, setText] = useState("");
   const [sprintId, setSprintId] = useState("");
+  const [filter, setFilter] = useState<IssueFilter>(NO_FILTER);
   const [showDone, setShowDone] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -51,6 +55,7 @@ export function EpicsView() {
     setFiltersFor(activeId);
     setText("");
     setSprintId("");
+    setFilter(NO_FILTER);
     setShowDone(false);
     setSelectedKey("");
     setExpanded(new Set());
@@ -59,7 +64,10 @@ export function EpicsView() {
   }
 
   const search = useDebounced(text, SEARCH_DELAY_MS, activeId);
-  const query = useMemo<TreeQuery>(() => ({ text: search, sprintId, showDone }), [search, sprintId, showDone]);
+  const query = useMemo<TreeQuery>(
+    () => ({ ...queryFields(filter), text: search, sprintId, showDone }),
+    [filter, search, sprintId, showDone],
+  );
   const tree = useEpicTree(activeId, query);
   const sprints = useSprints(activeId);
   // The detail panel's own Sprint field, not the filter bar above: away from
@@ -90,7 +98,7 @@ export function EpicsView() {
   const epicCount = tree.data?.epics.length ?? 0;
   const orphanCount = tree.data?.orphans.length ?? 0;
   const issueCount = (tree.data?.epics.reduce((sum, e) => sum + e.children.length, 0) ?? 0) + orphanCount;
-  const filtered = search !== "" || sprintId !== "" || showDone;
+  const filtered = search !== "" || sprintId !== "" || showDone || isFiltered(filter);
   const empty = epicCount === 0 && orphanCount === 0;
 
   return (
@@ -104,6 +112,7 @@ export function EpicsView() {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
+        <IssueFilters value={filter} onChange={setFilter} />
         <select
           className="detail-input filter-sprint"
           aria-label="Sprint"

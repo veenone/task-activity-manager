@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { filterBoard, groupBoard, matchesCard } from "./boardFilter";
+import { ASSIGNEE_NONE } from "../api";
 import type { BoardView, Issue } from "../api";
+import { NO_FILTER } from "./issueFilter";
 
 function card(over: Partial<Issue>): Issue {
   return {
@@ -84,5 +86,35 @@ describe("filterBoard", () => {
     expect(out.unmapped).toBe(1);
     expect(out.donePoints).toBe(2);
     expect(out.capped).toBe(true);
+  });
+});
+
+describe("filterBoard's type, status and assignee bar", () => {
+  // The board filters in the browser because it composes itself from one read:
+  // narrowing it in SQL would mean refetching the whole board to answer a
+  // question the cards on screen already carry.
+  it("narrows the cards the same way the store narrows a query", () => {
+    const out = filterBoard(view(), "", { types: ["bug"], status: "", assignee: "" });
+    expect(out.lanes[0].cells.flat().map((c) => c.key)).toEqual(["PLAT-401"]);
+    expect(out.columns.map((c) => c.total)).toEqual([1, 0]);
+  });
+
+  it("asks for unassigned cards as its own choice", () => {
+    const out = filterBoard(view(), "", { types: [], status: "", assignee: ASSIGNEE_NONE });
+    expect(out.lanes[0].cells.flat().map((c) => c.key)).toEqual(["TAM-NEW-1"]);
+  });
+
+  // The text box and the bar narrow together, so a standup can type a key and
+  // still have the bar's choice applied rather than silently replaced.
+  it("ANDs the text box with the bar", () => {
+    expect(filterBoard(view(), "PLAT-401", { types: ["bug"], status: "", assignee: "" }).lanes[0].count).toBe(1);
+    expect(filterBoard(view(), "PLAT-401", { types: ["story"], status: "", assignee: "" }).lanes[0].count).toBe(0);
+  });
+
+  // The untouched board is returned by identity, which is what keeps a render
+  // with no filter from rebuilding every lane.
+  it("returns the board untouched when neither is set", () => {
+    const v = view();
+    expect(filterBoard(v, "", NO_FILTER)).toBe(v);
   });
 });

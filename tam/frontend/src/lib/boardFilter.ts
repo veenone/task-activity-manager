@@ -1,5 +1,7 @@
 import type { BoardView, Issue } from "../api";
 import { orderFamilies } from "./issueFamilies";
+import { NO_FILTER, isFiltered, keptKeys, matchesFilter } from "./issueFilter";
+import type { IssueFilter } from "./issueFilter";
 
 export function groupBoard(view: BoardView): BoardView {
   return { ...view, lanes: view.lanes.map((lane) => ({ ...lane, cells: lane.cells.map(orderFamilies) })) };
@@ -20,7 +22,8 @@ export function matchesCard(issue: Issue, needle: string): boolean {
   );
 }
 
-// filterBoard hides the cards that do not match, keeping the board's shape:
+// filterBoard hides the cards that do not match the text box and the type,
+// status and assignee bar, keeping the board's shape:
 // every column and every lane stays, so a filter never makes a column look
 // as though the board lost it, and an empty lane still says which lane it is.
 //
@@ -30,15 +33,17 @@ export function matchesCard(issue: Issue, needle: string): boolean {
 // filtered, so claiming a number for them would be a guess. The board-level
 // totals (unmapped, notSynced, donePoints) are left alone: they describe the
 // board, not this view of it.
-export function filterBoard(view: BoardView, needle: string): BoardView {
-  if (needle.trim() === "") return view;
+export function filterBoard(view: BoardView, needle: string, filter: IssueFilter = NO_FILTER): BoardView {
+  if (needle.trim() === "" && !isFiltered(filter)) return view;
+  // Over every card on the board at once, not per cell: a family can span
+  // columns, so a subtask kept for its parent has to be found whichever
+  // column that parent sits in.
   const cards = view.lanes.flatMap((lane) => lane.cells.flat());
-  const matching = new Set(cards.filter((i) => matchesCard(i, needle)).map((i) => i.key));
-  const families = new Set(cards.filter((i) => matching.has(i.key)).map((i) => i.type === "subtask" ? i.parentKey : i.key));
+  const keep = keptKeys(cards, (i) => matchesCard(i, needle) && matchesFilter(i, filter));
   const totals = view.columns.map(() => ({ total: 0, points: 0 }));
   const lanes = view.lanes.map((lane) => {
     const cells = lane.cells.map((cell, col) => {
-      const kept = cell.filter((iss) => matching.has(iss.key) || families.has(iss.key) || (iss.type === "subtask" && families.has(iss.parentKey)));
+      const kept = cell.filter((iss) => keep.has(iss.key));
       totals[col].total += kept.length;
       totals[col].points += kept.reduce((sum, i) => sum + (i.storyPoints ?? 0), 0);
       return kept;
