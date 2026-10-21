@@ -174,17 +174,18 @@ describe("BacklogView", () => {
     expect(screen.getByRole("button", { name: "+ New" })).toBeInTheDocument();
   });
 
-  it("filters by text, type chips, and sprint", async () => {
+  it("filters by text, type, and sprint", async () => {
     renderView();
     await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
     await userEvent.type(screen.getByRole("searchbox", { name: "Search issues" }), "promo");
     await waitFor(() => expect(lastQuery()?.text).toBe("promo"));
     expect(lastQuery()?.offset).toBe(0);
-    await userEvent.click(screen.getByRole("button", { name: "Story", pressed: false }));
+    await userEvent.click(screen.getByRole("button", { name: /All types/ }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Story" }));
     await waitFor(() => expect(lastQuery()?.types).toEqual(["story"]));
-    await userEvent.click(screen.getByRole("button", { name: "Bug", pressed: false }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Bug" }));
     await waitFor(() => expect(lastQuery()?.types).toEqual(["story", "bug"]));
-    await userEvent.click(screen.getByRole("button", { name: "Story", pressed: true }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Story" }));
     await waitFor(() => expect(lastQuery()?.types).toEqual(["bug"]));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sprint" }), "13");
     await waitFor(() => expect(lastQuery()?.sprintId).toBe("13"));
@@ -197,14 +198,14 @@ describe("BacklogView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() => expect(lastQuery()?.offset).toBe(25));
     expect(screen.getByText(showing(26, 50, 1248))).toBeInTheDocument();
-    // Page one is still cached, so going back is served without another
-    // backend call and the pager is what shows the move.
+    // Page one is cached, so the pager is what shows the move back.
     await userEvent.click(screen.getByRole("button", { name: "Previous page" }));
     await waitFor(() => expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() => expect(screen.getByText(showing(26, 50, 1248))).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: "Bug", pressed: false }));
+    await userEvent.click(screen.getByRole("button", { name: /All types/ }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Bug" }));
     await waitFor(() => expect(lastQuery()).toMatchObject({ types: ["bug"], offset: 0 }));
   });
 

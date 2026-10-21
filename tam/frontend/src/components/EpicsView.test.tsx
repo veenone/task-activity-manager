@@ -265,9 +265,13 @@ describe("EpicsView", () => {
     });
     renderView();
     expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
-    await user.click(screen.getByText("▾"));
+    // Scoped to the tree: the type filter's dropdown button carries the same
+    // caret glyph, so the unscoped query matched two elements once that
+    // filter became a dropdown (#323).
+    const tree = screen.getByRole("tree");
+    await user.click(within(tree).getByText("▾"));
     expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument();
-    await user.click(screen.getByText("▸"));
+    await user.click(within(tree).getByText("▸"));
     expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
   });
 
@@ -587,8 +591,8 @@ describe("EpicsView's filters", () => {
     renderView();
     await screen.findByText("Parent");
 
-    const types = screen.getByRole("group", { name: "Issue types" });
-    await user.click(within(types).getByRole("button", { name: "Bug" }));
+    await user.click(screen.getByRole("button", { name: /All types/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Bug" }));
     await waitFor(() => expect(lastTreeQuery()?.types).toEqual(["bug"]));
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "To Do");
