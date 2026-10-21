@@ -280,6 +280,20 @@ issue's Phase 0 had left open. Fixtures in `xtm/internal/jira/testdata/`.
   having one of that shape. The iteration's status is written through the
   body.
 
+The steps of an iteration, read while building #334 against the same instance:
+
+- The run resource lists iterations **without their steps**. Steps come only
+  from `GET /rest/raven/2.0/api/testrun/{runId}/iteration/{id}`, so reading a
+  whole run costs one call per iteration on top of the two the run needs.
+- A step carries **no id and no status of its own**. Only the iteration has a
+  status, so a per-step result has nothing behind it to show.
+- A step's fields are keyed by their **display name** (`Action`, `Data`,
+  `Expected Result`), each `{type, value:{raw, rendered}}`. Those names are
+  instance configuration, not API, so a step whose keys match none of them
+  still has to keep its place or every step after it is renumbered.
+- **Xray substitutes the row's values before it answers.** `Data` comes back
+  resolved, so a reader that substitutes again is substituting twice.
+
 ### Writing a dataset
 
 The same spike, continued against a throwaway Test. Every operation the
