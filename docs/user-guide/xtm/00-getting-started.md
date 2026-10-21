@@ -150,5 +150,8 @@ The dark theme applies to the whole window:
 
 - **Test connection fails.** Check that the URL has no trailing path and that the token has not expired. For a server with a private certificate, add the CA certificate under **Advanced: TLS / certificate settings**.
 - **The grid is empty after creating a profile.** Run a sync. XTM never fetches tests on its own.
-- **Sync failed.** The status bar shows the error. Open **More → Sync history** for details and **More → Diagnostics** for the log.
+- **Sync failed.** A red ribbon across the status bar names what Jira answered
+  and what to change: the token, the Jira URL and project key, or nothing at
+  all when Jira itself failed. Open **More → Sync history** for the run and
+  **More → Diagnostics** for the log.
 - **You cannot switch profiles.** A sync is running. Wait for it to finish.

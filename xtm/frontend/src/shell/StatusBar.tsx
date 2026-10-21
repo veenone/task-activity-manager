@@ -5,12 +5,23 @@ import type { AppState } from "./useAppState";
 // synced test count and when it last ran.
 export function StatusBar({ s }: { s: AppState }) {
   const { progress, syncError, syncState } = s;
+  // A running sync supersedes the last one's failure, so the bar reports what
+  // is happening now. This mirrors the branch below because the ribbon colours
+  // the whole bar, which only the footer can do (#313).
+  const failed = !!syncError && !(progress && !progress.done);
   return (
-    <footer className="app-statusbar">
+    <footer className={failed ? "app-statusbar statusbar-failed" : "app-statusbar"}>
       {progress && !progress.done ? (
         <SyncBar progress={progress} />
-      ) : syncError ? (
-        <span className="error-text">Sync failed: {syncError}</span>
+      ) : failed ? (
+        <div className="sync-ribbon" role="alert">
+          <span className="sync-ribbon-mark" aria-hidden="true">
+            !
+          </span>
+          <span>
+            <strong>Sync failed.</strong> {syncError}
+          </span>
+        </div>
       ) : syncState ? (
         <span className="muted sync-info">
           {syncState.testCount.toLocaleString()} tests

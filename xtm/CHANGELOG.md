@@ -10,6 +10,11 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Sync failure ribbon**
+- A failed sync is drawn as a ribbon across the status bar rather than as red
+  text in its corner (#313), coloured from the danger tokens and growing to
+  fit the message instead of clipping it.
+
 **Bulk step find and replace**
 - **Replace step text…** in the Browse bulk toolbar finds a string in the
   steps of every selected test and replaces it across them (#311). Action,
@@ -140,6 +145,15 @@ on tests and the Components view, are below.
 
 ### Fixed
 
+- A sync against Jira 9 or newer failed outright with "Issue Does Not Exist"
+  (#313). Those versions removed the classic create-metadata endpoint, so the
+  request for the project's Test custom fields answered 404 and aborted the
+  run. The custom field list now falls back to the instance's own field list,
+  which is what it already did for instances that answer the endpoint with no
+  Test fields. The same request backs the Create Bug and Create Requirement
+  forms, which now open without the extra required fields instead of failing.
+- A failed sync no longer reports every 404 as a wrong Jira URL, and the sync
+  messages read as plain sentences rather than as notes about the app.
 - A precondition created as Generic or Cucumber was created as Manual: the
   type was never sent. It now goes to Xray's Pre-Condition Type field.
 
