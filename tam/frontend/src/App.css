@@ -115,7 +115,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
    buttons next to them. The .edit-form rule below cancels it for the same
    reason; the bar needed its own. */
 .filter-bar .detail-input { margin-bottom: 0; }
-.filter-bar .detail-input, .filter-bar .btn { height: 30px; }
+/* A floor, not a ceiling. `height: 30px` left 16px of content box for a line
+   box that wants 18.2px, and the text is what gave way: the descenders were
+   cut off (#323). min-height lines the row up without ever being the reason
+   a glyph does not fit.
+   33px is 19px of content plus 12px padding plus 2px border. 19 rather than
+   the 18.2 the line box needs, because a select takes its height from the
+   browser rather than from line-height and lands on 33px by itself: matching
+   it keeps the row one height, and leaves the input a pixel of slack instead
+   of sitting exactly on the figure. */
+.filter-bar .detail-input, .filter-bar .btn { min-height: 33px; }
 /* The search field gives way instead of wrapping the bar: at a fixed 300px
    the Backlog bar wrapped at about 1000px, which is an ordinary window. */
 .filter-search { flex: 1 1 180px; max-width: 300px; }
@@ -127,9 +136,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
    name is longer than a status name. */
 .filter-status { width: 130px; }
 .filter-assignee { width: 150px; }
-/* The chips stay their own size. They are the grid's type chips, and a
-   reader matches them to the column, not to the controls either side. */
-.type-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* The type filter's panel anchors left. MultiSelect anchors right by default,
+   which suits a control at the right end of a row; this one sits second from
+   the left, so a right-anchored panel opened back across the search box and
+   off the bar (#323). XTM overrides the same rule for its detail pickers. */
+.filter-bar .multiselect-panel { left: 0; right: auto; }
 .chip-type { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The chip palette lives in tokens.css: these fills were literals, so a chip
    kept its pastel ground when the window went dark and the text on it was
@@ -149,12 +160,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-type-alt-teal { background: var(--chip-teal-bg); color: var(--chip-teal-text); }
 .chip-type-alt-pink { background: var(--chip-pink-bg); color: var(--chip-pink-text); }
 .chip-type-alt-orange { background: var(--chip-orange-bg); color: var(--chip-orange-text); }
-.chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
-/* Hover lifts a chip part way; only a selected one is fully opaque, and it
-   also fills. One rule used to give both states the same opacity, so
-   hovering an unselected type filter made it look selected. */
-.chip-toggle:hover { opacity: 0.8; }
-.chip-toggle.chip-on { opacity: 1; border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; font-weight: 600; }
 .chip-status { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 6px; border-radius: 3px; }
 .chip-status-todo { background: var(--surface-3); color: var(--text); }
 .chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }

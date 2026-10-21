@@ -1100,76 +1100,15 @@
   max-width: 640px;
 }
 
-/* MultiSelect: checkbox dropdown for the Sankey filters. */
-.multiselect {
-  position: relative;
-  display: inline-block;
-}
-.multiselect-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 240px;
-  padding: 4px 8px;
-  font-size: var(--fs-sm);
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.multiselect-summary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.multiselect-caret {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.multiselect-panel {
-  position: absolute;
-  z-index: var(--z-modal-popover);
-  top: calc(100% + 4px);
-  right: 0;
-  min-width: 240px;
-  max-width: 360px;
-  max-height: 70vh;
-  overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  padding: 6px;
-}
+/* MultiSelect's own rules live in frontend/core/styles/primitives.css
+   since #323, when TAM's type filter became its second caller. This is
+   XTM's own override of them. */
 /* Detail-panel pickers open within the 440px detail (it has overflow:hidden);
    anchor left so the panel is not clipped at the detail's left border. */
 .pre-add .multiselect-panel {
   left: 0;
   right: auto;
   max-width: 100%;
-}
-.multiselect-clear {
-  font-size: var(--fs-xs);
-  margin: 2px 4px 6px;
-}
-.multiselect-search {
-  width: 100%;
-  box-sizing: border-box;
-  margin: 2px 0 6px;
-  padding: 5px 8px;
-  font-size: var(--fs-sm);
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text);
-}
-.multiselect-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 320px;
-  overflow-y: auto;
 }
 /* Single-select option rows (SearchableSelect) reuse the multiselect panel. */
 /* TokenPicker: chips plus a combobox input, used for labels. */
@@ -1267,23 +1206,6 @@
 .searchable-option.is-selected {
   background: var(--surface-2);
   font-weight: 600;
-}
-.multiselect-list label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 6px;
-  font-size: var(--fs-sm);
-  border-radius: 5px;
-  cursor: pointer;
-}
-/* Prevent the checkbox from stretching; keep it vertically centred with the label text. */
-.multiselect-list label input {
-  flex: 0 0 auto;
-  margin: 0;
-}
-.multiselect-list label:hover {
-  background: var(--surface-2);
 }
 .sankey-filters select {
   max-width: 220px;
@@ -3521,17 +3443,9 @@ tr.row-selected td:first-child {
   color: var(--text-muted);
 }
 
-.detail-input {
-  width: 100%;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-family: inherit;
-  font-size: var(--fs-md);
-  color: var(--text);
-  background: var(--surface);
-  margin-bottom: 12px;
-}
+/* .detail-input is defined once, in frontend/core/styles/primitives.css.
+   The copy that sat here was byte-identical, so the fix that gave it a
+   stated line-height reached TAM and not XTM (#323). */
 /* Status row groups the current-status pill with the workflow transition
    picker (FR-4.2). */
 .status-row {
