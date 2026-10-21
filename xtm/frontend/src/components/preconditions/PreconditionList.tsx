@@ -1,10 +1,11 @@
+import { Menu } from "@agile-suite/core";
 import { Pager } from "../Pager";
 import { SortControl } from "../SortControl";
 import type { PreconditionsState } from "./usePreconditionsState";
 import type { PreconditionsActions } from "./usePreconditionsActions";
 
-// PreconditionList is the left side: filter, Sync, sort, New and Import, the
-// usage pills, and the paged list.
+// PreconditionList is the left side: filter, Sync, sort, the create button
+// and a menu for the rest, the usage pills, and the paged list.
 export function PreconditionList({ s, a }: { s: PreconditionsState; a: PreconditionsActions }) {
   const { canSync, selected, setSelected, filter, setFilter, usageFilter, setUsageFilter, sortField, setSortField, sortDesc, setSortDesc, notice, setShowCreate, setShowImport, syncing, setListPage, listPageSize, setListPageSize, list, loading, usageCounts, filtered, listSafePage, pageList } = s;
   const { syncPreconditions } = a;
@@ -12,6 +13,10 @@ export function PreconditionList({ s, a }: { s: PreconditionsState; a: Precondit
     <>
       <aside className="precond-list">
         <div className="precond-list-head">
+          {/* View controls on one row, actions on the next: the shape
+              .reqs-list-head has. All five on one row wrapped this panel
+              into three at its normal width (#325). */}
+          <div className="precond-head-row">
           <input
             className="precond-search"
             data-tour="preconditions-tools"
@@ -20,7 +25,7 @@ export function PreconditionList({ s, a }: { s: PreconditionsState; a: Precondit
             onChange={(e) => setFilter(e.target.value)}
           />
           <button
-            className="btn"
+            className="btn precond-sync"
             onClick={syncPreconditions}
             disabled={!canSync}
             aria-busy={syncing}
@@ -42,15 +47,33 @@ export function PreconditionList({ s, a }: { s: PreconditionsState; a: Precondit
               setSortDesc(d);
             }}
           />
+          </div>
+          <div className="precond-list-toolbar">
           <button
             className="btn btn-primary precond-new"
             onClick={() => setShowCreate(true)}
           >
             New precondition
           </button>
-          <button className="btn precond-new" onClick={() => setShowImport(true)}>
-            Import…
-          </button>
+          {/* The secondary actions sit behind one trigger: this panel is
+              narrow, and four full-width labels on one row wrapped into two
+              rows of equal-weight buttons with no primary among them
+              (#325). The create button keeps the label it was renamed to. */}
+          <Menu
+            label="⋯"
+            triggerLabel="More actions"
+            triggerClassName="btn precond-new"
+            align="right"
+            items={[
+              {
+                key: "import",
+                label: "Import…",
+                title: "Import preconditions from a CSV or XLSX file",
+                onClick: () => setShowImport(true),
+              },
+            ]}
+          />
+          </div>
         </div>
         <div className="filter-pill-row">
           {(

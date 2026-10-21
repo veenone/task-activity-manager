@@ -10,7 +10,7 @@ The tab only appears when the profile's backend supports requirement objects.
 
 Requirements usually live in a different project from your tests, as Stories or Epics. XTM needs to know which projects and issue types to pull.
 
-1. Click **Sources…**.
+1. Click **⋯** beside **New requirement**, then **Sources…**.
 2. Under **Coverage link type**, choose the Jira link type that connects a test to the requirement it covers.
 3. Under **Add source**, enter the **Project key** and the **Issue types** that count as requirements, separated by spaces (for example `Story Epic`). Add a **Scope JQL** to narrow the source further.
 4. Click **Add source**. Repeat for each project.
@@ -61,11 +61,12 @@ The requirement is created in Jira when you commit.
 
 - **Edit** on an open requirement changes its fields. **Save** keeps the change.
 - **Actions → Delete requirement…** deletes it after you confirm.
+- **⋯** beside **New requirement** holds **Sources…**, **Import…** and **Export audit…**.
 - **Import…** creates requirements from a CSV or XLSX file, with the same steps as the test import.
-- **Export audit…** saves a coverage report for every requirement in the list. It is disabled while the list is empty.
+- **Export audit…** saves a coverage report for every requirement in the list. It is greyed out while the list is empty.
 
 ## Troubleshooting
 
-- **The list is empty.** Add a source with **Sources…**, then click **Sync**.
-- **A requirement shows UNCOVERED but a test covers it.** Check that the test uses the coverage link type you chose in **Sources…**.
+- **The list is empty.** Add a source with **⋯ → Sources…**, then click **Sync**.
+- **A requirement shows UNCOVERED but a test covers it.** Check that the test uses the coverage link type you chose in **⋯ → Sources…**.
 - **Results look old.** Run results come from executions. Sync the executions from [Containers](09-containers.md).

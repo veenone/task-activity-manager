@@ -165,7 +165,8 @@ describe("PreconditionsView", () => {
 
   it("opens the import dialog from Import…", async () => {
     renderView("https://jira.example.com/");
-    await userEvent.click(screen.getByRole("button", { name: "Import…" }));
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Import…" }));
     expect(
       screen.getByRole("dialog", { name: "Import preconditions (CSV or XLSX)" }),
     ).toBeInTheDocument();
@@ -278,5 +279,21 @@ describe("PreconditionsView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Actions" }));
     await userEvent.click(screen.getByRole("menuitem", { name: /Delete precondition/ }));
     expect(DeletePrecondition).toHaveBeenCalledWith("p1", "PC-1");
+  });
+});
+
+describe("PreconditionsView toolbar", () => {
+  // The list panel is narrow, and the create button stopped reading "+ New"
+  // when it was renamed to say what it makes. Four full-width labels on one
+  // row then wrapped, and the row read as two rows of equal-weight buttons
+  // with no primary among them (#325).
+  it("keeps the create action visible and puts the rest behind one menu", async () => {
+    renderView("https://jira.example.com/");
+    expect(screen.getByRole("button", { name: "New precondition" })).toBeInTheDocument();
+    // Not on the row any more, so the row cannot wrap on their account.
+    expect(screen.queryByRole("button", { name: "Import…" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(screen.getByRole("menuitem", { name: "Import…" })).toBeInTheDocument();
   });
 });
