@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, LiveRegion, ViewTabs, useProfile, useTour, errMsg } from "@agile-suite/core";
+import { Menu, LiveRegion, SyncRibbon, ViewTabs, useProfile, useTour, errMsg } from "@agile-suite/core";
 import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
@@ -164,6 +164,11 @@ export default function App() {
   const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
   const demo = isDemoUrl(activeProfile?.jiraUrl);
   const startupFailed = health !== null && !health.ok;
+  // The run that just failed, or the one the store remembers from a previous
+  // launch. A running sync supersedes both, so the bar reports what is
+  // happening now.
+  const lastSyncError = syncError || syncState.data?.lastError || "";
+  const syncFailed = !!lastSyncError && !progress;
 
   return (
     <div className="app">
@@ -327,29 +332,33 @@ export default function App() {
         </main>
       </div>
 
-      <footer className="app-statusbar">
-        <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
-        <span>{health?.ok ? "Local store ready" : "Starting up"}</span>
-        {!startupFailed && profileError ? (
-          <span className="error-text">Profiles could not be loaded: {profileError}</span>
-        ) : activeProfile ? (
-          <span data-testid="sync-summary">
-            {syncState.data
-              ? syncState.data.lastSynced
-                ? `${cachedCount(syncState.data)} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
-                : "Not synced yet"
-              : ""}
-          </span>
+      {/* A failed sync takes the whole bar, the way XTM's does: beside the
+          store state, the issue count and the theme it read as one more
+          value rather than the one thing here to act on (#315). */}
+      <footer className={syncFailed ? "app-statusbar statusbar-failed" : "app-statusbar"}>
+        {syncFailed ? (
+          <SyncRibbon message={lastSyncError} />
         ) : (
-          <span className="muted">Profiles are shared with Xray Test Manager</span>
+          <>
+            <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
+            <span>{health?.ok ? "Local store ready" : "Starting up"}</span>
+            {!startupFailed && profileError ? (
+              <span className="error-text">Profiles could not be loaded: {profileError}</span>
+            ) : activeProfile ? (
+              <span data-testid="sync-summary">
+                {syncState.data
+                  ? syncState.data.lastSynced
+                    ? `${cachedCount(syncState.data)} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
+                    : "Not synced yet"
+                  : ""}
+              </span>
+            ) : (
+              <span className="muted">Profiles are shared with Xray Test Manager</span>
+            )}
+            {progress && <SyncBar progress={progress} />}
+            <span className="muted statusbar-right">Theme: {theme}</span>
+          </>
         )}
-        {progress && <SyncBar progress={progress} />}
-        {(syncError || syncState.data?.lastError) && !progress && (
-          <span className="error-text" data-testid="sync-error">
-            Last sync failed: {syncError || syncState.data?.lastError}
-          </span>
-        )}
-        <span className="muted statusbar-right">Theme: {theme}</span>
       </footer>
 
       {/* LiveRegion's assertive channel is itself a role="alert" node, so it

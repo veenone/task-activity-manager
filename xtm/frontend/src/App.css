@@ -198,45 +198,6 @@
   color: var(--text-muted) !important;
 }
 
-/* A failed sync is the only thing the status bar reports that the user has to
-   act on, so the whole bar becomes a ribbon rather than holding a red string
-   in the corner, where it read as a stray value (#313). The bar is fixed-height
-   chrome otherwise; here it grows, because a clipped sentence about what went
-   wrong is worse than a taller bar. */
-.app-statusbar.statusbar-failed {
-  height: auto;
-  min-height: 26px;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  /* Mixed into the bar's own surface rather than set to --danger-tint, which
-     is translucent: the bar would then take its colour from whatever sits
-     behind it, and in dark mode that read as a pale strip pasted onto dark
-     chrome. --danger-solid is one colour in both themes, so the mix follows
-     the surface. */
-  background: color-mix(in srgb, var(--danger-solid) 12%, var(--surface-2));
-  border-top: 1px solid var(--danger-border);
-  color: var(--danger-fg-strong);
-}
-.sync-ribbon {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-/* The mark holds its size while the sentence wraps beside it. */
-.sync-ribbon-mark {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--danger-solid);
-  color: var(--on-accent);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  line-height: 14px;
-  text-align: center;
-}
-
 /* Sync progress bar */
 .syncbar {
   display: flex;

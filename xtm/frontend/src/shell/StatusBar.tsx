@@ -1,3 +1,5 @@
+import { SyncRibbon } from "@agile-suite/core";
+
 import type { SyncProgress } from "../api";
 import type { AppState } from "./useAppState";
 
@@ -14,14 +16,7 @@ export function StatusBar({ s }: { s: AppState }) {
       {progress && !progress.done ? (
         <SyncBar progress={progress} />
       ) : failed ? (
-        <div className="sync-ribbon" role="alert">
-          <span className="sync-ribbon-mark" aria-hidden="true">
-            !
-          </span>
-          <span>
-            <strong>Sync failed.</strong> {syncError}
-          </span>
-        </div>
+        <SyncRibbon message={syncError} />
       ) : syncState ? (
         <span className="muted sync-info">
           {syncState.testCount.toLocaleString()} tests
