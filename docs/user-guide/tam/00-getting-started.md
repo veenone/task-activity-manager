@@ -45,6 +45,8 @@ Press **Sync** at the right of the top bar and choose:
 
 The status bar at the bottom shows progress while it runs, then the issue count and when it last finished. A count like `38 of 2,943 issues` means the scope JQL, or an issue type TAM does not sync, keeps the rest out.
 
+When a sync fails, the whole bar turns into a red ribbon saying what Jira answered and what to change: the token, the Jira URL and project key, or nothing at all when Jira itself failed. It stays until the next sync, and **Help → Diagnostics** has the log.
+
 **Refresh**, next to Sync, is narrower: it re-reads the view you are on and fetches issue details again. It takes the same lock a sync does, so the two cannot run at once.
 
 ## The loop: edit, review, commit

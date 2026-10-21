@@ -1241,6 +1241,11 @@ reported per test:
 shows progress per phase (tests, folders, preconditions, containers,
 requirements, bugs, custom fields).
 
+When a sync fails, the whole bar turns into a red ribbon saying what Jira
+answered and what to change: the token, the Jira URL and project key, or
+nothing at all when Jira itself failed. **More → Sync history** has the run and
+**More → Diagnostics** has the log.
+
 ![Figure 30: Sync in progress](images/30-sync-progress.png)
 *Figure 30 — A sync in progress, with the phase and item counts in the status
 bar.*

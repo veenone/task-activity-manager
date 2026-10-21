@@ -12,6 +12,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
 	"agile-suite/core/shareddb"
@@ -314,6 +315,17 @@ func (a *App) SetDefaultProfile(id string) error {
 		return err
 	}
 	return a.settings.SetDefaultProfileID(id)
+}
+
+// syncFailure is what a sync error reads as on screen. core/jira turns a Jira
+// HTTP failure into something actionable; anything it does not recognise is
+// passed through unchanged. The caller has already logged the original, so
+// support still has the step that failed (#315).
+func syncFailure(err error) error {
+	if human := corejira.Humanize(err); human != "" {
+		return errors.New(human)
+	}
+	return err
 }
 
 // setupFileLogging sends the standard logger to tam.log in the app data

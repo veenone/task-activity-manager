@@ -115,7 +115,7 @@ nobody minds you breaking.
 | Tab band | The eight views. |
 | Navigation rail | An optional list of the same views down the left, toggled with **Ctrl+B**. |
 | Main area | The active view. |
-| Status bar | Whether the local store is ready, the cached issue count, when the last sync finished, and sync progress while one runs. |
+| Status bar | Whether the local store is ready, the cached issue count, when the last sync finished, and sync progress while one runs. A failed sync takes the whole bar as a red ribbon. |
 
 The native menu bar carries the same things:
 
