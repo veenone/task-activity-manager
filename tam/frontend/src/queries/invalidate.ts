@@ -19,6 +19,10 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
   for (const queryKey of [
     [profileId, "issues"] as const,
     keys.sprints(profileId),
+    // A sync is also the only thing that can bring a status or a person the
+    // project had not used before, so the filter bar would go on offering the
+    // pre-sync list for as long as the query stayed fresh.
+    keys.filterOptions(profileId),
     keys.syncState(profileId),
     keys.pending(profileId),
     [profileId, "tree"] as const,

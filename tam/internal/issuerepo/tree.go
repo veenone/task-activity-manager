@@ -11,10 +11,19 @@ import (
 // TreeQuery filters the Epics view. Text matches an epic or any child;
 // SprintID keeps epics with a child in the sprint; ShowDone keeps done
 // children and fully done epics.
+//
+// Types, Statuses and Assignees read the same as IssueQuery's: empty is no
+// filter, several entries are an OR inside the field, and the fields are an
+// AND. They narrow the children, and an epic the filter leaves no child is
+// dropped, the rule SprintID already follows. The tree is read for the work
+// under an epic, so an epic's own type, status and assignee are not matched.
 type TreeQuery struct {
-	Text     string `json:"text"`
-	SprintID string `json:"sprintId"`
-	ShowDone bool   `json:"showDone"`
+	Text      string   `json:"text"`
+	SprintID  string   `json:"sprintId"`
+	ShowDone  bool     `json:"showDone"`
+	Types     []string `json:"types"`
+	Statuses  []string `json:"statuses"`
+	Assignees []string `json:"assignees"`
 }
 
 // EpicNode is one epic with the children the filter kept and the progress
@@ -86,6 +95,23 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 			key IN (SELECT parent_key FROM issue WHERE profile_id = ? AND type = 'subtask' AND sprint_id = ?))`)
 		args = append(args, q.SprintID, profileID, q.SprintID, profileID, q.SprintID)
 	}
+	// Type, status and assignee narrow the children in SQL, beside the
+	// sprint clause and for the same reason: the read below stops at
+	// treeCap, so a Go-side filter would narrow whichever rows the cap let
+	// through and Truncated would describe a different set than the tree.
+	for _, f := range []struct {
+		column string
+		values []string
+	}{
+		{"type", q.Types},
+		{"status", q.Statuses},
+		{"assignee", q.Assignees},
+	} {
+		if clause, in := inClause(f.column, f.values); clause != "" {
+			where = append(where, clause)
+			args = append(args, in...)
+		}
+	}
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+issueColumns+` FROM issue WHERE `+strings.Join(where, " AND ")+issueOrder+` LIMIT ?`,
 		append(args, treeCap+1)...)
@@ -137,6 +163,11 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		}
 		return append([]backend.Issue{c}, children...)
 	}
+	// narrowed is true when the user asked for a subset of the children. An
+	// epic the filter left nothing under is then dropped rather than drawn
+	// empty, because an empty epic row under a filter reads as an epic with
+	// no work in it.
+	narrowed := q.SprintID != "" || len(q.Types) > 0 || len(q.Statuses) > 0 || len(q.Assignees) > 0
 	isEpic := map[string]bool{}
 	tree := Tree{Epics: []EpicNode{}, Orphans: []backend.Issue{}, Truncated: truncated}
 	for _, e := range epics {
@@ -171,7 +202,7 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		if text != "" && !epicMatches && !anyChild {
 			continue
 		}
-		if q.SprintID != "" && !anyChild {
+		if narrowed && !anyChild {
 			continue
 		}
 		if !q.ShowDone && node.Total > 0 && node.Done == node.Total && !anyChild {

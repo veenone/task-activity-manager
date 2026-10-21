@@ -120,6 +120,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
    the Backlog bar wrapped at about 1000px, which is an ordinary window. */
 .filter-search { flex: 1 1 180px; max-width: 300px; }
 .filter-sprint { width: 140px; }
+/* Status and assignee sit at a fixed width for the same reason the sprint
+   select does: the options come from the project, so a select sized to its
+   content would be a different width on every profile and the bar would
+   relayout on a sync. Assignee is the wider of the two because a display
+   name is longer than a status name. */
+.filter-status { width: 130px; }
+.filter-assignee { width: 150px; }
 /* The chips stay their own size. They are the grid's type chips, and a
    reader matches them to the column, not to the controls either side. */
 .type-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

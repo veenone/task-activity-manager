@@ -21,6 +21,10 @@ export const keys = {
   doneAgreement: (profileId: string, key: string, boardId: number, sprintId: number) =>
     [profileId, "issue", key, "doneAgreement", boardId, sprintId] as const,
   sprints: (profileId: string) => [profileId, "sprints"] as const,
+  // The statuses and people the filter bar offers, read from the cache like
+  // the sprints beside it. A sync invalidates it, because a sync is what can
+  // add a status or a person the project had not used before.
+  filterOptions: (profileId: string) => [profileId, "filterOptions"] as const,
   syncState: (profileId: string) => [profileId, "syncState"] as const,
   pending: (profileId: string) => [profileId, "pending"] as const,
   activity: (profileId: string, key: string) => [profileId, "issue", key, "activity"] as const,

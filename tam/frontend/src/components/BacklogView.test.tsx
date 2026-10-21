@@ -170,7 +170,7 @@ describe("BacklogView", () => {
     expect(within(row).getByText("Sprint 12")).toBeInTheDocument();
     expect(within(row).getByText("5")).toBeInTheDocument();
     expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
-    expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false, groupSubtasks: true });
+    expect(lastQuery()).toEqual({ text: "", types: [], statuses: [], assignees: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false, groupSubtasks: true });
     expect(screen.getByRole("button", { name: "+ New" })).toBeInTheDocument();
   });
 
@@ -237,7 +237,7 @@ describe("BacklogView", () => {
       expect(vi.mocked(api.ListIssues).mock.calls.some((c) => c[0] === "p2")).toBe(true),
     );
     const firstForP2 = vi.mocked(api.ListIssues).mock.calls.find((c) => c[0] === "p2");
-    expect(firstForP2?.[1]).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false, groupSubtasks: true });
+    expect(firstForP2?.[1]).toEqual({ text: "", types: [], statuses: [], assignees: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false, groupSubtasks: true });
     // No query for the new profile may carry the old profile's filters.
     for (const c of vi.mocked(api.ListIssues).mock.calls) {
       if (c[0] === "p2") expect(c[1].text).toBe("");

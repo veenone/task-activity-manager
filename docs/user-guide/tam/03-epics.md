@@ -12,9 +12,12 @@ Under the epics is everything with no epic, so work that was never filed under o
 
 The line above the tree counts what you are looking at: epics, issues, and how many have no epic. A project larger than 5,000 issues is cut off at that point, with a note asking you to narrow the filter.
 
+Narrowing works on the children, and an epic the filter leaves nothing under drops out of the tree rather than sitting there empty.
+
 ## Narrow it
 
 - **Search** matches a summary, a key or a label, across epics and their children.
+- **Type**, **Status** and **Assignee** are the same three controls the [Backlog](01-backlog.md#find-issues) has, narrowing by issue type, workflow status and who the work belongs to. **Unassigned** is its own choice on the assignee list.
 - **Sprint** narrows to one sprint.
 - **Show done** includes completed work, which is off by default so a long-running epic shows what is left.
 - **Expand all** and **Collapse all** work on every epic currently listed.

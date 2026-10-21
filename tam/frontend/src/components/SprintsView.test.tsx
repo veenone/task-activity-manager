@@ -38,6 +38,8 @@ vi.mock("../api", async () => {
     SearchUsers: vi.fn(),
     ListPriorities: vi.fn(),
     GetSubtaskTypeName: vi.fn(),
+    ListProjectTypes: vi.fn(),
+    ListFilterOptions: vi.fn(),
   };
 });
 
@@ -191,6 +193,14 @@ beforeEach(() => {
   vi.mocked(api.SearchUsers).mockResolvedValue([]);
   vi.mocked(api.ListPriorities).mockResolvedValue(["High"]);
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Sub-task");
+  vi.mocked(api.ListProjectTypes).mockResolvedValue([
+    { id: "1", name: "Task", subtask: false, logical: "task" },
+    { id: "2", name: "Story", subtask: false, logical: "story" },
+  ]);
+  vi.mocked(api.ListFilterOptions).mockResolvedValue({
+    statuses: ["To Do", "Done"],
+    assignees: ["M. Ortiz", "R. Anand"],
+  });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -567,5 +577,60 @@ describe("SprintsView", () => {
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
     await waitFor(() => expect(banner()).toHaveTextContent("Press Refresh."));
+  });
+});
+
+describe("SprintsView's filters", () => {
+  // The Sprints view had no filter at all, so a planning session reading what
+  // one person is carrying across three sprints had to read every row (#321).
+  // The rows are filtered in the browser: the view already holds every card it
+  // drew, so narrowing it in SQL would mean refetching to answer a question
+  // the rows on screen already carry.
+  it("narrows the cards drawn under each sprint", async () => {
+    const user = userEvent.setup();
+    renderView();
+    expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
+
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Assignee" }), "M. Ortiz");
+    await waitFor(() => expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument());
+    expect(screen.getByText("Rotate the gateway keys")).toBeInTheDocument();
+    // The sprint itself stays, the way a filtered board keeps every column: a
+    // filter must never read as a sprint the board lost.
+    expect(screen.getByRole("treeitem", { name: /Sprint 12/ })).toBeInTheDocument();
+  });
+
+  // SprintFillBar counts the cards the tree is drawing that are checked, and
+  // that is the list a fill sends. A card the filter hides has to leave the
+  // count with it: left in, it would be swept into the next fill with nothing
+  // on screen saying so. The board already guards this by measuring its
+  // selection against the drawn board, and this is the same guard.
+  it("drops a checked card from the selection when a filter hides it", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("checkbox", { name: "Check PLAT-412" }));
+    await user.click(screen.getByRole("checkbox", { name: "Check PLAT-409" }));
+    expect(await screen.findByText("2 cards selected")).toBeInTheDocument();
+
+    // PLAT-412 is R. Anand's, PLAT-409 is M. Ortiz's, so this hides one of the two.
+    await user.selectOptions(screen.getByRole("combobox", { name: "Assignee" }), "M. Ortiz");
+    await waitFor(() => expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument());
+    expect(screen.getByText("1 card selected")).toBeInTheDocument();
+
+    // Narrowed, not thrown away: clearing the filter brings it back, the way
+    // the board's selection survives a refetch that redrew the card.
+    await user.selectOptions(screen.getByRole("combobox", { name: "Assignee" }), "");
+    expect(await screen.findByText("2 cards selected")).toBeInTheDocument();
+  });
+
+  // The "more cards are in this list than the view draws" line is about the
+  // read stopping at its card budget. Counting the rows a filter removed into
+  // it would blame the cap for the user's own choice.
+  it("does not blame the card budget for the rows a filter removed", async () => {
+    const user = userEvent.setup();
+    renderView();
+    expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Assignee" }), "M. Ortiz");
+    await waitFor(() => expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument());
+    expect(screen.queryByText(/than the view draws/)).toBeNull();
   });
 });

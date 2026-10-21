@@ -4,6 +4,7 @@ import {
   GetIssueDetail,
   GetProfileSetting,
   GetSyncState,
+  ListFilterOptions,
   ListIssues,
   ListLinkedTests,
   ListSprints,
@@ -52,6 +53,17 @@ export function useSprints(profileId: string) {
   return useQuery({
     queryKey: keys.sprints(profileId),
     queryFn: () => call(() => ListSprints(profileId)),
+    enabled: !!profileId,
+  });
+}
+
+// useFilterOptions is what the filter bar offers for status and assignee.
+// Every view with a bar reads it, so it is one query under one key rather
+// than a read per view.
+export function useFilterOptions(profileId: string) {
+  return useQuery({
+    queryKey: keys.filterOptions(profileId),
+    queryFn: () => call(() => ListFilterOptions(profileId)),
     enabled: !!profileId,
   });
 }

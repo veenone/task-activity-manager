@@ -238,6 +238,10 @@ export function ListEpics(arg1) {
   return window['go']['main']['App']['ListEpics'](arg1);
 }
 
+export function ListFilterOptions(arg1) {
+  return window['go']['main']['App']['ListFilterOptions'](arg1);
+}
+
 export function ListIssues(arg1, arg2) {
   return window['go']['main']['App']['ListIssues'](arg1, arg2);
 }

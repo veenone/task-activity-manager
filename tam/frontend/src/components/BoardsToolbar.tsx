@@ -1,6 +1,8 @@
 import type { Board, Sprint, Swimlane } from "../api";
 import { SWIMLANES } from "../api";
 import { draftLabel } from "../lib/sprintOptions";
+import { IssueFilters } from "./IssueFilters";
+import type { IssueFilter } from "../lib/issueFilter";
 
 interface Props {
   boards: Board[];
@@ -37,6 +39,12 @@ interface Props {
   // filter narrows the cards drawn, by key, assignee, or issue type.
   filter: string;
   onFilter: (v: string) => void;
+  // The type, status and assignee bar, the same one the Backlog and Epics
+  // carry. It is a second row under the pickers rather than more controls
+  // beside them: the head already holds four pickers and five buttons, and
+  // the other views put these three on a row of their own.
+  issueFilter: IssueFilter;
+  onIssueFilter: (next: IssueFilter) => void;
 }
 
 // sprintOption labels a sprint "Name (State)", or "Name (draft)" for one
@@ -54,6 +62,7 @@ export function sprintOption(s: Sprint): string {
 export function BoardsToolbar({
   boards, board, onBoard, sprints, sprint, onSprint, swimlane, onSwimlane,
   refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete, onCreate, onNewBoard, onAddIssues,
+  issueFilter, onIssueFilter,
 }: Props) {
   // A ceremony belongs to the sprint on screen: the one that has not begun
   // can be started, the one that is running can be completed, and a closed
@@ -61,6 +70,7 @@ export function BoardsToolbar({
   const canStart = sprint?.state === "future";
   const canComplete = sprint?.state === "active";
   return (
+    <>
     <div className="board-head">
       <label className="board-picker">
         <span>Board</span>
@@ -137,5 +147,9 @@ export function BoardsToolbar({
         </button>
       </div>
     </div>
+    <div className="filter-bar">
+      <IssueFilters value={issueFilter} onChange={onIssueFilter} />
+    </div>
+    </>
   );
 }

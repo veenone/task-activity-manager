@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/issuerepo"
 )
 
 // app_people.go answers the two lookups the create and edit forms need from
@@ -71,4 +72,19 @@ func (a *App) ListProjectTypes(profileID string) ([]backend.IssueType, error) {
 		return nil, err
 	}
 	return a.repo.ProjectTypes(a.ctx, profileID)
+}
+
+// ListFilterOptions is the statuses and assignees the filter bar offers on
+// every view that lists issues. It sits beside ListProjectTypes because it is
+// the same kind of thing: the values a picker is built from, read out of the
+// local store rather than asked of Jira. The issue types come from
+// ListProjectTypes, so they are not repeated here.
+//
+// Empty lists are a profile that has never synced. The bar still draws, with
+// only its All options, which is the truth: there is nothing cached to narrow.
+func (a *App) ListFilterOptions(profileID string) (issuerepo.FilterOptions, error) {
+	if err := a.requireStore(); err != nil {
+		return issuerepo.FilterOptions{}, err
+	}
+	return a.repo.ListFilterOptions(a.ctx, profileID)
 }

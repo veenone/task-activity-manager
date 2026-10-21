@@ -22,6 +22,8 @@ vi.mock("../api", async () => {
     GetEpicTree: vi.fn(),
     ListEpics: vi.fn(),
     ListSprints: vi.fn(),
+    ListFilterOptions: vi.fn(),
+    ListProjectTypes: vi.fn(),
     ListOpenSprints: vi.fn(),
     MoveIssueToSprint: vi.fn(),
     GetIssueDetail: vi.fn(),
@@ -83,6 +85,11 @@ beforeEach(() => {
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.ListSprints).mockResolvedValue([{ id: "12", name: "Sprint 12" }]);
+  vi.mocked(api.ListFilterOptions).mockResolvedValue({ statuses: ["In Progress", "To Do"], assignees: ["S. Kim"] });
+  vi.mocked(api.ListProjectTypes).mockResolvedValue([
+    { id: "1", name: "Story", subtask: false, logical: "story" },
+    { id: "2", name: "Bug", subtask: false, logical: "bug" },
+  ]);
   vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-101", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([]);
@@ -560,5 +567,53 @@ describe("EpicTree keyboard", () => {
     await user.keyboard("{ArrowDown}");
     const epicRow = screen.getByRole("treeitem", { name: "PLAT-100 Checkout revamp" });
     expect(document.activeElement).toBe(epicRow);
+  });
+});
+
+describe("EpicsView's filters", () => {
+  // The Epics view had the sprint select alone, so there was no way to ask
+  // which bugs sit under an epic or what one person is carrying across them
+  // (#321). The three controls are the same component the Backlog uses, and
+  // they reach the tree query, which matters here more than on the Backlog:
+  // EpicTree caps its read, so a filter the query did not carry would narrow
+  // whichever rows the cap let through.
+  it("narrows the tree by type, status and assignee", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" })] })],
+      orphans: [],
+      truncated: false,
+    });
+    renderView();
+    await screen.findByText("Parent");
+
+    const types = screen.getByRole("group", { name: "Issue types" });
+    await user.click(within(types).getByRole("button", { name: "Bug" }));
+    await waitFor(() => expect(lastTreeQuery()?.types).toEqual(["bug"]));
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "To Do");
+    await waitFor(() => expect(lastTreeQuery()?.statuses).toEqual(["To Do"]));
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Assignee" }), "S. Kim");
+    await waitFor(() => expect(lastTreeQuery()?.assignees).toEqual(["S. Kim"]));
+    // All three travel together, so the tree is narrowed by their AND.
+    expect(lastTreeQuery()?.types).toEqual(["bug"]);
+    expect(lastTreeQuery()?.statuses).toEqual(["To Do"]);
+  });
+
+  // An empty tree has two causes and they want different advice: nothing was
+  // ever synced, or the filter matched nothing.
+  it("blames the filter, not the cache, when a filter emptied the tree", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" })] })],
+      orphans: [],
+      truncated: false,
+    });
+    renderView();
+    await screen.findByText("Parent");
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "To Do");
+    expect(await screen.findByText(/match this filter/)).toBeInTheDocument();
   });
 });

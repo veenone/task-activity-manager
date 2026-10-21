@@ -1182,6 +1182,20 @@ export namespace issuerepo {
 		    return a;
 		}
 	}
+	export class FilterOptions {
+	    statuses: string[];
+	    assignees: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FilterOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.statuses = source["statuses"];
+	        this.assignees = source["assignees"];
+	    }
+	}
 	export class IssuePage {
 	    issues: backend.Issue[];
 	    total: number;
@@ -1218,6 +1232,8 @@ export namespace issuerepo {
 	    text: string;
 	    types: string[];
 	    sprintId: string;
+	    statuses: string[];
+	    assignees: string[];
 	    offset: number;
 	    limit: number;
 	    groupSubtasks: boolean;
@@ -1235,6 +1251,8 @@ export namespace issuerepo {
 	        this.text = source["text"];
 	        this.types = source["types"];
 	        this.sprintId = source["sprintId"];
+	        this.statuses = source["statuses"];
+	        this.assignees = source["assignees"];
 	        this.offset = source["offset"];
 	        this.limit = source["limit"];
 	        this.groupSubtasks = source["groupSubtasks"];
@@ -1332,6 +1350,9 @@ export namespace issuerepo {
 	    text: string;
 	    sprintId: string;
 	    showDone: boolean;
+	    types: string[];
+	    statuses: string[];
+	    assignees: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TreeQuery(source);
@@ -1342,6 +1363,9 @@ export namespace issuerepo {
 	        this.text = source["text"];
 	        this.sprintId = source["sprintId"];
 	        this.showDone = source["showDone"];
+	        this.types = source["types"];
+	        this.statuses = source["statuses"];
+	        this.assignees = source["assignees"];
 	    }
 	}
 	export class UnpushableEdit {
