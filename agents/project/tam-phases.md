@@ -2360,7 +2360,10 @@ entered. Kiwi profile file refused.
     internal/suiteprofiles/  which shared profiles TAM shows, demo detection, validation
     frontend/            React app on @agile-suite/core (see ../frontend/core); EditorToolbar
                           lives there
-      src/api.ts         typed access to the bindings; plain shapes for fixtures
+      src/api.ts         typed access to the bindings; plain shapes for fixtures. It only
+                          re-exports src/api/, one module per domain (core, issues, boards,
+                          reports, edits, pending, importer, rituals, dashboards); import
+                          from "./api", never a module, so one vi.mock covers them all
       src/lib/keyColumn.ts  the issue-key column width both tables share
       src/lib/boardSelection.ts  the board's multi-selection: a set of keys and the three
                           gestures over an ordered key list, no React and no DOM
