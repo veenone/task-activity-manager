@@ -137,6 +137,8 @@ export function ListDashboards(arg1:string):Promise<Array<dashboardrepo.Dashboar
 
 export function ListEpics(arg1:string):Promise<Array<backend.Issue>>;
 
+export function ListFilterOptions(arg1:string):Promise<issuerepo.FilterOptions>;
+
 export function ListIssues(arg1:string,arg2:issuerepo.IssueQuery):Promise<issuerepo.IssuePage>;
 
 export function ListJiraFilters(arg1:string):Promise<Array<backend.Filter>>;

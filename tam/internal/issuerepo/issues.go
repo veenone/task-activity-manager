@@ -472,11 +472,19 @@ func scanIssuesInto(ctx context.Context, q dbtx.Querier, into map[string]backend
 func issueFilter(profileID string, q IssueQuery) (string, []any) {
 	where := []string{"profile_id = ?"}
 	args := []any{profileID}
-	if len(q.Types) > 0 {
-		marks := strings.TrimSuffix(strings.Repeat("?, ", len(q.Types)), ", ")
-		where = append(where, "type IN ("+marks+")")
-		for _, t := range q.Types {
-			args = append(args, t)
+	// The three list filters are an OR inside the field and an AND between
+	// them, which is what a filter bar means by narrowing.
+	for _, f := range []struct {
+		column string
+		values []string
+	}{
+		{"type", q.Types},
+		{"status", q.Statuses},
+		{"assignee", q.Assignees},
+	} {
+		if clause, in := inClause(f.column, f.values); clause != "" {
+			where = append(where, clause)
+			args = append(args, in...)
 		}
 	}
 	if q.SprintID != "" {

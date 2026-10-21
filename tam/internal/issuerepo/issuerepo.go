@@ -31,6 +31,19 @@ type IssueQuery struct {
 	Text     string   `json:"text"`
 	Types    []string `json:"types"`
 	SprintID string   `json:"sprintId"`
+	// Statuses and Assignees are the filter bar's own two lists: empty
+	// means the field is not filtered, and several entries are an OR
+	// within the field while the fields themselves are an AND. Both
+	// compare the names the sync stored, which is what the grid shows and
+	// what ListFilterOptions offers.
+	//
+	// Assignees holds display names, not usernames, and so is a different
+	// filter from AssigneeName below: that one is the "assigned to me" tab
+	// matching the connected user, this one is a name the user picked off a
+	// list. An empty entry here means unassigned, which is why the field is
+	// a list rather than a string that would read as no filter at all.
+	Statuses  []string `json:"statuses"`
+	Assignees []string `json:"assignees"`
 	Offset   int      `json:"offset"`
 	Limit    int      `json:"limit"`
 	// GroupSubtasks pages parent issues and includes their subtasks directly
