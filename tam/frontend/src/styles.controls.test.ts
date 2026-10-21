@@ -41,3 +41,23 @@ describe("control sizing", () => {
     expect(valueOf(rule, "height")).toBeUndefined();
   });
 });
+
+// #329: the rituals sidebar shipped with its cards flush against the panel
+// border and filled the same colour as the panel behind them.
+describe("the rituals sidebar", () => {
+  // .ritual-docs ul was declared twice, seven lines apart, and the second one
+  // zeroed the padding the first had set. One rule per selector is what stops
+  // the next edit landing in whichever copy the author happened to find.
+  it("declares its list once", () => {
+    const declarations = appCss.split(".ritual-docs ul {").length - 1;
+    expect(declarations).toBe(1);
+  });
+
+  // A card whose fill is its container's fill is separated by its border
+  // alone. XTM's preconditions panel is the reference: the cards are
+  // --surface and the ground behind them is not.
+  it("does not fill the ground behind the cards with the cards' own colour", () => {
+    const layout = declarationsOf(appCss, ".rituals-layout");
+    expect(valueOf(layout, "background")).not.toBe("var(--surface)");
+  });
+});
