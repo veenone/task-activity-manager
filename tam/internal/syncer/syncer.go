@@ -9,6 +9,7 @@ import (
 	"log"
 	"time"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
@@ -223,8 +224,17 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 // frame, and wraps the cause as a PartialSyncError when pages had landed.
 // The state write drops the cancellation, since a cancelled sync is exactly
 // the case where the status bar needs to say what went wrong.
+//
+// What it records is the human sentence, not the raw error: the status bar
+// reads last_error back on the next launch, so a relaunch would otherwise show
+// "jira: 401 : Unauthorized" where the run that failed had shown a sentence
+// (#315). The cause is returned unchanged, because the caller logs it and
+// support needs the step that failed.
 func (e *Engine) fail(ctx context.Context, profileID string, state issuerepo.SyncState, pages int, sum Summary, cause error, emit func(Progress)) (Summary, error) {
 	state.LastError = cause.Error()
+	if human := corejira.Humanize(cause); human != "" {
+		state.LastError = human
+	}
 	_ = e.repo.SetSyncState(context.WithoutCancel(ctx), profileID, state)
 	emit(Progress{Phase: "issues", Fetched: sum.Fetched, Done: true, Stage: "Failed"})
 	if pages > 0 {

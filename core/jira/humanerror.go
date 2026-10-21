@@ -3,8 +3,6 @@ package jira
 import (
 	"errors"
 	"net/http"
-
-	corejira "agile-suite/core/jira"
 )
 
 // Humanize turns a Jira HTTP failure into a sentence a user can act on, or
@@ -30,11 +28,16 @@ import (
 // are the ones that mislead. An error that is not an HTTP failure is left
 // alone: inventing a sentence for something this does not understand would
 // hide the only description of it there is.
+//
+// This lives beside HTTPError rather than in one app because both apps show
+// the same failures. It was XTM's until #315; TAM, which cannot import
+// xtm/internal, showed the raw text all along. No sentence here names an app,
+// which TestHumanizeNamesNoApp holds.
 func Humanize(err error) string {
 	if err == nil {
 		return ""
 	}
-	var he *corejira.HTTPError
+	var he *HTTPError
 	if !errors.As(err, &he) {
 		return ""
 	}

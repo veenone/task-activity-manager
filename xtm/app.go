@@ -19,6 +19,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"agile-suite/core/connection"
+	corejira "agile-suite/core/jira"
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
 	"agile-suite/core/shareddb"
@@ -1462,7 +1463,7 @@ func (a *App) SyncProfileFull(profileID string) error {
 // runSync is the shared sync path behind SyncProfile (incremental) and
 // SyncProfileFull (forced full). forceFull blanks the watermark so the engine
 // treats the run as a full pull.
-// syncFailure is what a sync error reads as on screen. internal/jira turns an
+// syncFailure is what a sync error reads as on screen. core/jira turns an
 // HTTP failure into something actionable; anything it does not recognise is
 // passed through unchanged, and the original is logged either way so support
 // still has the step that failed (#170).
@@ -1470,7 +1471,7 @@ func syncFailure(err error) error {
 	if err == nil {
 		return nil
 	}
-	if human := jira.Humanize(err); human != "" {
+	if human := corejira.Humanize(err); human != "" {
 		log.Printf("xtm: sync failed: %v", err)
 		return errors.New(human)
 	}
