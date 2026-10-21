@@ -1105,20 +1105,26 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 .rituals-view { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; }
 .rituals-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.rituals-layout { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); flex: 1; min-height: 0;
-  border: 1px solid var(--border); border-radius: 6px; background: var(--surface); overflow: hidden; }
+/* No wrapping panel, the way XTM's preconditions list has none: the sidebar
+   and the page are each their own card on the view's ground. The frame that
+   used to go round both filled itself with --surface, which is also what the
+   document cards are filled with, so a card had only its border to separate
+   it from what it sat on (#329). */
+.rituals-layout { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+  gap: 12px; flex: 1; min-height: 0; }
 /* The document list, built on XTM's requirements sidebar (#324). A row is a
    block carrying its name, its state and when it last synced, rather than a
    line of text with a chip floating beside it. */
-.ritual-docs { display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; }
-.ritual-docs ul { overflow: auto; flex: 1; min-height: 0; padding: 4px 6px; }
-.ritual-docs-head { padding: 6px; border-bottom: 1px solid var(--border); }
+.ritual-docs { display: flex; flex-direction: column; min-height: 0; }
+.ritual-docs-head { padding: 0 4px 6px; }
 .ritual-docs-filter { margin-bottom: 0; font-size: var(--fs-sm); }
 .ritual-docs-empty { padding: 10px 8px; }
 .ritual-doc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ritual-doc-name { font-size: var(--fs-sm); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ritual-doc-when { display: block; margin-top: 3px; font-size: var(--fs-xs); text-align: left; }
-.ritual-docs ul { list-style: none; margin: 0; padding: 0; }
+/* One declaration. There were two, seven lines apart, and the second zeroed
+   the padding the first set, so every card sat flush on the panel edge. */
+.ritual-docs ul { list-style: none; margin: 0; overflow: auto; flex: 1; min-height: 0; padding: 2px 4px; }
 /* The block itself, the shape XTM's .reqs-item has: a bordered card that
    takes the accent on hover and wears it inset when selected. */
 .ritual-doc { display: block; width: 100%; padding: 8px 10px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font: inherit; color: inherit; text-align: left; cursor: pointer; }
@@ -1141,7 +1147,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-root-modal p { line-height: 1.45; }
 .ritual-sync-result { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
 .ritual-sync-result p, .ritual-sync-result ul { margin: 0; }
-@media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } .ritual-docs { border-right: 0; border-bottom: 1px solid var(--border); } }
+@media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } }
 
 /* Diagnostics: XTM's readout in TAM's tokens. Font sizes are relative and
    the log's ground is the chrome's, so both themes and the px-font ratchet
