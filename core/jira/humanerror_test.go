@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	corejira "agile-suite/core/jira"
 )
 
 // The message this was raised for (#170):
@@ -19,7 +17,7 @@ import (
 // in that call asked about an issue, so it sends the reader looking for a
 // missing test.
 func TestHumanizeReplacesTheGeneric404(t *testing.T) {
-	err := fmt.Errorf("list custom fields: %w", &corejira.HTTPError{
+	err := fmt.Errorf("list custom fields: %w", &HTTPError{
 		Method: "GET", Path: "/rest/api/2/field", Code: 404,
 		Status: "404 ", Message: "Issue Does Not Exist",
 	})
@@ -40,8 +38,8 @@ func TestHumanizeReplacesTheGeneric404(t *testing.T) {
 // Credentials are the other common cause and need a different instruction:
 // re-entering a token fixes one of these and not the other.
 func TestHumanizeSeparatesAuthFromPermission(t *testing.T) {
-	unauth := Humanize(&corejira.HTTPError{Code: 401, Status: "401", Message: "Unauthorized"})
-	forbidden := Humanize(&corejira.HTTPError{Code: 403, Status: "403", Message: "Forbidden"})
+	unauth := Humanize(&HTTPError{Code: 401, Status: "401", Message: "Unauthorized"})
+	forbidden := Humanize(&HTTPError{Code: 403, Status: "403", Message: "Forbidden"})
 	if unauth == "" || forbidden == "" {
 		t.Fatalf("missing message: 401=%q 403=%q", unauth, forbidden)
 	}
@@ -59,7 +57,7 @@ func TestHumanizeSeparatesAuthFromPermission(t *testing.T) {
 // A server-side fault is worth telling apart from a mistake in the profile,
 // because there is nothing for the user to fix.
 func TestHumanizeSaysWhenJiraItselfFailed(t *testing.T) {
-	got := Humanize(&corejira.HTTPError{Code: 503, Status: "503", Message: "Service Unavailable"})
+	got := Humanize(&HTTPError{Code: 503, Status: "503", Message: "Service Unavailable"})
 	if !strings.Contains(strings.ToLower(got), "jira") {
 		t.Fatalf("no mention of Jira: %s", got)
 	}
@@ -77,5 +75,23 @@ func TestHumanizeLeavesOtherErrorsAlone(t *testing.T) {
 	}
 	if got := Humanize(nil); got != "" {
 		t.Errorf("Humanize(nil) = %q, want empty", got)
+	}
+}
+
+// Both apps show these sentences now (#315), so none of them may name one.
+// A sentence that says "XTM" is simply wrong in TAM's status bar, and the
+// compiler has nothing to say about it.
+func TestHumanizeNamesNoApp(t *testing.T) {
+	for _, code := range []int{401, 403, 404, 408, 429, 500, 503} {
+		got := Humanize(&HTTPError{Code: code, Status: fmt.Sprint(code), Message: "whatever"})
+		if got == "" {
+			t.Errorf("%d has no message", code)
+			continue
+		}
+		for _, app := range []string{"XTM", "TAM", "Xray Test Manager", "Task Activity Manager"} {
+			if strings.Contains(got, app) {
+				t.Errorf("%d names %s, but the other app shows this too: %s", code, app, got)
+			}
+		}
 	}
 }

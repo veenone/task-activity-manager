@@ -346,12 +346,13 @@ describe("App shell", () => {
     expect(await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ })).toBeInTheDocument();
   });
 
-  it("shows the last sync error in the status bar", async () => {
+  it("shows the last sync error as a ribbon across the status bar", async () => {
     vi.mocked(api.GetSyncState).mockResolvedValue({
       lastSynced: "2026-09-05T10:42:00Z", lastFull: "", lastError: "jira: 502 Bad Gateway", issueCount: 12, projectTotal: 0,
     });
     renderApp();
     await waitFor(() => expect(screen.getByTestId("sync-error")).toHaveTextContent("jira: 502 Bad Gateway"));
+    expect(screen.getByTestId("sync-error").closest("footer")).toHaveClass("statusbar-failed");
   });
 
   // #69: the bar is the one strip always on screen, and a file name is not
