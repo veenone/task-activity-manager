@@ -53,7 +53,8 @@ internal/
   connection/        Per-workspace connections (backend, URL, project)
   settings/          Global app preferences
 frontend/            React + TypeScript (Vite), rendered in WebView2
-  src/api.ts         Re-exports the generated Wails bindings as the frontend's typed API
+  src/api.ts         The frontend's typed API. It only re-exports src/api/, one module per
+                     domain; import from "./api", never a module, so one vi.mock covers all
   src/contexts/, components/   several files are re-exports from @agile-suite/core (frontend/core)
   wailsjs/           GENERATED bindings — do not hand-edit
 build/windows/installer/installer.iss  Inno Setup script; its AppId is XTM's own and never changes
@@ -65,9 +66,10 @@ build/windows/installer/installer.iss  Inno Setup script; its AppId is XTM's own
 `app.go` is callable from React (Wails generates `frontend/wailsjs` bindings from
 them). `app.go` is a thin adapter: it validates, loads the profile + PAT, and
 delegates to `internal/`. Keep real logic out of it. Adding/renaming an exported
-`App` method changes the frontend API surface — `frontend/src/api.ts` re-exports
-the generated bindings, so regenerate (`wails dev`/`wails build`) and update
-`api.ts` to match.
+`App` method changes the frontend API surface. `frontend/src/api/bindings.ts`
+re-exports the generated bindings, and the domain modules beside it wrap the ones
+that take a model class, so regenerate (`wails dev`/`wails build`) and update the
+module that owns the method.
 
 **`requireStore()` guards every store-dependent method.** The Windows GUI has no
 console, so a backend init failure must surface as a returned error, not a
