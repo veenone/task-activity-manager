@@ -469,3 +469,53 @@ describe("RitualsView", () => {
     await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "false"));
   });
 });
+
+describe("RitualsView sidebar", () => {
+  // The document list was the only left sidebar in either app that never got
+  // the list treatment (#324). XTM's requirements sidebar is the reference: a
+  // row is a block that carries its key line and its detail underneath, not a
+  // line of text with a chip floating beside it.
+  it("gives each document a row that carries its state and when it last synced", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(
+      five({ retro: { status: "synced", syncedAt: "2026-09-14T10:00:00Z" } }),
+    );
+    renderView();
+    const nav = await screen.findByRole("navigation", { name: "Ritual documents" });
+    const retro = within(nav).getByRole("button", { name: /Retrospective/ });
+    expect(retro).toHaveTextContent("Synced");
+    // The detail line is what the flat row had no room for.
+    expect(retro).toHaveTextContent(/last synced/);
+  });
+
+  // A document Confluence has never seen says so rather than showing an empty
+  // slot where a date would go.
+  it("says a document has never synced instead of leaving the line blank", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({}));
+    renderView();
+    const nav = await screen.findByRole("navigation", { name: "Ritual documents" });
+    expect(within(nav).getByRole("button", { name: /Planning/ })).toHaveTextContent(/Not synced/);
+  });
+
+  // A project that has accumulated documents offers no way to find one except
+  // scrolling, which is the second half of #324.
+  it("narrows the list by title", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({}));
+    renderView();
+    const nav = await screen.findByRole("navigation", { name: "Ritual documents" });
+    await user.type(screen.getByRole("searchbox", { name: "Filter documents" }), "retro");
+    await waitFor(() => expect(within(nav).queryByRole("button", { name: /Planning/ })).toBeNull());
+    expect(within(nav).getByRole("button", { name: /Retrospective/ })).toBeInTheDocument();
+  });
+
+  // Matching nothing is a filter result, not an empty project, and the two
+  // want different advice.
+  it("says when the filter matched nothing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({}));
+    renderView();
+    await screen.findByRole("navigation", { name: "Ritual documents" });
+    await user.type(screen.getByRole("searchbox", { name: "Filter documents" }), "zzz");
+    expect(await screen.findByText(/No documents match/)).toBeInTheDocument();
+  });
+});

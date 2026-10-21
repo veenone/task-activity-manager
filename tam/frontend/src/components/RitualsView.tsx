@@ -9,9 +9,10 @@ import type {
 } from "../api";
 import { useSync } from "../contexts/SyncContext";
 import { isBoardAgreement, navItems, navKey, selectedKey } from "../lib/ritualNav";
+import { RitualDocList } from "./RitualDocList";
 import {
   ADD_BOARD_AGREEMENT, ADD_SPRINT_AGREEMENT, AGREEMENT_ADDED, CLOSED_EMPTY_SENTENCE, DONE_AGREEMENT, GONE_SENTENCE,
-  NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, STATUS_LABEL, UNCONFIGURED_SENTENCE, conflictSentence, pendingLine,
+  NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, UNCONFIGURED_SENTENCE, conflictSentence, pendingLine,
   rootDoneSentence, rootMissingSentence, syncSummary,
 } from "../lib/ritualText";
 import { useModal } from "../modals";
@@ -48,7 +49,20 @@ export function RitualsView() {
   // and a sprint's additions to it share a type. Empty until something is
   // picked, which selectedKey reads as Planning.
   const [selected, setSelected] = useState<string>("");
+  // Narrows the document list by title. The page pane reads the selection,
+  // not this, so filtering never changes what is open: a filter that hid the
+  // document you were reading would be a navigation aid that navigates.
+  const [filter, setFilter] = useState("");
   const [lastSync, setLastSync] = useState("");
+  // The filter belongs to the profile it was typed for, so a switch clears it
+  // in the render that first sees the new id, the way every other filter in
+  // TAM does. Nothing here is queried on it, so an effect would do; the
+  // render-time form is what the other views use and reads the same.
+  const [filterFor, setFilterFor] = useState(activeId);
+  if (filterFor !== activeId) {
+    setFilterFor(activeId);
+    setFilter("");
+  }
   const [result, setResult] = useState<RitualSyncResult | null>(null);
   const [error, setError] = useState("");
   const [viewTheirs, setViewTheirs] = useState(false);
@@ -325,6 +339,8 @@ export function RitualsView() {
   const docList = docs ?? [];
   const items = navItems(docList);
   const effectiveSelected = selectedKey(items, selected);
+  const needle = filter.trim().toLowerCase();
+  const shown = needle ? items.filter((i) => i.label.toLowerCase().includes(needle)) : items;
   const doc = items.find((i) => i.key === effectiveSelected)?.doc ?? null;
   const hasBoardAgreement = docList.some(isBoardAgreement);
   const hasSprintAdditions = docList.some((d) => d.ritualType === DONE_AGREEMENT && d.sprintId === sprintId);
@@ -375,38 +391,19 @@ export function RitualsView() {
         <p className="muted">{sprint?.state === "closed" ? CLOSED_EMPTY_SENTENCE : "This sprint has no ritual pages yet."}</p>
       ) : (
         <div className="rituals-layout">
-          <nav aria-label="Ritual documents" className="ritual-docs">
-            <ul>
-              {items.map((item) => (
-                <li key={item.key}>
-                  <button
-                    className={`folder-item ritual-doc${effectiveSelected === item.key ? " folder-selected" : ""}`}
-                    aria-current={effectiveSelected === item.key ? "page" : undefined}
-                    onClick={() => { setSelected(item.key); setViewTheirs(false); }}
-                  >
-                    <span>{item.label}</span>
-                    <span className={`ritual-chip ritual-chip-${item.doc.status}`}>{STATUS_LABEL[item.doc.status]}</span>
-                  </button>
-                </li>
-              ))}
-              {/* The two documents nobody gets unasked. Each offer stands
-                  where the document itself will, and goes once it exists. */}
-              {!hasBoardAgreement && (
-                <li>
-                  <button className="folder-item ritual-doc" onClick={() => void addAgreement(0)}>
-                    <span>{ADD_BOARD_AGREEMENT}</span>
-                  </button>
-                </li>
-              )}
-              {!hasSprintAdditions && (
-                <li>
-                  <button className="folder-item ritual-doc" onClick={() => void addAgreement(sprintId)}>
-                    <span>{ADD_SPRINT_AGREEMENT}</span>
-                  </button>
-                </li>
-              )}
-            </ul>
-          </nav>
+          <RitualDocList
+            shown={shown}
+            selected={effectiveSelected}
+            onSelect={(key) => { setSelected(key); setViewTheirs(false); }}
+            filter={filter}
+            onFilter={setFilter}
+            offerBoardAgreement={!hasBoardAgreement}
+            offerSprintAdditions={!hasSprintAdditions}
+            boardAgreementLabel={ADD_BOARD_AGREEMENT}
+            sprintAdditionsLabel={ADD_SPRINT_AGREEMENT}
+            onAddBoardAgreement={() => void addAgreement(0)}
+            onAddSprintAdditions={() => void addAgreement(sprintId)}
+          />
           <article aria-label="Ritual page" className="ritual-page">
             {doc && (
               <>

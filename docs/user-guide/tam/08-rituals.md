@@ -22,6 +22,8 @@ Alongside them is the **Done agreement**: the team's definition of done, kept at
 
 A sprint that closed before the team used this view says so rather than offering to create pages for it after the fact.
 
+Each document in the left sidebar carries its name, whether it is synced, and when it last was, so you can tell at a glance what Confluence has and what it does not. A document TAM has created but never pushed says **Not synced yet**. **Filter documents** at the top narrows the list by name, which is worth having once a sprint has accumulated a few; it only narrows the list, so the page you are reading stays open.
+
 ## Editing
 
 The editor is a rich text field with headings, bullet and numbered lists, tables and links. A Confluence macro the editor cannot safely change, such as a Jira issue list, is shown as it renders and kept exactly as it is; edit those in Confluence.
