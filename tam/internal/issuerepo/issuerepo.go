@@ -44,8 +44,8 @@ type IssueQuery struct {
 	// a list rather than a string that would read as no filter at all.
 	Statuses  []string `json:"statuses"`
 	Assignees []string `json:"assignees"`
-	Offset   int      `json:"offset"`
-	Limit    int      `json:"limit"`
+	Offset    int      `json:"offset"`
+	Limit     int      `json:"limit"`
 	// GroupSubtasks pages parent issues and includes their subtasks directly
 	// after them. Total, Limit and Offset then count parent groups.
 	GroupSubtasks bool `json:"groupSubtasks"`
