@@ -54,7 +54,7 @@ You can also link a precondition from a test: open the test in [Browse](01-brows
 
 ## Import preconditions
 
-**Import…** opens **Import preconditions (CSV or XLSX)**. It works like the test import: choose a file, check the column mapping, validate, then import. The imported preconditions become pending creates.
+**⋯** beside **New precondition** holds the actions used less often. **Import…** there opens **Import preconditions (CSV or XLSX)**. It works like the test import: choose a file, check the column mapping, validate, then import. The imported preconditions become pending creates.
 
 ## Troubleshooting
 

@@ -707,7 +707,8 @@ precondition is created, the dialog asks for them under Description, and
 
 ### Importing preconditions
 
-**Import…** beside **New precondition** reads a `.csv` or `.xlsx` file with
+**Import…**, under the **⋯** beside **New precondition**, reads a `.csv` or
+`.xlsx` file with
 the columns Summary, Type, Condition, Description and Labels. **Download
 template** saves a CSV with those columns and two example rows. After you
 pick a file, each field is matched to a column by its header name; change
@@ -770,6 +771,8 @@ requirement detail.*
 - **New requirement** drafts a requirement in a left-docked panel: pick the
   project and issue type and write a markdown summary. It gets a temporary key
   locally and is created in Jira on the next commit.
+- **⋯** beside **New requirement** holds the actions used less often:
+  **Sources…**, **Import…** and **Export audit…**.
 - **Import…** loads requirements from a CSV or XLSX file, de-duplicating by
   summary (like Gap Analysis) and offering a downloadable template.
 - **Link…** relates the selected requirement to other requirements (for example
@@ -781,7 +784,7 @@ requirement detail.*
 ### Requirement sources
 
 Requirements can come from projects other than your test project. Configure
-which projects and issue types are pulled with **Sources…**:
+which projects and issue types are pulled with **⋯ → Sources…**:
 
 ![Figure 19: Requirement sources modal](images/19-requirement-sources.png)
 *Figure 19 — The Requirement Sources dialog: add a source project, the issue

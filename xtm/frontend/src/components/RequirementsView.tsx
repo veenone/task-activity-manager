@@ -348,15 +348,11 @@ export function RequirementsView({ onChanged }: Props) {
               }}
             />
           </div>
-          {/* Data actions: sources, create, import, export */}
+          {/* Data actions. The create button keeps the label it was renamed
+              to; the rest sit behind one trigger, because four full-width
+              labels on one row wrapped this narrow panel into two rows of
+              equal-weight buttons with no primary among them (#325). */}
           <div className="reqs-list-toolbar">
-            <button
-              className="btn reqs-sources-btn"
-              onClick={() => setShowSources(true)}
-              title="Choose which projects to pull requirements from"
-            >
-              Sources…
-            </button>
             <button
               className="btn btn-primary"
               onClick={() => setShowCreateReq(true)}
@@ -364,21 +360,33 @@ export function RequirementsView({ onChanged }: Props) {
             >
               New requirement
             </button>
-            <button
-              className="btn"
-              onClick={() => setShowImportReqs(true)}
-              title="Import requirements from a CSV or XLSX file"
-            >
-              Import…
-            </button>
-            <button
-              className="btn"
-              onClick={exportAudit}
-              disabled={busy || list.length === 0}
-              title="Export the coverage and sign-off audit as CSV or XLSX"
-            >
-              Export audit…
-            </button>
+            <Menu
+              label="⋯"
+              triggerLabel="More actions"
+              triggerClassName="btn reqs-sources-btn"
+              align="right"
+              items={[
+                {
+                  key: "sources",
+                  label: "Sources…",
+                  title: "Choose which projects to pull requirements from",
+                  onClick: () => setShowSources(true),
+                },
+                {
+                  key: "import",
+                  label: "Import…",
+                  title: "Import requirements from a CSV or XLSX file",
+                  onClick: () => setShowImportReqs(true),
+                },
+                {
+                  key: "export",
+                  label: "Export audit…",
+                  title: "Export the coverage and sign-off audit as CSV or XLSX",
+                  disabled: busy || list.length === 0,
+                  onClick: exportAudit,
+                },
+              ]}
+            />
           </div>
           {notice && <p className="reqs-notice muted">{notice}</p>}
         </div>
