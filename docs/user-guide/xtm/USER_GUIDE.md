@@ -399,7 +399,9 @@ After connecting, the main window appears. It has four regions:
    Duplicates, Gap Analysis, Test Calls, Dashboard, Traceability, and Containers
    (plus an opt-in **Coverage** tab, enabled from **More → Show Coverage tab**).
 3. **Work area** — the content of the selected view.
-4. **Status bar** — sync progress and the test count / last-sync time.
+4. **Status bar** — whether the local store came up, sync progress, the test
+   count and last-sync time, and the theme in force at the right end. A failed
+   sync takes the whole bar as a red ribbon.
 
 ![Figure 3: Annotated main window](images/03-main-window.png)
 *Figure 3 — The main window (Browse view) with the four regions labeled.*

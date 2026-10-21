@@ -10,11 +10,15 @@ function state(s: {
   progress?: SyncProgress | null;
   syncError?: string;
   syncState?: { testCount: number; lastSyncedAt: string } | null;
+  health?: { ok: boolean } | null;
+  theme?: string;
 }): AppState {
   return {
     progress: s.progress ?? null,
     syncError: s.syncError ?? "",
     syncState: s.syncState ?? null,
+    health: s.health ?? { ok: true },
+    theme: s.theme ?? "light",
   } as unknown as AppState;
 }
 
@@ -64,5 +68,42 @@ describe("StatusBar", () => {
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByText(/4,210 tests/)).toBeInstanceOf(HTMLElement);
+  });
+});
+
+describe("the health glyph and the theme", () => {
+  // useAppState has held health since the backend check was added and nothing
+  // on screen read it, so a backend that had not come up looked the same as
+  // one that had (#330). TAM has shown this since it shipped.
+  it("says whether the local store is ready", () => {
+    const { rerender } = render(<StatusBar s={state({ health: { ok: true } })} />);
+    expect(screen.getByText("Local store ready")).toBeInstanceOf(HTMLElement);
+
+    rerender(<StatusBar s={state({ health: { ok: false } })} />);
+    expect(screen.getByText("Starting up")).toBeInstanceOf(HTMLElement);
+  });
+
+  // The glyph is colour, and colour alone is not a reading. The words beside
+  // it carry the state, so the dot stays out of what is announced (I3).
+  it("keeps the glyph out of what is read", () => {
+    const { container } = render(<StatusBar s={state({ health: { ok: true } })} />);
+    const dot = container.querySelector(".dot");
+    expect(dot).toHaveAttribute("aria-hidden", "true");
+    expect(dot?.className).toContain("dot-ok");
+  });
+
+  // The More menu sets the theme and then closes. Without this nothing says
+  // which one is in force, and on System nothing says what System resolved to.
+  it("says which theme is in force", () => {
+    render(<StatusBar s={state({ theme: "dark" })} />);
+    expect(screen.getByText(/Theme: dark/)).toBeInstanceOf(HTMLElement);
+  });
+
+  // A failure takes the whole bar, so the furniture goes with the count.
+  it("gives the whole bar to a failure, health and theme included", () => {
+    render(<StatusBar s={state({ syncError: "Jira rejected this token." })} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Sync failed");
+    expect(screen.queryByText("Local store ready")).toBeNull();
+    expect(screen.queryByText(/Theme:/)).toBeNull();
   });
 });

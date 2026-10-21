@@ -433,6 +433,10 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  /* Both footers hold several children since #330, when XTM's gained the
+     health glyph and the theme. It lived in TAM alone while XTM's was one
+     line, and without it here XTM's children ran together. */
+  gap: 16px;
   height: 26px;
   padding: 0 14px;
   background: var(--surface-2);
@@ -448,6 +452,15 @@
    in the corner, where it read as a stray value (#313). The bar is fixed-height
    chrome otherwise; here it grows, because a clipped sentence about what went
    wrong is worse than a taller bar. */
+/* The health glyph and the right-hand slot. Both footers draw these since
+   #330: XTM held its health and its theme in state and showed neither, while
+   TAM had shown both since it shipped. One definition, so the two bars cannot
+   drift apart on the size of a dot. The dot is never the only thing saying a
+   state: the words beside it carry it (I3). */
+.statusbar-right { margin-left: auto; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot-ok { background: var(--ok-text); }
+.dot-warn { background: var(--warn-fg); }
 .app-statusbar.statusbar-failed {
   height: auto;
   min-height: 26px;
