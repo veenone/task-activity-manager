@@ -614,8 +614,8 @@ describe("BoardsView board", () => {
 
     // A type chip and the assignee select narrow together, so the board ends
     // up empty rather than showing whichever of the two was set last.
-    const types = screen.getByRole("group", { name: "Issue types" });
-    await user.click(within(types).getByRole("button", { name: "Story" }));
+    await user.click(screen.getByRole("button", { name: /All types/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Story" }));
     await waitFor(() => expect(screen.queryByText(KEYS.key)).not.toBeInTheDocument());
     expect(screen.queryByText(PROMO.key)).not.toBeInTheDocument();
   });

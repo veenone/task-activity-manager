@@ -213,6 +213,8 @@
   color: var(--text-strong);
   margin: 4px 0 4px;
 }
+/* The one definition both apps use. XTM carried a byte-identical copy in its
+   own App.css until #323, which meant a fix here reached only one of them. */
 .detail-input {
   width: 100%;
   border: 1px solid var(--border-strong);
@@ -220,6 +222,12 @@
   padding: 6px 8px;
   font-family: inherit;
   font-size: var(--fs-md);
+  /* Stated, not left at `normal`. `normal` is whatever the platform's font
+     says: Segoe UI answers about 1.33, which at 13px wants 17.3px, and any
+     rule that gives this box a height in pixels is then guessing against a
+     number it does not control. 1.4 puts the line box at 18.2px, so a caller
+     sizing the control needs 18.2 + 12 padding + 2 border, or 33px. */
+  line-height: 1.4;
   color: var(--text);
   background: var(--surface);
   margin-bottom: 12px;
@@ -1783,3 +1791,87 @@
 .view-tab:hover { color: var(--chrome-text); }
 .view-tab-active { background: var(--accent); color: var(--on-accent); }
 .view-tab:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+
+/* MultiSelect: the checkbox dropdown both apps pick several values with.
+   The panel anchors right; a caller whose control sits near the left edge
+   overrides that in its own stylesheet. */
+.multiselect {
+  position: relative;
+  display: inline-block;
+}
+.multiselect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  padding: 4px 8px;
+  font-size: var(--fs-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.multiselect-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.multiselect-caret {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.multiselect-panel {
+  position: absolute;
+  z-index: var(--z-modal-popover);
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 240px;
+  max-width: 360px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+}
+.multiselect-clear {
+  font-size: var(--fs-xs);
+  margin: 2px 4px 6px;
+}
+.multiselect-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 2px 0 6px;
+  padding: 5px 8px;
+  font-size: var(--fs-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+}
+.multiselect-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.multiselect-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  font-size: var(--fs-sm);
+  border-radius: 5px;
+  cursor: pointer;
+}
+/* Prevent the checkbox from stretching; keep it vertically centred with the label text. */
+.multiselect-list label input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.multiselect-list label:hover {
+  background: var(--surface-2);
+}

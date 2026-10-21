@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useProfile } from "@agile-suite/core";
+import { MultiSelect, useProfile } from "@agile-suite/core";
 import { ASSIGNEE_NONE } from "../api";
 import type { Profile, Settings } from "../api";
 import { useFilterOptions } from "../queries/issues";
@@ -35,25 +35,17 @@ export function IssueFilters({ value, onChange }: Props) {
   const chips = useMemo(() => typeChips(projectTypes.data), [projectTypes.data]);
   return (
     <>
-      <div className="type-filter" role="group" aria-label="Issue types">
-        {chips.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`chip chip-type chip-type-${t.modelled ? t.id : "none"} chip-toggle${value.types.includes(t.id) ? " chip-on" : ""}`}
-            aria-pressed={value.types.includes(t.id)}
-            title={t.title}
-            onClick={() =>
-              onChange({
-                ...value,
-                types: value.types.includes(t.id) ? value.types.filter((x) => x !== t.id) : [...value.types, t.id],
-              })
-            }
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* One control rather than one chip per type. A project with five types
+          spent five controls on one filter, and the action buttons were what
+          fell to the second row (#323). Still several types at once, because
+          "stories and bugs" is a real question to ask of a backlog. */}
+      <MultiSelect
+        options={chips.map((t) => ({ value: t.id, label: t.label }))}
+        selected={value.types}
+        onChange={(types) => onChange({ ...value, types })}
+        allLabel="All types"
+        title="Filter by issue type"
+      />
       <select
         className="detail-input filter-status"
         aria-label="Status"

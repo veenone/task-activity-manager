@@ -21,7 +21,7 @@ import {
 } from "../api";
 import { SankeyChart } from "./SankeyChart";
 import { RequirementSankey } from "./RequirementSankey";
-import { MultiSelect } from "./MultiSelect";
+import { MultiSelect } from "@agile-suite/core";
 
 interface Props {
   jiraUrl?: string;

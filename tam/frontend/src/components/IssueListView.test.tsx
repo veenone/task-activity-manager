@@ -85,33 +85,55 @@ beforeEach(() => {
 });
 
 describe("IssueListView's type filter", () => {
-  // A project with ten types gets ten chips, under its own names for the
-  // ones TAM has no concept of, and filtering for one of those has to reach
-  // the query (#68). Two Jira types that mean the same logical type share
-  // one chip: two chips selecting the same rows is a bar claiming two
-  // filters it does not have.
-  it("offers the project's own types, one TAM does not model included", async () => {
+  // One control, not one per type. A project with five types spent five
+  // controls on one filter, and the action buttons were what fell to the
+  // second row once #321 added two selects beside it (#323).
+  //
+  // The dropdown still selects several types at once, which the chips did and
+  // a plain select would not: narrowing to "stories and bugs" is a real
+  // question and losing it would be a worse bar, not a tidier one.
+  it("offers the project's own types in one dropdown, one TAM does not model included", async () => {
+    const user = userEvent.setup();
     renderView();
     await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
-    const bar = screen.getByRole("group", { name: "Issue types" });
-    const chip = await within(bar).findByRole("button", { name: "Improvement" });
-    expect(chip.className).toContain("chip-type-none");
-    await userEvent.click(chip);
+
+    const types = screen.getByRole("button", { name: /All types/ });
+    await user.click(types);
+    await user.click(await screen.findByRole("checkbox", { name: "Improvement" }));
     await waitFor(() => expect(lastQuery()?.types).toEqual(["Improvement"]));
-    expect(within(bar).getAllByRole("button", { name: "Task" })).toHaveLength(1);
-    // Nothing offers a type this project does not have.
-    expect(within(bar).queryByRole("button", { name: "Bug" })).not.toBeInTheDocument();
+
+    // Two Jira types meaning the same logical type share one entry: two rows
+    // selecting the same issues is a filter claiming two filters it has not.
+    expect(screen.getAllByRole("checkbox", { name: "Task" })).toHaveLength(1);
+    expect(screen.queryByRole("checkbox", { name: "Bug" })).toBeNull();
+
+    // A second pick adds to the first rather than replacing it.
+    await user.click(screen.getByRole("checkbox", { name: "Story" }));
+    await waitFor(() => expect(lastQuery()?.types).toEqual(["Improvement", "story"]));
   });
 
-  // A profile that has never synced has no type list to read, and the bar
+  // The button is the only thing on screen when the panel is shut, so it has
+  // to say what the filter is doing without being opened.
+  it("says what is selected on the button", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /All types/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Story" }));
+    expect(await screen.findByRole("button", { name: /Story/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Improvement" }));
+    expect(await screen.findByRole("button", { name: /2 selected/ })).toBeInTheDocument();
+  });
+
+  // A profile that has never synced has no type list to read, and the filter
   // falls back to the six TAM models rather than offering nothing.
   it("falls back to the types TAM models when the project's are unknown", async () => {
+    const user = userEvent.setup();
     vi.mocked(api.ListProjectTypes).mockResolvedValue([]);
     renderView();
     await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
-    const bar = screen.getByRole("group", { name: "Issue types" });
-    await within(bar).findByRole("button", { name: "Bug" });
-    await userEvent.click(within(bar).getByRole("button", { name: "Sub" }));
+    await user.click(screen.getByRole("button", { name: /All types/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Sub" }));
     await waitFor(() => expect(lastQuery()?.types).toEqual(["subtask"]));
   });
 });
@@ -121,8 +143,8 @@ describe("IssueListView's export", () => {
     const user = userEvent.setup();
     renderView();
     await screen.findByText("Apply promo");
-    const bar = screen.getByRole("group", { name: "Issue types" });
-    await user.click(within(bar).getByRole("button", { name: "Story" }));
+    await user.click(screen.getByRole("button", { name: /All types/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Story" }));
     await user.click(screen.getByRole("button", { name: /Export/ }));
     await waitFor(() => expect(api.ExportBacklog).toHaveBeenCalled());
     const sent = vi.mocked(api.ExportBacklog).mock.calls.at(-1)?.[1];
