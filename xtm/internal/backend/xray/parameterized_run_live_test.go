@@ -1,8 +1,8 @@
 package xray
 
 import (
-	"io"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -216,4 +216,3 @@ func TestXraySetIterationStatusRefusesAnIterationWithNoID(t *testing.T) {
 		t.Fatal("want an error for an iteration with no id")
 	}
 }
-
