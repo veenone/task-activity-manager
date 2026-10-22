@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"agile-suite/xtm/internal/backend"
@@ -45,6 +46,17 @@ func (a *App) GetParameterizedRun(profileID, execKey, testKey string, forceRefre
 	return stored, nil
 }
 
+// SetIterationStatus writes an iteration's result through the backend and then
+// brings the stored run back in line with it (#336).
+//
+// The backend write comes first: a store updated before a refused write would
+// show a status Xray never accepted. On demo the backend write is a no-op and
+// the store is the only record, which is what it has always been.
+//
+// The run is re-read rather than patched locally, because Xray derives the
+// run's own status from its iterations by a rule XTM does not own: writing one
+// iteration moves the run to EXECUTING on its own. A re-read costs a round trip
+// per write and is what keeps the view from showing a derived value XTM made up.
 func (a *App) SetIterationStatus(profileID, execKey, testKey, iterationID, status string) error {
 	if err := validateParameterizedRunWrite(profileID, execKey, testKey, iterationID, status); err != nil {
 		return err
@@ -52,7 +64,31 @@ func (a *App) SetIterationStatus(profileID, execKey, testKey, iterationID, statu
 	if err := a.requireParameterizedRunWrites(profileID); err != nil {
 		return err
 	}
-	return a.repo.SetIterationStatus(profileID, execKey, testKey, iterationID, status)
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return err
+	}
+	if err := b.SetIterationStatus(a.ctx, execKey, testKey, iterationID, status); err != nil {
+		return err
+	}
+	if err := a.repo.SetIterationStatus(profileID, execKey, testKey, iterationID, status); err != nil {
+		return err
+	}
+	if b.IsDemo() {
+		return nil
+	}
+	// A failed refresh is not a failed write: the status reached Xray, and the
+	// store already carries it. The run status is what stays stale, and the next
+	// read fixes it, so this is logged rather than returned.
+	run, err := b.GetParameterizedRun(a.ctx, execKey, testKey)
+	if err != nil {
+		log.Printf("xtm: iteration written but the run could not be re-read: %v", err)
+		return nil
+	}
+	if err := a.repo.ReplaceParameterizedRun(profileID, run); err != nil {
+		log.Printf("xtm: iteration written but the run could not be stored: %v", err)
+	}
+	return nil
 }
 
 func (a *App) SetIterationStepStatus(profileID, execKey, testKey, iterationID, stepResultID, status string) error {

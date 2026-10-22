@@ -564,13 +564,11 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsDatasetWrites:       true,
 	}
 	// Reading a parameterized run works on any Xray that answers the 2.0 run
-	// resource (#334). Writing an iteration back does not: #267 Phase 4 found a
-	// per-iteration PUT, but nothing here is tested against it, so the writes
-	// stay demo-only and the view keeps its read-only marker.
+	// resource (#334), and an iteration's status writes back through the same
+	// resource (#336). Per-step results are the exception and stay refused: the
+	// read gives no step-result id, so a per-step write has nothing to address.
 	caps.SupportsParameterizedRunDetail = true
-	if a.c != nil && a.c.IsDemo() {
-		caps.SupportsParameterizedRunWrites = true
-	}
+	caps.SupportsParameterizedRunWrites = true
 	return caps
 }
 
@@ -701,13 +699,37 @@ func (a *Adapter) GetParameterizedRun(ctx context.Context, execKey, testKey stri
 	}, nil
 }
 
+// SetIterationStatus writes one iteration's status back to Xray (#336). The
+// run's own status is left alone: Xray derives it from the iterations and
+// moves it itself, so writing it here would be XTM guessing at a rule it does
+// not own.
 func (a *Adapter) SetIterationStatus(ctx context.Context, execKey, testKey, iterationID, status string) error {
-	if a.c != nil && a.c.IsDemo() {
+	if a.c == nil {
+		return backend.ErrUnsupported
+	}
+	if a.c.IsDemo() {
 		return nil
 	}
-	return backend.ErrUnsupported
+	id, err := strconv.Atoi(iterationID)
+	if err != nil || id == 0 {
+		// A single-row run has no iteration id of its own, so there is nothing
+		// to address a write to. #334 reports that case with an empty id.
+		return fmt.Errorf("iteration %q has no id to write to", iterationID)
+	}
+	runID, missing, err := a.c.RunID(ctx, execKey, testKey)
+	if err != nil {
+		return err
+	}
+	if missing {
+		return fmt.Errorf("%s has no run in %s to write to", testKey, execKey)
+	}
+	return a.c.SetIterationStatus(ctx, runID, id, status)
 }
 
+// SetIterationStepStatus stays unsupported on live (#336). The per-iteration
+// read answers with steps that carry no id of their own, and the write
+// response's stepResults array comes back empty, so there is no step-result
+// id anywhere to address this to. Demo keeps its own ids and so keeps working.
 func (a *Adapter) SetIterationStepStatus(ctx context.Context, execKey, testKey, iterationID, stepResultID, status string) error {
 	if a.c != nil && a.c.IsDemo() {
 		return nil
