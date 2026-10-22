@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
 import type { EpicNode, EpicTreeData, Issue } from "../api";
-import { MAX_ORPHAN_ROWS, NO_EPIC_KEY, ownerOf, visibleRows } from "../lib/epicTreeItems";
+import { ownerOf, visibleRows } from "../lib/epicTreeItems";
 import type { Row } from "../lib/epicTreeItems";
 import { EpicChildRow, EpicRow } from "./EpicRow";
 import { keyColumnWidth } from "../lib/keyColumn";
@@ -26,7 +26,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
   const [flashKey, setFlashKey] = useState("");
   const [focusKey, setFocusKey] = useState(selectedKey);
   const [collapsed, setCollapsed] = useState(new Set<string>());
-  const allIssues = [...tree.epics.flatMap((n) => n.children), ...tree.orphans];
+  const allIssues = tree.epics.flatMap((n) => n.children);
   const counts = subtaskCounts(allIssues);
   function toggleChildren(key: string) {
     if (!collapsed.has(key) && allIssues.some((i) => i.key === selectedKey && i.type === "subtask" && i.parentKey === key)) onSelect(key);
@@ -34,9 +34,9 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
     setFocusKey(key);
   }
 
-  // A newly seen epic (or the orphans group) opens by default, and so does
-  // the branch holding the selected key, so nothing loads, or gets
-  // selected, hidden behind a collapsed row.
+  // A newly seen epic opens by default, and so does the branch holding the
+  // selected key, so nothing loads, or gets selected, hidden behind a
+  // collapsed row.
   useEffect(() => {
     const toOpen: string[] = [];
     for (const node of tree.epics) {
@@ -44,10 +44,6 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
         seenRef.current.add(node.issue.key);
         toOpen.push(node.issue.key);
       }
-    }
-    if (tree.orphans.length > 0 && !seenRef.current.has(NO_EPIC_KEY)) {
-      seenRef.current.add(NO_EPIC_KEY);
-      toOpen.push(NO_EPIC_KEY);
     }
     const owner = ownerOf(tree, selectedKey);
     if (owner && !seenRef.current.has(owner)) {
@@ -80,11 +76,9 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
   const keyWidth = keyColumnWidth([
     "All epics",
     ...tree.epics.flatMap((n) => [n.issue.key, ...n.children.map((c) => c.key)]),
-    ...tree.orphans.map((o) => o.key),
   ]);
   const typeWidth = typeColumnWidth([
     ...tree.epics.flatMap((n) => [typeChipLabel(n.issue.type, subtaskLabel), ...n.children.map((c) => typeChipLabel(c.type, subtaskLabel))]),
-    ...tree.orphans.map((o) => typeChipLabel(o.type, subtaskLabel)),
   ]);
   const indexOf = new Map(rows.map((r, i) => [r.id, i] as const));
 
@@ -131,11 +125,11 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
       moveFocus(Math.max(0, index - 1));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
-      if (row.kind === "epic" || row.kind === "noepic") onExpandedChange((prev) => new Set(prev).add(row.id));
+      if (row.kind === "epic") onExpandedChange((prev) => new Set(prev).add(row.id));
       else if (counts.has(row.id) && collapsed.has(row.id)) toggleChildren(row.id);
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
-      if (row.kind === "epic" || row.kind === "noepic") {
+      if (row.kind === "epic") {
         onExpandedChange((prev) => {
           const next = new Set(prev);
           next.delete(row.id);
@@ -175,32 +169,26 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
     ));
   }
 
-  // A branch is one epic (or the orphans group) plus its children when
-  // open: both render the same header-and-group shape, so they share it.
-  function branch(kind: "epic" | "noepic", rowKey: string, open: boolean, children: Issue[], node?: EpicNode, count?: number) {
+  // A branch is one epic plus its children when open.
+  function branch(rowKey: string, open: boolean, children: Issue[], node: EpicNode) {
     return (
       <div className="folder-node" key={rowKey}>
         <EpicRow
-          kind={kind}
           subtaskLabel={subtaskLabel}
           rowKey={rowKey}
           node={node}
-          count={count}
           index={indexOf.get(rowKey)}
           open={open}
           selected={rowKey === selectedKey}
           focused={rowKey === focusKey}
           flashed={flashKey === rowKey}
-          onActivate={() => (kind === "epic" ? selectAndFocus(rowKey) : toggle(rowKey, true))}
+          onActivate={() => selectAndFocus(rowKey)}
           onToggle={() => toggle(rowKey)}
-          onKeyDown={(e) => onKeyDown(e, { id: rowKey, kind, ownerKey: rowKey })}
+          onKeyDown={(e) => onKeyDown(e, { id: rowKey, kind: "epic", ownerKey: rowKey })}
         />
         {open && (
           <div className="folder-children" role="group">
             {renderChildren(children, rowKey)}
-            {kind === "noepic" && tree.orphans.length > MAX_ORPHAN_ROWS && (
-              <p className="muted small">{`and ${tree.orphans.length - MAX_ORPHAN_ROWS} more. Use the search to narrow.`}</p>
-            )}
           </div>
         )}
       </div>
@@ -232,10 +220,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
         <span className="epic-cell folder-count epic-cell-progress">{tree.epics.length}</span>
       </div>
 
-      {tree.epics.map((node) => branch("epic", node.issue.key, expanded.has(node.issue.key), node.children, node))}
-
-      {tree.orphans.length > 0 &&
-        branch("noepic", NO_EPIC_KEY, expanded.has(NO_EPIC_KEY), tree.orphans.slice(0, MAX_ORPHAN_ROWS), undefined, tree.orphans.length)}
+      {tree.epics.map((node) => branch(node.issue.key, expanded.has(node.issue.key), node.children, node))}
     </div>
   );
 }

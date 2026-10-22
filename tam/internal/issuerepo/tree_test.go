@@ -3,7 +3,6 @@ package issuerepo_test
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -41,12 +40,11 @@ func TestEpicTreeGroupsAndCountsAllChildren(t *testing.T) {
 	if promo.Total != 2 || promo.Done != 1 || promo.Points != 10 || promo.DonePoints != 2 || len(promo.Children) != 2 {
 		t.Errorf("promo: %+v", promo)
 	}
-	keys := []string{}
-	for _, o := range tree.Orphans {
-		keys = append(keys, o.Key)
-	}
-	if strings.Join(keys, ",") != "PLAT-409,PLAT-500" {
-		t.Errorf("orphans (no parent and unknown parent): %v", keys)
+	// The two issues under no epic are no longer in the tree at all; the
+	// no-epic tab reads them through ListIssues (#341). The tree reports
+	// how many there are so the tab can show a total.
+	if tree.OrphanTotal != 2 {
+		t.Errorf("OrphanTotal counts PLAT-409 and PLAT-500: %d", tree.OrphanTotal)
 	}
 }
 
@@ -83,10 +81,8 @@ func TestEpicTreeKeepsSubtasksUnderTheirIssueAndFindsThemByText(t *testing.T) {
 		if node.Total != wantTotal {
 			t.Fatalf("subtask inflated epic total: %+v", node)
 		}
-		for _, orphan := range tree.Orphans {
-			if orphan.Key == key {
-				t.Fatal("attached subtask appeared as orphan")
-			}
+		if tree.OrphanTotal != 2 {
+			t.Fatalf("an attached subtask belongs to its epic, not the no-epic side: %d", tree.OrphanTotal)
 		}
 	}
 }
@@ -99,11 +95,11 @@ func TestEpicTreeFilters(t *testing.T) {
 	if len(hidden.Epics) != 1 || hidden.Epics[0].Issue.Key != "PLAT-350" || len(hidden.Epics[0].Children) != 1 || hidden.Epics[0].Total != 2 {
 		t.Errorf("show done off hides done children and fully done epics, counts stay: %+v", hidden.Epics)
 	}
-	if len(hidden.Orphans) != 2 {
-		t.Errorf("orphans: %+v", hidden.Orphans)
+	if hidden.OrphanTotal != 2 {
+		t.Errorf("OrphanTotal is a count of the cache, not of what Show done draws: %d", hidden.OrphanTotal)
 	}
 	byText, _ := repo.EpicTree(ctx, "p1", issuerepo.TreeQuery{Text: "analytics", ShowDone: true})
-	if len(byText.Epics) != 1 || len(byText.Epics[0].Children) != 1 || byText.Epics[0].Children[0].Key != "PLAT-385" || len(byText.Orphans) != 0 {
+	if len(byText.Epics) != 1 || len(byText.Epics[0].Children) != 1 || byText.Epics[0].Children[0].Key != "PLAT-385" || byText.OrphanTotal != 2 {
 		t.Errorf("a matching child keeps its epic and only itself: %+v", byText)
 	}
 	byEpic, _ := repo.EpicTree(ctx, "p1", issuerepo.TreeQuery{Text: "promotions", ShowDone: true})
@@ -111,7 +107,7 @@ func TestEpicTreeFilters(t *testing.T) {
 		t.Errorf("a matching epic keeps every child: %+v", byEpic)
 	}
 	bySprint, _ := repo.EpicTree(ctx, "p1", issuerepo.TreeQuery{SprintID: "12", ShowDone: true})
-	if len(bySprint.Epics) != 1 || len(bySprint.Epics[0].Children) != 1 || len(bySprint.Orphans) != 1 || bySprint.Orphans[0].Key != "PLAT-409" {
+	if len(bySprint.Epics) != 1 || len(bySprint.Epics[0].Children) != 1 || bySprint.OrphanTotal != 2 {
 		t.Errorf("sprint filter: %+v", bySprint)
 	}
 	epics, _ := repo.ListEpics(ctx, "p1")
@@ -181,14 +177,17 @@ func TestEpicTreeReportsHowManyIssuesHaveNoEpic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !tree.Truncated {
-		t.Error("5,100 issues without an epic overrun the cap and must set Truncated")
+	// 5,100 issues with no epic no longer reach the tree, so they cannot
+	// truncate it; the no-epic tab pages them on its own (#341). What the
+	// tree owes that tab is the total for its label.
+	if tree.Truncated {
+		t.Error("the issues with no epic are not in the tree and cannot cut it short")
 	}
 	if got := tree.OrphanTotal; got != 5100 {
 		t.Errorf("OrphanTotal counts every issue with no epic: got %d, want 5100", got)
 	}
-	if got := len(tree.Orphans); got != 5000 {
-		t.Errorf("the orphan list stops at the cap: got %d, want 5000", got)
+	if got := tree.IssueTotal; got != 40 {
+		t.Errorf("IssueTotal counts the work under the epics: got %d, want 40", got)
 	}
 }
 
@@ -225,11 +224,8 @@ func TestEpicTreeCapsAtFiveThousandRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !tree.EpicsTruncated {
+	if !tree.Truncated {
 		t.Error("5,002 children under one epic fill the epic read and must set EpicsTruncated")
-	}
-	if tree.Truncated {
-		t.Error("none of these rows is an issue without an epic, so the orphan list is whole")
 	}
 	if tree.Epics[0].Total != 5000 {
 		t.Errorf("Total counts the capped rows, the one case where it cannot be whole: %d", tree.Epics[0].Total)
@@ -267,12 +263,10 @@ func TestEpicTreePlacesATypeTAMDoesNotModel(t *testing.T) {
 	if !under || promo.Total != 3 {
 		t.Errorf("promo = %+v, want PLAT-600 among its children and counted", promo)
 	}
-	loose := false
-	for _, o := range tree.Orphans {
-		loose = loose || o.Key == "PLAT-601"
-	}
-	if !loose {
-		t.Errorf("orphans = %+v, want PLAT-601 in the group for issues with no epic", tree.Orphans)
+	// PLAT-601 belongs to no epic, so it is counted on the no-epic side
+	// rather than drawn in the tree (#341).
+	if tree.OrphanTotal != 3 {
+		t.Errorf("OrphanTotal = %d, want PLAT-601 counted among the three with no epic", tree.OrphanTotal)
 	}
 }
 

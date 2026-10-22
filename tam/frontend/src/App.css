@@ -571,6 +571,17 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .epics-tree-pane > .muted, .epics-tree-pane > .error-text { flex: 1; display: grid; place-content: center; padding: 32px; text-align: center; }
 .epics-summary { flex: none; margin-bottom: 4px; }
 .epics-note { flex: none; }
+
+/* The two tabs of the Epics view (#341): the tree, and the issues under no
+   epic. Both panels are the flex column .backlog used to hold directly, so
+   whichever is open fills the view and scrolls inside itself.
+
+   The negative margin seats the tablist on the panel below it, the same
+   join .richfield-tabs makes over its textarea. */
+.epics-tabs { flex: none; margin-bottom: -1px; }
+.epics-tab-count { margin-left: 6px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.richfield-tab[aria-selected="true"] .epics-tab-count { color: var(--text); }
+.epics-tree-panel, .epics-noepic-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* Refetch state rides on the summary line the view already shows, so it
    cannot push the tree's rows down a line every time a query refreshes. */
 .epics-refreshing { color: var(--text-muted); }

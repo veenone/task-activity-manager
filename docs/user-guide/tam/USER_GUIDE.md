@@ -257,20 +257,20 @@ to you until somebody assigns it. Both live in the Backlog.
 
 ## 8. Epics
 
-The project as a tree: each epic with the issues that hang off it, and the
-issues that hang off nothing.
+Two tabs: the work under each epic, and the work filed under none. Each is
+labelled with the number of issues on its side, for example
+`Under epics 2,238` and `No epic 5,988`, and between them they account for
+every issue in the cache that is not itself an epic. The labels count the
+whole side, so they hold still while a filter narrows what the tab shows.
 
-An epic row carries its key, its summary and its progress, for example
-`7 of 12 done, 21 of 34 pts`. The points half appears only when the issues
-carry estimates. Under the epics is everything with no epic.
+**Under epics** is the tree. An epic row carries its key, its summary and
+its progress, for example `7 of 12 done, 21 of 34 pts`. The points half
+appears only when the issues carry estimates. The line above the tree counts
+the epics and the issues currently drawn.
 
-The line above the tree counts epics, issues and issues without an epic.
-
-The epics and their children are read apart from the issues that have no
-epic, so a crowded "No epic" group never costs an epic its children, and an
-epic's progress count is the work it really holds. The "No epic" list is the
-part with a ceiling: past 5,000 issues it stops there and a note says how
-many the profile holds. Search or filter to reach the rest.
+**No epic** is a flat list, so it is the same grid, filter bar and pager the
+Backlog uses. Every issue on it is reachable by paging, however many there
+are. Giving an issue an epic moves it to the other tab on the next read.
 
 **Search** matches across epics and children, **Type**, **Status** and
 **Assignee** narrow the children the same way the Backlog's do, **Sprint**

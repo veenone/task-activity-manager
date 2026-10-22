@@ -1316,10 +1316,9 @@ export namespace issuerepo {
 	}
 	export class Tree {
 	    epics: EpicNode[];
-	    orphans: backend.Issue[];
 	    truncated: boolean;
+	    issueTotal: number;
 	    orphanTotal: number;
-	    epicsTruncated: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Tree(source);
@@ -1328,10 +1327,9 @@ export namespace issuerepo {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.epics = this.convertValues(source["epics"], EpicNode);
-	        this.orphans = this.convertValues(source["orphans"], backend.Issue);
 	        this.truncated = source["truncated"];
+	        this.issueTotal = source["issueTotal"];
 	        this.orphanTotal = source["orphanTotal"];
-	        this.epicsTruncated = source["epicsTruncated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
