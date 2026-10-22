@@ -12,7 +12,7 @@ Under the epics is everything with no epic, so work that was never filed under o
 
 The line above the tree counts what you are looking at: epics, issues, and how many have no epic.
 
-The epics and their children are read apart from the issues that have no epic, so a crowded "No epic" group never costs an epic its children, and an epic's progress count is the work it really holds. The "No epic" list is the part with a ceiling: past 5,000 issues it stops there and a note says how many of them you are seeing, for example `Showing 4,812 of 5,988 issues that have no epic`. Search or filter to reach the rest.
+The epics and their children are read apart from the issues that have no epic, so a crowded "No epic" group never costs an epic its children, and an epic's progress count is the work it really holds. The "No epic" list is the part with a ceiling: past 5,000 issues it stops there and a note says how many the profile holds, for example `5,988 issues have no epic, more than this view lists at once`. Search or filter to reach the rest.
 
 Narrowing works on the children, and an epic the filter leaves nothing under drops out of the tree rather than sitting there empty.
 

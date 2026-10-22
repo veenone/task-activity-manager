@@ -270,7 +270,7 @@ The epics and their children are read apart from the issues that have no
 epic, so a crowded "No epic" group never costs an epic its children, and an
 epic's progress count is the work it really holds. The "No epic" list is the
 part with a ceiling: past 5,000 issues it stops there and a note says how
-many of them you are seeing. Search or filter to reach the rest.
+many the profile holds. Search or filter to reach the rest.
 
 **Search** matches across epics and children, **Type**, **Status** and
 **Assignee** narrow the children the same way the Backlog's do, **Sprint**
