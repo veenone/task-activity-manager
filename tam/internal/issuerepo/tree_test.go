@@ -275,3 +275,59 @@ func TestEpicTreePlacesATypeTAMDoesNotModel(t *testing.T) {
 		t.Errorf("orphans = %+v, want PLAT-601 in the group for issues with no epic", tree.Orphans)
 	}
 }
+
+// The no-epic tab reads through ListIssues rather than the tree, so it pages
+// like the Backlog does (#341). The filter is the tree's own underEpic
+// predicate negated, so the two tabs partition the profile between them.
+func TestListIssuesNoEpicIsTheOtherHalfOfTheTree(t *testing.T) {
+	repo := newRepo(t)
+	seedTree(t, repo)
+	ctx := context.Background()
+	page, err := repo.ListIssues(ctx, "p1", issuerepo.IssueQuery{NoEpic: true, Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, iss := range page.Issues {
+		got[iss.Key] = true
+	}
+	// PLAT-409 has no parent at all and PLAT-500 hangs off a key that was
+	// never synced. Neither sits under an epic, and nothing else in the
+	// seed qualifies.
+	if page.Total != 2 || !got["PLAT-409"] || !got["PLAT-500"] {
+		t.Errorf("issues with no epic = %d %v, want PLAT-409 and PLAT-500", page.Total, got)
+	}
+	under, err := repo.ListIssues(ctx, "p1", issuerepo.IssueQuery{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every non-epic issue is on exactly one side. The unfiltered list
+	// counts the epics too, so they come off the total before comparing.
+	// PLAT-412, PLAT-385 and PLAT-331 are the three the seed puts under an
+	// epic, against the two with none.
+	epics, _ := repo.ListEpics(ctx, "p1")
+	if under.Total-len(epics) != page.Total+3 {
+		t.Errorf("the two sides must partition the non-epic issues: %d non-epic, %d with no epic", under.Total-len(epics), page.Total)
+	}
+}
+
+// A profile whose issues all sit under epics has an empty no-epic side
+// rather than a broken query (#341).
+func TestListIssuesNoEpicIsEmptyWhenEverythingHasAnEpic(t *testing.T) {
+	repo := newRepo(t)
+	rows := []backend.Issue{
+		{Key: "PLAT-1", Type: backend.TypeEpic, Summary: "Epic", Rank: "0|a", Labels: []string{}},
+		{Key: "PLAT-2", Type: backend.TypeStory, Summary: "Child", Status: "To Do", ParentKey: "PLAT-1", Rank: "0|b", Labels: []string{}},
+		{Key: "PLAT-3", Type: backend.TypeSubtask, Summary: "Sub", Status: "To Do", ParentKey: "PLAT-2", Rank: "0|c", Labels: []string{}},
+	}
+	if err := repo.UpsertPage(context.Background(), "p1", rows, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	page, err := repo.ListIssues(context.Background(), "p1", issuerepo.IssueQuery{NoEpic: true, Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 0 {
+		t.Errorf("nothing is outside the epics here: %d, %+v", page.Total, page.Issues)
+	}
+}

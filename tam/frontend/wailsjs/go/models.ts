@@ -1234,6 +1234,7 @@ export namespace issuerepo {
 	    sprintId: string;
 	    statuses: string[];
 	    assignees: string[];
+	    noEpic: boolean;
 	    offset: number;
 	    limit: number;
 	    groupSubtasks: boolean;
@@ -1253,6 +1254,7 @@ export namespace issuerepo {
 	        this.sprintId = source["sprintId"];
 	        this.statuses = source["statuses"];
 	        this.assignees = source["assignees"];
+	        this.noEpic = source["noEpic"];
 	        this.offset = source["offset"];
 	        this.limit = source["limit"];
 	        this.groupSubtasks = source["groupSubtasks"];

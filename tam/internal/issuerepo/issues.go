@@ -491,6 +491,15 @@ func issueFilter(profileID string, q IssueQuery) (string, []any) {
 		where = append(where, "sprint_id = ?")
 		args = append(args, q.SprintID)
 	}
+	if q.NoEpic {
+		// Epics are excluded outright: an epic is the thing issues hang
+		// off, so counting it among the work that has none would put the
+		// same row on both sides of the split.
+		under, underArgs := underEpic(profileID)
+		where = append(where, "type <> ?", "NOT "+under)
+		args = append(args, backend.TypeEpic)
+		args = append(args, underArgs...)
+	}
 	if text := strings.TrimSpace(q.Text); text != "" {
 		like := "%" + escapeLike(text) + "%"
 		where = append(where, "(key LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR labels LIKE ? ESCAPE '\\')")
