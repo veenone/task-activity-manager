@@ -38,17 +38,26 @@ type EpicNode struct {
 }
 
 // Tree is the Epics view's data: epics in rank order and the non-epic
-// issues without a known epic. Truncated is set when the profile has more
-// non-epic issues than the tree will hold in one call.
+// issues without a known epic.
+//
+// The two halves are read and capped apart, so the size of one cannot cost
+// the other any rows (#338). Truncated says the issues with no epic stop at
+// the cap, and OrphanTotal is how many there are in all, which is what lets
+// the view name a number instead of warning in the abstract.
+// EpicsTruncated is the rarer case of a profile whose epic tree alone fills
+// a read; it is the only state in which an epic's counts are incomplete.
 type Tree struct {
-	Epics     []EpicNode      `json:"epics"`
-	Orphans   []backend.Issue `json:"orphans"`
-	Truncated bool            `json:"truncated"`
+	Epics          []EpicNode      `json:"epics"`
+	Orphans        []backend.Issue `json:"orphans"`
+	Truncated      bool            `json:"truncated"`
+	OrphanTotal    int             `json:"orphanTotal"`
+	EpicsTruncated bool            `json:"epicsTruncated"`
 }
 
-// treeCap bounds how many non-epic rows one EpicTree call reads. A profile
-// past it still gets a tree, just a truncated one; Total and Done are
-// computed over the rows the cap let through, not the whole cache.
+// treeCap bounds how many rows one read of the tree returns. It applies to
+// each half on its own: before #338 a single capped read in rank order
+// served both, so a cache full of issues with no epic pushed real epic
+// children past the cap and left their epics drawn as "0 of 0".
 const treeCap = 5000
 
 // ListEpics returns the profile's epics, drafts first, then by rank.
@@ -78,10 +87,52 @@ func matches(iss backend.Issue, text string) bool {
 	return strings.Contains(strings.ToLower(iss.Key), t) || strings.Contains(strings.ToLower(iss.Summary), t)
 }
 
+// underEpic matches the rows the epic tree is built from: the children of
+// an epic, and the subtasks hanging off those children. Its negation is the
+// rest of the cache, which is what the view lists under "No epic".
+//
+// The epic keys are a subquery rather than a Go-side list because the list
+// would have to be spliced into the SQL as placeholders, and a profile's
+// epics are already one indexed read away.
+func underEpic(profileID string) (string, []any) {
+	epicKeys := `SELECT key FROM issue WHERE profile_id = ? AND type = ?`
+	clause := `(parent_key IN (` + epicKeys + `) OR parent_key IN (` +
+		`SELECT key FROM issue WHERE profile_id = ? AND type <> ? AND parent_key IN (` + epicKeys + `)))`
+	return clause, []any{profileID, backend.TypeEpic, profileID, backend.TypeEpic, profileID, backend.TypeEpic}
+}
+
+// readTreeRows runs one capped read and says whether the cap cut it short.
+func (r *Repository) readTreeRows(ctx context.Context, where []string, args []any) ([]backend.Issue, bool, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT `+issueColumns+` FROM issue WHERE `+strings.Join(where, " AND ")+issueOrder+` LIMIT ?`,
+		append(append([]any{}, args...), treeCap+1)...)
+	if err != nil {
+		return nil, false, fmt.Errorf("list children: %w", err)
+	}
+	defer rows.Close()
+	out := []backend.Issue{}
+	truncated := false
+	for rows.Next() {
+		if len(out) == treeCap {
+			truncated = true
+			break
+		}
+		iss, err := scanIssue(rows)
+		if err != nil {
+			return nil, false, err
+		}
+		out = append(out, iss)
+	}
+	return out, truncated, rows.Err()
+}
+
 // EpicTree groups the cached issues under their epics. The sprint filter
 // runs in SQL, same as issueFilter's; text stays a Go-side check because a
 // matching epic must keep its non-matching children, which a WHERE clause
 // cannot express.
+//
+// The epic tree and the issues with no epic are read separately so one
+// cannot starve the other of rows (#338).
 func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery) (Tree, error) {
 	epics, err := r.ListEpics(ctx, profileID)
 	if err != nil {
@@ -96,9 +147,9 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		args = append(args, q.SprintID, profileID, q.SprintID, profileID, q.SprintID)
 	}
 	// Type, status and assignee narrow the children in SQL, beside the
-	// sprint clause and for the same reason: the read below stops at
+	// sprint clause and for the same reason: the reads below stop at
 	// treeCap, so a Go-side filter would narrow whichever rows the cap let
-	// through and Truncated would describe a different set than the tree.
+	// through and the counts would describe a different set than the tree.
 	for _, f := range []struct {
 		column string
 		values []string
@@ -112,32 +163,34 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 			args = append(args, in...)
 		}
 	}
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+issueColumns+` FROM issue WHERE `+strings.Join(where, " AND ")+issueOrder+` LIMIT ?`,
-		append(args, treeCap+1)...)
+	under, underArgs := underEpic(profileID)
+	// Each read gets its own slices: appending to a shared one would hand
+	// the second read the first one's backing array.
+	epicWhere := append(append([]string{}, where...), under)
+	orphanWhere := append(append([]string{}, where...), "NOT "+under)
+	bothArgs := append(append([]any{}, args...), underArgs...)
+
+	children, epicsTruncated, err := r.readTreeRows(ctx, epicWhere, bothArgs)
 	if err != nil {
-		return Tree{}, fmt.Errorf("list children: %w", err)
-	}
-	defer rows.Close()
-	byParent := map[string][]backend.Issue{}
-	var others []backend.Issue
-	n := 0
-	truncated := false
-	for rows.Next() {
-		if n == treeCap {
-			truncated = true
-			break
-		}
-		iss, err := scanIssue(rows)
-		if err != nil {
-			return Tree{}, err
-		}
-		byParent[iss.ParentKey] = append(byParent[iss.ParentKey], iss)
-		others = append(others, iss)
-		n++
-	}
-	if err := rows.Err(); err != nil {
 		return Tree{}, err
+	}
+	others, truncated, err := r.readTreeRows(ctx, orphanWhere, bothArgs)
+	if err != nil {
+		return Tree{}, err
+	}
+	var orphanTotal int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM issue WHERE `+strings.Join(orphanWhere, " AND "), bothArgs...,
+	).Scan(&orphanTotal); err != nil {
+		return Tree{}, fmt.Errorf("count issues with no epic: %w", err)
+	}
+
+	byParent := map[string][]backend.Issue{}
+	for _, iss := range children {
+		byParent[iss.ParentKey] = append(byParent[iss.ParentKey], iss)
+	}
+	for _, iss := range others {
+		byParent[iss.ParentKey] = append(byParent[iss.ParentKey], iss)
 	}
 	text := strings.TrimSpace(q.Text)
 	parents := map[string]bool{}
@@ -169,7 +222,10 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 	// no work in it.
 	narrowed := q.SprintID != "" || len(q.Types) > 0 || len(q.Statuses) > 0 || len(q.Assignees) > 0
 	isEpic := map[string]bool{}
-	tree := Tree{Epics: []EpicNode{}, Orphans: []backend.Issue{}, Truncated: truncated}
+	tree := Tree{
+		Epics: []EpicNode{}, Orphans: []backend.Issue{},
+		Truncated: truncated, OrphanTotal: orphanTotal, EpicsTruncated: epicsTruncated,
+	}
 	for _, e := range epics {
 		isEpic[e.Key] = true
 		node := EpicNode{Issue: e, Children: []backend.Issue{}}

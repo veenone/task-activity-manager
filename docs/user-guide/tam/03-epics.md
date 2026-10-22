@@ -10,7 +10,9 @@ Each epic is a row with its key, its summary and its progress: a bar and a count
 
 Under the epics is everything with no epic, so work that was never filed under one is visible rather than missing.
 
-The line above the tree counts what you are looking at: epics, issues, and how many have no epic. A project larger than 5,000 issues is cut off at that point, with a note asking you to narrow the filter.
+The line above the tree counts what you are looking at: epics, issues, and how many have no epic.
+
+The epics and their children are read apart from the issues that have no epic, so a crowded "No epic" group never costs an epic its children, and an epic's progress count is the work it really holds. The "No epic" list is the part with a ceiling: past 5,000 issues it stops there and a note says how many of them you are seeing, for example `Showing 4,812 of 5,988 issues that have no epic`. Search or filter to reach the rest.
 
 Narrowing works on the children, and an epic the filter leaves nothing under drops out of the tree rather than sitting there empty.
 

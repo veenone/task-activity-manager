@@ -149,7 +149,19 @@ export function EpicsView() {
         {`${epicCount} epics, ${issueCount} issues, ${orphanCount} without an epic`}
         {tree.isFetching && !tree.isLoading && <span className="epics-refreshing"> · refreshing</span>}
       </p>
-      {tree.data?.truncated && <p className="muted small epics-note">Showing the first 5,000 issues. Narrow the filter.</p>}
+      {/* The epic tree and the issues with no epic are capped apart (#338),
+          so the only incomplete part is named rather than warned about in
+          general. Epic counts stay whole unless the rarer epicsTruncated
+          case is what cut the read. */}
+      {tree.data?.epicsTruncated ? (
+        <p className="muted small epics-note">
+          This profile has more issues under its epics than the view can show at once. Search or filter to narrow it.
+        </p>
+      ) : tree.data?.truncated ? (
+        <p className="muted small epics-note">
+          {`Showing ${orphanCount.toLocaleString()} of ${tree.data.orphanTotal.toLocaleString()} issues that have no epic. Search or filter to reach the rest.`}
+        </p>
+      ) : null}
 
       <div className="epics-body">
         <div className="epics-tree-pane">

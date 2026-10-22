@@ -1316,6 +1316,8 @@ export namespace issuerepo {
 	    epics: EpicNode[];
 	    orphans: backend.Issue[];
 	    truncated: boolean;
+	    orphanTotal: number;
+	    epicsTruncated: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Tree(source);
@@ -1326,6 +1328,8 @@ export namespace issuerepo {
 	        this.epics = this.convertValues(source["epics"], EpicNode);
 	        this.orphans = this.convertValues(source["orphans"], backend.Issue);
 	        this.truncated = source["truncated"];
+	        this.orphanTotal = source["orphanTotal"];
+	        this.epicsTruncated = source["epicsTruncated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

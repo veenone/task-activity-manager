@@ -106,7 +106,7 @@ beforeEach(() => {
 describe("EpicsView", () => {
   it("shows a third-level subtask and navigates back to its parent issue", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" }), issue({ key: "P-2", type: "subtask", parentKey: "P-1", summary: "Child" })] })], orphans: [], truncated: false });
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" }), issue({ key: "P-2", type: "subtask", parentKey: "P-1", summary: "Child" })] })], orphans: [], truncated: false, orphanTotal: 0, epicsTruncated: false });
     renderView();
     const child = (await screen.findByText("Child")).closest('[role="treeitem"]') as HTMLElement;
     const parent = screen.getByText("Parent").closest('[role="treeitem"]');
@@ -138,7 +138,7 @@ describe("EpicsView", () => {
         ],
       })],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     await screen.findByText("Parent");
@@ -166,7 +166,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     expect(await screen.findByRole("treeitem", { name: "PLAT-100 Checkout revamp" })).toBeInTheDocument();
@@ -193,7 +193,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     const row = await screen.findByRole("treeitem", { name: "PLAT-100 Fix *login* at /auth" });
@@ -214,7 +214,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     await user.click(await screen.findByRole("treeitem", { name: "PLAT-100 Checkout revamp" }));
@@ -227,7 +227,7 @@ describe("EpicsView", () => {
 
   it("shows the No epic node with its count and a line past 200 orphans", async () => {
     const orphans = Array.from({ length: 205 }, (_, i) => issue({ key: `PLAT-${900 + i}`, summary: `Orphan ${i}` }));
-    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans, truncated: false });
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans, truncated: false, orphanTotal: 0, epicsTruncated: false });
     renderView();
     expect(await screen.findByText("No epic")).toBeInTheDocument();
     expect(screen.getByText("205")).toBeInTheDocument();
@@ -244,7 +244,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [issue({ key: "PLAT-200", summary: "Orphan issue" })],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     expect(await screen.findByText("1 epics, 3 issues, 1 without an epic")).toBeInTheDocument();
@@ -261,7 +261,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
@@ -286,7 +286,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
@@ -307,7 +307,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     await user.click(await screen.findByText("Apply promo code"));
@@ -325,7 +325,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     vi.mocked(api.ListOpenSprints).mockResolvedValue([
       { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
@@ -355,7 +355,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     vi.mocked(api.GetEpicTree)
       .mockResolvedValueOnce(treeWith(childV1))
@@ -384,7 +384,7 @@ describe("EpicsView", () => {
 
   it("sends the search text in the tree query after the debounce", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false, orphanTotal: 0, epicsTruncated: false });
     renderView();
     await screen.findByText(/without an epic/);
     await user.type(screen.getByRole("searchbox", { name: "Search epics and issues" }), "promo");
@@ -393,7 +393,7 @@ describe("EpicsView", () => {
 
   it("flips showDone from the checkbox", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false, orphanTotal: 0, epicsTruncated: false });
     renderView();
     await screen.findByText(/without an epic/);
     await user.click(screen.getByRole("checkbox", { name: "Show done" }));
@@ -413,7 +413,7 @@ describe("EpicsView", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     expect(await screen.findByText("1 of 2 done")).toBeInTheDocument();
@@ -426,7 +426,7 @@ describe("EpicsView", () => {
     const tree: EpicTreeData = {
       epics: [epicNode({ issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }) })],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     };
     let resolveFirst!: (v: EpicTreeData) => void;
     vi.mocked(api.GetEpicTree).mockReturnValueOnce(new Promise<EpicTreeData>((res) => { resolveFirst = res; }));
@@ -444,19 +444,53 @@ describe("EpicsView", () => {
   });
 
   it("shows the empty state when nothing is cached", async () => {
-    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false, orphanTotal: 0, epicsTruncated: false });
     renderView();
     expect(await screen.findByText("No issues cached yet. Use Sync in the topbar.")).toBeInTheDocument();
   });
 
-  it("shows the narrowing hint when the tree is truncated", async () => {
+  it("counts the issues with no epic that the cap left out", async () => {
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [epicNode({ issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }) })],
+      orphans: [issue({ key: "PLAT-900", type: "task", summary: "No epic" })],
+      truncated: true,
+      orphanTotal: 5988,
+      epicsTruncated: false,
+    });
+    renderView();
+    expect(
+      await screen.findByText("Showing 1 of 5,988 issues that have no epic. Search or filter to reach the rest."),
+    ).toBeInTheDocument();
+  });
+
+  it("says the epic tree itself was cut when that is what overran the cap", async () => {
     vi.mocked(api.GetEpicTree).mockResolvedValue({
       epics: [epicNode({ issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }) })],
       orphans: [],
-      truncated: true,
+      truncated: false,
+      orphanTotal: 0,
+      epicsTruncated: true,
     });
     renderView();
-    expect(await screen.findByText("Showing the first 5,000 issues. Narrow the filter.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "This profile has more issues under its epics than the view can show at once. Search or filter to narrow it.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about caps when the whole tree fits", async () => {
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [epicNode({ issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }) })],
+      orphans: [],
+      truncated: false,
+      orphanTotal: 0,
+      epicsTruncated: false,
+    });
+    renderView();
+    expect(await screen.findByRole("treeitem", { name: /PLAT-100/ })).toBeInTheDocument();
+    expect(screen.queryByText(/issues that have no epic/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/than the view can show/)).not.toBeInTheDocument();
   });
 });
 
@@ -471,7 +505,7 @@ describe("EpicTree keyboard", () => {
         }),
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     };
   }
 
@@ -586,7 +620,7 @@ describe("EpicsView's filters", () => {
     vi.mocked(api.GetEpicTree).mockResolvedValue({
       epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" })] })],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     await screen.findByText("Parent");
@@ -612,11 +646,11 @@ describe("EpicsView's filters", () => {
     vi.mocked(api.GetEpicTree).mockResolvedValue({
       epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" })] })],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderView();
     await screen.findByText("Parent");
-    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false, orphanTotal: 0, epicsTruncated: false });
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "To Do");
     expect(await screen.findByText(/match this filter/)).toBeInTheDocument();
   });
