@@ -30,14 +30,21 @@ func TestXrayReportsDatasetWrites(t *testing.T) {
 	}
 }
 
-func TestXrayKeepsLiveParameterizedRunsUnsupportedWithoutTransportEvidence(t *testing.T) {
+// Reading a live parameterized run became supported in #334, once the run
+// shape was captured from a real instance and committed as a fixture. Writing
+// an iteration back did not: #267 Phase 4 found a per-iteration PUT, but
+// nothing is tested against it, so both write paths still refuse and the view
+// keeps its read-only marker.
+//
+// An adapter with no client refuses the read too, because there is nothing to
+// read through.
+func TestXrayKeepsIterationWritesUnsupported(t *testing.T) {
 	a := &Adapter{}
-	capabilities := a.Capabilities()
-	if capabilities.SupportsParameterizedRunDetail || capabilities.SupportsParameterizedRunWrites {
-		t.Fatalf("parameterized run capabilities = (%v, %v), want both false", capabilities.SupportsParameterizedRunDetail, capabilities.SupportsParameterizedRunWrites)
+	if a.Capabilities().SupportsParameterizedRunWrites {
+		t.Fatal("live iteration writes are unsupported until a write path is verified")
 	}
 	if _, err := a.GetParameterizedRun(context.Background(), "QA-EXEC-1", "QA-1"); !errors.Is(err, backend.ErrUnsupported) {
-		t.Fatalf("GetParameterizedRun err = %v, want ErrUnsupported", err)
+		t.Fatalf("GetParameterizedRun with no client err = %v, want ErrUnsupported", err)
 	}
 	if err := a.SetIterationStatus(context.Background(), "QA-EXEC-1", "QA-1", "iteration-1", "PASS"); !errors.Is(err, backend.ErrUnsupported) {
 		t.Fatalf("SetIterationStatus err = %v, want ErrUnsupported", err)

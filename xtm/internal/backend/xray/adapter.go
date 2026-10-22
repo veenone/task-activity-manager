@@ -563,8 +563,12 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsDatasets:            true,
 		SupportsDatasetWrites:       true,
 	}
+	// Reading a parameterized run works on any Xray that answers the 2.0 run
+	// resource (#334). Writing an iteration back does not: #267 Phase 4 found a
+	// per-iteration PUT, but nothing here is tested against it, so the writes
+	// stay demo-only and the view keeps its read-only marker.
+	caps.SupportsParameterizedRunDetail = true
 	if a.c != nil && a.c.IsDemo() {
-		caps.SupportsParameterizedRunDetail = true
 		caps.SupportsParameterizedRunWrites = true
 	}
 	return caps
@@ -649,8 +653,11 @@ func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Data
 }
 
 func (a *Adapter) GetParameterizedRun(ctx context.Context, execKey, testKey string) (backend.ParameterizedRun, error) {
-	if a.c == nil || !a.c.IsDemo() {
+	if a.c == nil {
 		return backend.ParameterizedRun{}, backend.ErrUnsupported
+	}
+	if !a.c.IsDemo() {
+		return a.liveParameterizedRun(ctx, execKey, testKey)
 	}
 	input, err := a.c.ParameterizedRunInput(ctx, execKey, testKey)
 	if errors.Is(err, jira.ErrParameterizedRunUnavailable) {
