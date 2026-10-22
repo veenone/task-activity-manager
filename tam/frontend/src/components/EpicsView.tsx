@@ -158,8 +158,12 @@ export function EpicsView() {
           This profile has more issues under its epics than the view can show at once. Search or filter to narrow it.
         </p>
       ) : tree.data?.truncated ? (
+        // A ratio of drawn rows to the total would read as though the cap
+        // withheld every missing one, when Show done hides most of them. The
+        // count of issues with no epic is the one number that stays true
+        // whatever else is filtering the list.
         <p className="muted small epics-note">
-          {`Showing ${orphanCount.toLocaleString()} of ${tree.data.orphanTotal.toLocaleString()} issues that have no epic. Search or filter to reach the rest.`}
+          {`${tree.data.orphanTotal.toLocaleString()} issues have no epic, more than this view lists at once. Search or filter to reach the rest.`}
         </p>
       ) : null}
 

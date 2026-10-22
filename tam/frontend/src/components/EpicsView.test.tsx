@@ -459,8 +459,25 @@ describe("EpicsView", () => {
     });
     renderView();
     expect(
-      await screen.findByText("Showing 1 of 5,988 issues that have no epic. Search or filter to reach the rest."),
+      await screen.findByText(
+        "5,988 issues have no epic, more than this view lists at once. Search or filter to reach the rest.",
+      ),
     ).toBeInTheDocument();
+  });
+
+  // Show done hides most of the list on a large profile, so a ratio of drawn
+  // rows to the total would blame the cap for rows the checkbox hid.
+  it("does not count the drawn rows into the no-epic notice", async () => {
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [epicNode({ issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }) })],
+      orphans: [issue({ key: "PLAT-900", type: "task", summary: "No epic" })],
+      truncated: true,
+      orphanTotal: 5988,
+      epicsTruncated: false,
+    });
+    renderView();
+    expect(await screen.findByText(/5,988 issues have no epic/)).toBeInTheDocument();
+    expect(screen.queryByText(/Showing 1 of/)).not.toBeInTheDocument();
   });
 
   it("says the epic tree itself was cut when that is what overran the cap", async () => {
