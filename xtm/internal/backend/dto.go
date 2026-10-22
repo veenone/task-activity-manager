@@ -107,7 +107,9 @@ type Precondition struct {
 	Type        string
 	Description string
 	// Condition is the precondition definition text, distinct from the issue
-	// description. May be empty on live until the field id is verified.
+	// description. Empty on an instance whose field catalogue has no
+	// Pre-Condition field, which is what ConditionFieldValue reports as not
+	// ok; where the field exists it is read live with the issue.
 	Condition string
 	// Status is the workflow status of the underlying issue. Empty on a
 	// backend whose preconditions have no workflow, and on a row cached
