@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"io"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -153,14 +154,66 @@ func isUnsupported(err error) bool {
 	return err != nil && strings.Contains(err.Error(), backend.ErrUnsupported.Error())
 }
 
-// Live Xray stays read-only until a verified write path exists, so the
-// capability that gates the writes must not follow the read one.
-func TestXrayLiveReadsIterationsButDoesNotWriteThem(t *testing.T) {
+// An iteration's status writes back on live now (#336). Per-step results do
+// not: the read gives no step-result id, so there is nothing to address a
+// per-step write to, and that distinction is the whole of what the read-only
+// marker still covers.
+func TestXrayLiveWritesIterationStatusButNotStepStatus(t *testing.T) {
 	caps := New(jira.NewClient("https://jira.example.com", "tok")).Capabilities()
 	if !caps.SupportsParameterizedRunDetail {
 		t.Error("live Xray should read parameterized runs (#334)")
 	}
-	if caps.SupportsParameterizedRunWrites {
-		t.Error("live iteration writes are out of scope until a write path is verified")
+	if !caps.SupportsParameterizedRunWrites {
+		t.Error("live Xray should write an iteration status (#336)")
 	}
 }
+
+// The write goes to the run resource, which the adapter has to resolve from
+// the execution and test keys first.
+func TestXraySetIterationStatusResolvesTheRunAndWrites(t *testing.T) {
+	var wrotePath, method string
+	var wroteBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/rest/raven/1.0/api/testrun" {
+			_, _ = w.Write([]byte(`{"id":3278564,"testKey":"QA-1"}`))
+			return
+		}
+		method, wrotePath = r.Method, r.URL.Path
+		wroteBody, _ = io.ReadAll(r.Body)
+		_, _ = w.Write([]byte(`{"id":11862,"stepResults":[]}`))
+	}))
+	defer srv.Close()
+
+	err := New(jira.NewClient(srv.URL, "tok")).
+		SetIterationStatus(context.Background(), "QA-EXEC-1", "QA-1", "11862", "PASS")
+	if err != nil {
+		t.Fatalf("SetIterationStatus: %v", err)
+	}
+	if method != http.MethodPut {
+		t.Errorf("method = %s, want PUT", method)
+	}
+	if wrotePath != "/rest/raven/2.0/api/testrun/3278564/iteration/11862" {
+		t.Errorf("wrote to %s", wrotePath)
+	}
+	if !strings.Contains(string(wroteBody), `"status":"PASS"`) {
+		t.Errorf("body = %s", wroteBody)
+	}
+}
+
+// A single-row run carries no iteration id of its own (#334 reports it as an
+// empty one), so a write has nothing to address and says so instead of
+// sending a request that could only guess.
+func TestXraySetIterationStatusRefusesAnIterationWithNoID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("a write with no iteration id reached the network")
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	err := New(jira.NewClient(srv.URL, "tok")).
+		SetIterationStatus(context.Background(), "QA-EXEC-1", "QA-1", "", "PASS")
+	if err == nil {
+		t.Fatal("want an error for an iteration with no id")
+	}
+}
+
