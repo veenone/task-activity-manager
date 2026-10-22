@@ -255,13 +255,18 @@ export interface EpicNode {
   donePoints: number;
 }
 
-// EpicTreeData is named to avoid clashing with the EpicTree component;
-// truncated mirrors issuerepo.Tree.truncated, set when the cache holds more
-// issues than the tree will render.
+// EpicTreeData is named to avoid clashing with the EpicTree component. The
+// last three fields mirror issuerepo.Tree's: the epic tree and the issues
+// with no epic are read and capped apart (#338), so truncated is about the
+// second list alone, orphanTotal is how many such issues the profile holds,
+// and epicsTruncated is the rarer case of an epic tree too large to read at
+// once, the only one in which an epic's own counts are short.
 export interface EpicTreeData {
   epics: EpicNode[];
   orphans: Issue[];
   truncated: boolean;
+  orphanTotal: number;
+  epicsTruncated: boolean;
 }
 
 export interface SprintRef {

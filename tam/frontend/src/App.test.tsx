@@ -90,7 +90,7 @@ beforeEach(() => {
   vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0, projectTotal: 0 });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
   vi.mocked(api.ListSprints).mockResolvedValue([]);
-  vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+  vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false, orphanTotal: 0, epicsTruncated: false });
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
   vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "", spaceKey: "", rootPageID: "" });
@@ -246,7 +246,7 @@ describe("App shell", () => {
         },
       ],
       orphans: [],
-      truncated: false,
+      truncated: false, orphanTotal: 0, epicsTruncated: false,
     });
     renderApp();
     await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());

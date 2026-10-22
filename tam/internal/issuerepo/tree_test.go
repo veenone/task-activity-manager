@@ -120,6 +120,95 @@ func TestEpicTreeFilters(t *testing.T) {
 	}
 }
 
+// seedOrphanHeavy builds the shape #338 was filed for: a modest epic tree
+// behind enough issues with no epic to fill a capped read on their own. The
+// orphans rank first so one read in rank order never reaches the children.
+func seedOrphanHeavy(t *testing.T, repo *issuerepo.Repository, children, orphans int) {
+	t.Helper()
+	rows := []backend.Issue{{Key: "PLAT-1", Type: backend.TypeEpic, Summary: "Epic", Rank: "0|m", Labels: []string{}}}
+	for i := 1; i <= orphans; i++ {
+		rows = append(rows, backend.Issue{
+			Key: fmt.Sprintf("ORPH-%d", i), Type: backend.TypeTask, Summary: "No epic", Status: "To Do",
+			Rank: fmt.Sprintf("0|a%05d", i), Labels: []string{},
+		})
+	}
+	for i := 1; i <= children; i++ {
+		status := "To Do"
+		if i%2 == 0 {
+			status = "Done"
+		}
+		rows = append(rows, backend.Issue{
+			Key: fmt.Sprintf("PLAT-%d", 100+i), Type: backend.TypeStory, Summary: "Child", Status: status,
+			ParentKey: "PLAT-1", Rank: fmt.Sprintf("0|z%05d", i), StoryPoints: pts(2), Labels: []string{},
+		})
+	}
+	if err := repo.UpsertPage(context.Background(), "p1", rows, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// An epic keeps its children and its counts however many issues without an
+// epic sit in front of them (#338). Before the read was split, the cap fell
+// across one rank-ordered pass and the orphans ate it, so these epics drew
+// as "0 of 0" and opened empty.
+func TestEpicTreeKeepsEpicChildrenWhenOrphansFillTheCap(t *testing.T) {
+	repo := newRepo(t)
+	seedOrphanHeavy(t, repo, 40, 5100)
+	tree, err := repo.EpicTree(context.Background(), "p1", issuerepo.TreeQuery{ShowDone: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tree.Epics) != 1 {
+		t.Fatalf("the epic must survive the orphans: %d epics", len(tree.Epics))
+	}
+	if got := tree.Epics[0].Total; got != 40 {
+		t.Errorf("Total is the children the epic really has: got %d, want 40", got)
+	}
+	if got := tree.Epics[0].Done; got != 20 {
+		t.Errorf("Done counts every done child, not the ones a cap let through: got %d, want 20", got)
+	}
+	if got := len(tree.Epics[0].Children); got != 40 {
+		t.Errorf("expanding the epic shows its children: got %d, want 40", got)
+	}
+}
+
+// The notice over the tree needs the number it reports, not just the fact
+// that something was dropped (#338).
+func TestEpicTreeReportsHowManyIssuesHaveNoEpic(t *testing.T) {
+	repo := newRepo(t)
+	seedOrphanHeavy(t, repo, 40, 5100)
+	tree, err := repo.EpicTree(context.Background(), "p1", issuerepo.TreeQuery{ShowDone: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tree.Truncated {
+		t.Error("5,100 issues without an epic overrun the cap and must set Truncated")
+	}
+	if got := tree.OrphanTotal; got != 5100 {
+		t.Errorf("OrphanTotal counts every issue with no epic: got %d, want 5100", got)
+	}
+	if got := len(tree.Orphans); got != 5000 {
+		t.Errorf("the orphan list stops at the cap: got %d, want 5000", got)
+	}
+}
+
+// A profile under the cap says nothing was dropped, so the view can keep the
+// notice hidden (#338).
+func TestEpicTreeUnderTheCapIsNotTruncated(t *testing.T) {
+	repo := newRepo(t)
+	seedTree(t, repo)
+	tree, err := repo.EpicTree(context.Background(), "p1", issuerepo.TreeQuery{ShowDone: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tree.Truncated {
+		t.Error("a small profile drops nothing")
+	}
+	if got := tree.OrphanTotal; got != 2 {
+		t.Errorf("OrphanTotal counts PLAT-409 and PLAT-500: got %d, want 2", got)
+	}
+}
+
 func TestEpicTreeCapsAtFiveThousandRows(t *testing.T) {
 	repo := newRepo(t)
 	rows := []backend.Issue{{Key: "PLAT-1", Type: backend.TypeEpic, Summary: "Big epic", Rank: "0|a", Labels: []string{}}}
@@ -136,11 +225,14 @@ func TestEpicTreeCapsAtFiveThousandRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !tree.Truncated {
-		t.Error("5,002 non-epic rows must set Truncated")
+	if !tree.EpicsTruncated {
+		t.Error("5,002 children under one epic fill the epic read and must set EpicsTruncated")
+	}
+	if tree.Truncated {
+		t.Error("none of these rows is an issue without an epic, so the orphan list is whole")
 	}
 	if tree.Epics[0].Total != 5000 {
-		t.Errorf("Total counts the capped rows, not the whole cache: %d", tree.Epics[0].Total)
+		t.Errorf("Total counts the capped rows, the one case where it cannot be whole: %d", tree.Epics[0].Total)
 	}
 }
 

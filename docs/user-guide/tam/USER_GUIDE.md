@@ -264,9 +264,13 @@ An epic row carries its key, its summary and its progress, for example
 `7 of 12 done, 21 of 34 pts`. The points half appears only when the issues
 carry estimates. Under the epics is everything with no epic.
 
-The line above the tree counts epics, issues and issues without an epic. A
-project larger than 5,000 issues is cut off there, with a note asking you to
-narrow the filter.
+The line above the tree counts epics, issues and issues without an epic.
+
+The epics and their children are read apart from the issues that have no
+epic, so a crowded "No epic" group never costs an epic its children, and an
+epic's progress count is the work it really holds. The "No epic" list is the
+part with a ceiling: past 5,000 issues it stops there and a note says how
+many of them you are seeing. Search or filter to reach the rest.
 
 **Search** matches across epics and children, **Type**, **Status** and
 **Assignee** narrow the children the same way the Backlog's do, **Sprint**
