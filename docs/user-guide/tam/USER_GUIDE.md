@@ -175,8 +175,9 @@ detail panel for whatever is selected.
 
 - **Search** matches a summary, a key or a label, and waits for you to stop
   typing before it runs.
-- The **type chips** are one per issue type the project has, in Jira's order.
-  Press one to include that type, press it again to drop it.
+- **Type** is one dropdown, reading **All types** until you narrow it. Several
+  types can be chosen at once. The list is one entry per issue type the project
+  has, in Jira's order.
 - **Status** narrows to one workflow status, and **Assignee** to one person.
   Both lists are read from this project's cached issues, so neither offers a
   value the grid has nothing for. **Unassigned** is its own choice.

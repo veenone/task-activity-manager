@@ -9,7 +9,7 @@ The Backlog is the project's whole issue list: a filter bar, a grid in rank orde
 The filter bar sits above the grid, and every control in it narrows the same query.
 
 - **Search** matches a summary, a key or a label. It waits for you to stop typing before it runs.
-- The **type chips** are one per issue type the project has, in Jira's order. Press one to include that type, press it again to drop it. Types TAM models have short labels; a type it does not know is shown under the project's own name for it.
+- **Type** is one dropdown, reading **All types** until you narrow it. Several types can be chosen at once, so "stories and bugs" is one filter rather than two passes. The list is one entry per issue type the project has, in Jira's order; types TAM models have short labels, and a type it does not know is listed under the project's own name for it.
 - **Status** narrows to one workflow status. The list is the statuses this project's cached issues actually carry, so it never offers one the grid has nothing for.
 - **Assignee** narrows to one person, read from the cache the same way. **Unassigned** is its own choice, for the work nobody has picked up.
 - **Sprint** narrows to one sprint, or stays on **All sprints**.
