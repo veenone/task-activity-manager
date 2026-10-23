@@ -8,6 +8,21 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ## [Unreleased]
 
+### Added
+
+**A dashboard from a filter id, and a pointer to Jira's own dashboards (#349)**
+- **Filter id** takes the number out of a saved filter's Jira URL and pins that
+  filter as a dashboard. Data Center lists only the filters somebody has
+  starred, so a filter you wrote and never starred could not be reached from
+  the picker at all. The name and the JQL come back from Jira, so a dashboard
+  cannot end up labelled one thing and counting another, and an id nobody can
+  see adds nothing and says so.
+- **Jira dashboard** names the dashboards Jira holds and opens the chosen one
+  in your browser. TAM draws none of their contents: Data Center has no route
+  that enumerates a dashboard's gadgets, so there is nothing it could count
+  without guessing. The row appears only when Jira answers with at least one
+  dashboard.
+
 ## [1.1.0] - 2026-10-23
 
 A release about finding issues and trusting what the window says. Every view
