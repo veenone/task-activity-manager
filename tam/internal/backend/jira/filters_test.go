@@ -22,8 +22,8 @@ func newFilterServer(t *testing.T, searchBody string) (*jirabackend.Backend, *[]
 		switch r.URL.Path {
 		case "/rest/api/2/field":
 			_, _ = w.Write([]byte(historyFields))
-		case "/rest/api/2/filter/my":
-			_, _ = w.Write([]byte(`[]`))
+		case "/rest/api/2/myself":
+			_, _ = w.Write([]byte(`{"name":"reader"}`))
 		case "/rest/api/2/filter/favourite":
 			_, _ = w.Write([]byte(`[{"id":"10100","name":"My open bugs","jql":"type = Bug AND resolution = Unresolved"}]`))
 		case "/rest/api/2/search":
@@ -85,20 +85,21 @@ func TestSearchByJQLRunsTheFilterUnchangedAcrossProjects(t *testing.T) {
 	}
 }
 
-// scopedFilters answers the two filter reads with whatever the case needs,
-// so a test can say what the instance owns, what it has starred, and
-// whether it knows about owned filters at all.
-func scopedFilters(t *testing.T, ownedStatus int, owned, favourite string) *jirabackend.Backend {
+// filterServerAs answers the favourites and the connected user, so a test
+// can say who is reading and who wrote each filter. It asks for nothing
+// else: a request for any other path is the failure, /filter/my among them,
+// because that route is what #348 removed.
+func filterServerAs(t *testing.T, me string, meStatus int, favourite string) *jirabackend.Backend {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/rest/api/2/filter/my":
-			if ownedStatus != http.StatusOK {
-				w.WriteHeader(ownedStatus)
+		case "/rest/api/2/myself":
+			if meStatus != http.StatusOK {
+				w.WriteHeader(meStatus)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(owned))
+			_, _ = w.Write([]byte(`{"name":"` + me + `"}`))
 		case "/rest/api/2/filter/favourite":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(favourite))
@@ -120,52 +121,35 @@ func scopeOf(filters []backend.Filter, id string) (string, bool) {
 	return "", false
 }
 
-// The fault #346 was raised for: a filter you wrote and never starred was
-// absent from the picker, because the favourites are the only list Jira
-// stars for you.
-func TestFiltersIncludeTheOnesYouOwnAndSayWhichTheyAre(t *testing.T) {
-	b := scopedFilters(t, http.StatusOK,
-		`[{"id":"10200","name":"Mine, never starred","jql":"reporter = currentUser()"}]`,
-		`[{"id":"10100","name":"Team board","jql":"project = PLAT"}]`)
+// The scope is who wrote the filter, read per filter, because Data Center
+// has no route that answers it for a whole list. The literal strings are
+// asserted on purpose: they are the wire values the picker groups on.
+func TestFiltersSayWhichOnesThisUserWrote(t *testing.T) {
+	b := filterServerAs(t, "reader", http.StatusOK, `[
+		{"id":"10200","name":"Mine","jql":"reporter = currentUser()","owner":{"name":"reader"}},
+		{"id":"10100","name":"Theirs","jql":"project = PLAT","owner":{"name":"somebody"}}
+	]`)
 	filters, err := b.Filters(context.Background())
 	if err != nil {
 		t.Fatalf("filters: %v", err)
 	}
 	if len(filters) != 2 {
-		t.Fatalf("filters = %+v, want the owned one and the starred one", filters)
+		t.Fatalf("filters = %+v", filters)
 	}
 	if got, ok := scopeOf(filters, "10200"); !ok || got != "owned" {
-		t.Errorf("scope of the owned filter = %q (found %v), want owned", got, ok)
+		t.Errorf("scope of the reader's own filter = %q (found %v), want owned", got, ok)
 	}
 	if got, ok := scopeOf(filters, "10100"); !ok || got != "shared" {
-		t.Errorf("scope of the starred filter = %q (found %v), want shared", got, ok)
+		t.Errorf("scope of somebody else's filter = %q (found %v), want shared", got, ok)
 	}
 }
 
-// Starring your own filter is normal, and it must not put the same filter
-// in the picker twice.
-func TestFiltersListAFilterYouOwnAndStarredOnce(t *testing.T) {
-	b := scopedFilters(t, http.StatusOK,
-		`[{"id":"10200","name":"Mine","jql":"reporter = currentUser()"}]`,
-		`[{"id":"10200","name":"Mine","jql":"reporter = currentUser()"},{"id":"10100","name":"Team board","jql":"project = PLAT"}]`)
-	filters, err := b.Filters(context.Background())
-	if err != nil {
-		t.Fatalf("filters: %v", err)
-	}
-	if len(filters) != 2 {
-		t.Fatalf("filters = %+v, want each filter once", filters)
-	}
-	if got, _ := scopeOf(filters, "10200"); got != "owned" {
-		t.Errorf("scope = %q, want owned: owning it outranks having starred it", got)
-	}
-}
-
-// An instance with no /filter/my keeps the list it has always shown, and
-// leaves the scope off rather than guessing it, so the view knows not to
-// group what it cannot label.
-func TestFiltersFallBackToTheStarredListWithoutAScope(t *testing.T) {
-	b := scopedFilters(t, http.StatusNotFound, ``,
-		`[{"id":"10100","name":"Team board","jql":"project = PLAT"}]`)
+// A reader who cannot be named costs the labels, not the list. The filters
+// read fine, so dropping them over a second read would lose more than it
+// protects, and an unlabelled list is what this view showed before #346.
+func TestFiltersKeepTheListWhenTheReaderCannotBeNamed(t *testing.T) {
+	b := filterServerAs(t, "", http.StatusInternalServerError,
+		`[{"id":"10100","name":"Team board","jql":"project = PLAT","owner":{"name":"somebody"}}]`)
 	filters, err := b.Filters(context.Background())
 	if err != nil {
 		t.Fatalf("filters: %v", err)
@@ -174,14 +158,33 @@ func TestFiltersFallBackToTheStarredListWithoutAScope(t *testing.T) {
 		t.Fatalf("filters = %+v, want the starred list", filters)
 	}
 	if filters[0].Scope != "" {
-		t.Errorf("scope = %q, want it left empty when the instance cannot say", filters[0].Scope)
+		t.Errorf("scope = %q, want it left off when the reader is unknown", filters[0].Scope)
 	}
 }
 
-// A broken instance must not read as an old one.
-func TestFiltersReportAFailedOwnedRead(t *testing.T) {
-	b := scopedFilters(t, http.StatusInternalServerError, ``, `[]`)
+// An instance that names its users another way, Cloud by account id among
+// them, leaves the owner empty. Two empty names are not a match, or every
+// filter on such an instance would be labelled as this reader's own.
+func TestFiltersLeaveTheScopeOffAFilterWithNoNamedOwner(t *testing.T) {
+	b := filterServerAs(t, "reader", http.StatusOK,
+		`[{"id":"10100","name":"Named another way","jql":"project = PLAT","owner":{"accountId":"5b10a2"}}]`)
+	filters, err := b.Filters(context.Background())
+	if err != nil {
+		t.Fatalf("filters: %v", err)
+	}
+	if filters[0].Scope != "" {
+		t.Errorf("scope = %q, want it left off when the owner has no username", filters[0].Scope)
+	}
+}
+
+// Losing the filters themselves is still a failure.
+func TestFiltersReportAFailedFavouriteRead(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	b := jirabackend.New(corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client()), "Requirement")
 	if _, err := b.Filters(context.Background()); err == nil {
-		t.Fatal("want an error when the owned list cannot be read")
+		t.Fatal("want an error when the starred list cannot be read")
 	}
 }

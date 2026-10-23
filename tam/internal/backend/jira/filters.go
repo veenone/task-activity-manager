@@ -2,9 +2,6 @@ package jira
 
 import (
 	"context"
-	"errors"
-
-	corejira "agile-suite/core/jira"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -16,55 +13,55 @@ import (
 var _ backend.FilterBackend = (*Backend)(nil)
 
 // Filters is the saved filters this user can pin, with the JQL each one
-// stands for: the ones they own, then the ones they starred that somebody
-// else wrote.
+// stands for and who wrote it.
 //
-// Both lists are read because neither is the whole set. Jira does not star
-// a filter because you created it, so the favourites leave out everything a
-// person wrote and never pinned, which is what #346 was raised for. Which
-// list a filter arrived in is also the scope, so nothing here has to ask
-// Jira who the connected user is or compare owners.
+// Data Center has no route that lists the filters a user owns. /filter/my
+// is Cloud only and 404s there, which #346 built on and #348 took back
+// out. What Data Center does answer is the owner of each filter in the
+// starred list, so the scope is read per filter rather than per list.
 //
-// An instance with no owned-filter route answers the starred list alone
-// with no scope on it, which is exactly what this view did before. A
-// failure reading either list is still a failure.
+// This leaves one gap, recorded rather than papered over: a filter nobody
+// starred is in no list Data Center will enumerate, so it cannot be
+// offered. #349 covers reaching those by id.
 func (b *Backend) Filters(ctx context.Context) ([]backend.Filter, error) {
-	owned, err := b.c.OwnedFilters(ctx)
-	scoped := true
-	if errors.Is(err, corejira.ErrNoOwnedFilters) {
-		owned, scoped = nil, false
-	} else if err != nil {
-		return nil, err
-	}
 	starred, err := b.c.FavouriteFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Owned first, and the id is what dedupes: starring your own filter is
-	// normal and must not list it twice. Owning it is the stronger fact of
-	// the two, so the owned pass claims the id and the starred pass skips
-	// whatever is already spoken for.
-	out := make([]backend.Filter, 0, len(owned)+len(starred))
-	seen := make(map[string]bool, len(owned)+len(starred))
-	add := func(f corejira.RawFilter, scope string) {
-		if seen[f.ID] {
-			return
-		}
-		seen[f.ID] = true
-		out = append(out, backend.Filter{ID: f.ID, Name: f.Name, JQL: f.JQL, Scope: scope})
+	// Who is reading decides the scope, and failing to find out costs the
+	// labels rather than the list. The filters themselves read fine, so
+	// dropping the view over a second read would lose more than it
+	// protects, and an unlabelled list is what this view showed before.
+	reader := ""
+	if me, err := b.c.Myself(ctx); err == nil {
+		reader = me.Name
 	}
-	for _, f := range owned {
-		add(f, backend.FilterScopeOwned)
-	}
-	shared := backend.FilterScopeShared
-	if !scoped {
-		shared = ""
-	}
+
+	out := make([]backend.Filter, 0, len(starred))
 	for _, f := range starred {
-		add(f, shared)
+		out = append(out, backend.Filter{
+			ID:    f.ID,
+			Name:  f.Name,
+			JQL:   f.JQL,
+			Scope: filterScope(reader, f.Owner.Name),
+		})
 	}
 	return out, nil
+}
+
+// filterScope names a filter by who wrote it. Both names have to be known:
+// an unread owner and an unread reader are both the empty string, and
+// treating that as a match would label every filter on an instance that
+// names its users another way as this reader's own.
+func filterScope(reader, owner string) string {
+	if reader == "" || owner == "" {
+		return ""
+	}
+	if owner == reader {
+		return backend.FilterScopeOwned
+	}
+	return backend.FilterScopeShared
 }
 
 // SearchByJQL runs a filter's own words and maps the hits onto rows.
