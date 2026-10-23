@@ -69,16 +69,16 @@ commit hash behind it; the instruction gate checks the hash exists.
   `{startAt, maxResults, total, prev, next, dashboards:[{id, name, self,
   view}]}`. `view` is the URL of the dashboard's page, built by Jira from the
   base URL the instance is configured with, so it is handed on rather than
-  rebuilt from the address TAM connects to (08b91157).
+  rebuilt from the address TAM connects to (a7a5b530).
 - The route documents `startAt` as having to be zero or a multiple of
   `maxResults`, and says to read `maxResults` back out of the answer because
   the server imposes its own limit. Advancing by what the page actually held
   satisfies both. A short page is the last one the server will serve, so it
-  ends the walk even when `total` claims more (08b91157).
+  ends the walk even when `total` claims more (a7a5b530).
 - `GET /rest/api/2/filter/{id}` is present and answers any filter the reader
   can see, with `name`, `jql` and `owner`. It is the only way to reach a
   filter nobody starred, since the starred list is the only one Data Center
-  will enumerate (ca8bb6a1).
+  will enumerate (b0aae343).
 
 ## Jira worklogs
 
