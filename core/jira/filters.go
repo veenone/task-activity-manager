@@ -1,6 +1,9 @@
 package jira
 
-import "context"
+import (
+	"context"
+	"net/url"
+)
 
 // RawFilter is one saved filter as Jira answers it: the id a dashboard is
 // pinned to, the name its owner gave it, and the JQL it stands for.
@@ -34,6 +37,21 @@ func (c *Client) FavouriteFilters(ctx context.Context) ([]RawFilter, error) {
 	out := []RawFilter{}
 	if err := c.Get(ctx, "/rest/api/2/filter/favourite", &out); err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+// Filter is one saved filter by id, which is the only way to reach a filter
+// nobody starred: Data Center enumerates the starred list and nothing else,
+// so a filter its own author never starred is in no list at all. An id is
+// what a reader reads off a Jira URL.
+//
+// The id is escaped into one path segment. It is typed by a person, and
+// anything with a slash in it would otherwise reach a different route.
+func (c *Client) Filter(ctx context.Context, id string) (RawFilter, error) {
+	out := RawFilter{}
+	if err := c.Get(ctx, "/rest/api/2/filter/"+url.PathEscape(id), &out); err != nil {
+		return RawFilter{}, err
 	}
 	return out, nil
 }

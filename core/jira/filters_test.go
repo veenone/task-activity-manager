@@ -112,3 +112,53 @@ func TestFavouriteFiltersLeaveAnUnnamedOwnerEmpty(t *testing.T) {
 		t.Errorf("owner = %q, want empty when the instance names users another way", filters[0].Owner.Name)
 	}
 }
+
+// A filter nobody starred is in no list Data Center will enumerate, so the
+// only way to reach one is by the id a reader reads off a Jira URL.
+func TestOneFilterByIDReadsItsNameAndJQL(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"25475","name":"All Open Bugs","jql":"type = Bug and resolution is empty",
+			"owner":{"name":"someone-else"}}`))
+	}))
+	defer srv.Close()
+
+	c := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	f, err := c.Filter(context.Background(), "25475")
+	if err != nil {
+		t.Fatalf("filter: %v", err)
+	}
+	if path != "/rest/api/2/filter/25475" {
+		t.Errorf("path = %q", path)
+	}
+	if f.Name != "All Open Bugs" || f.JQL != "type = Bug and resolution is empty" {
+		t.Errorf("filter = %+v", f)
+	}
+	if f.Owner.Name != "someone-else" {
+		t.Errorf("owner = %q, want the owner this route carries too", f.Owner.Name)
+	}
+}
+
+// An id with a slash or a space in it is not a filter id, and sending it
+// raw would reach a different route or none at all.
+func TestOneFilterByIDEscapesWhatItIsGiven(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// EscapedPath, not Path: Path has already been unescaped, so a
+		// slash sent as %2F and one sent raw read the same there.
+		path = r.URL.EscapedPath()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"1","name":"n","jql":"project = PLAT"}`))
+	}))
+	defer srv.Close()
+
+	c := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if _, err := c.Filter(context.Background(), "1/permission"); err != nil {
+		t.Fatalf("filter: %v", err)
+	}
+	if path != "/rest/api/2/filter/1%2Fpermission" {
+		t.Errorf("path = %q, want the id escaped into one segment", path)
+	}
+}
