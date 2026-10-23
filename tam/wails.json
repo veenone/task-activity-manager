@@ -13,7 +13,7 @@
   "info": {
     "companyName": "Achmad Fienan Rahardianto",
     "productName": "Task Activity Manager",
-    "productVersion": "1.0.0",
+    "productVersion": "1.1.0",
     "copyright": "Copyright (c) 2026 Achmad Fienan Rahardianto. Licensed under GPL-3.0-only",
     "comments": "Agile task management for Jira Data Center"
   }
