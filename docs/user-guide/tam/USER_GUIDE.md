@@ -24,6 +24,29 @@ in one app is already set up in the other.
 
 ---
 
+## What's new in 1.1.0
+
+- **Filters on every issue view.** Backlog, Assigned to me, Epics, Boards and
+  Sprints narrow by **Type**, **Status** and **Assignee** from the same three
+  controls. The status and assignee lists come from the cached issues, so
+  neither offers a value the grid has nothing for. See
+  [Finding issues](#finding-issues).
+- **Epics splits in two.** **Under epics** holds the tree, **No epic** holds
+  every issue that sits under none, as a flat list with its own pager. Each tab
+  is labelled with the count of its own side. See [Epics](#8-epics).
+- **Dashboards says who wrote each filter.** The **Saved filter** picker groups
+  what you have starred in Jira under **Your filters** and **Shared with you**.
+  See [Dashboards](#12-dashboards).
+- **One dropdown for the issue type filter**, where a project with five types
+  used to spend five controls and push the action buttons onto a second row.
+- **A failed sync says what to change.** The status bar becomes a red ribbon
+  carrying a sentence, not Jira's raw status code. See
+  [The main window](#4-the-main-window).
+
+See [`CHANGELOG.md`](../../../tam/CHANGELOG.md) for the full history.
+
+---
+
 ## Contents
 
 1. [Installation and first launch](#1-installation-and-first-launch)
