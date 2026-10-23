@@ -1,6 +1,6 @@
 # Task Activity Manager — User Guide
 
-**Version:** 1.0.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** scrum
+**Version:** 1.1.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** scrum
 masters, product owners, and anyone planning work in Jira Data Center.
 
 Task Activity Manager (TAM) is a Windows desktop app for planning and tracking
@@ -21,6 +21,29 @@ in one app is already set up in the other.
 > **Reading this on screen.** The same material is split one page per view in
 > [this folder](README.md), which is easier to navigate and is where edits are
 > made.
+
+---
+
+## What's new in 1.1.0
+
+- **Filters on every issue view.** Backlog, Assigned to me, Epics, Boards and
+  Sprints narrow by **Type**, **Status** and **Assignee** from the same three
+  controls. The status and assignee lists come from the cached issues, so
+  neither offers a value the grid has nothing for. See
+  [Finding issues](#finding-issues).
+- **Epics splits in two.** **Under epics** holds the tree, **No epic** holds
+  every issue that sits under none, as a flat list with its own pager. Each tab
+  is labelled with the count of its own side. See [Epics](#8-epics).
+- **Dashboards says who wrote each filter.** The **Saved filter** picker groups
+  what you have starred in Jira under **Your filters** and **Shared with you**.
+  See [Dashboards](#12-dashboards).
+- **One dropdown for the issue type filter**, where a project with five types
+  used to spend five controls and push the action buttons onto a second row.
+- **A failed sync says what to change.** The status bar becomes a red ribbon
+  carrying a sentence, not Jira's raw status code. See
+  [The main window](#4-the-main-window).
+
+See [`CHANGELOG.md`](../../../tam/CHANGELOG.md) for the full history.
 
 ---
 
@@ -175,8 +198,9 @@ detail panel for whatever is selected.
 
 - **Search** matches a summary, a key or a label, and waits for you to stop
   typing before it runs.
-- The **type chips** are one per issue type the project has, in Jira's order.
-  Press one to include that type, press it again to drop it.
+- **Type** is one dropdown, reading **All types** until you narrow it. Several
+  types can be chosen at once. The list is one entry per issue type the project
+  has, in Jira's order.
 - **Status** narrows to one workflow status, and **Assignee** to one person.
   Both lists are read from this project's cached issues, so neither offers a
   value the grid has nothing for. **Unassigned** is its own choice.
