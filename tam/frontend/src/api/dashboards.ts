@@ -50,6 +50,17 @@ export interface JiraFilter {
   scope: string;
 }
 
+// JiraDashboard is one of Jira's own dashboards, which is a page of gadgets
+// and not a TAM dashboard at all. TAM lists these so a reader can open one,
+// and draws none of their contents: Data Center cannot enumerate a
+// dashboard's gadgets, so there is nothing honest to draw (#349).
+export interface JiraDashboard {
+  id: string;
+  name: string;
+  // The address Jira answered with, opened in the reader's own browser.
+  url: string;
+}
+
 export const ListJiraFilters: (profileId: string) => Promise<JiraFilter[]> =
   App.ListJiraFilters as unknown as (profileId: string) => Promise<JiraFilter[]>;
 export const ListDashboards: (profileId: string) => Promise<Dashboard[]> =
@@ -61,3 +72,11 @@ export const CreateDashboard: (profileId: string, name: string, filterId: string
 export const RefreshDashboard: (profileId: string, id: string) => Promise<Dashboard> =
   App.RefreshDashboard as unknown as (profileId: string, id: string) => Promise<Dashboard>;
 export const DeleteDashboard: (profileId: string, id: string) => Promise<void> = App.DeleteDashboard;
+
+export const ListJiraDashboards: (profileId: string) => Promise<JiraDashboard[]> =
+  App.ListJiraDashboards as unknown as (profileId: string) => Promise<JiraDashboard[]>;
+// AddDashboardByFilterID pins a filter the picker could not offer, which on
+// Data Center is any filter nobody starred. The name and the JQL come back
+// from Jira, so the reader types an id and nothing else.
+export const AddDashboardByFilterID: (profileId: string, filterId: string) => Promise<Dashboard> =
+  App.AddDashboardByFilterID as unknown as (profileId: string, filterId: string) => Promise<Dashboard>;

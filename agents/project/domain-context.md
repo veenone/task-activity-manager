@@ -59,6 +59,27 @@ commit hash behind it; the instruction gate checks the hash exists.
   `docs.atlassian.com/software/jira/docs/api/REST/<version>/` is plain HTML
   and answers these questions; it is large, so read it at an offset.
 
+## Jira dashboards
+
+- A Jira dashboard and a TAM dashboard share a word and nothing else. A Jira
+  dashboard is a page of gadgets; a TAM dashboard is a local snapshot of what
+  one saved filter counts. Nothing routes from one to the other, and nothing
+  can: see the gadget entry in `agents/project/out-of-scope.md`.
+- `GET /rest/api/2/dashboard` is present on Data Center and answers
+  `{startAt, maxResults, total, prev, next, dashboards:[{id, name, self,
+  view}]}`. `view` is the URL of the dashboard's page, built by Jira from the
+  base URL the instance is configured with, so it is handed on rather than
+  rebuilt from the address TAM connects to (a7a5b530).
+- The route documents `startAt` as having to be zero or a multiple of
+  `maxResults`, and says to read `maxResults` back out of the answer because
+  the server imposes its own limit. Advancing by what the page actually held
+  satisfies both. A short page is the last one the server will serve, so it
+  ends the walk even when `total` claims more (a7a5b530).
+- `GET /rest/api/2/filter/{id}` is present and answers any filter the reader
+  can see, with `name`, `jql` and `owner`. It is the only way to reach a
+  filter nobody starred, since the starred list is the only one Data Center
+  will enumerate (b0aae343).
+
 ## Jira worklogs
 
 - An issue's worklog comes from `GET /rest/api/2/issue/{key}/worklog`, which

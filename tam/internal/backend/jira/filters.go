@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"strings"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -48,6 +49,22 @@ func (b *Backend) Filters(ctx context.Context) ([]backend.Filter, error) {
 		})
 	}
 	return out, nil
+}
+
+// FilterByID is one saved filter by id, which is the only way to reach a
+// filter the starred list does not hold. The id is what a reader reads off
+// a Jira URL, so it is trimmed before it is sent: a pasted id arrives with
+// whatever whitespace came with it.
+//
+// No scope is read. The scope groups the picker, and a filter reached by id
+// is not in the picker, so a second request for a label nothing draws would
+// be spent on nothing.
+func (b *Backend) FilterByID(ctx context.Context, id string) (backend.Filter, error) {
+	f, err := b.c.Filter(ctx, strings.TrimSpace(id))
+	if err != nil {
+		return backend.Filter{}, err
+	}
+	return backend.Filter{ID: f.ID, Name: f.Name, JQL: f.JQL}, nil
 }
 
 // filterScope names a filter by who wrote it. Both names have to be known:

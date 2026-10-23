@@ -320,6 +320,22 @@ export namespace backend {
 	        this.logical = source["logical"];
 	    }
 	}
+	export class JiraDashboard {
+	    id: string;
+	    name: string;
+	    url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new JiraDashboard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.url = source["url"];
+	    }
+	}
 	
 	export class LinkDraft {
 	    type: string;
