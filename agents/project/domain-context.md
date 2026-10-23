@@ -294,6 +294,24 @@ The steps of an iteration, read while building #334 against the same instance:
 - **Xray substitutes the row's values before it answers.** `Data` comes back
   resolved, so a reader that substitutes again is substituting twice.
 
+Writing one back, confirmed while building #336 on the same instance:
+
+- The `PUT` Phase 4 found does work: `{"status":"PASS"}` on the iteration
+  resource is accepted and the next read shows the new status.
+- **A closed Test Execution refuses it with 403**, `Current user does not have
+  permissions to execute the Test Run`. The same write on an open execution
+  from the same account succeeds, so the message names a permission but the
+  cause is the execution's state. This is the first thing to check when a
+  write is refused.
+- The run's own status did **not** move to `EXECUTING` here: writing one of
+  two iterations to PASS left the run at `TODO`. Phase 4 recorded a move to
+  EXECUTING, so the derivation depends on more than one iteration changing.
+  Either way it is Xray's rule, which is why the run is re-read after a write
+  rather than recomputed.
+- **Per-step results still cannot be written.** The read gives steps with no
+  id, and the write answers `stepResults: []`, so nothing exposes a
+  step-result id to address. `SetIterationStepStatus` stays unsupported.
+
 ### Writing a dataset
 
 The same spike, continued against a throwaway Test. Every operation the

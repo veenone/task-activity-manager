@@ -30,19 +30,11 @@ func TestXrayReportsDatasetWrites(t *testing.T) {
 	}
 }
 
-// Reading a live parameterized run became supported in #334, once the run
-// shape was captured from a real instance and committed as a fixture. Writing
-// an iteration back did not: #267 Phase 4 found a per-iteration PUT, but
-// nothing is tested against it, so both write paths still refuse and the view
-// keeps its read-only marker.
-//
-// An adapter with no client refuses the read too, because there is nothing to
-// read through.
-func TestXrayKeepsIterationWritesUnsupported(t *testing.T) {
+// An adapter with no client refuses every parameterized-run call, because
+// there is nothing to read or write through. Per-step writes refuse even with
+// a client: the read gives no step-result id to address one to (#336).
+func TestXrayRefusesParameterizedRunCallsWithoutAClient(t *testing.T) {
 	a := &Adapter{}
-	if a.Capabilities().SupportsParameterizedRunWrites {
-		t.Fatal("live iteration writes are unsupported until a write path is verified")
-	}
 	if _, err := a.GetParameterizedRun(context.Background(), "QA-EXEC-1", "QA-1"); !errors.Is(err, backend.ErrUnsupported) {
 		t.Fatalf("GetParameterizedRun with no client err = %v, want ErrUnsupported", err)
 	}
