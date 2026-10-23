@@ -43,6 +43,11 @@ export interface JiraFilter {
   id: string;
   name: string;
   jql: string;
+  // "owned" for a filter this user wrote, "shared" for one they starred
+  // that somebody else wrote, and empty when the instance cannot say.
+  // Empty is why the picker checks every filter before it groups any: a
+  // heading taken from a scope nobody read would be a guess on screen.
+  scope: string;
 }
 
 export const ListJiraFilters: (profileId: string) => Promise<JiraFilter[]> =

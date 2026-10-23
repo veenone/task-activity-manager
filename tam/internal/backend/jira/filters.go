@@ -2,6 +2,9 @@ package jira
 
 import (
 	"context"
+	"errors"
+
+	corejira "agile-suite/core/jira"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -12,16 +15,54 @@ import (
 // build instead.
 var _ backend.FilterBackend = (*Backend)(nil)
 
-// Filters is the saved filters this user has starred, with the JQL each
-// one stands for.
+// Filters is the saved filters this user can pin, with the JQL each one
+// stands for: the ones they own, then the ones they starred that somebody
+// else wrote.
+//
+// Both lists are read because neither is the whole set. Jira does not star
+// a filter because you created it, so the favourites leave out everything a
+// person wrote and never pinned, which is what #346 was raised for. Which
+// list a filter arrived in is also the scope, so nothing here has to ask
+// Jira who the connected user is or compare owners.
+//
+// An instance with no owned-filter route answers the starred list alone
+// with no scope on it, which is exactly what this view did before. A
+// failure reading either list is still a failure.
 func (b *Backend) Filters(ctx context.Context) ([]backend.Filter, error) {
-	raw, err := b.c.FavouriteFilters(ctx)
+	owned, err := b.c.OwnedFilters(ctx)
+	scoped := true
+	if errors.Is(err, corejira.ErrNoOwnedFilters) {
+		owned, scoped = nil, false
+	} else if err != nil {
+		return nil, err
+	}
+	starred, err := b.c.FavouriteFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]backend.Filter, 0, len(raw))
-	for _, f := range raw {
-		out = append(out, backend.Filter{ID: f.ID, Name: f.Name, JQL: f.JQL})
+
+	// Owned first, and the id is what dedupes: starring your own filter is
+	// normal and must not list it twice. Owning it is the stronger fact of
+	// the two, so the owned pass claims the id and the starred pass skips
+	// whatever is already spoken for.
+	out := make([]backend.Filter, 0, len(owned)+len(starred))
+	seen := make(map[string]bool, len(owned)+len(starred))
+	add := func(f corejira.RawFilter, scope string) {
+		if seen[f.ID] {
+			return
+		}
+		seen[f.ID] = true
+		out = append(out, backend.Filter{ID: f.ID, Name: f.Name, JQL: f.JQL, Scope: scope})
+	}
+	for _, f := range owned {
+		add(f, backend.FilterScopeOwned)
+	}
+	shared := backend.FilterScopeShared
+	if !scoped {
+		shared = ""
+	}
+	for _, f := range starred {
+		add(f, shared)
 	}
 	return out, nil
 }

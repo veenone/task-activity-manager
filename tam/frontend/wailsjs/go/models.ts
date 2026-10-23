@@ -114,6 +114,7 @@ export namespace backend {
 	    id: string;
 	    name: string;
 	    jql: string;
+	    scope: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Filter(source);
@@ -124,6 +125,7 @@ export namespace backend {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.jql = source["jql"];
+	        this.scope = source["scope"];
 	    }
 	}
 	export class Issue {

@@ -10,7 +10,21 @@ type Filter struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	JQL  string `json:"jql"`
+	// Scope is FilterScopeOwned, FilterScopeShared, or empty when the
+	// instance cannot say. Empty is a real answer, not a default: a Jira
+	// with no owned-filter route still lists the starred ones, and a
+	// picker that groups them by a scope nobody read would be inventing
+	// the label. The view draws one flat list in that case.
+	Scope string `json:"scope"`
 }
+
+// The two scopes a filter can carry. A filter is owned when it came back
+// from the read of what this user owns, and shared when the only list it
+// appeared in was their starred one, which means somebody else wrote it.
+const (
+	FilterScopeOwned  = "owned"
+	FilterScopeShared = "shared"
+)
 
 // FilterBackend is the pair of reads the Dashboards view needs. It is an
 // optional interface rather than part of IssueBackend, the way

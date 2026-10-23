@@ -432,10 +432,15 @@ Settings…**. None of them touches Jira.
 
 A dashboard is one of your saved Jira filters, counted and kept.
 
-Pick a filter from **Saved filter** and add it. Each panel shows **Issues**,
-**Points**, **Estimated** and **Logged**, rankings **By status**, **By type**
-and **By assignee**, and when it was last counted. A panel that has never run
-says **Not counted yet**.
+Pick a filter from **Saved filter** and add it. The list groups the filters
+you wrote under **Your filters** and the ones you starred that somebody else
+wrote under **Shared with you**, and a filter you wrote is there whether or
+not you starred it. A Jira that cannot say which are yours gives one
+ungrouped list of the starred ones instead.
+
+Each panel shows **Issues**, **Points**, **Estimated** and **Logged**,
+rankings **By status**, **By type** and **By assignee**, and when it was last
+counted. A panel that has never run says **Not counted yet**.
 
 ![Two dashboards, each counting one saved filter](images/dashboards-01-view.png)
 
