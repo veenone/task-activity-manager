@@ -2,7 +2,6 @@ package jira_test
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -61,58 +60,55 @@ func TestNoFavouriteFiltersIsAnEmptyListRatherThanAnError(t *testing.T) {
 	}
 }
 
-// A filter you created is not starred just because you made it, so the
-// favourites alone cannot answer "which of these are mine". This is the
-// read that can.
-func TestOwnedFiltersReadTheFiltersYouOwn(t *testing.T) {
-	var path string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path = r.URL.Path
+// Who wrote a filter is the only thing that separates one a person owns
+// from one somebody else shared with them, and Data Center has no route
+// that answers that question for a whole list. It answers it per filter,
+// in the list TAM already reads.
+func TestFavouriteFiltersCarryTheirOwner(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[{"id":"10200","name":"Mine, never starred","jql":"reporter = currentUser()"}]`))
+		_, _ = w.Write([]byte(`[
+			{"id":"10100","name":"Mine","jql":"reporter = currentUser()",
+			 "owner":{"name":"achmarah","displayName":"A Person"}},
+			{"id":"10101","name":"Theirs","jql":"project = PLAT",
+			 "owner":{"name":"someone-else","displayName":"Another Person"}}
+		]`))
 	}))
 	defer srv.Close()
 
-	owned, err := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client()).OwnedFilters(context.Background())
+	c := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	filters, err := c.FavouriteFilters(context.Background())
 	if err != nil {
-		t.Fatalf("owned: %v", err)
+		t.Fatalf("filters: %v", err)
 	}
-	if path != "/rest/api/2/filter/my" {
-		t.Errorf("path = %q", path)
+	if len(filters) != 2 {
+		t.Fatalf("filters = %+v", filters)
 	}
-	if len(owned) != 1 || owned[0].ID != "10200" || owned[0].Name != "Mine, never starred" {
-		t.Fatalf("owned = %+v", owned)
+	if filters[0].Owner.Name != "achmarah" {
+		t.Errorf("first owner = %q, want the username /myself answers with", filters[0].Owner.Name)
 	}
-	if owned[0].JQL != "reporter = currentUser()" {
-		t.Errorf("jql = %q", owned[0].JQL)
-	}
-}
-
-// Not every Jira exposes the route. A 404 is the instance saying it cannot
-// answer the question, which the caller turns back into the starred list
-// rather than a failed view, so it has to be told apart from a real error.
-func TestOwnedFiltersWithoutTheRouteIsErrNoOwnedFilters(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
-
-	_, err := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client()).OwnedFilters(context.Background())
-	if !errors.Is(err, jira.ErrNoOwnedFilters) {
-		t.Fatalf("err = %v, want ErrNoOwnedFilters", err)
+	if filters[1].Owner.Name != "someone-else" {
+		t.Errorf("second owner = %q", filters[1].Owner.Name)
 	}
 }
 
-// A 500 is a real failure and must not be read as "no such route", or a
-// broken instance would quietly look like an old one.
-func TestOwnedFiltersPassARealFailureThrough(t *testing.T) {
+// A Jira that names its users some other way, Cloud among them, leaves the
+// username empty. An empty owner is a real answer and must stay empty
+// rather than read as a match against another empty one.
+func TestFavouriteFiltersLeaveAnUnnamedOwnerEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"id":"10100","name":"Mine","jql":"project = PLAT",
+			"owner":{"accountId":"5b10a2844c20165700ede21g"}}]`))
 	}))
 	defer srv.Close()
 
-	_, err := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client()).OwnedFilters(context.Background())
-	if err == nil || errors.Is(err, jira.ErrNoOwnedFilters) {
-		t.Fatalf("err = %v, want a real failure", err)
+	c := jira.NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	filters, err := c.FavouriteFilters(context.Background())
+	if err != nil {
+		t.Fatalf("filters: %v", err)
+	}
+	if filters[0].Owner.Name != "" {
+		t.Errorf("owner = %q, want empty when the instance names users another way", filters[0].Owner.Name)
 	}
 }

@@ -432,11 +432,11 @@ Settings…**. None of them touches Jira.
 
 A dashboard is one of your saved Jira filters, counted and kept.
 
-Pick a filter from **Saved filter** and add it. The list groups the filters
-you wrote under **Your filters** and the ones you starred that somebody else
-wrote under **Shared with you**, and a filter you wrote is there whether or
-not you starred it. A Jira that cannot say which are yours gives one
-ungrouped list of the starred ones instead.
+Pick a filter from **Saved filter** and add it. The list is your starred
+filters, grouped: the ones you wrote under **Your filters** and the rest under
+**Shared with you**. An empty heading is not drawn. Starring a filter in Jira
+is what puts it here, because Data Center has no way to list the filters you
+own. A Jira that cannot say who you are gives one ungrouped list instead.
 
 Each panel shows **Issues**, **Points**, **Estimated** and **Logged**,
 rankings **By status**, **By type** and **By assignee**, and when it was last

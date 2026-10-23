@@ -1,10 +1,6 @@
 package jira
 
-import (
-	"context"
-	"errors"
-	"net/http"
-)
+import "context"
 
 // RawFilter is one saved filter as Jira answers it: the id a dashboard is
 // pinned to, the name its owner gave it, and the JQL it stands for.
@@ -17,6 +13,18 @@ type RawFilter struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	JQL  string `json:"jql"`
+	// Owner is who wrote the filter, and only their username is kept: it
+	// is the same value /rest/api/2/myself answers with, so comparing the
+	// two is how a caller tells a filter this user owns from one somebody
+	// else shared with them.
+	//
+	// An instance that names its users another way, Cloud by account id
+	// among them, leaves this empty. Empty is a real answer meaning the
+	// owner could not be read, and it must never be compared against
+	// another empty one as though they matched.
+	Owner struct {
+		Name string `json:"name"`
+	} `json:"owner"`
 }
 
 // FavouriteFilters is the saved filters this user has starred. A person
@@ -25,36 +33,6 @@ type RawFilter struct {
 func (c *Client) FavouriteFilters(ctx context.Context) ([]RawFilter, error) {
 	out := []RawFilter{}
 	if err := c.Get(ctx, "/rest/api/2/filter/favourite", &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// ErrNoOwnedFilters is a Jira with no /filter/my route. The favourites are
-// still readable on such an instance, so a caller reports this by leaving
-// the scope off its filters rather than by failing: a picker that lists
-// the starred filters unlabelled is what this view has always done, and
-// strictly better than an error where a list used to be.
-var ErrNoOwnedFilters = errors.New("jira: this instance cannot list the filters you own")
-
-// OwnedFilters is the saved filters this user owns, starred or not.
-//
-// It is the other half of FavouriteFilters, and the reason both are read:
-// Jira does not star a filter because you created it, so the favourites
-// leave out everything a person wrote and never pinned. Which list a
-// filter came from is also the only scope signal needed. Being in this one
-// means it is yours, which saves asking Jira who the connected user is and
-// comparing owners.
-//
-// A 404 becomes ErrNoOwnedFilters, the same soft failure Boards makes of a
-// missing Agile API. Any other error is returned as it stands.
-func (c *Client) OwnedFilters(ctx context.Context) ([]RawFilter, error) {
-	out := []RawFilter{}
-	if err := c.Get(ctx, "/rest/api/2/filter/my", &out); err != nil {
-		var httpErr *HTTPError
-		if errors.As(err, &httpErr) && httpErr.Code == http.StatusNotFound {
-			return nil, ErrNoOwnedFilters
-		}
 		return nil, err
 	}
 	return out, nil

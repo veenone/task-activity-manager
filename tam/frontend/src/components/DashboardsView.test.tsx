@@ -188,6 +188,10 @@ describe("DashboardsView", () => {
     const picker = screen.getByRole("combobox", { name: "Saved filter" });
     expect(within(picker).getByRole("group", { name: "Your filters" })).toBeInTheDocument();
     expect(within(picker).queryByRole("group", { name: "Shared with you" })).not.toBeInTheDocument();
+    // A line explaining the order of two groups, over one group, promises a
+    // heading that is not there. This is the live Data Center case: every
+    // filter a reader has starred is usually one they wrote (#348).
+    expect(screen.queryByText(/Filters you own come first/)).not.toBeInTheDocument();
   });
 
 });

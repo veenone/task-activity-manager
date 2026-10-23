@@ -145,7 +145,11 @@ export function DashboardsView() {
         )}
       </div>
 
-      {grouped && (
+      {/* Only when both headings are drawn. A line explaining the order of
+          two groups, sitting over one group, promises a heading that is not
+          there, and on Data Center one group is the common case: the list is
+          what the reader starred, and people mostly star their own (#348). */}
+      {grouped && owned.length > 0 && shared.length > 0 && (
         <p className="muted small">
           Filters you own come first, then the ones you starred that someone else wrote.
         </p>

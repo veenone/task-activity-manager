@@ -6,9 +6,11 @@ A dashboard is one of your saved Jira filters, counted and kept. The view holds 
 
 ## Add one
 
-Pick a filter from **Saved filter** and add it. The list holds the filters you wrote and the ones you starred in Jira, under two headings: **Your filters** and **Shared with you**. A filter you wrote is listed whether or not you ever starred it, which is worth knowing because Jira does not star one for you when you create it. TAM does not create or edit them.
+Pick a filter from **Saved filter** and add it. The list holds the filters you have starred in Jira, under two headings: **Your filters** for the ones you wrote and **Shared with you** for the rest. A heading with nothing under it is not drawn, so a list of filters you all wrote yourself shows **Your filters** alone. TAM does not create or edit them.
 
-If your Jira cannot say which filters you own, the list is a single ungrouped one of the filters you have starred, the same as it was before.
+Starring a filter in Jira is what puts it in this list. Jira Data Center has no way to list the filters you own, so one you wrote and never starred is in no list TAM can read.
+
+If TAM cannot tell who you are in Jira, or your Jira names its users in a way that cannot be matched against a filter's owner, the list is a single ungrouped one of your starred filters, the same as it was before.
 
 ## What a panel shows
 

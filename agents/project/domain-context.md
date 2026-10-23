@@ -37,6 +37,28 @@ commit hash behind it; the instruction gate checks the hash exists.
   reads as "tested by" from one side and something else from the other, so a
   link is resolved by direction, never by type name alone (6ef4b6d, 0218fca).
 
+## Jira saved filters
+
+- Data Center has no route that lists the filters a user owns.
+  `/rest/api/2/filter/my` and `/rest/api/2/filter/search` are both Cloud only
+  and 404 on Data Center; the 9.12 reference lists the whole filter resource
+  as `POST /filter`, `GET/PUT/DELETE /filter/{id}`, `/filter/{id}/columns`,
+  `/filter/{id}/permission`, `/filter/defaultShareScope` and
+  `/filter/favourite`. A feature was built on `/filter/my` and shipped dead,
+  saved from erroring only by its own fallback (22b6dd6).
+- Which filters are a user's own is answered per filter, not per list:
+  `/filter/favourite` carries `owner.name`, and `/rest/api/2/myself` answers
+  with the same username, so comparing the two is the scope. Both names have
+  to be non-empty. Cloud identifies users by account id and leaves `name`
+  empty, so matching empty against empty would mark every filter as the
+  reader's own (4c20722).
+- A filter nobody starred is in no list Data Center will enumerate. Reaching
+  one needs its id and `GET /filter/{id}`.
+- The Data Center REST reference at developer.atlassian.com is rendered
+  client-side and unreadable to a fetch tool. The static reference at
+  `docs.atlassian.com/software/jira/docs/api/REST/<version>/` is plain HTML
+  and answers these questions; it is large, so read it at an offset.
+
 ## Jira worklogs
 
 - An issue's worklog comes from `GET /rest/api/2/issue/{key}/worklog`, which
