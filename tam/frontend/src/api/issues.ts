@@ -183,6 +183,10 @@ export interface IssueQuery {
   // filter.
   statuses?: string[];
   assignees?: string[];
+  // Keeps only the issues under no epic, which is what the Epics view's
+  // no-epic tab pages (#341). It is the exact complement of what the tree
+  // draws, so an issue belongs to one tab or the other and never to both.
+  noEpic?: boolean;
   offset: number;
   limit: number;
   // "" is the store's default rank order. Sorting is a backend concern
@@ -255,18 +259,21 @@ export interface EpicNode {
   donePoints: number;
 }
 
-// EpicTreeData is named to avoid clashing with the EpicTree component. The
-// last three fields mirror issuerepo.Tree's: the epic tree and the issues
-// with no epic are read and capped apart (#338), so truncated is about the
-// second list alone, orphanTotal is how many such issues the profile holds,
-// and epicsTruncated is the rarer case of an epic tree too large to read at
-// once, the only one in which an epic's own counts are short.
+// EpicTreeData is named to avoid clashing with the EpicTree component, and
+// mirrors issuerepo.Tree. It carries the epic half of the view only: the
+// issues under no epic are paged separately through GetIssues with
+// NoEpic set (#341).
+//
+// issueTotal and orphanTotal size the two tabs and together account for
+// every non-epic issue the profile has cached. They are counts of each
+// side, not of what the current filter leaves, so a tab's label holds still
+// while its contents narrow. truncated says the epic read hit its cap,
+// which is the only case where an epic's own counts are short.
 export interface EpicTreeData {
   epics: EpicNode[];
-  orphans: Issue[];
   truncated: boolean;
+  issueTotal: number;
   orphanTotal: number;
-  epicsTruncated: boolean;
 }
 
 export interface SprintRef {

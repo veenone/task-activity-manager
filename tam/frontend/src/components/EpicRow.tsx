@@ -10,11 +10,9 @@ import { ProgressBar } from "@agile-suite/core";
 import { progressText } from "../lib/format";
 
 interface EpicRowProps {
-  kind: "epic" | "noepic";
   subtaskLabel?: string;
   rowKey: string;
-  node?: EpicNode;
-  count?: number;
+  node: EpicNode;
   index: number | undefined;
   open: boolean;
   selected: boolean;
@@ -25,25 +23,23 @@ interface EpicRowProps {
   onKeyDown: (e: KeyboardEvent) => void;
 }
 
-// EpicRow renders the header treeitem for either an epic node or the
-// orphans group: same caret, expand state, and selection wiring, with the
-// icon, name, count, and pending dot filled in from whichever kind it is.
+// EpicRow renders the header treeitem for one epic: its caret, expand
+// state and selection wiring, with the icon, name, progress and pending
+// dot filled in from the node.
 export function EpicRow({
-  kind, subtaskLabel, rowKey, node, count, index, open, selected, focused, flashed, onActivate, onToggle, onKeyDown,
+  subtaskLabel, rowKey, node, index, open, selected, focused, flashed, onActivate, onToggle, onKeyDown,
 }: EpicRowProps) {
-  const isEpic = kind === "epic" && node;
-  const typeIcon: ReactNode = isEpic ? <TypeChip type={node.issue.type} subtaskLabel={subtaskLabel} /> : <span />;
-  const countText = isEpic ? progressText(node.done, node.total, node.donePoints, node.points) : String(count ?? 0);
-  const summary = isEpic ? toPlainText(node.issue.summary, "summary") : "";
-  const ariaLabel = isEpic ? `${rowKey} ${summary}` : undefined;
-  const pending = isEpic && node.issue.pending;
+  const typeIcon: ReactNode = <TypeChip type={node.issue.type} subtaskLabel={subtaskLabel} />;
+  const countText = progressText(node.done, node.total, node.donePoints, node.points);
+  const summary = toPlainText(node.issue.summary, "summary");
+  const pending = node.issue.pending;
   return (
     <div
       role="treeitem"
       aria-expanded={open}
       aria-selected={selected}
       tabIndex={focused ? 0 : -1}
-      {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
+      aria-label={`${rowKey} ${summary}`}
       data-tree-index={index}
       data-tree-key={rowKey}
       className={`folder-item epic-row${selected ? " folder-selected" : ""}${flashed ? " epic-row-moved" : ""}`}
@@ -54,14 +50,14 @@ export function EpicRow({
         {open ? "▾" : "▸"}
       </span>
       {typeIcon}
-      <span className="epic-cell epic-cell-key accent-text" title={isEpic ? rowKey : undefined}>
-        {isEpic ? rowKey : "No epic"}
+      <span className="epic-cell epic-cell-key accent-text" title={rowKey}>
+        {rowKey}
       </span>
-      <span className="epic-cell epic-cell-summary" title={isEpic ? summary : undefined}>
-        {isEpic ? summary : ""}
+      <span className="epic-cell epic-cell-summary" title={summary}>
+        {summary}
       </span>
       <span className="epic-cell folder-count epic-cell-progress">
-        {isEpic && node.total > 0 && (
+        {node.total > 0 && (
           <span className="epic-progress-bar">
             <ProgressBar
               value={node.done}
@@ -95,8 +91,8 @@ interface EpicChildRowProps {
   onKeyDown: (e: KeyboardEvent, row: Row) => void;
 }
 
-// EpicChildRow renders one leaf row, whether it hangs off an epic or off
-// the orphans group; ownerKey tells the keyboard model which it is.
+// EpicChildRow renders one leaf row under an epic; ownerKey tells the
+// keyboard model which branch it belongs to.
 export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true, onToggleSubtasks, subtaskLabel, ownerKey, place = "root", index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
   const row: Row = { id: child.key, kind: "child", ownerKey };
   const summary = toPlainText(child.summary, "summary");

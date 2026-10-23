@@ -221,7 +221,9 @@ func TestEpicTreeFiltersByAssignee(t *testing.T) {
 	if got := strings.Join(keysOf(tree.Epics[0].Children), ","); got != "PLAT-412" {
 		t.Errorf("children = %q, want only the row assigned to S. Kim", got)
 	}
-	if len(tree.Orphans) != 0 {
-		t.Errorf("orphans = %v, want none: no unparented row is assigned to S. Kim", keysOf(tree.Orphans))
+	// OrphanTotal labels the no-epic tab, so it sizes that side of the
+	// profile and does not move with the filter the tree was read under.
+	if tree.OrphanTotal != 2 {
+		t.Errorf("OrphanTotal = %d, want the profile's two unparented rows", tree.OrphanTotal)
 	}
 }

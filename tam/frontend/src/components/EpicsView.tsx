@@ -12,13 +12,22 @@ import { NewIssueModal } from "./NewIssueModal";
 import { useDebounced } from "../lib/useDebounced";
 import { useSubtaskType } from "../queries/people";
 import { IssueFilters } from "./IssueFilters";
+import { IssueListView } from "./IssueListView";
+import { EpicsTabs, epicsPanelId, epicsTabId } from "./EpicsTabs";
+import type { EpicsTab } from "./EpicsTabs";
 import { NO_FILTER, isFiltered, queryFields } from "../lib/issueFilter";
 import type { IssueFilter } from "../lib/issueFilter";
 
 const SEARCH_DELAY_MS = 250;
 
-// findIssue looks an issue up in the tree by key, whichever branch holds it:
-// an epic itself, one of its children, or an orphan.
+// Frozen and module level so the no-epic tab's query is referentially
+// stable: IssueListView merges baseQuery into a memo, and a fresh object
+// every render would refetch on every render.
+const NO_EPIC_QUERY = Object.freeze({ noEpic: true });
+
+// findIssue looks an issue up in the tree by key, whichever branch holds
+// it: an epic itself or one of its children. Issues with no epic are not in
+// the tree, and the no-epic tab keeps its own selection (#341).
 function findIssue(tree: EpicTreeData, key: string): Issue | undefined {
   if (!key) return undefined;
   for (const node of tree.epics) {
@@ -26,7 +35,7 @@ function findIssue(tree: EpicTreeData, key: string): Issue | undefined {
     const child = node.children.find((c) => c.key === key);
     if (child) return child;
   }
-  return tree.orphans.find((o) => o.key === key);
+  return undefined;
 }
 
 // EpicsView is the epic to story to task tree: a toolbar over EpicTree, with
@@ -40,6 +49,7 @@ export function EpicsView() {
   const [selectedKey, setSelectedKey] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [movedKey, setMovedKey] = useState("");
+  const [tab, setTab] = useState<EpicsTab>("epics");
 
   // A parentKey edit made in the detail panel journals the change and the
   // tree query is invalidated with it, so the freshly loaded tree carries
@@ -60,6 +70,7 @@ export function EpicsView() {
     setSelectedKey("");
     setExpanded(new Set());
     setMovedKey("");
+    setTab("epics");
     lastParentRef.current.clear();
   }
 
@@ -96,13 +107,30 @@ export function EpicsView() {
   // the epic the selected row hangs off.
   const epicInContext = selected ? (selected.type === "epic" ? selected.key : selected.parentKey) : "";
   const epicCount = tree.data?.epics.length ?? 0;
-  const orphanCount = tree.data?.orphans.length ?? 0;
-  const issueCount = (tree.data?.epics.reduce((sum, e) => sum + e.children.length, 0) ?? 0) + orphanCount;
+  const drawnCount = tree.data?.epics.reduce((sum, e) => sum + e.children.length, 0) ?? 0;
   const filtered = search !== "" || sprintId !== "" || showDone || isFiltered(filter);
-  const empty = epicCount === 0 && orphanCount === 0;
+  const empty = epicCount === 0;
 
   return (
     <section className="backlog" aria-label="Epics" data-tour="epics-body">
+      <EpicsTabs
+        current={tab}
+        onSelect={setTab}
+        issueTotal={tree.data?.issueTotal ?? 0}
+        orphanTotal={tree.data?.orphanTotal ?? 0}
+      />
+
+      {tab === "noepic" ? (
+        <div id={epicsPanelId("noepic")} role="tabpanel" aria-labelledby={epicsTabId("noepic")} className="epics-noepic-pane">
+          <IssueListView
+            viewId="epics-noepic"
+            label="No epic"
+            baseQuery={NO_EPIC_QUERY}
+            emptyNote="Every cached issue sits under an epic."
+          />
+        </div>
+      ) : (
+      <div id={epicsPanelId("epics")} role="tabpanel" aria-labelledby={epicsTabId("epics")} className="epics-tree-panel">
       <div className="filter-bar">
         <input
           type="search"
@@ -146,26 +174,16 @@ export function EpicsView() {
       </div>
 
       <p className="muted epics-summary">
-        {`${epicCount} epics, ${issueCount} issues, ${orphanCount} without an epic`}
+        {`${epicCount} epics, ${drawnCount} issues shown`}
         {tree.isFetching && !tree.isLoading && <span className="epics-refreshing"> · refreshing</span>}
       </p>
-      {/* The epic tree and the issues with no epic are capped apart (#338),
-          so the only incomplete part is named rather than warned about in
-          general. Epic counts stay whole unless the rarer epicsTruncated
-          case is what cut the read. */}
-      {tree.data?.epicsTruncated ? (
+      {/* The only ceiling left on this tab is its own: the issues with no
+          epic have their own tab and their own pager (#341). */}
+      {tree.data?.truncated && (
         <p className="muted small epics-note">
           This profile has more issues under its epics than the view can show at once. Search or filter to narrow it.
         </p>
-      ) : tree.data?.truncated ? (
-        // A ratio of drawn rows to the total would read as though the cap
-        // withheld every missing one, when Show done hides most of them. The
-        // count of issues with no epic is the one number that stays true
-        // whatever else is filtering the list.
-        <p className="muted small epics-note">
-          {`${tree.data.orphanTotal.toLocaleString()} issues have no epic, more than this view lists at once. Search or filter to reach the rest.`}
-        </p>
-      ) : null}
+      )}
 
       <div className="epics-body">
         <div className="epics-tree-pane">
@@ -212,6 +230,8 @@ export function EpicsView() {
           />
         )}
       </div>
+      </div>
+      )}
 
       {isOpen("newIssue") && (
         <NewIssueModal

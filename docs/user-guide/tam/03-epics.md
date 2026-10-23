@@ -1,20 +1,24 @@
 # Epics
 
-The Epics view is the project as a tree: each epic with the issues that hang off it, and the issues that hang off nothing. It answers how much of a piece of work has landed, which the flat backlog cannot show.
+The Epics view answers two questions, and has a tab for each: how much of the work under an epic has landed, which the flat backlog cannot show, and what was never filed under an epic at all.
 
 ![The Epics tree, with progress per epic](images/epics-01-tree.png)
 
-## The tree
+Each tab is labelled with the number of issues on its side, for example `Under epics 2,238` and `No epic 5,988`. Between them they account for every issue in the cache that is not itself an epic. The labels count the whole side, so they hold still while a filter narrows what the tab shows.
+
+## Under epics
 
 Each epic is a row with its key, its summary and its progress: a bar and a count, for example `7 of 12 done, 21 of 34 pts`. The points half only appears when the issues carry estimates. Open an epic to see its children; a child with subtasks opens again.
 
-Under the epics is everything with no epic, so work that was never filed under one is visible rather than missing.
-
-The line above the tree counts what you are looking at: epics, issues, and how many have no epic.
-
-The epics and their children are read apart from the issues that have no epic, so a crowded "No epic" group never costs an epic its children, and an epic's progress count is the work it really holds. The "No epic" list is the part with a ceiling: past 5,000 issues it stops there and a note says how many the profile holds, for example `5,988 issues have no epic, more than this view lists at once`. Search or filter to reach the rest.
+The line above the tree counts the epics and the issues currently drawn.
 
 Narrowing works on the children, and an epic the filter leaves nothing under drops out of the tree rather than sitting there empty.
+
+## No epic
+
+Work that was never filed under an epic is a flat list rather than a tree, so this tab is the same grid, filter bar and pager the [Backlog](01-backlog.md) uses. Every issue on it is reachable by paging, however many there are, and you do not have to search for one to find out it is there.
+
+Giving an issue an epic moves it to the other tab on the next read.
 
 ## Narrow it
 
