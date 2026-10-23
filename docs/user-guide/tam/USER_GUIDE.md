@@ -462,6 +462,17 @@ filters, grouped: the ones you wrote under **Your filters** and the rest under
 is what puts it here, because Data Center has no way to list the filters you
 own. A Jira that cannot say who you are gives one ungrouped list instead.
 
+**Filter id** is the way in for a filter that list cannot offer, which is any
+you have not starred: type the number out of the filter's Jira URL and press
+**Add by id**, and Jira supplies the name and the search. An id that does not
+resolve, or one your account cannot see, is reported beside the box and adds
+nothing.
+
+**Jira dashboard** lists the dashboards your account can see, and **Open in
+Jira** opens the chosen one in your browser. That is all it does. A Jira
+dashboard is a page of gadgets and Data Center offers no way to read which
+gadgets one holds, so TAM cannot turn it into panels here.
+
 Each panel shows **Issues**, **Points**, **Estimated** and **Logged**,
 rankings **By status**, **By type** and **By assignee**, and when it was last
 counted. A panel that has never run says **Not counted yet**.

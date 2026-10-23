@@ -12,6 +12,18 @@ Starring a filter in Jira is what puts it in this list. Jira Data Center has no 
 
 If TAM cannot tell who you are in Jira, or your Jira names its users in a way that cannot be matched against a filter's owner, the list is a single ungrouped one of your starred filters, the same as it was before.
 
+## Add one by its id
+
+**Filter id** is the way in for a filter the list above cannot offer, which is any filter you have not starred. The id is the number in the filter's own Jira URL, for example the `25475` in `.../issues/?filter=25475`. Type it and press **Add by id**; the name and the search both come from Jira, so there is nothing else to fill in.
+
+An id Jira will not resolve, because it does not exist or because your account cannot see that filter, is reported beside the box and adds nothing.
+
+## Opening a Jira dashboard
+
+**Jira dashboard** lists the dashboards your Jira account can see and **Open in Jira** opens the one you chose in your browser. The row is only there when there are dashboards to open.
+
+That is all this does. A Jira dashboard is a page of gadgets, and Data Center offers no way to read what gadgets a dashboard holds, so TAM cannot turn one into panels here. Counting a saved filter is what a TAM dashboard does, and the two things share a word and nothing else.
+
 ## What a panel shows
 
 - **Issues**, **Points**, **Estimated** and **Logged** for everything the filter matched.
