@@ -73,8 +73,8 @@ beforeEach(() => {
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.ListDashboards).mockResolvedValue([dashboard()]);
   vi.mocked(api.ListJiraFilters).mockResolvedValue([
-    { id: "10100", name: "My open bugs", jql: "type = Bug AND resolution = Unresolved" },
-    { id: "10101", name: "Platform this quarter", jql: "project in (PLAT, OPS)" },
+    { id: "10100", name: "My open bugs", jql: "type = Bug AND resolution = Unresolved", scope: "owned" },
+    { id: "10101", name: "Platform this quarter", jql: "project in (PLAT, OPS)", scope: "shared" },
   ]);
   vi.mocked(api.CreateDashboard).mockResolvedValue(dashboard({ id: "d2", name: "Platform this quarter" }));
   vi.mocked(api.RefreshDashboard).mockResolvedValue(dashboard({ snapshot: snapshot({ total: 15 }) }));
@@ -145,4 +145,49 @@ describe("DashboardsView", () => {
     renderView();
     expect(await screen.findByText(/cannot read saved filters/)).toBeInTheDocument();
   });
+
+  // #346: a filter you wrote and never starred used to be missing here
+  // altogether. Now that both lists are read, the picker has to say which
+  // is which, or a name you do not recognise is indistinguishable from one
+  // you wrote.
+  it("groups the picker by the filters you own and the ones shared with you", async () => {
+    renderView();
+    // The select is on screen from the first render, so waiting for it
+    // proves nothing. Waiting for an option proves the filters arrived.
+    await screen.findByRole("option", { name: "My open bugs" });
+    const picker = screen.getByRole("combobox", { name: "Saved filter" });
+    const yours = within(picker).getByRole("group", { name: "Your filters" });
+    expect(within(yours).getByRole("option", { name: "My open bugs" })).toBeInTheDocument();
+    const theirs = within(picker).getByRole("group", { name: "Shared with you" });
+    expect(within(theirs).getByRole("option", { name: "Platform this quarter" })).toBeInTheDocument();
+    expect(screen.getByText(/Filters you own come first/)).toBeInTheDocument();
+  });
+
+  // A Jira with no owned-filter route leaves the scope empty, and a group
+  // labelled from a scope nobody read would be a guess on screen. The list
+  // stays flat, and the guidance that explains the groups goes with them.
+  it("lists the filters flat when the instance cannot say which are yours", async () => {
+    vi.mocked(api.ListJiraFilters).mockResolvedValue([
+      { id: "10100", name: "My open bugs", jql: "type = Bug", scope: "" },
+      { id: "10101", name: "Platform this quarter", jql: "project = PLAT", scope: "" },
+    ]);
+    renderView();
+    await screen.findByRole("option", { name: "My open bugs" });
+    const picker = screen.getByRole("combobox", { name: "Saved filter" });
+    expect(within(picker).queryAllByRole("group")).toHaveLength(0);
+    expect(screen.queryByText(/Filters you own come first/)).not.toBeInTheDocument();
+  });
+
+  // One group with nothing in it would be a heading over empty space.
+  it("draws only the group that has filters in it", async () => {
+    vi.mocked(api.ListJiraFilters).mockResolvedValue([
+      { id: "10100", name: "My open bugs", jql: "type = Bug", scope: "owned" },
+    ]);
+    renderView();
+    await screen.findByRole("option", { name: "My open bugs" });
+    const picker = screen.getByRole("combobox", { name: "Saved filter" });
+    expect(within(picker).getByRole("group", { name: "Your filters" })).toBeInTheDocument();
+    expect(within(picker).queryByRole("group", { name: "Shared with you" })).not.toBeInTheDocument();
+  });
+
 });

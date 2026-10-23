@@ -98,6 +98,16 @@ export function DashboardsView() {
   const busy = add.isPending || refresh.isPending;
   const list = dashboards.data ?? [];
 
+  // The picker groups the filters only when every one of them carries a
+  // scope. A Jira with no owned-filter route leaves the scope empty, and a
+  // partial split would quietly drop whatever it could not place, so an
+  // unknown anywhere in the list means one flat list, which is what this
+  // view showed before #346.
+  const pickable = filters.data ?? [];
+  const owned = pickable.filter((f) => f.scope === "owned");
+  const shared = pickable.filter((f) => f.scope === "shared");
+  const grouped = pickable.length > 0 && owned.length + shared.length === pickable.length;
+
   return (
     <section className="dashboards-view" aria-label="Dashboards">
       <div className="dashboards-toolbar">
@@ -110,9 +120,22 @@ export function DashboardsView() {
           disabled={busy || (filters.data ?? []).length === 0}
         >
           <option value="">Choose a filter</option>
-          {(filters.data ?? []).map((f) => (
-            <option key={f.id} value={f.id}>{f.name}</option>
-          ))}
+          {grouped ? (
+            <>
+              {owned.length > 0 && (
+                <optgroup label="Your filters">
+                  {owned.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </optgroup>
+              )}
+              {shared.length > 0 && (
+                <optgroup label="Shared with you">
+                  {shared.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </optgroup>
+              )}
+            </>
+          ) : (
+            pickable.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)
+          )}
         </select>
         <button type="button" className="btn" onClick={() => add.mutate()} disabled={busy || filterId === ""}>
           Add dashboard
@@ -121,6 +144,12 @@ export function DashboardsView() {
           <span className="error-text">Saved filters could not be read: {errMsg(filters.error)}</span>
         )}
       </div>
+
+      {grouped && (
+        <p className="muted small">
+          Filters you own come first, then the ones you starred that someone else wrote.
+        </p>
+      )}
 
       {error && <p className="error-text">{error}</p>}
 
