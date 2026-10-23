@@ -2,6 +2,7 @@ package demo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"agile-suite/tam/internal/backend"
@@ -26,6 +27,26 @@ var demoFilters = []backend.Filter{
 // Filters is that list.
 func (b *Backend) Filters(context.Context) ([]backend.Filter, error) {
 	return append([]backend.Filter{}, demoFilters...), nil
+}
+
+// FilterByID resolves one of those three by id and refuses anything else,
+// so the demo exercises both halves of the by-id box: the filter the
+// picker could not have offered, and the id nobody can see.
+func (b *Backend) FilterByID(_ context.Context, id string) (backend.Filter, error) {
+	want := strings.TrimSpace(id)
+	for _, f := range demoFilters {
+		if f.ID == want {
+			return f, nil
+		}
+	}
+	return backend.Filter{}, fmt.Errorf("no filter with id %s, or this account cannot see it", want)
+}
+
+// JiraDashboards is empty, which is the honest answer. A demo profile has
+// no Jira behind it, and the list exists only to open a dashboard in a
+// browser, so a made-up row would be a link to nowhere.
+func (b *Backend) JiraDashboards(context.Context) ([]backend.JiraDashboard, error) {
+	return []backend.JiraDashboard{}, nil
 }
 
 // SearchByJQL answers the two shapes the demo filters are written in and

@@ -27,6 +27,54 @@ func (a *App) ListJiraFilters(profileID string) ([]backend.Filter, error) {
 	return f.Filters(a.ctx)
 }
 
+// ListJiraDashboards is Jira's own dashboards, which TAM lists as a
+// signpost and nothing more: a name, and the URL that opens it in the
+// reader's browser.
+//
+// Nothing here renders a dashboard. A Jira dashboard is a page of gadgets
+// and Data Center will not enumerate them, so the only honest thing TAM can
+// do with one is point at it (#349).
+func (a *App) ListJiraDashboards(profileID string) ([]backend.JiraDashboard, error) {
+	_, b, err := a.backendForProfile(profileID)
+	if err != nil {
+		return nil, err
+	}
+	f, ok := b.(backend.FilterBackend)
+	if !ok {
+		return nil, errors.New("this connection cannot read Jira dashboards")
+	}
+	return f.JiraDashboards(a.ctx)
+}
+
+// AddDashboardByFilterID pins a filter the picker could not offer.
+//
+// The picker holds what Jira will enumerate, which on Data Center is the
+// starred list alone, so a filter the reader owns but never starred cannot
+// be chosen there at all. An id reaches any filter they can see.
+//
+// The name and the JQL come from Jira rather than from the reader, so a
+// dashboard cannot end up labelled one thing and counting another. An id
+// that does not resolve adds nothing and says so.
+func (a *App) AddDashboardByFilterID(profileID, filterID string) (dashboardrepo.Dashboard, error) {
+	id := strings.TrimSpace(filterID)
+	if id == "" {
+		return dashboardrepo.Dashboard{}, errors.New("enter the id of a saved filter, the number in its Jira URL")
+	}
+	_, b, err := a.backendForProfile(profileID)
+	if err != nil {
+		return dashboardrepo.Dashboard{}, err
+	}
+	f, ok := b.(backend.FilterBackend)
+	if !ok {
+		return dashboardrepo.Dashboard{}, errors.New("this connection cannot read saved filters")
+	}
+	found, err := f.FilterByID(a.ctx, id)
+	if err != nil {
+		return dashboardrepo.Dashboard{}, err
+	}
+	return a.CreateDashboard(profileID, found.Name, found.ID, found.JQL)
+}
+
 // ListDashboards is the profile's dashboards with their last figures. It
 // reads the store alone, so it answers with Jira unreachable, which is the
 // whole reason a dashboard holds a snapshot.
