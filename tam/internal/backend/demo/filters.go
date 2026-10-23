@@ -9,13 +9,18 @@ import (
 
 var _ backend.FilterBackend = (*Backend)(nil)
 
-// demoFilters are the saved filters the demo instance pretends its user
-// has starred. They are curated rather than derived, the way the rest of
-// this dataset is: a filter is something a person wrote, and two of them
-// are enough to show what a dashboard is for.
+// demoFilters are the saved filters the demo instance pretends its user can
+// reach. They are curated rather than derived, the way the rest of this
+// dataset is: a filter is something a person wrote.
+//
+// One of them is owned and the other two are shared, so the picker draws
+// both of its groups here without a live Jira behind it. The owned one is
+// the case #346 was about, a filter its author never starred, which on a
+// real instance the favourites read cannot see.
 var demoFilters = []backend.Filter{
-	{ID: "10100", Name: "Everything in this project", JQL: "project = PLAT"},
-	{ID: "10101", Name: "Open bugs", JQL: "project = PLAT AND type = Bug AND status != Done"},
+	{ID: "10102", Name: "What I am working on", JQL: "project = PLAT AND assignee = currentUser()", Scope: backend.FilterScopeOwned},
+	{ID: "10100", Name: "Everything in this project", JQL: "project = PLAT", Scope: backend.FilterScopeShared},
+	{ID: "10101", Name: "Open bugs", JQL: "project = PLAT AND type = Bug AND status != Done", Scope: backend.FilterScopeShared},
 }
 
 // Filters is that list.

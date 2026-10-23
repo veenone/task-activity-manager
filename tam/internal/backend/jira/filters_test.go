@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	corejira "agile-suite/core/jira"
+	"agile-suite/tam/internal/backend"
 	jirabackend "agile-suite/tam/internal/backend/jira"
 )
 
@@ -21,6 +22,8 @@ func newFilterServer(t *testing.T, searchBody string) (*jirabackend.Backend, *[]
 		switch r.URL.Path {
 		case "/rest/api/2/field":
 			_, _ = w.Write([]byte(historyFields))
+		case "/rest/api/2/filter/my":
+			_, _ = w.Write([]byte(`[]`))
 		case "/rest/api/2/filter/favourite":
 			_, _ = w.Write([]byte(`[{"id":"10100","name":"My open bugs","jql":"type = Bug AND resolution = Unresolved"}]`))
 		case "/rest/api/2/search":
@@ -79,5 +82,106 @@ func TestSearchByJQLRunsTheFilterUnchangedAcrossProjects(t *testing.T) {
 	}
 	if page[0].StatusCategory != "done" {
 		t.Errorf("first row category = %q", page[0].StatusCategory)
+	}
+}
+
+// scopedFilters answers the two filter reads with whatever the case needs,
+// so a test can say what the instance owns, what it has starred, and
+// whether it knows about owned filters at all.
+func scopedFilters(t *testing.T, ownedStatus int, owned, favourite string) *jirabackend.Backend {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/rest/api/2/filter/my":
+			if ownedStatus != http.StatusOK {
+				w.WriteHeader(ownedStatus)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(owned))
+		case "/rest/api/2/filter/favourite":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(favourite))
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return jirabackend.New(corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client()), "Requirement")
+}
+
+func scopeOf(filters []backend.Filter, id string) (string, bool) {
+	for _, f := range filters {
+		if f.ID == id {
+			return f.Scope, true
+		}
+	}
+	return "", false
+}
+
+// The fault #346 was raised for: a filter you wrote and never starred was
+// absent from the picker, because the favourites are the only list Jira
+// stars for you.
+func TestFiltersIncludeTheOnesYouOwnAndSayWhichTheyAre(t *testing.T) {
+	b := scopedFilters(t, http.StatusOK,
+		`[{"id":"10200","name":"Mine, never starred","jql":"reporter = currentUser()"}]`,
+		`[{"id":"10100","name":"Team board","jql":"project = PLAT"}]`)
+	filters, err := b.Filters(context.Background())
+	if err != nil {
+		t.Fatalf("filters: %v", err)
+	}
+	if len(filters) != 2 {
+		t.Fatalf("filters = %+v, want the owned one and the starred one", filters)
+	}
+	if got, ok := scopeOf(filters, "10200"); !ok || got != "owned" {
+		t.Errorf("scope of the owned filter = %q (found %v), want owned", got, ok)
+	}
+	if got, ok := scopeOf(filters, "10100"); !ok || got != "shared" {
+		t.Errorf("scope of the starred filter = %q (found %v), want shared", got, ok)
+	}
+}
+
+// Starring your own filter is normal, and it must not put the same filter
+// in the picker twice.
+func TestFiltersListAFilterYouOwnAndStarredOnce(t *testing.T) {
+	b := scopedFilters(t, http.StatusOK,
+		`[{"id":"10200","name":"Mine","jql":"reporter = currentUser()"}]`,
+		`[{"id":"10200","name":"Mine","jql":"reporter = currentUser()"},{"id":"10100","name":"Team board","jql":"project = PLAT"}]`)
+	filters, err := b.Filters(context.Background())
+	if err != nil {
+		t.Fatalf("filters: %v", err)
+	}
+	if len(filters) != 2 {
+		t.Fatalf("filters = %+v, want each filter once", filters)
+	}
+	if got, _ := scopeOf(filters, "10200"); got != "owned" {
+		t.Errorf("scope = %q, want owned: owning it outranks having starred it", got)
+	}
+}
+
+// An instance with no /filter/my keeps the list it has always shown, and
+// leaves the scope off rather than guessing it, so the view knows not to
+// group what it cannot label.
+func TestFiltersFallBackToTheStarredListWithoutAScope(t *testing.T) {
+	b := scopedFilters(t, http.StatusNotFound, ``,
+		`[{"id":"10100","name":"Team board","jql":"project = PLAT"}]`)
+	filters, err := b.Filters(context.Background())
+	if err != nil {
+		t.Fatalf("filters: %v", err)
+	}
+	if len(filters) != 1 || filters[0].ID != "10100" {
+		t.Fatalf("filters = %+v, want the starred list", filters)
+	}
+	if filters[0].Scope != "" {
+		t.Errorf("scope = %q, want it left empty when the instance cannot say", filters[0].Scope)
+	}
+}
+
+// A broken instance must not read as an old one.
+func TestFiltersReportAFailedOwnedRead(t *testing.T) {
+	b := scopedFilters(t, http.StatusInternalServerError, ``, `[]`)
+	if _, err := b.Filters(context.Background()); err == nil {
+		t.Fatal("want an error when the owned list cannot be read")
 	}
 }
