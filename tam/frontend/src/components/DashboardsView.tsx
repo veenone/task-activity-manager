@@ -2,9 +2,12 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { errMsg, useConfirm, useProfile } from "@agile-suite/core";
 import {
+  AddDashboardByFilterID,
+  BrowserOpenURL,
   CreateDashboard,
   DeleteDashboard,
   ListDashboards,
+  ListJiraDashboards,
   ListJiraFilters,
   RefreshDashboard,
 } from "../api";
@@ -33,6 +36,10 @@ export function DashboardsView() {
   const queries = useQueryClient();
   const { confirm } = useConfirm();
   const [filterId, setFilterId] = useState("");
+  // The id typed into the by-id box, which is a different thing from the
+  // picker's choice: it reaches a filter the picker cannot offer at all.
+  const [typedId, setTypedId] = useState("");
+  const [jiraBoardId, setJiraBoardId] = useState("");
   const [error, setError] = useState("");
 
   const dashboards = useQuery({
@@ -50,6 +57,15 @@ export function DashboardsView() {
     retry: false,
   });
 
+  // Jira's own dashboards. The read is a signpost and its failure is
+  // reported beside where it would have drawn, not over the figures.
+  const jiraBoards = useQuery({
+    queryKey: [activeId, "jiraDashboards"],
+    queryFn: () => ListJiraDashboards(activeId),
+    enabled: activeId !== "",
+    retry: false,
+  });
+
   const done = () => {
     void queries.invalidateQueries({ queryKey: [activeId, "dashboards"] });
   };
@@ -62,6 +78,19 @@ export function DashboardsView() {
     },
     onSuccess: () => {
       setError("");
+      done();
+    },
+    onError: (e) => setError(errMsg(e)),
+  });
+
+  // Adding by id is its own mutation rather than a branch of add: the name
+  // and the JQL come back from Jira, so there is nothing to look up here
+  // first, and its failure is the id the reader typed being wrong.
+  const addById = useMutation({
+    mutationFn: () => AddDashboardByFilterID(activeId, typedId.trim()),
+    onSuccess: () => {
+      setError("");
+      setTypedId("");
       done();
     },
     onError: (e) => setError(errMsg(e)),
@@ -95,7 +124,7 @@ export function DashboardsView() {
     }
   }
 
-  const busy = add.isPending || refresh.isPending;
+  const busy = add.isPending || addById.isPending || refresh.isPending;
   const list = dashboards.data ?? [];
 
   // The picker groups the filters only when every one of them carries a
@@ -144,6 +173,67 @@ export function DashboardsView() {
           <span className="error-text">Saved filters could not be read: {errMsg(filters.error)}</span>
         )}
       </div>
+
+      {/* The second way in, for the filters the first one cannot offer. Data
+          Center enumerates the starred list and no other, so a filter its own
+          author never starred is in no list to pick from (#349). */}
+      <div className="dashboards-toolbar">
+        <label className="muted small" htmlFor="dashboard-filter-id">Filter id</label>
+        <input
+          id="dashboard-filter-id"
+          className="detail-input dashboards-filter-id"
+          value={typedId}
+          onChange={(e) => setTypedId(e.target.value)}
+          disabled={busy}
+          placeholder="25475"
+        />
+        <button
+          type="button"
+          className="btn"
+          onClick={() => addById.mutate()}
+          disabled={busy || typedId.trim() === ""}
+        >
+          Add by id
+        </button>
+        <span className="muted small">
+          For a filter you have not starred. The id is the number in its Jira URL, and Jira supplies the name.
+        </span>
+      </div>
+
+      {/* Jira's own dashboards, as a way out to them and nothing more. A Jira
+          dashboard is a page of gadgets, and Data Center will not enumerate
+          them, so there is nothing here TAM could honestly draw (#349). */}
+      {(jiraBoards.data ?? []).length > 0 && (
+        <div className="dashboards-toolbar">
+          <label className="muted small" htmlFor="jira-dashboard">Jira dashboard</label>
+          <select
+            id="jira-dashboard"
+            className="detail-input"
+            value={jiraBoardId}
+            onChange={(e) => setJiraBoardId(e.target.value)}
+          >
+            <option value="">Choose a dashboard</option>
+            {(jiraBoards.data ?? []).map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const chosen = (jiraBoards.data ?? []).find((d) => d.id === jiraBoardId);
+              if (chosen) BrowserOpenURL(chosen.url);
+            }}
+            disabled={jiraBoardId === ""}
+          >
+            Open in Jira
+          </button>
+          <span className="muted small">Opens in your browser. TAM counts saved filters, not dashboard gadgets.</span>
+        </div>
+      )}
+      {jiraBoards.isError && (
+        <p className="error-text">Jira dashboards could not be read: {errMsg(jiraBoards.error)}</p>
+      )}
 
       {/* Only when both headings are drawn. A line explaining the order of
           two groups, sitting over one group, promises a heading that is not

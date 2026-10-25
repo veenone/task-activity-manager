@@ -188,3 +188,56 @@ func TestFiltersReportAFailedFavouriteRead(t *testing.T) {
 		t.Fatal("want an error when the starred list cannot be read")
 	}
 }
+
+// A filter reached by id is one the picker could not offer: Data Center
+// enumerates the starred list and nothing else, so a filter nobody starred
+// is in no list at all.
+func TestFilterByIDReadsTheNameAndJQLBehindAnID(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		if r.URL.Path != "/rest/api/2/filter/25475" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"25475","name":"Release blockers","jql":"project = PLAT AND priority = Blocker",
+			"owner":{"name":"somebody"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	b := jirabackend.New(corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client()), "Requirement")
+
+	f, err := b.FilterByID(context.Background(), "  25475  ")
+	if err != nil {
+		t.Fatalf("filter: %v", err)
+	}
+	if path != "/rest/api/2/filter/25475" {
+		t.Errorf("path = %q, want the id trimmed before it is sent", path)
+	}
+	if f.ID != "25475" || f.Name != "Release blockers" {
+		t.Errorf("filter = %+v", f)
+	}
+	if f.JQL != "project = PLAT AND priority = Blocker" {
+		t.Errorf("jql = %q, want the filter's own words", f.JQL)
+	}
+	// No scope. The scope groups the picker, and a filter reached by id is
+	// not in the picker, so reading /myself for a label nothing draws
+	// would be a round trip spent on nothing.
+	if f.Scope != "" {
+		t.Errorf("scope = %q, want it left off a filter reached by id", f.Scope)
+	}
+}
+
+// An id nobody can see is the common mistake with this field, and it has
+// to come back as a failure rather than as an empty filter the view would
+// then try to pin.
+func TestFilterByIDReportsAnIDThisReaderCannotSee(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	b := jirabackend.New(corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client()), "Requirement")
+	if _, err := b.FilterByID(context.Background(), "999999"); err == nil {
+		t.Fatal("want an error for an id that does not resolve")
+	}
+}

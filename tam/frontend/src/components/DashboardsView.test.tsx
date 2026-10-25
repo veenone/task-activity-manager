@@ -16,9 +16,12 @@ vi.mock("../api", async () => {
     GetSettings: vi.fn(),
     ListDashboards: vi.fn(),
     ListJiraFilters: vi.fn(),
+    ListJiraDashboards: vi.fn(),
     CreateDashboard: vi.fn(),
+    AddDashboardByFilterID: vi.fn(),
     RefreshDashboard: vi.fn(),
     DeleteDashboard: vi.fn(),
+    BrowserOpenURL: vi.fn(),
   };
 });
 
@@ -76,7 +79,11 @@ beforeEach(() => {
     { id: "10100", name: "My open bugs", jql: "type = Bug AND resolution = Unresolved", scope: "owned" },
     { id: "10101", name: "Platform this quarter", jql: "project in (PLAT, OPS)", scope: "shared" },
   ]);
+  vi.mocked(api.ListJiraDashboards).mockResolvedValue([
+    { id: "25475", name: "PR Management - IST R&D", url: "https://jira.example/secure/Dashboard.jspa?selectPageId=25475" },
+  ]);
   vi.mocked(api.CreateDashboard).mockResolvedValue(dashboard({ id: "d2", name: "Platform this quarter" }));
+  vi.mocked(api.AddDashboardByFilterID).mockResolvedValue(dashboard({ id: "d3", name: "Release blockers" }));
   vi.mocked(api.RefreshDashboard).mockResolvedValue(dashboard({ snapshot: snapshot({ total: 15 }) }));
   vi.mocked(api.DeleteDashboard).mockResolvedValue();
 });
@@ -192,6 +199,61 @@ describe("DashboardsView", () => {
     // heading that is not there. This is the live Data Center case: every
     // filter a reader has starred is usually one they wrote (#348).
     expect(screen.queryByText(/Filters you own come first/)).not.toBeInTheDocument();
+  });
+
+
+  // #349: the picker holds what Jira will enumerate, which on Data Center is
+  // the starred list alone. A filter nobody starred is reachable only by the
+  // id a reader reads off its Jira URL.
+  it("pins a filter by the id typed into the box", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("region", { name: "My open bugs" });
+    await user.type(screen.getByLabelText(/Filter id/), "25475");
+    await user.click(screen.getByRole("button", { name: /Add by id/ }));
+    await waitFor(() => expect(api.AddDashboardByFilterID).toHaveBeenCalledWith("p1", "25475"));
+  });
+
+  // An id nobody can see is the common mistake with this box. It has to be
+  // reported where it was typed, and the figures already on screen stay.
+  it("reports an id Jira will not resolve and leaves the dashboards alone", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.AddDashboardByFilterID).mockRejectedValue(new Error("no filter with id 999999"));
+    renderView();
+    const panel = await screen.findByRole("region", { name: "My open bugs" });
+    await user.type(screen.getByLabelText(/Filter id/), "999999");
+    await user.click(screen.getByRole("button", { name: /Add by id/ }));
+    expect(await screen.findByText(/no filter with id 999999/)).toBeInTheDocument();
+    expect(within(panel).getByText("12")).toBeInTheDocument();
+  });
+
+  // The signpost is the whole of what TAM can do with a Jira dashboard: open
+  // it. Data Center will not enumerate a dashboard's gadgets, so there is
+  // nothing to draw here and nothing is drawn.
+  it("opens one of Jira's own dashboards in the browser", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("option", { name: "PR Management - IST R&D" });
+    await user.selectOptions(screen.getByLabelText(/Jira dashboard/), "25475");
+    await user.click(screen.getByRole("button", { name: /Open in Jira/ }));
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://jira.example/secure/Dashboard.jspa?selectPageId=25475");
+  });
+
+  // A profile with no Jira dashboards it can see, the demo among them, gets
+  // no control for them rather than an empty picker.
+  it("draws no Jira dashboard picker when there are none to open", async () => {
+    vi.mocked(api.ListJiraDashboards).mockResolvedValue([]);
+    renderView();
+    await screen.findByRole("option", { name: "My open bugs" });
+    expect(screen.queryByLabelText(/Jira dashboard/)).not.toBeInTheDocument();
+  });
+
+  // Drawing nothing because Jira could not be reached reads as a profile
+  // with no dashboards, which is a different fact.
+  it("says when Jira's own dashboards could not be read", async () => {
+    vi.mocked(api.ListJiraDashboards).mockRejectedValue(new Error("no route to host"));
+    renderView();
+    expect(await screen.findByText(/Jira dashboards could not be read/)).toBeInTheDocument();
   });
 
 });
