@@ -28,6 +28,14 @@ function read(rel: string): string {
   return fs.readFileSync(path.join(repoRoot, rel), 'utf8');
 }
 
+function git(args: string[]): string {
+  try {
+    return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+}
+
 function gitOk(args: string[]): boolean {
   try {
     execFileSync('git', args, { cwd: repoRoot, stdio: 'ignore' });
@@ -66,8 +74,17 @@ describe('instruction gate: knowledge files', () => {
       for (const m of read(file).matchAll(/\(([0-9a-f]{7,40})\)/g)) hashes.add(m[1]);
     }
     const base = defaultBranchRef();
+    // The commits on main in one read, rather than a git call per hash. Two
+    // spawns per citation ran past vitest's 5s default once the whole
+    // workspace suite was competing for the machine, and this asks the same
+    // question: a citation is an abbreviated sha, so it is on main when it
+    // prefixes one of these.
+    const onBase = git(['rev-list', base]).split('\n').filter(Boolean);
+    // M2: assert the gate read something, or an unreadable ref would fail
+    // every citation and read as thirteen bad hashes.
+    expect(onBase.length, `read no commits out of ${base}`).toBeGreaterThan(0);
     const offenders = [...hashes]
-      .filter((h) => !gitOk(['merge-base', '--is-ancestor', h, base]))
+      .filter((h) => !onBase.some((full) => full.startsWith(h)))
       .map((h) => (gitOk(['cat-file', '-e', `${h}^{commit}`]) ? `${h} (only on a branch)` : `${h} (no such commit)`));
     expect(
       offenders,
