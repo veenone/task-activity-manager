@@ -56,24 +56,33 @@ export function matchesFilter(issue: Issue, f: IssueFilter): boolean {
   return issue.assignee === (f.assignee === ASSIGNEE_NONE ? "" : f.assignee);
 }
 
-// keptKeys is which rows survive a filter, families included. A row that
-// matches brings the family it belongs to: a matching subtask keeps its
-// parent and its siblings, and a matching parent keeps its subtasks. Without
-// that, a filter would leave subtasks indented under a parent that is no
-// longer drawn, which the Family rows contract exists to prevent.
+// keptKeys is which rows survive a filter. Two predicates, because a filter
+// bar and a search box ask different questions of a family (#353):
 //
-// It takes the predicate rather than an IssueFilter because the board ANDs
-// its own text box into the same decision. Both callers get one family rule
-// this way, which is the point: the board and the sprint list drew families
-// from the same helpers and would otherwise each have their own copy of it.
-export function keptKeys(issues: Issue[], match: (i: Issue) => boolean): Set<string> {
-  const matching = new Set(issues.filter(match).map((i) => i.key));
-  const families = new Set(
-    issues.filter((i) => matching.has(i.key)).map((i) => (i.type === "subtask" ? i.parentKey : i.key)),
-  );
+// anchor says which rows select the family they belong to. narrow says which
+// rows inside a selected family are drawn, and defaults to anchor for the
+// callers that have one question.
+//
+// A subtask is drawn only when it matches narrow. Its parent is drawn either
+// way, because the Family rows contract would otherwise leave the subtask
+// indented under a row that is not there, and the parent is the only honest
+// root to give it. Siblings that match nothing stay out, which is what
+// separates this from keeping the family whole: a filter on Story used to
+// return every subtask under every story.
+//
+// The predicates are functions rather than an IssueFilter because the board
+// ANDs its own text box into the first one. Both callers get one family rule
+// this way, which is the point: the board and the sprint list would
+// otherwise each hold a copy of it.
+export function keptKeys(
+  issues: Issue[],
+  anchor: (i: Issue) => boolean,
+  narrow: (i: Issue) => boolean = anchor,
+): Set<string> {
+  const families = new Set(issues.filter(anchor).map((i) => (i.type === "subtask" ? i.parentKey : i.key)));
   return new Set(
     issues
-      .filter((i) => matching.has(i.key) || families.has(i.key) || (i.type === "subtask" && families.has(i.parentKey)))
+      .filter((i) => (i.type === "subtask" ? families.has(i.parentKey) && narrow(i) : families.has(i.key)))
       .map((i) => i.key),
   );
 }

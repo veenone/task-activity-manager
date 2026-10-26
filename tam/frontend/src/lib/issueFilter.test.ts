@@ -101,17 +101,23 @@ describe("typeChips", () => {
 describe("filterIssues", () => {
   const parent = issue({ key: "PLAT-1", type: "story", assignee: "R. Anand" });
   const sub = issue({ key: "PLAT-2", type: "subtask", parentKey: "PLAT-1", assignee: "S. Kim" });
+  const sibling = issue({ key: "PLAT-4", type: "subtask", parentKey: "PLAT-1", assignee: "R. Anand" });
   const other = issue({ key: "PLAT-3", type: "bug", assignee: "M. Ortiz" });
-  const rows = [parent, sub, other];
+  const rows = [parent, sub, sibling, other];
 
   // The Family rows contract: a subtask is drawn indented under its parent, so
   // keeping the subtask without the parent would indent a row under nothing.
-  it("keeps the parent of a matching subtask", () => {
+  // The parent is the only row drawn without matching, and only for that.
+  it("keeps the parent of a matching subtask, and not its siblings", () => {
     expect(filterIssues(rows, { ...NO_FILTER, assignee: "S. Kim" }).map((i) => i.key)).toEqual(["PLAT-1", "PLAT-2"]);
   });
 
-  it("keeps the subtasks of a matching parent", () => {
-    expect(filterIssues(rows, { ...NO_FILTER, assignee: "R. Anand" }).map((i) => i.key)).toEqual(["PLAT-1", "PLAT-2"]);
+  it("drops the subtasks of a matching parent that do not match", () => {
+    expect(filterIssues(rows, { ...NO_FILTER, assignee: "R. Anand" }).map((i) => i.key)).toEqual(["PLAT-1", "PLAT-4"]);
+  });
+
+  it("draws a matching parent alone when no subtask of it matches", () => {
+    expect(filterIssues(rows, { ...NO_FILTER, types: ["story"] }).map((i) => i.key)).toEqual(["PLAT-1"]);
   });
 
   it("drops a family nothing in it matches", () => {
