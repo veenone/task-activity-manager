@@ -661,6 +661,13 @@ toolbar** appears above the grid:
   remove** works like Labels…. **Replace all** sets every selected test to the
   components you pick; picking none clears them. The line under the pickers
   says how many tests will change.
+- **Replace step text…** — find a string in the steps of every selected test
+  and replace it across them. Tick which of **Action**, **Data** and
+  **Expected** to search, and narrow it with **Match case** and **Whole word**.
+  **Find matches** writes nothing: it lists one row per matching step field
+  with the text now and the text after, and any row can be unticked before you
+  click **Replace**. Tests with no match are counted below the list and are
+  never written to.
 - **Bulk transition…** — move all selected tests through a workflow transition.
 - **Allocate…** — add the selected tests to a Test Set / Plan / Execution.
 - **Move to folder…** — re-file into a Test Repository folder.
@@ -680,7 +687,9 @@ changes rather than writing straight to Jira.*
 
 The **Preconditions** tab is a dedicated surface for managing Xray
 Preconditions. The left side is a filterable **card list**; selecting a card
-opens its detail on the right.
+opens its detail on the right. Each card carries the precondition's key, its
+type, its summary, its workflow status and the number of tests that use it, and
+**Sort** orders the list by Key, Type, Status or Usage.
 
 ![Figure 16: Preconditions view](images/16-preconditions.png)
 *Figure 16 — Preconditions: card list (left) with a detail pane (right) for the
@@ -917,6 +926,40 @@ and a run-comment update).
 *Figure 55 — A Test Execution's member table with the **Defects** column (linked
 bug chips and the ＋ picker) and the editable **Remarks** column.*
 
+### A test with a dataset
+
+A member test that uses a dataset expands into one result per parameter
+combination, on a live Xray profile as well as on a demo one. The header says
+how many iterations are finished and which dataset the run took its rows from.
+Steps arrive one call per iteration, so a long dataset takes a moment to fill
+in.
+
+Each iteration row carries the values it ran with and its result, and expanding
+one shows its steps with those values already substituted. Pick a result in an
+iteration's **Result** column to record it.
+
+- On a live Xray profile the result reaches Xray as you pick it, rather than
+  waiting for a commit. A refused write is reported above the table and leaves
+  the result as it was. The first thing to check is whether the Test Execution
+  is closed: a closed one refuses the write with a 403 that names a permission,
+  where the cause is the execution's state.
+- The change is also listed under Pending changes. Committing it finds Xray
+  already holding that result and clears the row without writing again, or
+  holds it as a **Dataset iteration result** conflict if somebody moved that
+  iteration to a third result in between.
+- Xray derives the test's own run result from its iterations, so the
+  **Execution** column follows what Xray settled on rather than a value XTM
+  works out for itself.
+- A step's result is a demo-only control. Xray gives a step inside an iteration
+  no id of its own, so there is nothing for a step write to address, and
+  picking a step result on a live profile reports that it is unsupported.
+- A dataset of one row produces no iterations, because Xray keeps that run's
+  parameters on the run itself. Record its result in the test's own
+  **Execution** column.
+
+A backend that reports no write support marks the panel **Read-only results**
+and shows each result as a badge instead of a dropdown.
+
 ### Import JUnit XML results
 
 You can update run results in bulk by importing a **JUnit-compatible XML** report.
@@ -932,6 +975,14 @@ view:
   enter the execution summary, optionally tick **Create missing tests** (any
   testcase with no matching test is created first), then pick the file. All tests
   are allocated to the new execution and given their results.
+
+For a parameterized test, add one JUnit `<property>` for every dataset
+parameter, so the testcase names a full parameter combination. XTM matches that
+signature to one iteration and records the result against it. If the signature
+matches more than one iteration, or the dataset has changed since the run, the
+result is kept as a conflict rather than written to the wrong iteration. A new
+execution has no server run ids until it exists, so the signature is stored and
+resolved on commit.
 
 Either way the work is queued as pending changes and a preview shows what will be
 applied before you commit. See [Committing changes](#committing-changes-to-jira).
