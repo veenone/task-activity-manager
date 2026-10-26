@@ -39,13 +39,39 @@ In the same row you can:
 - On a FAIL row, click the bug button to create a bug for the failed test.
 - Click **✕** to remove the test from the execution.
 
-When a test uses a dataset, expand its row to see one result for each
-parameter combination. Each iteration shows the values it used and its steps
-with those values filled in. On the Demo2 profile, you can change an iteration
-or step result and commit it from the Pending list. On a live Xray connection,
-these controls appear only when the backend reports verified write support for
-parameterized runs. Other connections show the results as read-only and keep
-any local pending data.
+### A test with a dataset
+
+When a test uses a dataset, expand its row to see one result for each parameter
+combination. This reads from a live Xray profile as well as from a demo one.
+The header says how many iterations are finished and which dataset the run took
+its rows from. Steps arrive one call per iteration, so a long dataset takes a
+moment to fill in.
+
+Each iteration row carries the values it ran with and its result, and expanding
+one shows its steps with those values already substituted. Pick a result in an
+iteration's **Result** column to record it.
+
+- On a live Xray profile the result reaches Xray as you pick it, rather than
+  waiting for a commit. A refused write is reported above the table and leaves
+  the result as it was.
+- The change is also listed under Pending changes. Committing it finds Xray
+  already holding that result and clears the row without writing again. If
+  somebody moved that iteration to a third result in between, your change is
+  held as a conflict labelled **Dataset iteration result** rather than
+  overwriting theirs.
+- Xray decides the test's own run result from its iterations. XTM re-reads the
+  run after each write instead of working that out for itself, so the
+  **Execution** column shows what Xray settled on.
+- A step's result is a demo-only control. Xray gives a step inside an iteration
+  no id of its own, so there is nothing for a step write to address, and
+  picking a step result on a live profile reports that it is unsupported.
+- A dataset of one row produces no iterations. Xray keeps that run's parameters
+  on the run itself, so record the result in the test's own **Execution**
+  column.
+
+A backend that reports no write support at all marks the panel **Read-only
+results** and shows each result as a badge instead of a dropdown, keeping any
+local pending data.
 
 ### Many tests at once
 
@@ -144,3 +170,5 @@ Click **Bugs** in the toggle at the top left to list the defects linked to your 
 - **"You don't have any Test Sets yet."** Create one, or sync, or generate sample data on a demo profile.
 - **The run columns are missing.** They only show for Test Executions.
 - **A JUnit testcase is skipped as ambiguous.** Several tests share that summary. Rename the duplicates (see [Duplicates](04-duplicates.md)) and import again.
+- **An iteration result is refused with 403, "Current user does not have permissions to execute the Test Run".** Check whether the Test Execution is closed. The same account writes to an open execution without trouble, so the message names a permission when the cause is usually the execution's state.
+- **A step result will not save on a live profile.** Only a demo profile can set one. Xray exposes no id for a step result, so XTM has nothing to address the write to.

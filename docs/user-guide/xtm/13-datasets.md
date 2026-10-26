@@ -74,6 +74,10 @@ From an expanded row:
 The catalog is read-only. Edit a default dataset from the Test detail panel.
 You cannot edit Plan or Execution overrides from this view.
 
+Results are not recorded here either. A dataset test's row in a Test Execution
+expands into one result per iteration, in
+[Containers](09-containers.md#a-test-with-a-dataset).
+
 The editor supports Text parameters and ad-hoc List parameters. List options
 are stored with the Test dataset. A parameter bound to an existing predefined
 Jira list keeps that binding unless you confirm converting it to an ad-hoc
