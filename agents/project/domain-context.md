@@ -69,29 +69,29 @@ commit hash behind it; the instruction gate checks the hash exists.
   `{startAt, maxResults, total, prev, next, dashboards:[{id, name, self,
   view}]}`. `view` is the URL of the dashboard's page, built by Jira from the
   base URL the instance is configured with, so it is handed on rather than
-  rebuilt from the address TAM connects to (a7a5b530).
+  rebuilt from the address TAM connects to (c3987fbd).
 - The route documents `startAt` as having to be zero or a multiple of
   `maxResults`, and says to read `maxResults` back out of the answer because
   the server imposes its own limit. Advancing by what the page actually held
   satisfies both. A short page is the last one the server will serve, so it
-  ends the walk even when `total` claims more (a7a5b530).
+  ends the walk even when `total` claims more (c3987fbd).
 - `GET /rest/api/2/filter/{id}` is present and answers any filter the reader
   can see, with `name`, `jql` and `owner`. It is the only way to reach a
   filter nobody starred, since the starred list is the only one Data Center
-  will enumerate (b0aae343).
+  will enumerate (c3987fbd).
 
 ## Jira worklogs
 
 - An issue's worklog comes from `GET /rest/api/2/issue/{key}/worklog`, which
   pages. A search's `fields=worklog` caps at 20 entries per issue and says
   nothing about the rest, so an issue worked on for a month would read as one
-  worked on for a week (6400c42).
+  worked on for a week (57c4107c).
 - `started` is an offset-carrying stamp, `2026-09-29T01:00:00.000+0700`, and
   Jira files the entry under the day that offset makes of it. Sending the same
   instant as UTC moves the work to the day before for anyone east of
   Greenwich, which is then wrong in every Jira report that groups by day, the
   main reason people log work at all. TAM formats it from the machine's own
-  clock with `2006-01-02T15:04:05.000-0700` and sends it verbatim (6400c42).
+  clock with `2006-01-02T15:04:05.000-0700` and sends it verbatim (57c4107c).
 - Jira parses the duration phrase itself and refuses a zero or unparseable
   one with a 400, which without a check of its own would surface at Commit
   rather than at the keystroke. A day and a week inside a duration are
@@ -99,7 +99,7 @@ commit hash behind it; the instruction gate checks the hash exists.
   `ParseWorkSeconds` assumes for the total TAM shows beside an entry it has not
   pushed yet. Jira's own seconds replace that reading once Commit has landed
   it, so a non-default instance reads a pending `1d` a little high rather than
-  reporting a wrong number for ever (55129be).
+  reporting a wrong number for ever (57c4107c).
 
 ## Jira issue types
 
@@ -130,11 +130,11 @@ commit hash behind it; the instruction gate checks the hash exists.
   instance seen in the field answers six fields for every type of a project,
   story and sub-task alike: summary, priority, reporter, description, labels
   and assignee. Story Points is not among them, although it reads fine on the
-  issue and exists in the instance's field list (a0672d1). A field list is not
+  issue and exists in the instance's field list (1bfc2ee3). A field list is not
   a screen.
 - The editmeta payload is the same `fields` map keyed by field id that the
   classic create-meta call returns, so `MetaField` and `MetaSchema` read both
-  (09ab90a).
+  (1bfc2ee3).
 - The edit screen and the create screen are separate configurations and a
   field can be on one and not the other, so neither answer stands in for the
   other.
@@ -152,7 +152,7 @@ commit hash behind it; the instruction gate checks the hash exists.
   and that says nothing rather than no.
 - A screen that cannot be read is not an empty screen. Treating a failed
   editmeta read as "nothing is editable" would refuse every field on a 403;
-  the write goes and Jira's own refusal decides (a0672d1).
+  the write goes and Jira's own refusal decides (1bfc2ee3).
 
 ## Jira board configuration
 
