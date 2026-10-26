@@ -18,7 +18,14 @@ APP_DIR=${GT_APP_DIR:-.}                            # ADAPT: where the test comm
 UNIT_TEST_RE=${GT_UNIT_TEST_RE:-'(_test\.go|_test\.py|/test_[^/]+\.py|\.test\.[jt]sx?|_spec\.rb|Test\.java|Tests?\.cs|_test\.rs)$'}
 TEST_SUPPORT_RE=${GT_TEST_SUPPORT_RE:-'(^|/)(tests?|__tests__|spec|testdata|fixtures)/|conftest\.py$|/setup\.(ts|js)$|^scripts/'}
 NON_CODE_RE=${GT_NON_CODE_RE:-'^(docs/|agents/|\.github/|\.githooks/|Makefile$|\.ratchet-|.*\.(md|rst|txt|yml|yaml)$|.*baseline.*\.json$)'}
-SKIP_TYPES='docs chore ci refactor build style test'
+# "deps" is here because .github/dependabot.yml sets commit-message prefix
+# "deps", so every bump the bot raises carries a type this gate used to reject
+# outright: a lock file and a package.json are code by NON_CODE_RE, no test
+# sits beside them, and there is no test a dependency refresh could have been
+# red about. #292 and the first push of #345 both failed on exactly that. What
+# proves a bump is the suite and the gates running against the new tree, which
+# every other job on the PR already does.
+SKIP_TYPES='docs chore ci refactor build style test deps'
 # ADAPT: run only the given test files. This repo is two languages, so the list
 # is split by extension and each half goes to its own runner. Handing a .test.ts
 # to `go test` is not a harmless no-op: it exits non-zero with "no Go files",
