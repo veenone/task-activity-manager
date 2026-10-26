@@ -3,4 +3,8 @@
 # Cheap gates only; CI re-runs everything, so a skipped hook merges nothing new.
 set -e
 sh scripts/ratchet.sh
-cd frontend/core && npx vitest run src/instruction-gate.test.ts
+# The prefix, not the one file. The gate is split across five files now, each
+# one a cut made when the file before it hit the 400-line limit, and naming
+# one of them skipped the other four here. `make instruction` has always run
+# the prefix; this line had not been updated since the first split (#355).
+cd frontend/core && npx vitest run src/instruction-gate
