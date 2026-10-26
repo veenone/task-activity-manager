@@ -10,6 +10,39 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Dataset iterations on a live Xray profile**
+- A dataset test's row in a Test Execution expands on a live Xray profile and
+  not only on a demo one (#334). The member table reads the run through
+  `GetParameterizedRun`, which answered unsupported off demo and invented
+  statuses from a PASS/FAIL/TODO cycle on it.
+- Steps come only from the per-iteration resource, so reading a whole run
+  costs one call per iteration. A step carries no status of its own, so it
+  shows the iteration's, and Xray substitutes the row's values before it
+  answers, so the text is left as it arrives rather than substituted twice.
+- An iteration's result can be written back (#336), which was the last thing
+  in XTM that worked on demo and refused on live. The status goes in the body
+  of the iteration resource; the `.../status?status=PASS` route the run
+  resource suggests does not exist.
+- The run is re-read after a write rather than patched, because Xray derives
+  the run's own status from its iterations by a rule XTM does not own. A
+  failed re-read is logged instead of returned: the write reached Xray, so
+  only the derived status is stale and the next read fixes it.
+- A step result stays demo only. The read gives steps with no id and the write
+  answers with an empty `stepResults` array, so nothing exposes a step-result
+  id to address one to.
+- Found on the live run and worth knowing: **a closed Test Execution refuses
+  the write with 403**, `Current user does not have permissions to execute the
+  Test Run`. The same write on an open execution from the same account
+  succeeds, so the message names a permission when the cause is the
+  execution's state.
+
+**The status bar says whether the store is up, and which theme is in force**
+- The left of the status bar carries a glyph and the words beside it, reading
+  **Local store ready** or **Starting up** (#330), and the right says which
+  theme is in force. Both are what TAM's status bar already showed.
+- The theme reading is worth having on **System**, where the menu says System
+  and the status bar says what System resolved to.
+
 **Sync failure ribbon**
 - A failed sync is drawn as a ribbon across the status bar rather than as red
   text in its corner (#313), coloured from the danger tokens and growing to
