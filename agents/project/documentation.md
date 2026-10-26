@@ -22,4 +22,10 @@ Read before editing user or developer documentation.
 - Developer docs cite AGENTS.md rule IDs or AGENTS.project.md contract
   names instead of copying process rules.
 - Reports and retrospectives are documentation; every rule above applies.
-  Claims cite their commit, verified to exist before citing.
+- A claim cites the commit on the default branch that landed the work, not one
+  from the branch it was written on. This repo squash-merges, so a branch
+  commit is never on main and resolves only while the branch is kept. Work
+  being landed cites its issue or PR number instead, because its own hashes
+  will not survive the merge. Existing was the old test and it passed for six
+  citations that main did not have (#355). Gate: the instruction gate's hash
+  check, which measures reachability from main.

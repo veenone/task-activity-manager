@@ -3,16 +3,16 @@
  *
  * The instruction files are read by every session, so they are checked like
  * code: every name a contract cites exists, the portable core stays portable,
- * the always-loaded files stay small, cited commits exist, and no private data
- * leaks into knowledge files. The grep gates at the bottom are the contract
- * Never clauses a text search settles and that are clean today; clauses with a
- * backlog live in the ratchet instead, so this file never carries an allowed
- * number.
+ * and the always-loaded files stay small. The grep gates at the bottom are the
+ * contract Never clauses a text search settles and that are clean today;
+ * clauses with a backlog live in the ratchet instead, so this file never
+ * carries an allowed number.
  *
  * It lives in frontend/core so `npm test --workspaces` runs it, which CI
  * already does. It checks repo-root files, not this package. The Store
- * schema and purge contract is checked in instruction-gate.store.test.ts,
- * which split off when this file reached the 400-line limit.
+ * schema and purge contract is checked in instruction-gate.store.test.ts and
+ * the knowledge files in instruction-gate.knowledge.test.ts, both of which
+ * split off when this file reached the 400-line limit.
  */
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -36,13 +36,6 @@ const FORBIDDEN_IN_CORE = [
 const WORD_BUDGET = 2500;
 const ALWAYS_LOADED = ['AGENTS.md', 'AGENTS.project.md', 'CLAUDE.md'];
 const MIN_CONTRACTS = 6;
-const KNOWLEDGE_FILES = [
-  'agents/project/domain-context.md',
-  'agents/project/glossary.md',
-  'agents/project/out-of-scope.md',
-  'agents/project/testing.md',
-  'agents/generic/claude-workflows.md',
-];
 /**
  * Class names a stylesheet in this repo never defines, and should not.
  * ProseMirror and its plugins set their own classes on nodes we render.
@@ -90,15 +83,6 @@ function git(args: string[]): string {
     return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
   } catch {
     return '';
-  }
-}
-
-function gitOk(args: string[]): boolean {
-  try {
-    execFileSync('git', args, { cwd: repoRoot, stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -172,27 +156,6 @@ describe('instruction gate', () => {
       words,
       `always-loaded instruction files are ${words} words, budget ${WORD_BUDGET}`,
     ).toBeLessThanOrEqual(WORD_BUDGET);
-  });
-
-  it('every commit hash cited in a knowledge file exists', () => {
-    const hashes = new Set<string>();
-    for (const file of KNOWLEDGE_FILES) {
-      if (!fs.existsSync(path.join(repoRoot, file))) continue;
-      for (const m of read(file).matchAll(/\(([0-9a-f]{7,40})\)/g)) hashes.add(m[1]);
-    }
-    const missing = [...hashes].filter((h) => !gitOk(['cat-file', '-e', `${h}^{commit}`]));
-    expect(missing, `knowledge files cite commits that do not exist: ${missing.join(', ')}`).toEqual([]);
-  });
-
-  it('knowledge files carry no email or IP address', () => {
-    const offenders: string[] = [];
-    for (const file of KNOWLEDGE_FILES) {
-      if (!fs.existsSync(path.join(repoRoot, file))) continue;
-      const text = read(file);
-      if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(text)) offenders.push(`${file}: email`);
-      if (/\b\d{1,3}(\.\d{1,3}){3}\b/.test(text)) offenders.push(`${file}: IP address`);
-    }
-    expect(offenders, offenders.join('; ')).toEqual([]);
   });
 
   it.each(GREP_GATES)('$name', ({ dirs, ext, pattern, exempt }) => {
