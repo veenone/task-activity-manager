@@ -260,26 +260,28 @@ Earlier releases added commit **conflict management** (three-way merge),
 
 1. [Installation & first launch](#installation-first-launch)
 2. [Connecting to Jira (profiles)](#connecting-to-jira-profiles)
-3. [Demo mode — try it without Jira](#demo-mode-try-it-without-jira)
-4. [The main window](#the-main-window)
-5. [Browsing tests](#browsing-tests)
-6. [Viewing & editing a test](#viewing-editing-a-test)
-7. [Creating & importing tests](#creating-importing-tests)
-8. [Bulk operations](#bulk-operations)
-9. [Preconditions](#preconditions)
-10. [Requirements & coverage](#requirements-coverage)
-11. [Finding duplicates](#finding-duplicates)
-12. [Test Sets, Plans & Executions (Containers)](#test-sets-plans-executions-containers)
+   - [Demo mode, without a Jira connection](#demo-mode-try-it-without-jira)
+3. [The main window](#the-main-window)
+4. [Browsing tests](#browsing-tests)
+5. [Viewing & editing a test](#viewing-editing-a-test)
+6. [Creating & importing tests](#creating-importing-tests)
+7. [Bulk operations](#bulk-operations)
+8. [Preconditions](#preconditions)
+9. [Requirements & coverage](#requirements-coverage)
+10. [Finding duplicates](#finding-duplicates)
+11. [Test Sets, Plans & Executions (Containers)](#test-sets-plans-executions-containers)
+12. [Datasets](#datasets)
 13. [Defect tracking](#defect-tracking)
 14. [Dashboard](#dashboard)
 15. [Traceability](#traceability)
 16. [Gap analysis](#gap-analysis)
 17. [Coverage module](#coverage-module)
-18. [Committing changes to Jira](#committing-changes-to-jira)
-19. [Syncing](#syncing)
-20. [Settings & profile management](#settings-profile-management)
-21. [Diagnostics & troubleshooting](#diagnostics-troubleshooting)
-22. [Glossary](#glossary)
+18. [Spellcheck](#spellcheck)
+19. [Committing changes to Jira](#committing-changes-to-jira)
+20. [Syncing](#syncing)
+21. [Settings & profile management](#settings-profile-management)
+22. [Diagnostics & troubleshooting](#diagnostics-troubleshooting)
+23. [Glossary](#glossary)
 
 ---
 
@@ -661,6 +663,13 @@ toolbar** appears above the grid:
   remove** works like Labels…. **Replace all** sets every selected test to the
   components you pick; picking none clears them. The line under the pickers
   says how many tests will change.
+- **Replace step text…** — find a string in the steps of every selected test
+  and replace it across them. Tick which of **Action**, **Data** and
+  **Expected** to search, and narrow it with **Match case** and **Whole word**.
+  **Find matches** writes nothing: it lists one row per matching step field
+  with the text now and the text after, and any row can be unticked before you
+  click **Replace**. Tests with no match are counted below the list and are
+  never written to.
 - **Bulk transition…** — move all selected tests through a workflow transition.
 - **Allocate…** — add the selected tests to a Test Set / Plan / Execution.
 - **Move to folder…** — re-file into a Test Repository folder.
@@ -680,7 +689,9 @@ changes rather than writing straight to Jira.*
 
 The **Preconditions** tab is a dedicated surface for managing Xray
 Preconditions. The left side is a filterable **card list**; selecting a card
-opens its detail on the right.
+opens its detail on the right. Each card carries the precondition's key, its
+type, its summary, its workflow status and the number of tests that use it, and
+**Sort** orders the list by Key, Type, Status or Usage.
 
 ![Figure 16: Preconditions view](images/16-preconditions.png)
 *Figure 16 — Preconditions: card list (left) with a detail pane (right) for the
@@ -917,6 +928,40 @@ and a run-comment update).
 *Figure 55 — A Test Execution's member table with the **Defects** column (linked
 bug chips and the ＋ picker) and the editable **Remarks** column.*
 
+### A test with a dataset
+
+A member test that uses a dataset expands into one result per parameter
+combination, on a live Xray profile as well as on a demo one. The header says
+how many iterations are finished and which dataset the run took its rows from.
+Steps arrive one call per iteration, so a long dataset takes a moment to fill
+in.
+
+Each iteration row carries the values it ran with and its result, and expanding
+one shows its steps with those values already substituted. Pick a result in an
+iteration's **Result** column to record it.
+
+- On a live Xray profile the result reaches Xray as you pick it, rather than
+  waiting for a commit. A refused write is reported above the table and leaves
+  the result as it was. The first thing to check is whether the Test Execution
+  is closed: a closed one refuses the write with a 403 that names a permission,
+  where the cause is the execution's state.
+- The change is also listed under Pending changes. Committing it finds Xray
+  already holding that result and clears the row without writing again, or
+  holds it as a **Dataset iteration result** conflict if somebody moved that
+  iteration to a third result in between.
+- Xray derives the test's own run result from its iterations, so the
+  **Execution** column follows what Xray settled on rather than a value XTM
+  works out for itself.
+- A step's result is a demo-only control. Xray gives a step inside an iteration
+  no id of its own, so there is nothing for a step write to address, and
+  picking a step result on a live profile reports that it is unsupported.
+- A dataset of one row produces no iterations, because Xray keeps that run's
+  parameters on the run itself. Record its result in the test's own
+  **Execution** column.
+
+A backend that reports no write support marks the panel **Read-only results**
+and shows each result as a badge instead of a dropdown.
+
 ### Import JUnit XML results
 
 You can update run results in bulk by importing a **JUnit-compatible XML** report.
@@ -932,6 +977,14 @@ view:
   enter the execution summary, optionally tick **Create missing tests** (any
   testcase with no matching test is created first), then pick the file. All tests
   are allocated to the new execution and given their results.
+
+For a parameterized test, add one JUnit `<property>` for every dataset
+parameter, so the testcase names a full parameter combination. XTM matches that
+signature to one iteration and records the result against it. If the signature
+matches more than one iteration, or the dataset has changed since the run, the
+result is kept as a conflict rather than written to the wrong iteration. A new
+execution has no server run ids until it exists, so the signature is stored and
+resolved on commit.
 
 Either way the work is queued as pending changes and a preview shows what will be
 applied before you commit. See [Committing changes](#committing-changes-to-jira).
@@ -993,7 +1046,89 @@ project admin rights, Jira refuses the change and the tab says so.
 
 ---
 
-## 12. Defect tracking
+## 12. Datasets
+
+The **Datasets** tab lists the parameterized tests in the selected profile, one
+row per test, with the test's own default dataset, its Plan and Execution
+overrides, and the containers that use it. The tab appears only on a backend
+that reports dataset support.
+
+### Build the catalog
+
+Open **View → Datasets** and click **Scan datasets**. A normal profile sync
+does not build this catalog: XTM has to inspect the project's tests, Plans and
+Executions one at a time, so the scan is a step of its own.
+
+The scan only reads. It edits no test and queues no pending change. The previous
+catalog stays usable while a new scan runs, and a scan that fails or is
+cancelled leaves the last complete snapshot in place rather than replacing it
+with partial results. A view saying the project has not been scanned means this
+profile has no successful snapshot yet.
+
+The timestamp on the view is when that snapshot was taken. It does not track
+Jira live, so a change made since then shows up only after another scan.
+
+### Read a test group
+
+Each row is one test, not a reusable project-level dataset. Expand it for one
+card per scope that exists:
+
+- **Default dataset** — the parameters and rows defined on the test.
+- **Plan overrides** — a different dataset for that test, defined in a Test
+  Plan.
+- **Execution overrides** — a different dataset for that test, defined in a
+  Test Execution.
+- **Used by** — every synced Plan and Execution that holds the test. Click a
+  container key to open it.
+
+A usage reading **Inherited default** uses the test's own dataset, **Override**
+has its own definition for that container, and **Override only** means the test
+has no default while a Plan or Execution defines one.
+
+Plan exports carry no parameter type metadata, so a type XTM cannot read is
+shown as unknown.
+
+### Profile and project boundaries
+
+The selected profile decides what the catalog holds: tests owned by the
+profile's Jira project, plus tests from another project that one of the
+profile's Plans or Executions uses. Those are marked **External**.
+
+An external test may not be in the local Browse cache. Its dataset preview and
+its Jira action still work, but **Open Test** is hidden, because it would open
+an empty local view.
+
+### Find and open related work
+
+Search by test key, summary, Plan key or Execution key. **Dataset scope**
+narrows the list to defaults, Plan overrides or Execution overrides, and **Test
+ownership** switches between project-owned and external tests.
+
+From an expanded row, **Open Test** opens it in Browse when XTM holds it
+locally, a Plan or Execution link opens that container in Containers, and
+**Open _key_ in Jira** opens the issue on the configured Jira site.
+
+### Where editing and results happen
+
+The catalog is read-only. Edit a test's default dataset from its detail panel in
+Browse, below the steps, where **Add row** adds an iteration and the arrows at
+the end of a row set the order the iterations run in. Plan and Execution
+overrides cannot be edited from XTM at all.
+
+The editor takes Text parameters and ad-hoc List parameters, and stores a list's
+options with the test's dataset. A parameter bound to an existing predefined
+Jira list keeps that binding until you confirm converting it to an ad-hoc list;
+XTM never creates, edits or deletes a project list. A CSV import matches columns
+to existing parameters by name, so those keep their list metadata, and a column
+matching no parameter becomes Text.
+
+Run results are not recorded here. A dataset test's row in a Test Execution
+expands into one result per iteration: see
+[A test with a dataset](#a-test-with-a-dataset).
+
+---
+
+## 13. Defect tracking
 
 When a test fails you can raise and track a defect (bug) for it without leaving
 the app. Defect tracking spans three places:
@@ -1055,7 +1190,7 @@ Execution.*
 
 ---
 
-## 13. Dashboard
+## 14. Dashboard
 
 The **Dashboard** tab summarizes the cached project from the local cache: total
 tests, pending changes, and breakdowns by status, priority, folder, label,
@@ -1073,7 +1208,7 @@ their own [Traceability](#traceability) tab.
 
 ---
 
-## 14. Traceability
+## 15. Traceability
 
 The **Traceability** tab holds three Sankey diagrams behind a tab bar; each keeps
 its own filters and only one shows at a time. Hover any node to trace its
@@ -1115,7 +1250,7 @@ Parent filter.*
 
 ---
 
-## 15. Gap analysis
+## 16. Gap analysis
 
 The **Gap Analysis** tab compares two sets of tests and reports what each one is
 missing, so coverage gaps — between two projects, or between a spreadsheet and a
@@ -1157,7 +1292,7 @@ in target**, **Total gap**) plus two lists:
 
 ---
 
-## 16. Coverage module
+## 17. Coverage module
 
 The **Coverage** tab is an opt-in, local-only workspace for **parameter-level
 test coverage** and **cross-project functional-requirement reuse**. It is hidden
@@ -1215,7 +1350,68 @@ admin.
 
 ---
 
-## 17. Committing changes to Jira
+## 18. Spellcheck
+
+**Spellcheck** scans your synced tests for typos in the summary, the
+description, and the Gherkin or Generic definition text. Every fix is queued as
+a pending change, so nothing reaches Jira until you commit. Open it from the
+**Spellcheck** tab or the **View** menu.
+
+### Scan for typos
+
+Click **Scan for typos**; the button reads **Scanning…** while it runs. When
+it finishes, the number of findings appears beside the button and the table
+fills in. Each row is one finding: the test, the field, the word, a snippet of
+its context, and the suggested replacements.
+
+![Figure 56: Spellcheck findings](images/spellcheck-02-results.png)
+*Figure 56 — The Spellcheck table after a scan, one row per finding.*
+
+Technical terms such as `csv` or `api` are reported too. Ignore one once and it
+stops appearing.
+
+### Fix one finding
+
+Clicking a suggestion in the **Suggestions** column replaces the word and queues
+the change. To see more first, click the row: a panel opens on the right with
+the suggestions, a **Replace with** box, the full context, and **Ignore word**.
+Type a replacement and the panel shows the text before and after it;
+**Replace** queues it.
+
+![Figure 57: A replacement previewed](images/spellcheck-04-replace-preview.png)
+*Figure 57 — The finding panel, previewing the text before and after the
+replacement.*
+
+### Fix or ignore many findings
+
+Tick one finding and XTM selects every finding of the same word, so a single
+tick can select hundreds of rows. The bar above the table says how many
+findings and how many words are selected.
+
+With one word selected, pick a suggestion beside **Replace all:**, or type into
+**Replace all with…** and click **Replace all**. **Ignore selected** ignores
+the selected words instead, and **Clear** deselects everything.
+
+![Figure 58: Every csv finding selected](images/spellcheck-05-bulk.png)
+*Figure 58 — One tick selected every finding of the same word.*
+
+### The ignore list
+
+**Ignore** on a row, **Ignore word** in the panel and **Ignore selected** in the
+bar all add words to the ignore list, and an ignored word is skipped by every
+later scan. **Ignore list** opens it: **Add a word to ignore…** adds a word,
+**Filter…** finds one, a word's remove button takes it off, and **Done**
+closes the dialog. The ignore list is shared by all of your profiles.
+
+![Figure 59: The ignore list](images/spellcheck-06-ignore-list.png)
+*Figure 59 — The ignore list, which every profile shares.*
+
+The table is a snapshot of the last scan, so scan again after fixing a batch. A
+word you fixed is still the old word in Jira until you commit.
+
+---
+
+## 19. Committing changes to Jira
 
 All edits — field changes, steps, transitions, links, bugs, new entities,
 deletions — are queued locally as **pending changes**. Nothing reaches Jira
@@ -1240,7 +1436,7 @@ reported per test:
 
 ---
 
-## 18. Syncing
+## 20. Syncing
 
 **Sync** pulls the latest tests from Jira into the local cache. The status bar
 shows progress per phase (tests, folders, preconditions, containers,
@@ -1286,7 +1482,7 @@ full sync.
 
 ---
 
-## 19. Settings & profile management
+## 21. Settings & profile management
 
 The **Profile** menu (top-left) manages the active profile:
 
@@ -1308,7 +1504,7 @@ Switch the **color theme** from **More → Theme: Light / Dark / System**.
 
 ---
 
-## 20. Diagnostics & troubleshooting
+## 22. Diagnostics & troubleshooting
 
 **More → Diagnostics** shows the test cache database path (your profiles live
 in the shared `agile-suite/profiles.db`, whose path appears in the exported
@@ -1323,7 +1519,7 @@ reporting an issue.
 | Blank window on launch | Install the Microsoft WebView2 runtime, relaunch. |
 | "Backend failed to start" | Note the DB/log path shown, check the log; try removing the test cache database (`xtm.db`) and relaunching; this does not touch your profiles, which live in the shared `agile-suite/profiles.db`. |
 | Sync shows 0 tests | Check the project key and that the PAT has access; confirm the scope JQL isn't excluding everything. |
-| Edits not in Jira | They are local until you **Commit** (see §17). Check the pending badge. |
+| Edits not in Jira | They are local until you **Commit** (see §19). Check the pending badge. |
 | A commit reports **Conflict** | Sync, then override or keep-remote in the Pending Changes dialog. |
 | Token rejected | Rotate it with **Profile → Set token…**. |
 
