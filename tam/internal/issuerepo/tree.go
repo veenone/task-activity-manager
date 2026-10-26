@@ -164,18 +164,16 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 	// sprint clause and for the same reason: the reads below stop at
 	// treeCap, so a Go-side filter would narrow whichever rows the cap let
 	// through and the counts would describe a different set than the tree.
-	for _, f := range []struct {
-		column string
-		values []string
-	}{
-		{"type", q.Types},
-		{"status", q.Statuses},
-		{"assignee", q.Assignees},
-	} {
-		if clause, in := inClause(f.column, f.values); clause != "" {
-			where = append(where, clause)
-			args = append(args, in...)
-		}
+	if narrow, narrowArgs := narrowRows(q.Types, q.Statuses, q.Assignees); narrow != "" {
+		// A row that matched, or the parent of a subtask that matched. The
+		// parent is read as context so that the match is drawn at all:
+		// family below hangs the kept children off their parent, and with
+		// the parent filtered out the child had nothing to sit under and
+		// went missing with it (#353). Its siblings do not come along.
+		where = append(where, "(("+narrow+") OR key IN (SELECT parent_key FROM issue WHERE profile_id = ? AND type = ? AND "+narrow+"))")
+		args = append(args, narrowArgs...)
+		args = append(args, profileID, backend.TypeSubtask)
+		args = append(args, narrowArgs...)
 	}
 	under, underArgs := underEpic(profileID)
 	// Each read gets its own slice: appending to a shared one would hand

@@ -39,7 +39,14 @@ export function filterBoard(view: BoardView, needle: string, filter: IssueFilter
   // columns, so a subtask kept for its parent has to be found whichever
   // column that parent sits in.
   const cards = view.lanes.flatMap((lane) => lane.cells.flat());
-  const keep = keptKeys(cards, (i) => matchesCard(i, needle) && matchesFilter(i, filter));
+  // The text box selects a family and the bar narrows it. Typing a subtask's
+  // key is how it gets found in context, so the box keeps the family whole;
+  // the bar decides each card on its own (#353).
+  const keep = keptKeys(
+    cards,
+    (i) => matchesCard(i, needle) && matchesFilter(i, filter),
+    (i) => matchesFilter(i, filter),
+  );
   const totals = view.columns.map(() => ({ total: 0, points: 0 }));
   const lanes = view.lanes.map((lane) => {
     const cells = lane.cells.map((cell, col) => {

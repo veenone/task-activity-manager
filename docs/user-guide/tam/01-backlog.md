@@ -20,7 +20,7 @@ Changing any of them goes back to page one, so a filter never lands you on a pag
 
 Eight columns: **Key**, **Type**, **Summary**, **Status**, **Assignee**, **Sprint**, **Pts** and **Time**. Click a header to sort by it. The first click sorts the way that column reads best, ascending for text and largest-first for a number, the second click reverses it, and the third returns to the project's rank order.
 
-Subtasks stay under their parent rather than scattering through the list, and the toggle on a parent collapses them. A filter applies to the whole family, so a parent is still drawn when one of its subtasks matches.
+Subtasks stay under their parent rather than scattering through the list, and the toggle on a parent collapses them. The filters decide each row on its own, so a subtask that does not match is not drawn under a parent that does. The one row you see without it matching is the parent of a matching subtask, which is drawn so the subtask has something to sit under. The search box works the other way and brings the whole family, because finding a subtask usually means wanting to see where it sits.
 
 ### Paging
 

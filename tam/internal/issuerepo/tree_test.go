@@ -3,6 +3,7 @@ package issuerepo_test
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -147,6 +148,38 @@ func seedOrphanHeavy(t *testing.T, repo *issuerepo.Repository, children, orphans
 // epic sit in front of them (#338). Before the read was split, the cap fell
 // across one rank-ordered pass and the orphans ate it, so these epics drew
 // as "0 of 0" and opened empty.
+// A subtask the filter matched is drawn under its own parent even when the
+// parent does not match, and its siblings are not. The tree used to filter
+// every row in SQL and nothing put the parent back, so the parent never
+// reached byParent and the matching child was dropped with it (#353).
+func TestEpicTreeKeepsTheParentOfAMatchingSubtask(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	rows := []backend.Issue{
+		{Key: "E-1", Type: backend.TypeEpic, Summary: "Epic", Status: "In Progress", Rank: "0|a", Labels: []string{}},
+		{Key: "S-1", Type: backend.TypeStory, Summary: "Story", Status: "In Progress", ParentKey: "E-1", Rank: "0|b", Labels: []string{}},
+		{Key: "S-2", Type: backend.TypeSubtask, Summary: "Matched", Status: "Blocked", ParentKey: "S-1", Rank: "0|c", Labels: []string{}},
+		{Key: "S-3", Type: backend.TypeSubtask, Summary: "Not matched", Status: "To Do", ParentKey: "S-1", Rank: "0|d", Labels: []string{}},
+	}
+	if err := r.UpsertPage(ctx, "p1", rows, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	tree, err := r.EpicTree(ctx, "p1", issuerepo.TreeQuery{Statuses: []string{"Blocked"}, ShowDone: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tree.Epics) != 1 {
+		t.Fatalf("the epic holding the match is gone: %+v", tree.Epics)
+	}
+	var keys []string
+	for _, c := range tree.Epics[0].Children {
+		keys = append(keys, c.Key)
+	}
+	if !reflect.DeepEqual(keys, []string{"S-1", "S-2"}) {
+		t.Fatalf("children = %v; want the matching subtask under its parent, without the sibling", keys)
+	}
+}
+
 func TestEpicTreeKeepsEpicChildrenWhenOrphansFillTheCap(t *testing.T) {
 	repo := newRepo(t)
 	seedOrphanHeavy(t, repo, 40, 5100)

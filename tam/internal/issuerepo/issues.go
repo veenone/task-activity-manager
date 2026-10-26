@@ -247,8 +247,14 @@ func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQu
 }
 
 // withSubtasks expands only the selected page's parents, preserving the sort
-// within each family. Filters select families, so siblings remain available
-// alongside a matching child, including when the parent itself did not match.
+// within each family.
+//
+// The three row filters apply to the children too, so a family is narrowed
+// inside rather than kept whole: a subtask that does not match is not drawn
+// under a parent that survived, and a parent that matched does not drag in
+// subtasks that did not (#353). The parent of a matching subtask is still
+// drawn, matching or not, because the Family rows contract needs a root for
+// the indent to hang off and the parent is the only honest one.
 func (r *Repository) withSubtasks(ctx context.Context, profileID string, parents []backend.Issue, q IssueQuery) ([]backend.Issue, error) {
 	args := []any{profileID}
 	for _, parent := range parents {
@@ -260,8 +266,13 @@ func (r *Repository) withSubtasks(ctx context.Context, profileID string, parents
 		return parents, nil
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?,", len(args)-1), ",")
+	narrow, narrowArgs := narrowRows(q.Types, q.Statuses, q.Assignees)
+	if narrow != "" {
+		narrow = " AND " + narrow
+		args = append(args, narrowArgs...)
+	}
 	rows, err := r.db.QueryContext(ctx, `SELECT `+issueColumns+` FROM issue
-		WHERE profile_id = ? AND type = 'subtask' AND parent_key IN (`+marks+`)`+orderFor(q), args...)
+		WHERE profile_id = ? AND type = 'subtask' AND parent_key IN (`+marks+`)`+narrow+orderFor(q), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list backlog subtasks: %w", err)
 	}
@@ -467,25 +478,47 @@ func scanIssuesInto(ctx context.Context, q dbtx.Querier, into map[string]backend
 	return rows.Err()
 }
 
-// issueFilter builds the WHERE clause for q. The profile is always the first
-// condition, so an empty query still scopes to one profile.
-func issueFilter(profileID string, q IssueQuery) (string, []any) {
-	where := []string{"profile_id = ?"}
-	args := []any{profileID}
-	// The three list filters are an OR inside the field and an AND between
-	// them, which is what a filter bar means by narrowing.
+// narrowRows is the type, status and assignee conditions: an OR inside each
+// field and an AND between them, which is what a filter bar means by
+// narrowing.
+//
+// They are separate from the rest of issueFilter because they are the part
+// that decides a row on its own, and a family read has to apply them to the
+// children as well as to the parents. Without that, a filter picked the
+// parents and every subtask under a surviving parent was drawn whether it
+// matched or not (#353).
+//
+// The text and sprint conditions are deliberately not in here. Those select
+// a whole family: a search is how a subtask is found in context, and Jira
+// puts no sprint on a subtask, so narrowing either one row at a time would
+// answer a question nobody asked.
+func narrowRows(types, statuses, assignees []string) (string, []any) {
+	var where []string
+	var args []any
 	for _, f := range []struct {
 		column string
 		values []string
 	}{
-		{"type", q.Types},
-		{"status", q.Statuses},
-		{"assignee", q.Assignees},
+		{"type", types},
+		{"status", statuses},
+		{"assignee", assignees},
 	} {
 		if clause, in := inClause(f.column, f.values); clause != "" {
 			where = append(where, clause)
 			args = append(args, in...)
 		}
+	}
+	return strings.Join(where, " AND "), args
+}
+
+// issueFilter builds the WHERE clause for q. The profile is always the first
+// condition, so an empty query still scopes to one profile.
+func issueFilter(profileID string, q IssueQuery) (string, []any) {
+	where := []string{"profile_id = ?"}
+	args := []any{profileID}
+	if clause, in := narrowRows(q.Types, q.Statuses, q.Assignees); clause != "" {
+		where = append(where, clause)
+		args = append(args, in...)
 	}
 	if q.SprintID != "" {
 		where = append(where, "sprint_id = ?")

@@ -56,6 +56,22 @@ describe("filterBoard", () => {
     expect(filtered.lanes[0].cells[1]).toEqual([doneChild]);
     expect(v.lanes[0].cells[0][0]).toBe(child);
   });
+  // The text box and the bar are two different questions. The box selects a
+  // family, because typing a subtask's key is how it gets found in context.
+  // The bar decides each card on its own, and only the parent of a matching
+  // subtask is drawn without matching (#353).
+  it("narrows a family by the bar while the text box still selects one", () => {
+    const v = view();
+    const child = card({ key: "PLAT-2", type: "subtask", parentKey: anand.key, assignee: "S. Kim" });
+    const sibling = card({ key: "PLAT-3", type: "subtask", parentKey: anand.key, assignee: "R. Anand" });
+    v.lanes[0].cells = [[anand, child, sibling], [draft]];
+    const byBar = filterBoard(v, "", { ...NO_FILTER, assignee: "S. Kim" });
+    expect(byBar.lanes[0].cells[0].map((i) => i.key)).toEqual([anand.key, child.key]);
+    expect(byBar.columns[0].total).toBe(2);
+    const byBox = filterBoard(v, child.key);
+    expect(byBox.lanes[0].cells[0].map((i) => i.key)).toEqual([anand.key, child.key, sibling.key]);
+  });
+
   it("returns the view untouched when nothing is being filtered", () => {
     const v = view();
     expect(filterBoard(v, "")).toBe(v);
