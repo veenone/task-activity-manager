@@ -23,6 +23,23 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   without guessing. The row appears only when Jira answers with at least one
   dashboard.
 
+### Fixed
+
+**The issue filters narrow inside a family (#353)**
+- A filter on type, status or assignee decides each row on its own. The
+  Backlog, Assigned to me, the Epics tabs, Boards and Sprints no longer draw
+  a subtask that does not match under a parent that does, and a matching
+  parent no longer brings along the subtasks that did not match.
+- The parent of a matching subtask is still drawn, matching or not, so the
+  subtask has a root to sit under. It is the only row any of these views
+  draws without it matching.
+- The Epics tree had the opposite fault and dropped a subtask it had matched
+  when the subtask's own parent did not match, which emptied the tab for a
+  filter only subtasks carry. It draws the parent as context instead.
+- The search box still selects whole families, and the sprint filter still
+  reads a subtask as belonging to its parent's sprint, which is where Jira
+  keeps it.
+
 ## [1.1.0] - 2026-10-23
 
 A release about finding issues and trusting what the window says. Every view

@@ -215,10 +215,13 @@ Eight columns: **Key**, **Type**, **Summary**, **Status**, **Assignee**,
 the way it reads best, then the other way, then back to the project's rank
 order.
 
-Subtasks stay under their parent rather than scattering through the list, and a
-filter applies to the whole family, so a parent is still drawn when one of its
-subtasks matches. The pager counts families rather than rows, so a page of 25
-holds 25 parents and everything beneath them.
+Subtasks stay under their parent rather than scattering through the list. The
+filters decide each row on its own, so a subtask that does not match is not
+drawn under a parent that does, and the parent of a matching subtask is drawn
+so the subtask has something to sit under. The search box brings the whole
+family instead, because finding a subtask usually means wanting to see where it
+sits. The pager counts families rather than rows, so a page of 25 holds 25
+parents and everything beneath them.
 
 ### Reading and editing an issue
 
