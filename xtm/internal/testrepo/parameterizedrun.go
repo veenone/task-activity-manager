@@ -21,17 +21,11 @@ func (r *Repository) ReplaceParameterizedRun(profileID string, run backend.Param
 		return fmt.Errorf("begin parameterized run replacement: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	args := []any{profileID, run.ExecutionKey, run.TestKey}
-	if _, err := tx.Exec(
-		`DELETE FROM test_run_iteration_step WHERE profile_id = ? AND exec_key = ? AND test_key = ?`, args...,
-	); err != nil {
-		return fmt.Errorf("clear iteration steps: %w", err)
-	}
-	if _, err := tx.Exec(
-		`DELETE FROM test_run_iteration WHERE profile_id = ? AND exec_key = ? AND test_key = ?`, args...,
-	); err != nil {
-		return fmt.Errorf("clear iterations: %w", err)
-	}
+
+	// This refresh used to delete the whole tree and reinsert it, which threw
+	// away any result that had been set locally and not yet committed (#364).
+	// It upserts instead, and keeps a status that has a pending change, the way
+	// UpsertTests guards every editable field of a test against a sync.
 	for _, iteration := range run.Iterations {
 		parametersJSON, err := json.Marshal(iteration.Parameters)
 		if err != nil {
@@ -41,36 +35,132 @@ func (r *Repository) ReplaceParameterizedRun(profileID string, run backend.Param
 			`INSERT INTO test_run_iteration
 			 (profile_id, exec_key, test_key, iteration_id, run_id, rank, status, run_status,
 			  dataset_source_kind, dataset_source_key, parameters_json)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(profile_id, exec_key, test_key, iteration_id) DO UPDATE SET
+			   run_id              = excluded.run_id,
+			   rank                = excluded.rank,
+			   run_status          = excluded.run_status,
+			   dataset_source_kind = excluded.dataset_source_kind,
+			   dataset_source_key  = excluded.dataset_source_key,
+			   parameters_json     = excluded.parameters_json,
+			   status              = CASE WHEN EXISTS (
+			       SELECT 1 FROM pending_change
+			       WHERE pending_change.profile_id  = ?
+			         AND pending_change.entity_type = ?
+			         AND pending_change.entity_key  = ?
+			         AND pending_change.field       = 'status'
+			     ) THEN test_run_iteration.status ELSE excluded.status END`,
 			profileID, run.ExecutionKey, run.TestKey, iteration.ID, run.ID, iteration.Rank,
 			iteration.Status, run.Status, run.DatasetSourceKind, run.DatasetSourceKey, string(parametersJSON),
+			profileID, entityTestRunIteration, iterationEntityKey(run.ExecutionKey, run.TestKey, iteration.ID),
 		); err != nil {
-			return fmt.Errorf("insert iteration %s: %w", iteration.ID, err)
+			return fmt.Errorf("store iteration %s: %w", iteration.ID, err)
 		}
 		for _, step := range iteration.Steps {
 			if _, err := tx.Exec(
 				`INSERT INTO test_run_iteration_step
 				 (profile_id, exec_key, test_key, iteration_id, step_result_id, step_definition_id,
 				  rank, status, action, data, expected)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				 ON CONFLICT(profile_id, exec_key, test_key, iteration_id, step_result_id) DO UPDATE SET
+				   step_definition_id = excluded.step_definition_id,
+				   rank               = excluded.rank,
+				   action             = excluded.action,
+				   data               = excluded.data,
+				   expected           = excluded.expected,
+				   status             = CASE WHEN EXISTS (
+				       SELECT 1 FROM pending_change
+				       WHERE pending_change.profile_id  = ?
+				         AND pending_change.entity_type = ?
+				         AND pending_change.entity_key  = ?
+				         AND pending_change.field       = 'status'
+				     ) THEN test_run_iteration_step.status ELSE excluded.status END`,
 				profileID, run.ExecutionKey, run.TestKey, iteration.ID, step.ID, step.DefinitionID,
 				step.Rank, step.Status, step.Action, step.Data, step.Expected,
+				profileID, entityTestRunIterStep, iterationStepEntityKey(run.ExecutionKey, run.TestKey, iteration.ID, step.ID),
 			); err != nil {
-				return fmt.Errorf("insert iteration step %s: %w", step.ID, err)
+				return fmt.Errorf("store iteration step %s: %w", step.ID, err)
 			}
 		}
+	}
+	if err := pruneParameterizedRun(tx, profileID, run); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
 
+// pruneParameterizedRun drops what the backend no longer reports, so a dataset
+// that lost a row does not leave an iteration behind that nothing can commit.
+func pruneParameterizedRun(tx *sql.Tx, profileID string, run backend.ParameterizedRun) error {
+	iterationIDs := make([]any, 0, len(run.Iterations))
+	marks := make([]string, 0, len(run.Iterations))
+	for _, iteration := range run.Iterations {
+		iterationIDs = append(iterationIDs, iteration.ID)
+		marks = append(marks, "?")
+	}
+	kept := "(" + strings.Join(marks, ",") + ")"
+
+	args := append([]any{profileID, run.ExecutionKey, run.TestKey}, iterationIDs...)
+	if _, err := tx.Exec(
+		`DELETE FROM test_run_iteration
+		 WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id NOT IN `+kept, args...,
+	); err != nil {
+		return fmt.Errorf("drop iterations the backend no longer reports: %w", err)
+	}
+	if _, err := tx.Exec(
+		`DELETE FROM test_run_iteration_step
+		 WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id NOT IN `+kept, args...,
+	); err != nil {
+		return fmt.Errorf("drop steps of iterations the backend no longer reports: %w", err)
+	}
+	for _, iteration := range run.Iterations {
+		stepIDs := make([]any, 0, len(iteration.Steps))
+		stepMarks := make([]string, 0, len(iteration.Steps))
+		for _, step := range iteration.Steps {
+			stepIDs = append(stepIDs, step.ID)
+			stepMarks = append(stepMarks, "?")
+		}
+		stepArgs := append([]any{profileID, run.ExecutionKey, run.TestKey, iteration.ID}, stepIDs...)
+		query := `DELETE FROM test_run_iteration_step
+		          WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ?`
+		if len(stepMarks) > 0 {
+			query += ` AND step_result_id NOT IN (` + strings.Join(stepMarks, ",") + `)`
+		}
+		if _, err := tx.Exec(query, stepArgs...); err != nil {
+			return fmt.Errorf("drop steps iteration %s no longer has: %w", iteration.ID, err)
+		}
+	}
+	return nil
+}
+
+// The pending-change entity keys for a parameterized result. They are built in
+// one place because the store writes them, the refresh above reads them back to
+// protect a local edit, and the commit path parses them.
+func iterationEntityKey(execKey, testKey, iterationID string) string {
+	return strings.Join([]string{execKey, testKey, iterationID}, ":")
+}
+
+func iterationStepEntityKey(execKey, testKey, iterationID, stepResultID string) string {
+	return strings.Join([]string{execKey, testKey, iterationID, stepResultID}, ":")
+}
+
 func (r *Repository) ParameterizedRun(profileID, execKey, testKey string) (backend.ParameterizedRun, bool, error) {
+	// The uncommitted flag comes from the journal rather than a column, so the
+	// store cannot drift from what Commit would actually push (#366).
 	rows, err := r.db.Query(
 		`SELECT iteration_id, run_id, rank, status, run_status, dataset_source_kind,
-		        dataset_source_key, parameters_json
+		        dataset_source_key, parameters_json,
+		        EXISTS (
+		          SELECT 1 FROM pending_change
+		          WHERE pending_change.profile_id  = ?
+		            AND pending_change.entity_type = 'test_run_iteration'
+		            AND pending_change.entity_key  = ? || ':' || ? || ':' || iteration_id
+		            AND pending_change.field       = 'status'
+		        )
 		 FROM test_run_iteration
 		 WHERE profile_id = ? AND exec_key = ? AND test_key = ?
 		 ORDER BY rank`,
-		profileID, execKey, testKey,
+		profileID, execKey, testKey, profileID, execKey, testKey,
 	)
 	if err != nil {
 		return backend.ParameterizedRun{}, false, fmt.Errorf("query parameterized run: %w", err)
@@ -82,7 +172,7 @@ func (r *Repository) ParameterizedRun(profileID, execKey, testKey string) (backe
 		var parametersJSON string
 		if err := rows.Scan(
 			&iteration.ID, &run.ID, &iteration.Rank, &iteration.Status, &run.Status,
-			&run.DatasetSourceKind, &run.DatasetSourceKey, &parametersJSON,
+			&run.DatasetSourceKind, &run.DatasetSourceKey, &parametersJSON, &iteration.Uncommitted,
 		); err != nil {
 			return backend.ParameterizedRun{}, false, fmt.Errorf("scan parameterized run: %w", err)
 		}
@@ -105,11 +195,18 @@ func (r *Repository) ParameterizedRun(profileID, execKey, testKey string) (backe
 
 func (r *Repository) iterationSteps(profileID, execKey, testKey, iterationID string) ([]backend.IterationStep, error) {
 	rows, err := r.db.Query(
-		`SELECT step_result_id, step_definition_id, rank, status, action, data, expected
+		`SELECT step_result_id, step_definition_id, rank, status, action, data, expected,
+		        EXISTS (
+		          SELECT 1 FROM pending_change
+		          WHERE pending_change.profile_id  = ?
+		            AND pending_change.entity_type = 'test_run_iteration_step'
+		            AND pending_change.entity_key  = ? || ':' || ? || ':' || ? || ':' || step_result_id
+		            AND pending_change.field       = 'status'
+		        )
 		 FROM test_run_iteration_step
 		 WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ?
 		 ORDER BY rank`,
-		profileID, execKey, testKey, iterationID,
+		profileID, execKey, testKey, iterationID, profileID, execKey, testKey, iterationID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query iteration steps: %w", err)
@@ -118,7 +215,8 @@ func (r *Repository) iterationSteps(profileID, execKey, testKey, iterationID str
 	steps := []backend.IterationStep{}
 	for rows.Next() {
 		var step backend.IterationStep
-		if err := rows.Scan(&step.ID, &step.DefinitionID, &step.Rank, &step.Status, &step.Action, &step.Data, &step.Expected); err != nil {
+		if err := rows.Scan(&step.ID, &step.DefinitionID, &step.Rank, &step.Status, &step.Action,
+			&step.Data, &step.Expected, &step.Uncommitted); err != nil {
 			return nil, fmt.Errorf("scan iteration step: %w", err)
 		}
 		steps = append(steps, step)
@@ -140,14 +238,14 @@ func (r *Repository) setParameterizedStatus(profileID, execKey, testKey, iterati
 	}
 	table := "test_run_iteration"
 	entityType := entityTestRunIteration
-	entityKey := strings.Join([]string{execKey, testKey, iterationID}, ":")
+	entityKey := iterationEntityKey(execKey, testKey, iterationID)
 	query := `SELECT status FROM test_run_iteration WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ?`
 	update := `UPDATE test_run_iteration SET status = ? WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ?`
 	selectArgs := []any{profileID, execKey, testKey, iterationID}
 	if stepResultID != "" {
 		table = "test_run_iteration_step"
 		entityType = entityTestRunIterStep
-		entityKey = strings.Join([]string{execKey, testKey, iterationID, stepResultID}, ":")
+		entityKey = iterationStepEntityKey(execKey, testKey, iterationID, stepResultID)
 		query = `SELECT status FROM test_run_iteration_step WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ? AND step_result_id = ?`
 		update = `UPDATE test_run_iteration_step SET status = ? WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ? AND step_result_id = ?`
 		selectArgs = append(selectArgs, stepResultID)
