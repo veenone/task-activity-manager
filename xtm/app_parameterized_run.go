@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -31,9 +32,18 @@ func (a *App) GetParameterizedRun(profileID, execKey, testKey string, forceRefre
 	}
 	run, err := b.GetParameterizedRun(a.ctx, execKey, testKey)
 	if err != nil {
+		// ErrUnsupported is the ordinary answer for a test with no dataset,
+		// and every member row of every execution asks, so logging that would
+		// bury the failures worth reading. Anything else is a real one (#362).
+		if !errors.Is(err, backend.ErrUnsupported) {
+			log.Printf("xtm: could not read the parameterized run of %s in %s: %v", testKey, execKey, err)
+		}
 		return backend.ParameterizedRun{}, err
 	}
 	if err := a.repo.ReplaceParameterizedRun(profileID, run); err != nil {
+		// The run was read and then refused by the store, which is invisible
+		// in the view: the member row simply shows no iterations (#362).
+		log.Printf("xtm: read the parameterized run of %s in %s but could not store it: %v", testKey, execKey, err)
 		return backend.ParameterizedRun{}, err
 	}
 	stored, found, err := a.repo.ParameterizedRun(profileID, execKey, testKey)

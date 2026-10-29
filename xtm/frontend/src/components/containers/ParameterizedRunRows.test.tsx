@@ -141,4 +141,41 @@ describe("ParameterizedRunRows", () => {
     );
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
+
+  // #362: a read that failed used to render nothing, so a run the store refused
+  // looked exactly like a test with no dataset.
+  it("says so when the run cannot be read", async () => {
+    const onLoaded = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(api.GetParameterizedRun).mockRejectedValue(
+      new Error("read the parameterized run of QA-1: iteration 11862 has a step with missing identity"),
+    );
+
+    render(
+      <QueryClientProvider client={client}>
+        <ParameterizedRunIndicator profileId="p1" execKey="EXEC-1" testKey="QA-1" expanded={false} onLoaded={onLoaded} onToggle={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("iterations unavailable")).toBeVisible();
+    expect(onLoaded).not.toHaveBeenCalled();
+  });
+
+  // A test with no dataset answers with the unsupported sentinel, and every
+  // member row asks, so that answer must stay silent or every ordinary row
+  // grows a warning.
+  it("stays silent for a test that has no dataset", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(api.GetParameterizedRun).mockRejectedValue(new Error("backend: operation not supported"));
+
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <ParameterizedRunIndicator profileId="p1" execKey="EXEC-1" testKey="QA-1" expanded={false} onLoaded={vi.fn()} onToggle={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(vi.mocked(api.GetParameterizedRun)).toHaveBeenCalled());
+    expect(screen.queryByText("iterations unavailable")).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
 });

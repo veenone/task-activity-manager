@@ -25,6 +25,15 @@ interface IndicatorProps {
   onToggle: () => void;
 }
 
+// A test with no dataset answers with backend.ErrUnsupported, and every member
+// row of every execution asks, so that answer is not a failure to report: the
+// row just has no iterations. Anything else is a failure, and used to render as
+// nothing at all, which is how #362 stayed invisible for two releases. The text
+// is the sentinel's own, which is the only signal the binding carries across.
+function isNotParameterized(error: unknown): boolean {
+  return errMsg(error).includes("operation not supported");
+}
+
 // ParameterizedRunIndicator resolves the run while the member row is visible,
 // so parameterized tests advertise their iteration count before expansion.
 export function ParameterizedRunIndicator({ profileId, execKey, testKey, expanded, onLoaded, onToggle }: IndicatorProps) {
@@ -38,6 +47,17 @@ export function ParameterizedRunIndicator({ profileId, execKey, testKey, expande
     onLoaded(run.iterations.length);
   }, [run, onLoaded]);
 
+  // A read that failed says so in the row. It is not a toggle: there is no run
+  // to expand, and the detail rows below only mount for a row that reported its
+  // iterations, so a button here would open an empty panel.
+  if (query.error && !isNotParameterized(query.error)) {
+    return (
+      <span className="parameterized-run-indicator-error" title={errMsg(query.error)}>
+        <span aria-hidden="true">!</span>
+        <span>iterations unavailable</span>
+      </span>
+    );
+  }
   if (!run || run.iterations.length === 0) return null;
   const count = run.iterations.length;
   return (
