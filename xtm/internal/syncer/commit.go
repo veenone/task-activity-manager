@@ -58,8 +58,8 @@ const (
 	// (#336). The row stays pending and is reported rather than failed, so it
 	// does not read as an error the user could fix (#364).
 	skipReasonIterationStepWrites = "backend cannot write a result for a single step"
-	skipReasonDatasetWrites      = "backend does not support dataset writes"
-	skipReasonIterationWrites    = "backend does not support parameterized run writes"
+	skipReasonDatasetWrites       = "backend does not support dataset writes"
+	skipReasonIterationWrites     = "backend does not support parameterized run writes"
 )
 
 // CreatedTest records that a locally-created Test (TempKey, "NEW-N") was created
