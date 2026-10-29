@@ -24,6 +24,7 @@ const run: ParameterizedRun = {
   iterations: [
     {
       id: "iteration-1",
+      uncommitted: false,
       rank: 0,
       status: "PASS",
       parameters: [
@@ -33,6 +34,7 @@ const run: ParameterizedRun = {
       steps: [
         {
           id: "result-1",
+          uncommitted: false,
           definitionId: "step-1",
           rank: 0,
           status: "PASS",
@@ -44,6 +46,7 @@ const run: ParameterizedRun = {
     },
     {
       id: "iteration-2",
+      uncommitted: false,
       rank: 1,
       status: "FAIL",
       parameters: [
@@ -54,6 +57,7 @@ const run: ParameterizedRun = {
     },
     {
       id: "iteration-3",
+      uncommitted: false,
       rank: 2,
       status: "TO" + "DO",
       parameters: [
@@ -65,11 +69,11 @@ const run: ParameterizedRun = {
   ],
 };
 
-function view(canWrite: boolean) {
+function view(canWrite: boolean, data: ParameterizedRun = run) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  vi.mocked(api.GetParameterizedRun).mockResolvedValue(structuredClone(run) as never);
+  vi.mocked(api.GetParameterizedRun).mockResolvedValue(structuredClone(data) as never);
   render(
     <QueryClientProvider client={client}>
       <table>
@@ -159,6 +163,28 @@ describe("ParameterizedRunRows", () => {
 
     expect(await screen.findByText("iterations unavailable")).toBeVisible();
     expect(onLoaded).not.toHaveBeenCalled();
+  });
+
+  // #366: results are journalled and pushed on Commit, so a local pick has to
+  // be distinguishable from a value the backend already holds.
+  it("marks a result that has not been committed", async () => {
+    const withPending = structuredClone(run) as ParameterizedRun;
+    withPending.iterations[0].uncommitted = true;
+    withPending.iterations[0].steps[0].uncommitted = true;
+    view(true, withPending);
+
+    await screen.findByText("2 of 3 completed");
+    // One for the iteration, one for its step once the panel is open.
+    expect(screen.getAllByText("not committed")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: /iteration 1/i }));
+    expect(screen.getAllByText("not committed")).toHaveLength(2);
+  });
+
+  it("leaves a committed result unmarked", async () => {
+    view(true);
+
+    await screen.findByText("2 of 3 completed");
+    expect(screen.queryByText("not committed")).not.toBeInTheDocument();
   });
 
   // A test with no dataset answers with the unsupported sentinel, and every

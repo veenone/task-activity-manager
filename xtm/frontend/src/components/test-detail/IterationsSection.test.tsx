@@ -16,6 +16,7 @@ function iterations(): RunIteration[] {
       id: "11868",
 	  rank: 0,
 	  steps: [],
+	  uncommitted: false,
       status: "PASS",
       parameters: [
         { name: "TIER", value: "gold" },
@@ -26,6 +27,7 @@ function iterations(): RunIteration[] {
       id: "11869",
 	  rank: 1,
 	  steps: [],
+	  uncommitted: false,
       status: "FAIL",
       parameters: [
         { name: "TIER", value: "silver" },
@@ -36,6 +38,7 @@ function iterations(): RunIteration[] {
       id: "11870",
 	  rank: 2,
 	  steps: [],
+	  uncommitted: false,
       status: "TODO",
       parameters: [
         { name: "TIER", value: "bronze" },

@@ -200,7 +200,10 @@ function IterationRows({
             <span aria-hidden="true">{open ? "▾" : "▸"}</span> Iteration {index + 1}
           </button>
         </th>
-        <td>{canWrite ? <StatusSelect label={`Iteration ${index + 1} status`} value={iteration.status} onChange={onIterationStatus} /> : <StatusBadge status={iteration.status} />}</td>
+        <td>
+          {canWrite ? <StatusSelect label={`Iteration ${index + 1} status`} value={iteration.status} onChange={onIterationStatus} /> : <StatusBadge status={iteration.status} />}
+          {iteration.uncommitted && <UncommittedMark />}
+        </td>
         <td>
           <dl className="parameterized-values">
             {iteration.parameters.map((parameter) => (
@@ -241,6 +244,7 @@ function IterationRows({
                         ) : (
                           <StatusBadge status={step.status} />
                         )}
+                        {step.uncommitted && <UncommittedMark />}
                       </td>
                     </tr>
                   ))}
@@ -251,6 +255,17 @@ function IterationRows({
         </tr>
       )}
     </>
+  );
+}
+
+// A result that is journalled and not yet pushed. Results are local-first
+// (#366), so without this a local pick is indistinguishable from the value Xray
+// already holds.
+function UncommittedMark() {
+  return (
+    <span className="parameterized-run-uncommitted" title="Set locally. Commit to send it to Jira.">
+      not committed
+    </span>
   );
 }
 
