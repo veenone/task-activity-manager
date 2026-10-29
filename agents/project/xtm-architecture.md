@@ -130,14 +130,21 @@ sent back with their ids and scope unless the user confirms conversion. XTM
 does not administer project lists. `testrepo.ValidateDataset` checks this
 contract before the whole table can enter the journal.
 
-**Iterations are read fresh, never cached.** How each dataset row went in an
-execution comes from the 2.0 run resource when the panel opens, and goes
-nowhere near the store. A dataset changes rarely and is cached; results change
-every time someone runs the test, and the only reader is a panel open in front
-of the person who changed them. They are also a property of the run rather
-than of the dataset: a run keeps the parameters it was created with, so
-rendering them from the cached dataset would show rows that run never had
-(#267 Phase 4).
+**Iterations come from the run, never from the cached dataset.** How each
+dataset row went in an execution comes from the 2.0 run resource. It is then
+stored: `app.GetParameterizedRun` writes what the backend returned through
+`ReplaceParameterizedRun` and reads it back before the view sees any of it,
+because a status edit needs the stored row to journal the value it replaced.
+A run the store refuses therefore reaches nothing at all, and the member row
+shows no iterations with no error anywhere, which is how #362 hid every live
+iteration for two releases. The gate for that is
+`xray.TestLiveParameterizedRunSurvivesTheStore`, which puts the live reader's
+own output through the store rather than asserting the reader in isolation.
+
+What must never happen is rendering iterations from the cached dataset. They
+are a property of the run: a run keeps the parameters it was created with, so
+a dataset edited afterwards does not change a run that already exists, and
+drawing one from the other would show rows that run never had (#267 Phase 4).
 
 **Renaming a dataset parameter is two changes, not one.** The dataset write
 carries the rename by sending the parameter's existing id, but every

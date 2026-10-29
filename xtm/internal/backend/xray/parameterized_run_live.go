@@ -8,6 +8,7 @@ package xray
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"agile-suite/xtm/internal/backend"
@@ -62,15 +63,25 @@ func (a *Adapter) liveParameterizedRun(ctx context.Context, execKey, testKey str
 		out[i].Steps = make([]backend.IterationStep, len(steps))
 		for j, s := range steps {
 			out[i].Steps[j] = backend.IterationStep{
-				// Xray reports neither a step-result id nor a per-step status
-				// on this resource, so the id stays empty and the step shows
-				// the iteration's status. Inventing either would put a value
-				// on screen that nothing in Xray backs.
-				Rank:     j,
-				Status:   it.Status,
-				Action:   s.Action,
-				Data:     s.Data,
-				Expected: s.Expected,
+				// Xray reports no step-result id and no per-step status on this
+				// resource, so both of these are local (#362). The id keys the
+				// step in the store, which app.GetParameterizedRun writes the
+				// run into and reads back before the view sees it, so a step
+				// without one is a run the view never receives. It is built
+				// from the iteration and the step's position, which makes it
+				// unique within the iteration: the store keys steps by it.
+				//
+				// Nothing sends either value to Xray. A live step write is
+				// refused precisely because Xray exposes no id to address, and
+				// the status shown stays the iteration's own rather than a
+				// per-step value nothing in Xray backs.
+				ID:           fmt.Sprintf("%s-step-%d", out[i].ID, j),
+				DefinitionID: strconv.Itoa(s.Rank),
+				Rank:         j,
+				Status:       it.Status,
+				Action:       s.Action,
+				Data:         s.Data,
+				Expected:     s.Expected,
 			}
 		}
 	}
