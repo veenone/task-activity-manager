@@ -4,7 +4,8 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { SetIterationStatus, SetIterationStepStatus, errMsg, type ParameterizedRun } from "../../api";
 import { keys } from "../../queries/keys";
 import { useParameterizedRun } from "../../queries/parameterizedRuns";
-import { RUN_STATUSES } from "./constants";
+import { IterationRows, stepKey } from "./IterationRows";
+import { ResultBulkBar } from "./ResultBulkBar";
 import "./parameterized-runs.css";
 
 interface Props {
@@ -80,6 +81,8 @@ export function ParameterizedRunRows({ profileId, execKey, testKey, expanded, ca
   const query = useParameterizedRun(profileId, execKey, testKey, expanded);
   const client = useQueryClient();
   const [openIterations, setOpenIterations] = useState<Set<string>>(new Set());
+  const [selectedIterations, setSelectedIterations] = useState<Set<string>>(new Set());
+  const [selectedSteps, setSelectedSteps] = useState<Set<string>>(new Set());
   const [writeError, setWriteError] = useState("");
   const announcedRun = useRef("");
   const run = query.data;
@@ -90,28 +93,46 @@ export function ParameterizedRunRows({ profileId, execKey, testKey, expanded, ca
     onLoaded?.();
   }, [run, onLoaded]);
 
+  // A selection belongs to the run it was made in. Moving to another execution
+  // reuses this component, so without this the ticks would carry over onto
+  // rows the user never chose (#365).
+  const runID = run?.id ?? "";
+  useEffect(() => {
+    setSelectedIterations(new Set());
+    setSelectedSteps(new Set());
+  }, [runID]);
+
   if (!expanded) return null;
   if (query.isFetching && !run) return <p className="parameterized-run-message">Loading dataset iterations...</p>;
   if (query.error) return <p className="parameterized-run-error">{errMsg(query.error)}</p>;
   if (!run) return <p className="parameterized-run-message">Iteration details are unavailable.</p>;
 
   const completed = run.iterations.filter((item) => !["TODO", "EXECUTING"].includes(item.status)).length;
+  // The appliers below are hoisted declarations, so the narrowing from the
+  // guard above does not reach inside them. This carries it in.
+  const iterations = run.iterations;
 
-  async function setIterationStatus(iterationId: string, status: string) {
-    setWriteError("");
+  // Each applier reports rather than throws, so a bulk apply can keep going
+  // and name what did not take instead of stopping at the first refusal
+  // (#365). The patch marks the result uncommitted because that is what it now
+  // is: it is journalled and waits for Commit (#366), and nothing refetches
+  // the run after a pick to discover that for us.
+  async function applyIterationResult(iterationId: string, status: string): Promise<string> {
     try {
       await SetIterationStatus(profileId, execKey, testKey, iterationId, status);
       patchRun(client, profileId, execKey, testKey, (current) => ({
         ...current,
-        iterations: current.iterations.map((item) => (item.id === iterationId ? { ...item, status } : item)),
+        iterations: current.iterations.map((item) =>
+          item.id === iterationId ? { ...item, status, uncommitted: true } : item,
+        ),
       }));
+      return "";
     } catch (error) {
-      setWriteError(errMsg(error));
+      return errMsg(error);
     }
   }
 
-  async function setStepStatus(iterationId: string, stepId: string, status: string) {
-    setWriteError("");
+  async function applyStepResult(iterationId: string, stepId: string, status: string): Promise<string> {
     try {
       await SetIterationStepStatus(profileId, execKey, testKey, iterationId, stepId, status);
       patchRun(client, profileId, execKey, testKey, (current) => ({
@@ -120,14 +141,61 @@ export function ParameterizedRunRows({ profileId, execKey, testKey, expanded, ca
           item.id === iterationId
             ? {
                 ...item,
-                steps: item.steps.map((step) => (step.id === stepId ? { ...step, status } : step)),
+                steps: item.steps.map((step) =>
+                  step.id === stepId ? { ...step, status, uncommitted: true } : step,
+                ),
               }
             : item,
         ),
       }));
+      return "";
     } catch (error) {
-      setWriteError(errMsg(error));
+      return errMsg(error);
     }
+  }
+
+  async function setIterationStatus(iterationId: string, status: string) {
+    setWriteError(await applyIterationResult(iterationId, status));
+  }
+
+  async function setStepStatus(iterationId: string, stepId: string, status: string) {
+    setWriteError(await applyStepResult(iterationId, stepId, status));
+  }
+
+  // Applied one at a time rather than at once: these are local writes now, and
+  // a sequential pass keeps the order of the journal rows the same as the order
+  // of the rows on screen.
+  async function applyToSelectedIterations(status: string) {
+    const failures: string[] = [];
+    for (const [index, iteration] of iterations.entries()) {
+      if (!selectedIterations.has(iteration.id)) continue;
+      const failure = await applyIterationResult(iteration.id, status);
+      if (failure) failures.push(`iteration ${index + 1} (${failure})`);
+    }
+    setWriteError(bulkFailureMessage(failures));
+    setSelectedIterations(new Set());
+  }
+
+  async function applyToSelectedSteps(iterationId: string, status: string) {
+    const iteration = iterations.find((item) => item.id === iterationId);
+    const failures: string[] = [];
+    for (const [index, step] of (iteration?.steps ?? []).entries()) {
+      if (!selectedSteps.has(stepKey(iterationId, step.id))) continue;
+      const failure = await applyStepResult(iterationId, step.id, status);
+      if (failure) failures.push(`step ${index + 1} (${failure})`);
+    }
+    setWriteError(bulkFailureMessage(failures));
+    clearStepSelection(iterationId);
+  }
+
+  function clearStepSelection(iterationId: string) {
+    setSelectedSteps((current) => {
+      const next = new Set(current);
+      for (const key of current) {
+        if (key.startsWith(`${iterationId}\u0000`)) next.delete(key);
+      }
+      return next;
+    });
   }
 
   return (
@@ -146,10 +214,32 @@ export function ParameterizedRunRows({ profileId, execKey, testKey, expanded, ca
           {writeError}
         </p>
       )}
+      {canWrite && (
+        <ResultBulkBar
+          label={`Selected iterations of ${testKey}`}
+          count={selectedIterations.size}
+          onApply={(status) => void applyToSelectedIterations(status)}
+          onClear={() => setSelectedIterations(new Set())}
+        />
+      )}
       <div className="parameterized-run-scroll">
         <table className="parameterized-run-table" aria-label={`Iterations for ${testKey}`}>
           <thead>
             <tr>
+              {canWrite && (
+                <th scope="col" className="parameterized-pick-col">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select every iteration of ${testKey}`}
+                    checked={selectedIterations.size === run.iterations.length}
+                    onChange={(event) =>
+                      setSelectedIterations(
+                        event.target.checked ? new Set(run.iterations.map((item) => item.id)) : new Set(),
+                      )
+                    }
+                  />
+                </th>
+              )}
               <th scope="col">Iteration</th>
               <th scope="col">Result</th>
               <th scope="col">Parameters</th>
@@ -163,7 +253,25 @@ export function ParameterizedRunRows({ profileId, execKey, testKey, expanded, ca
                 index={index}
                 open={openIterations.has(iteration.id)}
                 canWrite={canWrite}
+                selected={selectedIterations.has(iteration.id)}
+                selectedSteps={selectedSteps}
                 onToggle={() => setOpenIterations((current) => toggleSet(current, iteration.id))}
+                onSelect={() => setSelectedIterations((current) => toggleSet(current, iteration.id))}
+                onSelectStep={(stepId) => setSelectedSteps((current) => toggleSet(current, stepKey(iteration.id, stepId)))}
+                onSelectEveryStep={(stepIds) =>
+                  setSelectedSteps((current) => {
+                    const next = new Set(current);
+                    const keys = stepIds.map((id) => stepKey(iteration.id, id));
+                    const all = keys.every((key) => next.has(key));
+                    for (const key of keys) {
+                      if (all) next.delete(key);
+                      else next.add(key);
+                    }
+                    return next;
+                  })
+                }
+                onApplyToSteps={(status) => void applyToSelectedSteps(iteration.id, status)}
+                onClearSteps={() => clearStepSelection(iteration.id)}
                 onIterationStatus={(status) => void setIterationStatus(iteration.id, status)}
                 onStepStatus={(stepId, status) => void setStepStatus(iteration.id, stepId, status)}
               />
@@ -175,116 +283,15 @@ export function ParameterizedRunRows({ profileId, execKey, testKey, expanded, ca
   );
 }
 
-function IterationRows({
-  iteration,
-  index,
-  open,
-  canWrite,
-  onToggle,
-  onIterationStatus,
-  onStepStatus,
-}: {
-  iteration: ParameterizedRun["iterations"][number];
-  index: number;
-  open: boolean;
-  canWrite: boolean;
-  onToggle: () => void;
-  onIterationStatus: (status: string) => void;
-  onStepStatus: (stepId: string, status: string) => void;
-}) {
-  return (
-    <>
-      <tr>
-        <th scope="row">
-          <button type="button" className="parameterized-run-toggle" aria-expanded={open} onClick={onToggle}>
-            <span aria-hidden="true">{open ? "▾" : "▸"}</span> Iteration {index + 1}
-          </button>
-        </th>
-        <td>
-          {canWrite ? <StatusSelect label={`Iteration ${index + 1} status`} value={iteration.status} onChange={onIterationStatus} /> : <StatusBadge status={iteration.status} />}
-          {iteration.uncommitted && <UncommittedMark />}
-        </td>
-        <td>
-          <dl className="parameterized-values">
-            {iteration.parameters.map((parameter) => (
-              <div key={parameter.name}>
-                <dt>{parameter.name}</dt>
-                <dd>{parameter.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </td>
-      </tr>
-      {open && (
-        <tr className="parameterized-step-row">
-          <td colSpan={3}>
-            {iteration.steps.length === 0 ? (
-              <span className="muted">No step results.</span>
-            ) : (
-              <table className="parameterized-step-table" aria-label={`Steps for iteration ${index + 1}`}>
-                <thead>
-                  <tr>
-                    <th scope="col">Step</th>
-                    <th scope="col">Action</th>
-                    <th scope="col">Data</th>
-                    <th scope="col">Expected</th>
-                    <th scope="col">Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {iteration.steps.map((step, stepIndex) => (
-                    <tr key={step.id}>
-                      <th scope="row">{stepIndex + 1}</th>
-                      <td>{step.action || "-"}</td>
-                      <td>{step.data || "-"}</td>
-                      <td>{step.expected || "-"}</td>
-                      <td>
-                        {canWrite ? (
-                          <StatusSelect label={`Step ${stepIndex + 1} status`} value={step.status} onChange={(status) => onStepStatus(step.id, status)} />
-                        ) : (
-                          <StatusBadge status={step.status} />
-                        )}
-                        {step.uncommitted && <UncommittedMark />}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
-
-// A result that is journalled and not yet pushed. Results are local-first
-// (#366), so without this a local pick is indistinguishable from the value Xray
-// already holds.
-function UncommittedMark() {
-  return (
-    <span className="parameterized-run-uncommitted" title="Set locally. Commit to send it to Jira.">
-      not committed
-    </span>
-  );
-}
-
-function StatusSelect({ label, value, onChange }: { label: string; value: string; onChange: (status: string) => void }) {
-  return (
-    <select className={`run-select run-${value.toLowerCase()}`} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
-      {RUN_STATUSES.map((status) => (
-        <option key={status}>{status}</option>
-      ))}
-    </select>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return <span className={`run-badge run-${status.toLowerCase()}`}>{status}</span>;
-}
-
 function sourceName(kind: ParameterizedRun["datasetSourceKind"]): string {
   return kind === "execution" ? "Execution" : kind === "plan" ? "Plan" : "Test";
+}
+
+// Names what did not take and leaves the rest applied, rather than reporting
+// one failure as if the whole apply had failed (#365).
+function bulkFailureMessage(failures: string[]): string {
+  if (failures.length === 0) return "";
+  return `Not applied to ${failures.join(", ")}. The rest were applied.`;
 }
 
 function toggleSet(current: Set<string>, value: string): Set<string> {
