@@ -75,6 +75,31 @@
   white-space: nowrap;
 }
 
+.parameterized-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+}
+
+.parameterized-bulk-count {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+/* Narrow enough that the tick does not push the result control out of view on
+   a table that already carries a toggle, a status and the parameter list. */
+.parameterized-pick-col {
+  width: 28px;
+  text-align: center;
+}
+
 .parameterized-run-uncommitted {
   display: inline-block;
   margin-left: 6px;

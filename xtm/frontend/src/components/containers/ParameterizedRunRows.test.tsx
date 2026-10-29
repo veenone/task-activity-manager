@@ -180,6 +180,87 @@ describe("ParameterizedRunRows", () => {
     expect(screen.getAllByText("not committed")).toHaveLength(2);
   });
 
+  // #365: nine iterations for a three-by-three dataset made marking a run that
+  // went the same way everywhere nine picks, and more for the steps.
+  it("applies one result to every selected iteration", async () => {
+    vi.mocked(api.SetIterationStatus).mockResolvedValue(undefined as never);
+    view(true);
+    await screen.findByText("2 of 3 completed");
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /select iteration 1/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /select iteration 3/i }));
+    expect(screen.getByText("2 selected")).toBeVisible();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /result to apply/i }), "FAIL");
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(vi.mocked(api.SetIterationStatus).mock.calls.map((call) => [call[3], call[4]])).toEqual([
+      ["iteration-1", "FAIL"],
+      ["iteration-3", "FAIL"],
+    ]);
+    // Iteration 2 was never ticked, so it is left alone.
+    expect(vi.mocked(api.SetIterationStatus).mock.calls).toHaveLength(2);
+    // The selection is spent once applied.
+    expect(screen.queryByText("2 selected")).not.toBeInTheDocument();
+  });
+
+  it("selects and clears every iteration at once", async () => {
+    view(true);
+    await screen.findByText("2 of 3 completed");
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /select every iteration/i }));
+    expect(screen.getByText("3 selected")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.queryByText("3 selected")).not.toBeInTheDocument();
+  });
+
+  it("applies one result to the selected steps of an iteration", async () => {
+    vi.mocked(api.SetIterationStepStatus).mockResolvedValue(undefined as never);
+    view(true);
+    await screen.findByText("2 of 3 completed");
+    await userEvent.click(screen.getByRole("button", { name: /iteration 1/i }));
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /select step 1 of iteration 1/i }));
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: /selected steps of iteration 1: result to apply/i }),
+      "BLOCKED",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(vi.mocked(api.SetIterationStepStatus).mock.calls.map((call) => [call[4], call[5]])).toEqual([
+      ["result-1", "BLOCKED"],
+    ]);
+  });
+
+  // One refusal must not throw away the results that did apply.
+  it("names the rows a bulk apply could not set and keeps the rest", async () => {
+    vi.mocked(api.SetIterationStatus).mockImplementation((...args: unknown[]) =>
+      args[3] === "iteration-3" ? Promise.reject(new Error("refused")) : (Promise.resolve() as never),
+    );
+    view(true);
+    await screen.findByText("2 of 3 completed");
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /select every iteration/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/iteration 3 \(refused\)/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/the rest were applied/i);
+    expect(vi.mocked(api.SetIterationStatus).mock.calls).toHaveLength(3);
+  });
+
+  it("offers no apply control until something is selected", async () => {
+    view(true);
+    await screen.findByText("2 of 3 completed");
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+  });
+
+  it("offers no selection at all when results are read-only", async () => {
+    view(false);
+    await screen.findByText("2 of 3 completed");
+    expect(screen.queryByRole("checkbox", { name: /select every iteration/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /select iteration 1/i })).not.toBeInTheDocument();
+  });
+
   it("leaves a committed result unmarked", async () => {
     view(true);
 
