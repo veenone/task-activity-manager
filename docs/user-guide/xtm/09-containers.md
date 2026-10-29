@@ -51,6 +51,17 @@ Each iteration row carries the values it ran with and its result, and expanding
 one shows its steps with those values already substituted. Pick a result in an
 iteration's **Result** column to record it.
 
+To set several at once, tick the iterations you mean and a bar appears above the
+table: choose a result, then **Apply**. The tick in the header row selects every
+iteration, and **Clear** drops the selection without applying anything. An
+expanded iteration has the same for its steps. This matters most on a
+combinatorial dataset, where three parameters over three rows run as nine
+iterations rather than three.
+
+A bulk apply is the same edit as picking each row by hand, so it journals the
+same way and commits the same way. If one row cannot take the result the others
+still apply, and the message above the table names the ones that did not.
+
 - A result is recorded locally and sent to Jira when you commit, like every
   other edit. Nothing reaches Xray as you pick it, so a result picked by
   mistake can be discarded from Pending changes instead of having to be put

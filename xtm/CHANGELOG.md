@@ -8,6 +8,22 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ## [Unreleased]
 
+### Added
+
+**Set iteration and step results in bulk**
+- Tick the iterations you mean and apply one result to all of them, with the
+  header tick selecting every iteration and **Clear** dropping the selection
+  (#365). An expanded iteration has the same for its steps.
+- It earns its place on a combinatorial dataset: three parameters over three
+  rows run as nine iterations, each with its own steps, so a run that went the
+  same way everywhere was nine picks and more.
+- A bulk apply is the same edit as a single pick, journalled and committed
+  identically, rather than a second write path. A row that cannot take the
+  result is named and the others still apply.
+- The bar appears only once something is selected, and selection is dropped
+  when the run changes, so ticks cannot carry over onto another execution's
+  rows.
+
 ### Changed
 
 **An iteration result is committed, not written on the pick**
@@ -25,6 +41,9 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 - A step result is still local only on a live profile: Xray exposes no
   step-result id, so there is nothing to address a write to. Commit now reports
   it as skipped and leaves it pending, instead of failing it on every run.
+- Picking a result marks it **not committed** immediately, rather than only
+  after the run is read again. The optimistic update set the result without the
+  mark that goes with it.
 
 ### Fixed
 
