@@ -8,6 +8,27 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ## [Unreleased]
 
+### Fixed
+
+**Live dataset iterations never appeared at all**
+- A dataset test in a Test Execution showed no iterations on any live Xray
+  profile, with no error and no log line (#362). The read itself worked; the
+  store refused what it returned. `validateParameterizedRun` required every
+  step to carry an id and a step-definition id, and the live reader leaves both
+  empty because the Xray 2.0 iteration resource exposes neither. A live step
+  now carries a local key built from its iteration and position, which the
+  store keys it by and which is never sent to Xray.
+- A one-row dataset was refused for the same reason, since Xray reports its
+  single iteration with no id of its own. That absence is now allowed through,
+  and still identifies a run no per-iteration write can address.
+- A read that fails says "iterations unavailable" in the member row instead of
+  rendering nothing, which is what made this invisible: the indicator had no
+  error state, and it is the only control that can expand a row, so the error
+  message the detail rows already carried could never be reached. A test with
+  no dataset still shows nothing, because that answer is routine.
+- The Go side logs a failed read and a refused store, so the next occurrence is
+  visible in `xtm.log` rather than only in the database.
+
 ### Added
 
 **Dataset iterations on a live Xray profile**
