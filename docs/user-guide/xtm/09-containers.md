@@ -51,23 +51,28 @@ Each iteration row carries the values it ran with and its result, and expanding
 one shows its steps with those values already substituted. Pick a result in an
 iteration's **Result** column to record it.
 
-- On a live Xray profile the result reaches Xray as you pick it, rather than
-  waiting for a commit. A refused write is reported above the table and leaves
-  the result as it was.
-- The change is also listed under Pending changes. Committing it finds Xray
-  already holding that result and clears the row without writing again. If
-  somebody moved that iteration to a third result in between, your change is
+- A result is recorded locally and sent to Jira when you commit, like every
+  other edit. Nothing reaches Xray as you pick it, so a result picked by
+  mistake can be discarded from Pending changes instead of having to be put
+  back.
+- An uncommitted result is marked **not committed** beside it. Once committed,
+  the mark goes.
+- Committing a result Xray already holds clears the row without writing again.
+  If somebody moved that iteration to a third result in between, your change is
   held as a conflict labelled **Dataset iteration result** rather than
   overwriting theirs.
-- Xray decides the test's own run result from its iterations. XTM re-reads the
-  run after each write instead of working that out for itself, so the
-  **Execution** column shows what Xray settled on.
-- A step's result is a demo-only control. Xray gives a step inside an iteration
-  no id of its own, so there is nothing for a step write to address, and
-  picking a step result on a live profile reports that it is unsupported.
+- Xray decides the test's own run result from its iterations, by a rule XTM
+  does not own. The **Execution** column therefore shows what Xray last
+  reported, which does not move until your results are committed.
+- A step's result is recorded locally on any profile, but only a demo profile
+  can send one. Xray gives a step inside an iteration no id of its own, so
+  there is nothing for a step write to address, and committing one on a live
+  profile reports it as skipped and leaves it pending.
 - A dataset of one row produces no iterations. Xray keeps that run's parameters
   on the run itself, so record the result in the test's own **Execution**
   column.
+- Refreshing or syncing the run brings Xray's results for everything you have
+  not touched, and leaves an uncommitted result alone.
 
 A backend that reports no write support at all marks the panel **Read-only
 results** and shows each result as a badge instead of a dropdown, keeping any
@@ -171,5 +176,5 @@ Click **Bugs** in the toggle at the top left to list the defects linked to your 
 - **The run columns are missing.** They only show for Test Executions.
 - **A JUnit testcase is skipped as ambiguous.** Several tests share that summary. Rename the duplicates (see [Duplicates](04-duplicates.md)) and import again.
 - **An iteration result is refused with 403, "Current user does not have permissions to execute the Test Run".** Check whether the Test Execution is closed. The same account writes to an open execution without trouble, so the message names a permission when the cause is usually the execution's state.
-- **A step result will not save on a live profile.** Only a demo profile can set one. Xray exposes no id for a step result, so XTM has nothing to address the write to.
+- **A step result is reported as skipped by Commit.** Only a demo profile can send one. Xray exposes no id for a step result, so XTM has nothing to address the write to. The result stays recorded locally and stays pending, so nothing is lost; it just does not reach Jira.
 - **A row reads "iterations unavailable".** The run was found but could not be read or kept. Hover the marker for the reason, and look in `xtm.log` for the line naming the test and the execution. A test with no dataset shows nothing at all instead, which is not a fault.
