@@ -196,8 +196,13 @@ func validateParameterizedRun(run backend.ParameterizedRun) error {
 	iterationRanks := map[int]struct{}{}
 	var parameterNames []string
 	for iterationIndex, iteration := range run.Iterations {
-		if strings.TrimSpace(iteration.ID) == "" || strings.TrimSpace(iteration.Status) == "" {
-			return fmt.Errorf("iteration %d identity and status are required", iterationIndex+1)
+		// A one-row dataset has no iteration id, because Xray gives it none:
+		// it reports the run's parameters flat and no iterations at all, and
+		// the reader keeps that absence rather than inventing an id a write
+		// would then address to nothing (#362). The duplicate check below
+		// still catches a second iteration arriving without one.
+		if strings.TrimSpace(iteration.Status) == "" {
+			return fmt.Errorf("iteration %d status is required", iterationIndex+1)
 		}
 		if _, duplicate := iterationIDs[iteration.ID]; duplicate {
 			return fmt.Errorf("duplicate iteration id %q", iteration.ID)
