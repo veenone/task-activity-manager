@@ -138,6 +138,7 @@ export namespace backend {
 	    action: string;
 	    data: string;
 	    expected: string;
+	    uncommitted: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new IterationStep(source);
@@ -152,6 +153,7 @@ export namespace backend {
 	        this.action = source["action"];
 	        this.data = source["data"];
 	        this.expected = source["expected"];
+	        this.uncommitted = source["uncommitted"];
 	    }
 	}
 	export class RunIteration {
@@ -160,6 +162,7 @@ export namespace backend {
 	    status: string;
 	    parameters: IterationParameter[];
 	    steps: IterationStep[];
+	    uncommitted: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RunIteration(source);
@@ -172,6 +175,7 @@ export namespace backend {
 	        this.status = source["status"];
 	        this.parameters = this.convertValues(source["parameters"], IterationParameter);
 	        this.steps = this.convertValues(source["steps"], IterationStep);
+	        this.uncommitted = source["uncommitted"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

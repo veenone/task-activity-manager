@@ -26,6 +26,11 @@ type RunIteration struct {
 	Status     string               `json:"status"`
 	Parameters []IterationParameter `json:"parameters"`
 	Steps      []IterationStep      `json:"steps"`
+	// Uncommitted marks a result that is journalled locally and has not
+	// reached the backend yet (#366). A backend never sets it: it is what the
+	// store knows and the view needs, so a local pick does not read as a value
+	// the server already holds.
+	Uncommitted bool `json:"uncommitted"`
 }
 
 type IterationParameter struct {
@@ -41,6 +46,8 @@ type IterationStep struct {
 	Action       string `json:"action"`
 	Data         string `json:"data"`
 	Expected     string `json:"expected"`
+	// Uncommitted carries the same meaning as on the iteration (#366).
+	Uncommitted bool `json:"uncommitted"`
 }
 
 // ExpandDataset deterministically expands a dataset for demo fixtures and

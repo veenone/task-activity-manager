@@ -116,6 +116,8 @@ export interface IterationStep {
   action: string;
   data: string;
   expected: string;
+  // Same meaning as on the iteration (#366).
+  uncommitted: boolean;
 }
 
 export interface RunIteration {
@@ -124,6 +126,10 @@ export interface RunIteration {
   status: string;
   parameters: IterationParameter[];
   steps: IterationStep[];
+  // True while the result is journalled locally and has not been committed
+  // (#366). It comes from the pending-change journal, so it is always what
+  // Commit would push, never a second copy of that state.
+  uncommitted: boolean;
 }
 
 export interface ParameterizedRun {

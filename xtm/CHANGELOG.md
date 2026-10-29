@@ -8,7 +8,36 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ## [Unreleased]
 
+### Changed
+
+**An iteration result is committed, not written on the pick**
+- Picking a result for a dataset iteration no longer sends it to Xray straight
+  away (#366). It updates the local store and is journalled, like every other
+  edit in XTM, and Commit pushes it. Until then it carries a **not committed**
+  mark, and it can be discarded from Pending changes.
+- This was the only edit in XTM that reached the server without a Commit, so a
+  mistaken pick could not be reviewed or undone, and it contradicted the
+  contract that the store is a cache plus a journal while Jira is the system of
+  record.
+- The **Execution** column shows the result Xray last reported rather than
+  being refreshed on every pick, because Xray derives a run's own result from
+  its iterations by a rule XTM does not own.
+- A step result is still local only on a live profile: Xray exposes no
+  step-result id, so there is nothing to address a write to. Commit now reports
+  it as skipped and leaves it pending, instead of failing it on every run.
+
 ### Fixed
+
+**A refresh overwrote a result set locally**
+- Setting a step result and then the iteration's own result lost the step
+  result (#364). Refreshing a run replaced the whole iteration tree with what
+  Xray reports, and Xray reports no per-step status, so every step silently
+  took the iteration's result while the journal still named the user's choice.
+- The refresh now upserts and keeps any result that has a pending change, the
+  way `UpsertTests` has always guarded an edited test field against a sync, so
+  the store and the journal cannot disagree about what Commit would push.
+- Iterations and steps the backend no longer reports are dropped, so a dataset
+  that lost a row does not leave a result behind that nothing can commit.
 
 **Live dataset iterations never appeared at all**
 - A dataset test in a Test Execution showed no iterations on any live Xray

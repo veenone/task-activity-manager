@@ -940,24 +940,27 @@ Each iteration row carries the values it ran with and its result, and expanding
 one shows its steps with those values already substituted. Pick a result in an
 iteration's **Result** column to record it.
 
-- On a live Xray profile the result reaches Xray as you pick it, rather than
-  waiting for a commit. A refused write is reported above the table and leaves
-  the result as it was. The first thing to check is whether the Test Execution
-  is closed: a closed one refuses the write with a 403 that names a permission,
-  where the cause is the execution's state.
-- The change is also listed under Pending changes. Committing it finds Xray
-  already holding that result and clears the row without writing again, or
-  holds it as a **Dataset iteration result** conflict if somebody moved that
-  iteration to a third result in between.
-- Xray derives the test's own run result from its iterations, so the
-  **Execution** column follows what Xray settled on rather than a value XTM
-  works out for itself.
-- A step's result is a demo-only control. Xray gives a step inside an iteration
-  no id of its own, so there is nothing for a step write to address, and
-  picking a step result on a live profile reports that it is unsupported.
+- A result is recorded locally and sent to Jira when you commit, like every
+  other edit. Nothing reaches Xray as you pick it, so a result picked by
+  mistake can be discarded from Pending changes instead of having to be put
+  back. An uncommitted result is marked **not committed** beside it.
+- Committing a result Xray already holds clears the row without writing again,
+  or holds it as a **Dataset iteration result** conflict if somebody moved that
+  iteration to a third result in between. A commit refused with a 403 that
+  names a permission usually means the Test Execution is closed, where the
+  cause is the execution's state rather than the account.
+- Xray derives the test's own run result from its iterations, by a rule XTM
+  does not own. The **Execution** column therefore shows what Xray last
+  reported, and does not move until your results are committed.
+- A step's result is recorded locally on any profile, but only a demo profile
+  can send one. Xray gives a step inside an iteration no id of its own, so
+  there is nothing for a step write to address, and committing one on a live
+  profile reports it as skipped and leaves it pending.
 - A dataset of one row produces no iterations, because Xray keeps that run's
   parameters on the run itself. Record its result in the test's own
   **Execution** column.
+- Refreshing or syncing the run brings Xray's results for everything you have
+  not touched, and leaves an uncommitted result alone.
 
 A backend that reports no write support marks the panel **Read-only results**
 and shows each result as a badge instead of a dropdown.

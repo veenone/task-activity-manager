@@ -56,17 +56,24 @@ func (a *App) GetParameterizedRun(profileID, execKey, testKey string, forceRefre
 	return stored, nil
 }
 
-// SetIterationStatus writes an iteration's result through the backend and then
-// brings the stored run back in line with it (#336).
+// SetIterationStatus records an iteration's result locally and journals it for
+// Commit (#366).
 //
-// The backend write comes first: a store updated before a refused write would
-// show a status Xray never accepted. On demo the backend write is a no-op and
-// the store is the only record, which is what it has always been.
+// #336 wrote it straight to Xray on the pick, which made it the only edit in
+// XTM that reached the server without a Commit: it could not be reviewed in
+// Pending changes or discarded, and it broke the contract that the store is a
+// cache plus a journal and Jira is the system of record. The write now goes
+// where every other edit goes, and `syncer/commit_iteration.go` pushes it.
 //
-// The run is re-read rather than patched locally, because Xray derives the
-// run's own status from its iterations by a rule XTM does not own: writing one
-// iteration moves the run to EXECUTING on its own. A re-read costs a round trip
-// per write and is what keeps the view from showing a derived value XTM made up.
+// Dropping the write also drops the re-read it forced. That re-read was what
+// destroyed a locally set step result (#364), because refreshing the run
+// replaced the whole iteration tree with what Xray reports, and Xray reports no
+// per-step status.
+//
+// The run's own status is therefore no longer refreshed on every pick. Xray
+// derives it from the iterations by a rule XTM does not own, so the Execution
+// column keeps showing the value last read from Xray until the results are
+// committed, rather than a value XTM invented.
 func (a *App) SetIterationStatus(profileID, execKey, testKey, iterationID, status string) error {
 	if err := validateParameterizedRunWrite(profileID, execKey, testKey, iterationID, status); err != nil {
 		return err
@@ -74,31 +81,7 @@ func (a *App) SetIterationStatus(profileID, execKey, testKey, iterationID, statu
 	if err := a.requireParameterizedRunWrites(profileID); err != nil {
 		return err
 	}
-	b, err := a.backendFor(profileID)
-	if err != nil {
-		return err
-	}
-	if err := b.SetIterationStatus(a.ctx, execKey, testKey, iterationID, status); err != nil {
-		return err
-	}
-	if err := a.repo.SetIterationStatus(profileID, execKey, testKey, iterationID, status); err != nil {
-		return err
-	}
-	if b.IsDemo() {
-		return nil
-	}
-	// A failed refresh is not a failed write: the status reached Xray, and the
-	// store already carries it. The run status is what stays stale, and the next
-	// read fixes it, so this is logged rather than returned.
-	run, err := b.GetParameterizedRun(a.ctx, execKey, testKey)
-	if err != nil {
-		log.Printf("xtm: iteration written but the run could not be re-read: %v", err)
-		return nil
-	}
-	if err := a.repo.ReplaceParameterizedRun(profileID, run); err != nil {
-		log.Printf("xtm: iteration written but the run could not be stored: %v", err)
-	}
-	return nil
+	return a.repo.SetIterationStatus(profileID, execKey, testKey, iterationID, status)
 }
 
 func (a *App) SetIterationStepStatus(profileID, execKey, testKey, iterationID, stepResultID, status string) error {

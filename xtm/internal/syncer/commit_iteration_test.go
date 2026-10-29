@@ -75,6 +75,36 @@ func TestCommitIterationStatusClearsOnlyTheAcceptedChange(t *testing.T) {
 	}
 }
 
+// A step result has nowhere to go on live Xray, because the iteration resource
+// exposes no step-result id (#336). It is reported and left pending rather than
+// failed, so Commit does not show an error the user cannot act on (#364).
+func TestCommitSkipsAStepResultTheBackendCannotWrite(t *testing.T) {
+	b, engine, repo, profileID := seedIterationCommit(t)
+	b.iterationErr["result-1"] = backend.ErrUnsupported
+	if err := repo.SetIterationStepStatus(profileID, "QA-EXEC-1", "QA-1", "iteration-1", "result-1", "BLOCKED"); err != nil {
+		t.Fatalf("edit step: %v", err)
+	}
+
+	result, err := engine.CommitChanges(context.Background(), profileID, "QA")
+	if err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	if len(result.Failed) != 0 {
+		t.Errorf("step result reported as failed: %+v", result.Failed)
+	}
+	if len(result.Skipped) != 1 {
+		t.Fatalf("skipped = %+v, want the one step result", result.Skipped)
+	}
+	if result.Skipped[0].EntityType != "test_run_iteration_step" {
+		t.Errorf("skipped the wrong entity: %+v", result.Skipped[0])
+	}
+	// Left pending, so it is still visible and still discardable.
+	pending, _ := repo.ListPendingChanges(profileID)
+	if len(pending) != 1 {
+		t.Errorf("pending = %+v, want the step result to stay", pending)
+	}
+}
+
 func TestCommitIterationOnDemo2ClearsTheAcceptedChange(t *testing.T) {
 	repo, profileID := newSyncerRepoWithProfile(t)
 	b := xray.New(jira.NewClient("demo", "token"))
