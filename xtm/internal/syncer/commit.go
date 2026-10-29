@@ -53,6 +53,11 @@ const (
 	skipReasonExecType           = "backend does not support the Test Type (exec_type) field"
 	skipReasonRunDefects         = "backend does not support run-level defect links"
 	skipReasonRunComments        = "backend does not support run-level comments"
+	// A step result has nowhere to go on live Xray: the iteration resource
+	// exposes no step-result id, so there is nothing to address the write to
+	// (#336). The row stays pending and is reported rather than failed, so it
+	// does not read as an error the user could fix (#364).
+	skipReasonIterationStepWrites = "backend cannot write a result for a single step"
 	skipReasonDatasetWrites      = "backend does not support dataset writes"
 	skipReasonIterationWrites    = "backend does not support parameterized run writes"
 )

@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"agile-suite/xtm/internal/backend"
@@ -48,6 +49,17 @@ func (e *Engine) commitIterations(ctx context.Context, profileID string, rows []
 				err = e.backend.SetIterationStatus(ctx, identity.execKey, identity.testKey, identity.iterationID, change.AfterVal)
 			} else {
 				err = e.backend.SetIterationStepStatus(ctx, identity.execKey, identity.testKey, identity.iterationID, identity.stepResultID, change.AfterVal)
+			}
+			// A step result the backend cannot express is reported and left
+			// pending, not failed: nothing the user does will make it land, so
+			// an error every Commit would be noise rather than news (#364).
+			if errors.Is(err, backend.ErrUnsupported) && identity.stepResultID != "" {
+				result.Skipped = append(result.Skipped, SkippedCommit{
+					EntityKey:  change.EntityKey,
+					EntityType: change.EntityType,
+					Reason:     skipReasonIterationStepWrites,
+				})
+				continue
 			}
 			if err != nil {
 				result.Failed = append(result.Failed, FailedCommit{TestKey: identity.testKey, Error: "set parameterized result: " + sanitizeError(err.Error())})
