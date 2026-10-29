@@ -663,8 +663,8 @@ toolbar** appears above the grid:
   remove** works like Labels…. **Replace all** sets every selected test to the
   components you pick; picking none clears them. The line under the pickers
   says how many tests will change.
-- **Replace step text…** — find a string in the steps of every selected test
-  and replace it across them. Tick which of **Action**, **Data** and
+- **Replace step text…** finds a string in the steps of every selected test
+  and replaces it across them. Tick which of **Action**, **Data** and
   **Expected** to search, and narrow it with **Match case** and **Whole word**.
   **Find matches** writes nothing: it lists one row per matching step field
   with the text now and the text after, and any row can be unticked before you
@@ -1073,12 +1073,12 @@ Jira live, so a change made since then shows up only after another scan.
 Each row is one test, not a reusable project-level dataset. Expand it for one
 card per scope that exists:
 
-- **Default dataset** — the parameters and rows defined on the test.
-- **Plan overrides** — a different dataset for that test, defined in a Test
+- **Default dataset**: the parameters and rows defined on the test.
+- **Plan overrides**: a different dataset for that test, defined in a Test
   Plan.
-- **Execution overrides** — a different dataset for that test, defined in a
-  Test Execution.
-- **Used by** — every synced Plan and Execution that holds the test. Click a
+- **Execution overrides**: a different dataset for that test, defined in a Test
+  Execution.
+- **Used by**: every synced Plan and Execution that holds the test. Click a
   container key to open it.
 
 A usage reading **Inherited default** uses the test's own dataset, **Override**
@@ -1365,7 +1365,7 @@ fills in. Each row is one finding: the test, the field, the word, a snippet of
 its context, and the suggested replacements.
 
 ![Figure 56: Spellcheck findings](images/spellcheck-02-results.png)
-*Figure 56 — The Spellcheck table after a scan, one row per finding.*
+*Figure 56: the Spellcheck table after a scan, one row per finding.*
 
 Technical terms such as `csv` or `api` are reported too. Ignore one once and it
 stops appearing.
@@ -1379,7 +1379,7 @@ Type a replacement and the panel shows the text before and after it;
 **Replace** queues it.
 
 ![Figure 57: A replacement previewed](images/spellcheck-04-replace-preview.png)
-*Figure 57 — The finding panel, previewing the text before and after the
+*Figure 57: the finding panel, previewing the text before and after the
 replacement.*
 
 ### Fix or ignore many findings
@@ -1393,7 +1393,7 @@ With one word selected, pick a suggestion beside **Replace all:**, or type into
 the selected words instead, and **Clear** deselects everything.
 
 ![Figure 58: Every csv finding selected](images/spellcheck-05-bulk.png)
-*Figure 58 — One tick selected every finding of the same word.*
+*Figure 58: one tick selected every finding of the same word.*
 
 ### The ignore list
 
@@ -1404,7 +1404,7 @@ later scan. **Ignore list** opens it: **Add a word to ignore…** adds a word,
 closes the dialog. The ignore list is shared by all of your profiles.
 
 ![Figure 59: The ignore list](images/spellcheck-06-ignore-list.png)
-*Figure 59 — The ignore list, which every profile shares.*
+*Figure 59: the ignore list, which every profile shares.*
 
 The table is a snapshot of the last scan, so scan again after fixing a batch. A
 word you fixed is still the old word in Jira until you commit.
