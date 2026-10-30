@@ -47,6 +47,31 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Fixed
 
+**A step result held its test in a conflict nothing could clear**
+- Committing a step result could report a conflict that neither **Resolve &
+  re-commit** nor **Discard mine** had any effect on, so the same conflict
+  returned on the next Commit and there was no way out of it (#369).
+- The commit was comparing the result against a value nobody can set. Xray
+  publishes no status for an individual step, so XTM shows each step carrying
+  its iteration's result. Once the iteration moved, that borrowed value matched
+  neither the result the step started from nor the one picked for it, and the
+  comparison read as a conflict. Whether a backend takes step results is now a
+  stated capability, and a step result is set aside as skipped before any
+  comparison happens.
+- **Discard mine** found none of a test's results. It gathered pending edits by
+  the test's own key, while a result is keyed by its execution first, so it
+  reported success having deleted nothing. It now covers a test's run and
+  iteration results too, and matches a project key exactly rather than reading
+  its underscores as wildcards.
+- Discarding a single result from **Pending changes** failed with "unknown
+  entity_type" rather than reverting it, so the result the 1.11 notes said
+  could be discarded could not be. Discarding one now restores the result the
+  backend last reported.
+- Keeping your own value on a conflicted iteration result left the conflict in
+  place. These results are compared by value rather than by a version, so
+  keeping mine now re-bases onto what Xray holds, as a dataset edit already
+  did.
+
 **A refresh overwrote a result set locally**
 - Setting a step result and then the iteration's own result lost the step
   result (#364). Refreshing a run replaced the whole iteration tree with what
