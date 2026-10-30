@@ -14,11 +14,25 @@ const iterationConflictLabel = "Dataset iteration result"
 // commitIterations checks the current result by stable server id before it
 // writes. A changed remote result is held as a conflict, while one already at
 // the requested value is treated as satisfied and only clears the local row.
-func (e *Engine) commitIterations(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+func (e *Engine) commitIterations(ctx context.Context, profileID string, rows []testrepo.PendingChange, caps backend.Capabilities, result *CommitResult) {
 	for _, change := range rows {
 		identity, ok := parseIterationEntityKey(change)
 		if !ok {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: change.EntityKey, Error: "malformed parameterized result key"})
+			continue
+		}
+
+		// A step result the backend cannot address is skipped before anything is
+		// compared. Its remote side is the iteration's own status, which matches
+		// neither end of the edit whenever the iteration moved, so the conflict
+		// check below would hold the Test on a value no resolution can change
+		// and the same conflict would return on every Commit (#369).
+		if identity.stepResultID != "" && !caps.SupportsParameterizedRunStepWrites {
+			result.Skipped = append(result.Skipped, SkippedCommit{
+				EntityKey:  change.EntityKey,
+				EntityType: change.EntityType,
+				Reason:     skipReasonIterationStepWrites,
+			})
 			continue
 		}
 
