@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="588" viewBox="0 0 900 588" role="img" aria-label="Mockup of a Zephyr test cycle with per-step results, comments and defect links">
+  <title>Zephyr cycle, execution and per-step results</title>
+  <desc>A Zephyr Essential test cycle in the left pane with its folders and executions, and on the right one execution expanded to its four steps. Each step carries its own result, an optional comment and its own defect links, which Xray cannot address. Local edits are marked not committed, matching the journal and Commit model XTM already uses.</desc>
+
+  <defs>
+    <style>
+      .t      { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .mono   { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; }
+      .title  { font-size: 16px; font-weight: 600; fill: #1f2933; }
+      .h2     { font-size: 13px; font-weight: 600; fill: #1f2933; }
+      .lbl    { font-size: 11px; fill: #8b949e; letter-spacing: .4px; }
+      .body   { font-size: 13px; fill: #1f2933; }
+      .muted  { font-size: 12px; fill: #6b7280; }
+      .small  { font-size: 11px; fill: #6b7280; }
+      .chrome { fill: #ffffff; stroke: #d6dbe1; }
+      .side   { fill: #f6f8fa; stroke: #e3e8ee; }
+      .row    { fill: #ffffff; stroke: #eceff2; }
+      .rowalt { fill: #fbfcfd; stroke: #eceff2; }
+      .selrow { fill: #e8f0fe; stroke: #cfe0fb; }
+      .sel    { fill: #ffffff; stroke: #c3cad2; }
+      .pend   { fill: #fdf0dc; stroke: #e8d4b4; }
+      .pendt  { font-size: 10px; fill: #8a4b0f; }
+      .pass   { fill: #e3f3e8; stroke: #bfe2cb; }
+      .passt  { font-size: 11px; font-weight: 600; fill: #1b6b3a; }
+      .fail   { fill: #fdeaea; stroke: #f2c7c7; }
+      .failt  { font-size: 11px; font-weight: 600; fill: #a3242b; }
+      .wip    { fill: #eaf1fd; stroke: #c7d9f6; }
+      .wipt   { font-size: 11px; font-weight: 600; fill: #1f4f9c; }
+      .warnp  { fill: #fdf6e3; stroke: #ecdcb0; }
+      .warnt  { font-size: 11px; font-weight: 600; fill: #7a5a12; }
+      .bug    { font-size: 11px; fill: #a3242b; }
+      .btn    { fill: #1f6feb; stroke: #1f6feb; }
+      .btng   { fill: #ffffff; stroke: #c3cad2; }
+      .onlbl  { font-size: 12px; font-weight: 600; fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect width="900" height="588" fill="#eef1f4"/>
+  <rect x="16" y="16" width="868" height="556" rx="6" class="chrome"/>
+
+  <text x="34" y="44" class="t title">Test Executions</text>
+  <rect x="690" y="28" width="86" height="26" rx="4" class="btng"/>
+  <text x="704" y="46" class="t body">Refresh</text>
+  <rect x="784" y="28" width="86" height="26" rx="4" class="btn"/>
+  <text x="798" y="46" class="t onlbl">Commit 3</text>
+  <line x1="16" y1="64" x2="884" y2="64" stroke="#e3e8ee"/>
+
+  <rect x="16" y="64" width="266" height="508" class="side"/>
+  <text x="32" y="88" class="t lbl">CYCLES  ·  PROJECT PROJ</text>
+
+  <text x="32" y="114" class="t body">Regression cycle</text>
+  <text x="46" y="134" class="t small">Release 2.4  ·  cycle 501</text>
+
+  <text x="46" y="162" class="t body">Provisioning</text>
+  <rect x="40" y="172" width="226" height="24" rx="3" class="selrow"/>
+  <text x="60" y="189" class="t body">PROJ-101  Minimum Acceptance</text>
+  <text x="60" y="212" class="t muted">PROJ-102  Payment smoke test</text>
+
+  <text x="46" y="244" class="t body">Tokenisation</text>
+  <text x="60" y="266" class="t muted">PROJ-103  Card art refresh</text>
+
+  <text x="32" y="306" class="t body">Ad-hoc executions</text>
+  <text x="46" y="326" class="t small">the cycle Zephyr reports as -1</text>
+
+  <text x="32" y="372" class="t lbl">NOT IN ZEPHYR ESSENTIAL</text>
+  <text x="32" y="394" class="t small">Test sets and test plans. A cycle is</text>
+  <text x="32" y="412" class="t small">the only container kind here.</text>
+
+  <text x="304" y="92" class="t title">PROJ-101</text>
+  <text x="304" y="112" class="t muted">Minimum Acceptance  ·  execution 2001  ·  executed by qa.user</text>
+
+  <text x="304" y="146" class="t lbl">EXECUTION RESULT</text>
+  <rect x="440" y="132" width="110" height="24" rx="4" class="sel"/>
+  <text x="452" y="149" class="t body">WIP</text>
+  <rect x="560" y="133" width="92" height="22" rx="11" class="pend"/>
+  <text x="572" y="148" class="t pendt">not committed</text>
+
+  <text x="304" y="186" class="t h2">Step results</text>
+  <text x="396" y="186" class="t small">each one addressable in Zephyr, unlike Xray</text>
+
+  <rect x="304" y="198" width="564" height="26" class="rowalt"/>
+  <text x="314" y="215" class="t lbl">#</text>
+  <text x="344" y="215" class="t lbl">STEP</text>
+  <text x="596" y="215" class="t lbl">RESULT</text>
+  <text x="712" y="215" class="t lbl">COMMENT AND DEFECTS</text>
+
+  <rect x="304" y="224" width="564" height="46" class="row"/>
+  <text x="314" y="252" class="t body">1</text>
+  <text x="344" y="246" class="t body">Sign in</text>
+  <text x="344" y="263" class="t small">step 3001  ·  result 4001</text>
+  <rect x="596" y="236" width="80" height="22" rx="11" class="fail"/>
+  <text x="612" y="251" class="t failt">FAIL</text>
+  <text x="712" y="244" class="t muted">gateway returned no</text>
+  <text x="712" y="260" class="t muted">response</text>
+
+  <rect x="304" y="270" width="564" height="46" class="rowalt"/>
+  <text x="314" y="298" class="t body">2</text>
+  <text x="344" y="292" class="t body">Token activation</text>
+  <text x="344" y="309" class="t small">step 3002  ·  result 4002</text>
+  <rect x="596" y="282" width="80" height="22" rx="11" class="pass"/>
+  <text x="610" y="297" class="t passt">PASS</text>
+  <text x="712" y="300" class="t small">no comment</text>
+
+  <rect x="304" y="316" width="564" height="46" class="row"/>
+  <text x="314" y="344" class="t body">3</text>
+  <text x="344" y="338" class="t body">Payment authorisation</text>
+  <text x="344" y="355" class="t small">step 3003  ·  result 4003</text>
+  <rect x="596" y="328" width="112" height="22" rx="11" class="warnp"/>
+  <text x="608" y="343" class="t warnt">PASS WARNING</text>
+  <text x="712" y="338" class="t bug">PROJ-510</text>
+  <text x="712" y="356" class="t small">defect on this step</text>
+
+  <rect x="304" y="362" width="564" height="46" class="row"/>
+  <text x="314" y="390" class="t body">4</text>
+  <text x="344" y="384" class="t body">Settlement reconciliation</text>
+  <text x="344" y="401" class="t small">step 3004  ·  result 4004</text>
+  <rect x="596" y="374" width="80" height="22" rx="11" class="wip"/>
+  <text x="608" y="389" class="t wipt">WIP</text>
+  <rect x="712" y="375" width="92" height="22" rx="11" class="pend"/>
+  <text x="724" y="390" class="t pendt">not committed</text>
+
+  <rect x="304" y="428" width="564" height="28" rx="4" class="selrow"/>
+  <text x="318" y="446" class="t body">2 selected</text>
+  <rect x="396" y="432" width="92" height="20" rx="4" class="sel"/>
+  <text x="406" y="446" class="t muted">PASS</text>
+  <rect x="496" y="432" width="56" height="20" rx="4" class="btn"/>
+  <text x="508" y="446" class="t onlbl">Apply</text>
+  <rect x="560" y="432" width="56" height="20" rx="4" class="btng"/>
+  <text x="572" y="446" class="t muted">Clear</text>
+  <text x="636" y="446" class="t small">the bulk bar from #365, unchanged</text>
+
+  <text x="304" y="486" class="t lbl">WHY THIS MATTERS</text>
+  <text x="304" y="508" class="t small">PASS WARNING is not one of SmartBear's five documented statuses. It is defined on this</text>
+  <text x="304" y="526" class="t small">instance, so the adapter reads the vocabulary at connect time and maps names to the</text>
+  <text x="304" y="544" class="t small">numeric ids this instance uses. A hardcoded map would write the wrong result silently.</text>
+</svg>
