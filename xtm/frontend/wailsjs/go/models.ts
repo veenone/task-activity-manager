@@ -25,6 +25,7 @@ export namespace backend {
 	    supportsDatasetWrites: boolean;
 	    supportsParameterizedRunDetail: boolean;
 	    supportsParameterizedRunWrites: boolean;
+	    supportsParameterizedRunStepWrites: boolean;
 	    supportsComponentAdmin: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -57,6 +58,7 @@ export namespace backend {
 	        this.supportsDatasetWrites = source["supportsDatasetWrites"];
 	        this.supportsParameterizedRunDetail = source["supportsParameterizedRunDetail"];
 	        this.supportsParameterizedRunWrites = source["supportsParameterizedRunWrites"];
+	        this.supportsParameterizedRunStepWrites = source["supportsParameterizedRunStepWrites"];
 	        this.supportsComponentAdmin = source["supportsComponentAdmin"];
 	    }
 	}

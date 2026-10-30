@@ -114,6 +114,11 @@ type Capabilities struct {
 
 	SupportsParameterizedRunDetail bool `json:"supportsParameterizedRunDetail"`
 	SupportsParameterizedRunWrites bool `json:"supportsParameterizedRunWrites"`
+	// StepWrites is separate because Xray takes an iteration result but not a
+	// step one, and reports each step carrying its iteration's status: the
+	// commit path must ask before it compares values or it raises a conflict no
+	// resolution can clear (#369).
+	SupportsParameterizedRunStepWrites bool `json:"supportsParameterizedRunStepWrites"`
 
 	// SupportsComponentAdmin: the backend can create, edit and delete project
 	// components (it implements ComponentManager).

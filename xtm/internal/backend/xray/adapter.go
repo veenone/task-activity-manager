@@ -569,6 +569,7 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 	// read gives no step-result id, so a per-step write has nothing to address.
 	caps.SupportsParameterizedRunDetail = true
 	caps.SupportsParameterizedRunWrites = true
+	caps.SupportsParameterizedRunStepWrites = false
 	return caps
 }
 

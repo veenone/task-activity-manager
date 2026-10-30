@@ -144,6 +144,23 @@ func iterationStepEntityKey(execKey, testKey, iterationID, stepResultID string) 
 	return strings.Join([]string{execKey, testKey, iterationID, stepResultID}, ":")
 }
 
+// splitIterationEntityKey parses a key built by the two helpers above: three
+// parts for an iteration, four for one of its steps. Issue keys contain no
+// colon, so the split is unambiguous. An empty part means a malformed key, which
+// would otherwise revert or delete by a blank identifier.
+func splitIterationEntityKey(entityKey string, want int) ([]string, bool) {
+	parts := strings.Split(entityKey, ":")
+	if len(parts) != want {
+		return nil, false
+	}
+	for _, part := range parts {
+		if strings.TrimSpace(part) == "" {
+			return nil, false
+		}
+	}
+	return parts, true
+}
+
 func (r *Repository) ParameterizedRun(profileID, execKey, testKey string) (backend.ParameterizedRun, bool, error) {
 	// The uncommitted flag comes from the journal rather than a column, so the
 	// store cannot drift from what Commit would actually push (#366).

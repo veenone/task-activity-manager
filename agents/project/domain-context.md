@@ -354,6 +354,14 @@ Writing one back, confirmed while building #336 on the same instance:
 - **Per-step results still cannot be written.** The read gives steps with no
   id, and the write answers `stepResults: []`, so nothing exposes a
   step-result id to address. `SetIterationStepStatus` stays unsupported.
+- **A step's reported status is its iteration's, not its own.** The live reader
+  fills every step with the iteration status because Xray offers nothing else.
+  That value is a display convenience, so no commit may compare against it: a
+  step edit whose iteration has since moved matches neither the value it
+  started from nor the one the user asked for, and the comparison raises a
+  conflict whose remote side is not a field anyone can set. A commit decides a
+  step row on `SupportsParameterizedRunStepWrites` and skips it before reading
+  values at all (#369).
 
 ### Writing a dataset
 

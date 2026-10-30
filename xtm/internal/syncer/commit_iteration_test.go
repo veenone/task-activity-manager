@@ -16,13 +16,18 @@ type iterationCommitBackend struct {
 	backend.Backend
 	run              backend.ParameterizedRun
 	writes           bool
+	stepWrites       bool
 	iterationErr     map[string]error
 	iterationCalls   []string
 	iterationStepIDs []string
 }
 
 func (b *iterationCommitBackend) Capabilities() backend.Capabilities {
-	return backend.Capabilities{SupportsParameterizedRunDetail: true, SupportsParameterizedRunWrites: b.writes}
+	return backend.Capabilities{
+		SupportsParameterizedRunDetail:     true,
+		SupportsParameterizedRunWrites:     b.writes,
+		SupportsParameterizedRunStepWrites: b.stepWrites,
+	}
 }
 
 func (b *iterationCommitBackend) GetParameterizedRun(context.Context, string, string) (backend.ParameterizedRun, error) {
@@ -53,7 +58,7 @@ func seedIterationCommit(t *testing.T) (*iterationCommitBackend, *syncer.Engine,
 	if err := repo.ReplaceParameterizedRun(profileID, run); err != nil {
 		t.Fatalf("seed parameterized run: %v", err)
 	}
-	b := &iterationCommitBackend{run: run, writes: true, iterationErr: map[string]error{}}
+	b := &iterationCommitBackend{run: run, writes: true, stepWrites: true, iterationErr: map[string]error{}}
 	return b, syncer.New(b, repo), repo, profileID
 }
 
@@ -193,5 +198,43 @@ func TestCommitIterationFailureDoesNotDeleteSiblingChange(t *testing.T) {
 	pending, _ := repo.ListPendingChanges(profileID)
 	if len(pending) != 1 || pending[0].EntityKey != "QA-EXEC-1:QA-1:iteration-1" {
 		t.Fatalf("pending = %+v, want only failed sibling", pending)
+	}
+}
+
+// #369: a step result's "remote" value is the iteration's own status, because
+// live Xray exposes no per-step result. When that status matches neither end of
+// the pending edit the conflict check fires, and no resolution can clear it: the
+// value it compares against is not a field anyone can set. The row has to reach
+// the skip instead, the same way one the backend refuses does.
+func TestCommitSkipsAStepResultRatherThanConflictingOnTheIterationStatus(t *testing.T) {
+	b, engine, repo, profileID := seedIterationCommit(t)
+	b.stepWrites = false
+	// The step and its iteration both read EXECUTING, as the live reader builds
+	// them, and the user moves the step to BLOCKED.
+	b.run.Iterations[0].Status = "EXECUTING"
+	b.run.Iterations[0].Steps[0].Status = "EXECUTING"
+	if err := repo.ReplaceParameterizedRun(profileID, b.run); err != nil {
+		t.Fatalf("seed executing run: %v", err)
+	}
+	if err := repo.SetIterationStepStatus(profileID, "QA-EXEC-1", "QA-1", "iteration-1", "result-1", "BLOCKED"); err != nil {
+		t.Fatalf("edit step: %v", err)
+	}
+	// Xray now reports the iteration as ABORTED, so the step reads ABORTED too:
+	// neither the EXECUTING it was nor the BLOCKED the user asked for.
+	b.run.Iterations[0].Status = "ABORTED"
+	b.run.Iterations[0].Steps[0].Status = "ABORTED"
+
+	result, err := engine.CommitChanges(context.Background(), profileID, "QA")
+	if err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	if len(result.Conflicted) != 0 {
+		t.Errorf("step result raised a conflict no resolution can clear: %+v", result.Conflicted)
+	}
+	if len(result.Skipped) != 1 {
+		t.Fatalf("skipped = %+v, want the one step result", result.Skipped)
+	}
+	if result.Skipped[0].EntityType != "test_run_iteration_step" {
+		t.Errorf("skipped the wrong entity: %+v", result.Skipped[0])
 	}
 }

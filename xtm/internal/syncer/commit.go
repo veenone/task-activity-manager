@@ -909,7 +909,7 @@ testLoop:
 	}
 	e.commitRuns(ctx, profileID, runRows, &result)
 	if caps.SupportsParameterizedRunWrites {
-		e.commitIterations(ctx, profileID, iterationRows, &result)
+		e.commitIterations(ctx, profileID, iterationRows, caps, &result)
 	} else {
 		e.skipRows(iterationRows, skipReasonIterationWrites, &result)
 	}

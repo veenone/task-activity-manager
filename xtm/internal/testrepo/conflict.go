@@ -18,6 +18,19 @@ type ConflictDecision struct {
 	RemoteValue string `json:"remoteValue"` // value to keep when choice == "theirs"
 }
 
+// valueComparedOnCommit reports whether this entity's commit decides a conflict
+// by comparing the pending before value against the backend's current value,
+// rather than by comparing version tokens. Keeping mine on one of these has to
+// move the before value, because re-basing base_version leaves the comparison
+// that raised the conflict exactly as it was.
+func valueComparedOnCommit(entityType string) bool {
+	switch entityType {
+	case entityTestDataset, entityTestRunIteration, entityTestRunIterStep:
+		return true
+	}
+	return false
+}
+
 // RecreateDeletedTest converts a Test that was deleted in Jira into a brand-new
 // local Test carrying its current (locally-edited) content, so the user's work
 // isn't lost when they hit a remote-delete conflict (FR-1.4). The original
@@ -77,11 +90,12 @@ func (r *Repository) ResolveConflictMerge(profileID, testKey, remoteVersion stri
 	defer func() { _ = tx.Rollback() }()
 
 	for _, d := range decisions {
-		// Keeping mine re-bases the dataset's before value onto the table Jira
-		// holds now. The dataset commit compares those two rather than a
-		// version token, so without this the same conflict comes back on every
-		// commit and the edit can never be pushed (#277 W1).
-		if d.Choice == "mine" && d.EntityType == entityTestDataset {
+		// Keeping mine re-bases the before value onto what the backend holds
+		// now. These commits compare those two values rather than a version
+		// token, so without this the same conflict comes back on every commit
+		// and the edit can never be pushed: first seen for datasets (#277 W1),
+		// and true of an iteration result for the same reason (#369).
+		if d.Choice == "mine" && valueComparedOnCommit(d.EntityType) {
 			if _, err := tx.Exec(
 				`UPDATE pending_change SET before_val = ? WHERE profile_id = ? AND id = ?`,
 				d.RemoteValue, profileID, d.PendingID,
