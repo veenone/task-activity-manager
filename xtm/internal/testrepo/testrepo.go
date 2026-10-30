@@ -4247,6 +4247,35 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 	case entityTestRunIterationImport:
 		// A deferred JUnit result has no local materialized value to restore.
 		// Discarding it only removes the queued instruction below.
+	case entityTestRunIteration:
+		// entity_key is "<execKey>:<testKey>:<iterationID>". Without these two
+		// cases the switch fell through to the default below, so discarding a
+		// result reported "unknown entity_type" and left it pending (#369).
+		parts, ok := splitIterationEntityKey(entityKey, 3)
+		if !ok {
+			return fmt.Errorf("malformed iteration result key %q", entityKey)
+		}
+		if _, err := tx.Exec(
+			`UPDATE test_run_iteration SET status = ?
+			 WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND iteration_id = ?`,
+			beforeVal, profileID, parts[0], parts[1], parts[2],
+		); err != nil {
+			return fmt.Errorf("revert iteration result: %w", err)
+		}
+	case entityTestRunIterStep:
+		// entity_key adds the step result id to the iteration's key.
+		parts, ok := splitIterationEntityKey(entityKey, 4)
+		if !ok {
+			return fmt.Errorf("malformed iteration step result key %q", entityKey)
+		}
+		if _, err := tx.Exec(
+			`UPDATE test_run_iteration_step SET status = ?
+			 WHERE profile_id = ? AND exec_key = ? AND test_key = ?
+			   AND iteration_id = ? AND step_result_id = ?`,
+			beforeVal, profileID, parts[0], parts[1], parts[2], parts[3],
+		); err != nil {
+			return fmt.Errorf("revert iteration step result: %w", err)
+		}
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
 	}
@@ -4512,14 +4541,33 @@ func (r *Repository) RebaseTestConflict(profileID, testKey, baseVersion string) 
 	return nil
 }
 
+// likeEscape makes an issue key safe to interpolate into a LIKE pattern. A Jira
+// project key contains underscores, and LIKE reads "_" as "any one character",
+// so an unescaped key matches neighbours it does not own. Harmless where the
+// pattern only widens a read; not harmless where the rows are then deleted.
+func likeEscape(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return strings.ReplaceAll(s, `%`, `\%`)
+}
+
 // DiscardTestChanges drops every pending change belonging to a Test, reverting
 // the local cache to match the committed/remote state (FR-1.4 conflict
-// resolution — "keep remote"). Step / custom-field / review rows are included.
+// resolution, "keep remote"). Step / custom-field / review rows are included,
+// and so are the rows keyed by an execution: a run status is
+// "<execKey>:<testKey>" and an iteration result adds more parts after it, so
+// matching only the Test's own prefix found none of them and the call reported
+// success having deleted nothing (#369).
 func (r *Repository) DiscardTestChanges(profileID, testKey string) error {
+	key := likeEscape(testKey)
 	rows, err := r.db.Query(
 		`SELECT id FROM pending_change
-		 WHERE profile_id = ? AND (entity_key = ? OR entity_key LIKE ?)`,
-		profileID, testKey, testKey+":%",
+		 WHERE profile_id = ? AND (
+		       entity_key = ?
+		    OR entity_key LIKE ? ESCAPE '\'
+		    OR entity_key LIKE ? ESCAPE '\'
+		    OR entity_key LIKE ? ESCAPE '\')`,
+		profileID, testKey, key+":%", "%:"+key, "%:"+key+":%",
 	)
 	if err != nil {
 		return fmt.Errorf("list test pending changes: %w", err)
