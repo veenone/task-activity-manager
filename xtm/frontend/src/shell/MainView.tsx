@@ -18,12 +18,16 @@ import { TestCallsView } from "../components/TestCallsView";
 import MisspellingsView from "../components/MisspellingsView";
 import type { AppState } from "./useAppState";
 import type { AppActions } from "./useAppActions";
+import { offeredKinds } from "../components/containers/constants";
 
 // MainView renders the chosen view. Browse, the fallback, is the grouped
 // sidebar, the test table, and the detail or New Test panel beside it.
 export function MainView({ s, a }: { s: AppState; a: AppActions }) {
   const { activeProfile, pulling, view, setView, groupBy, setGroupBy, selectedFolder, setSelectedFolder, selectedContainer, setSelectedContainer, selectedComponent, setSelectedComponent, showNewTest, setShowNewTest, newTestFolder, openContainer, selectedKey, setSelectedKey, detailVersion, sidebarWidth, syncState, folders, groupContainers, components, pendingByTestKey, reloadPending, refreshProfileData, isDemo, demoVar, caps, startSidebarResize } = s;
   const { createFolder, renameFolder, deleteFolder, syncTests, handleEdited, openNewTest, handleTestCreated } = a;
+  // Browse can group by Test Set or Test Plan, which only Xray has. The same
+  // list narrows the Containers view's type picker (#371 Phase 2).
+  const groupKinds = offeredKinds(caps.containerKinds).map((k) => k.value);
   return (
     <>
       {view === "preconditions" && caps.supportsPreconditionObjects ? (
@@ -158,8 +162,12 @@ export function MainView({ s, a }: { s: AppState; a: AppActions }) {
               {caps.supportsFolders && (
                 <option value="folder">Group by: Folder</option>
               )}
-              <option value="testset">Group by: Test Set</option>
-              <option value="testplan">Group by: Test Plan</option>
+              {groupKinds.includes("testset") && (
+                <option value="testset">Group by: Test Set</option>
+              )}
+              {groupKinds.includes("testplan") && (
+                <option value="testplan">Group by: Test Plan</option>
+              )}
               <option value="component">Group by: Component</option>
             </select>
             {groupBy === "component" ? (

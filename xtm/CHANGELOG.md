@@ -77,6 +77,13 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Fixed
 
+**The container type picker offered kinds the backend does not have**
+- The Containers view offered Test Set and Test Plan on every profile,
+  although only Xray has them, and it remembered the chosen kind per profile.
+  A Kiwi or Zephyr profile could therefore open on a kind that can never hold
+  anything, which reads as a sync that did not run. Browse's Group by menu
+  offered the same two (#371).
+
 **A step result held its test in a conflict nothing could clear**
 - Committing a step result could report a conflict that neither **Resolve &
   re-commit** nor **Discard mine** had any effect on, so the same conflict

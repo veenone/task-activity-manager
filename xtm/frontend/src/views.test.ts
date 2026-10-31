@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { VIEWS, visibleViews } from "./views";
+import { VIEWS, visibleViews, browseGrouping } from "./views";
 import type { ViewContext } from "./views";
 
 const all: ViewContext = {
@@ -78,5 +78,35 @@ describe("the view list", () => {
   it("gives every view a distinct tour hook", () => {
     const tours = VIEWS.map((v) => v.tour);
     expect(new Set(tours).size).toBe(tours.length);
+  });
+});
+
+describe("browseGrouping", () => {
+  const xray = { containerKinds: ["testset", "testplan", "testexec"], supportsFolders: true };
+  const zephyr = { containerKinds: ["testexec"], supportsFolders: false };
+
+  it("keeps the remembered dimension when the backend has it", () => {
+    expect(browseGrouping("testplan", xray)).toBe("testplan");
+    expect(browseGrouping("folder", xray)).toBe("folder");
+  });
+
+  it("leaves a grouping the backend cannot fill", () => {
+    // A Zephyr Essential profile has no test plans, so grouping by one lists
+    // nothing and reads as a sync that did not run.
+    expect(browseGrouping("testplan", zephyr)).not.toBe("testplan");
+    expect(browseGrouping("testset", zephyr)).not.toBe("testset");
+  });
+
+  it("does not fall back to folders on a backend without a folder tree", () => {
+    expect(browseGrouping("testplan", zephyr)).toBe("component");
+    expect(browseGrouping("folder", zephyr)).toBe("component");
+  });
+
+  it("falls back to folders when the backend has them", () => {
+    expect(browseGrouping("testplan", { containerKinds: ["testexec"], supportsFolders: true })).toBe("folder");
+  });
+
+  it("leaves component grouping alone, which every backend has", () => {
+    expect(browseGrouping("component", zephyr)).toBe("component");
   });
 });

@@ -8,7 +8,7 @@ import type { ExecMemberRun, RollupMember } from "../../api";
 import { keyCompare, cmpStr, applyDir } from "../../sort";
 import { useContainers, useContainerBoard, useContainerBugs, useContainerMembers, useContainerRollup } from "../../queries/containers";
 import { useCapabilities } from "../../features";
-import { KINDS } from "./constants";
+import { KINDS, offeredKinds } from "./constants";
 
 // useContainerState holds what the Containers view knows: the chosen kind and
 // container with their filters, the queries behind them, the member table's
@@ -122,6 +122,10 @@ export function useContainerState() {
   // board is paged client-side. The page size is user-selectable; default 15.
   const [pageSize, setPageSize] = useState(15);
 
+  // The kinds this backend has. The chosen kind is persisted per profile, so a
+  // profile on a backend with executions alone would otherwise keep whichever
+  // kind was last picked on another profile and show an empty view.
+  const kinds = useMemo(() => offeredKinds(caps.containerKinds), [caps.containerKinds]);
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
   const selectedContainer = containers.find((c) => c.key === selected) ?? null;
 
@@ -231,6 +235,10 @@ export function useContainerState() {
     setEnvToolsOpen(false);
   }, [kind]);
 
+  useEffect(() => {
+    if (!kinds.some((k) => k.value === kind)) setKind(kinds[0].value);
+  }, [kinds, kind, setKind]);
+
   // Close the batch-environment popover on Escape, matching the Menu component.
   useEffect(() => {
     if (!envToolsOpen) return;
@@ -339,7 +347,7 @@ export function useContainerState() {
     (safePage + 1) * pageSize,
   );
 
-  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
+  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
 }
 
 export type ContainerState = ReturnType<typeof useContainerState>;
