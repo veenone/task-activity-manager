@@ -1,6 +1,8 @@
 // Test runs, roll-ups, and JUnit import.
 
 import {
+  GetRunStepResults as getRunStepResultsBinding,
+  SetRunStepStatus as setRunStepStatusBinding,
   AnalyzeJUnitImport as analyzeJUnitImportBinding,
   ApplyJUnitImport as applyJUnitImportBinding,
   AnalyzeJUnitImportNewExec as analyzeJUnitImportNewExecBinding,
@@ -9,6 +11,53 @@ import {
 import { testrepo } from "../../wailsjs/go/models";
 import type { BulkEditResult } from "./changes";
 import type { IterationParameter } from "./datasets";
+
+// RunStepResult mirrors backend.RunStepResult: one step's recorded result on
+// one test's execution, with no dataset and no iteration involved. Only a
+// backend whose step results carry their own ids reports these, which today
+// means a Zephyr profile (#371 Phase 6).
+export interface RunStepResult {
+  // The result's own id on the backend, which is what a write addresses. The
+  // step it belongs to is definitionId, and two executions of the same test
+  // have two results for the same step.
+  id: string;
+  definitionId: string;
+  rank: number;
+  status: string;
+  action: string;
+  data: string;
+  expected: string;
+  // What the executor recorded against this step. Read only: the write that
+  // sets it is one of the endpoints #371 Phase 4 has still to measure.
+  comment: string;
+  // True while the result is journalled locally and has not been committed.
+  // Same meaning, and same journal-derived source, as on an iteration (#366).
+  uncommitted: boolean;
+}
+
+export async function GetRunStepResults(
+  profileId: string,
+  execKey: string,
+  testKey: string,
+  forceRefresh: boolean,
+): Promise<RunStepResult[]> {
+  return getRunStepResultsBinding(
+    profileId,
+    execKey,
+    testKey,
+    forceRefresh,
+  ) as unknown as Promise<RunStepResult[]>;
+}
+
+export async function SetRunStepStatus(
+  profileId: string,
+  execKey: string,
+  testKey: string,
+  stepResultId: string,
+  status: string,
+): Promise<void> {
+  return setRunStepStatusBinding(profileId, execKey, testKey, stepResultId, status);
+}
 
 export async function AnalyzeJUnitImport(
   profileId: string,
