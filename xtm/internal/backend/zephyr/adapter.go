@@ -1,0 +1,128 @@
+package zephyr
+
+import (
+	"context"
+	"fmt"
+
+	"agile-suite/xtm/internal/backend"
+	"agile-suite/xtm/internal/jira"
+)
+
+// Adapter implements backend.Backend for a Zephyr Essential Data Center
+// instance.
+//
+// It holds two clients because Zephyr splits in two: a test is an ordinary
+// Jira issue, so its fields, workflow, comments, requirements and defects are
+// the Jira calls XTM already makes, and only cycles, executions, steps and
+// step results live behind /rest/zapi/latest. Wrapping the existing Jira
+// client rather than reimplementing those reads is what keeps this backend
+// smaller than the Kiwi one.
+//
+// Phase 1 (#371) implements the connection test and the capability
+// declaration. Every other method answers backend.ErrUnsupported until the
+// phase that fills it; see unsupported.go.
+type Adapter struct {
+	j *jira.Client
+	z *Client
+}
+
+// New pairs a Jira client with a Zephyr client for the same instance. Both
+// authenticate with the same personal access token.
+func New(j *jira.Client, z *Client) *Adapter { return &Adapter{j: j, z: z} }
+
+// Compile-time assertion that the adapter satisfies the interface.
+var _ backend.Backend = (*Adapter)(nil)
+
+// --- connection / auth ---
+
+// TestConnection is a two-part check, and both parts matter.
+//
+// Jira answering /myself proves only that the token works. It says nothing
+// about whether Zephyr is installed, so a Zephyr profile pointed at a plain
+// Jira would otherwise connect cleanly and then fail on every call that
+// touches a cycle. Asking for the Test issue type settles it and captures the
+// id at the same time.
+//
+// Both status vocabularies are read here too. They are needed by everything
+// that reports or writes a result, and an instance that cannot answer them is
+// better refused at connect time than one endpoint at a time later.
+func (a *Adapter) TestConnection(ctx context.Context) (*backend.User, error) {
+	u, err := a.j.TestConnection(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := a.z.TestIssueTypeID(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := a.z.ExecutionStatuses(ctx); err != nil {
+		return nil, fmt.Errorf("read this instance's execution statuses: %w", err)
+	}
+	if _, err := a.z.StepStatuses(ctx); err != nil {
+		return nil, fmt.Errorf("read this instance's step statuses: %w", err)
+	}
+	if u == nil {
+		return nil, nil
+	}
+	return &backend.User{Name: u.Name, DisplayName: u.DisplayName, Email: u.Email}, nil
+}
+
+// IsDemo is always false. There is no offline Zephyr instance to generate, as
+// there is for Kiwi.
+func (a *Adapter) IsDemo() bool { return false }
+
+// SetRequirementLinkType configures the Jira issue-link type used when linking
+// a test to a requirement. Requirements are Jira issues here, so this is the
+// Jira client's setting unchanged.
+func (a *Adapter) SetRequirementLinkType(name string) { a.j.SetRequirementLinkType(name) }
+
+// --- capabilities ---
+
+// Capabilities declares what a Zephyr Essential profile can do.
+//
+// The four absences are the ones the probes confirmed by 404, not guesses:
+// there is no test case repository, no preconditions, no datasets or
+// parameters, and no test plans. Each is a view that goes dark on a Zephyr
+// profile, which is what these flags are for. Zephyr's folders group
+// executions inside a cycle rather than organising test cases, so they are not
+// the folder tree SupportsFolders promises and the flag stays off.
+//
+// The parameterized-run flags are off for the same reason: Essential has no
+// datasets, so there is no iteration to report. That is not because step
+// results are missing. Zephyr's step results are first-class, with their own
+// ids, comments and defect links, which is the one thing it does better than
+// Xray; they just do not hang off a dataset. Phase 6 is where that becomes a
+// capability of its own rather than a parameterized-run flag.
+func (a *Adapter) Capabilities() backend.Capabilities {
+	return backend.Capabilities{
+		Name:             "zephyr-essential-dc",
+		IDStyle:          "opaque",
+		SupportsJQLScope: true,
+		StepModel:        "objects",
+
+		SupportsTestTypes:           false,
+		SupportsFolders:             false,
+		SupportsFolderWrites:        false,
+		SupportsPreconditionObjects: false,
+		SupportsRequirementObjects:  true,
+		SupportsIssueLinkTypes:      true,
+		SupportsEnvironments:        false,
+
+		SupportsContainers: true,
+		ContainerKinds:     []string{backend.KindTestExec},
+		SupportsTestRuns:   true,
+
+		StatusModel:                 "workflow",
+		SupportsWorkflowTransitions: true,
+		SupportsBugCreation:         true,
+		SupportsBugLinks:            true,
+		SupportsTags:                true,
+
+		SupportsDatasets:                   false,
+		SupportsDatasetWrites:              false,
+		SupportsParameterizedRunDetail:     false,
+		SupportsParameterizedRunWrites:     false,
+		SupportsParameterizedRunStepWrites: false,
+
+		SupportsComponentAdmin: false,
+	}
+}
