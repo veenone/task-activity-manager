@@ -4,13 +4,34 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"agile-suite/xtm/internal/backend"
 )
 
-// CustomFieldDef mirrors a Jira custom field on the Test issue type (FR-2.6).
+// fieldScope normalises a definition's scope. A backend that reports none
+// means the test issue, which is what every backend meant before the scope
+// existed, and a row cached before the column existed reads the same way
+// (I1: the value crosses a trust boundary from the adapter).
+func fieldScope(s string) string {
+	if s == "" {
+		return backend.FieldScopeIssue
+	}
+	return s
+}
+
+// CustomFieldDef mirrors a custom field the backend reports (FR-2.6).
+//
+// Scope is one of the backend.FieldScope* values and says what the field is
+// attached to. Only a field on the test issue can be edited here, because a
+// custom field edit commits as a Jira issue update; a Zephyr profile also has
+// fields on an execution and on a step (#371 Phase 3). An empty scope is
+// stored as the issue scope, which is what every definition written before the
+// column existed meant.
 type CustomFieldDef struct {
 	FieldID string `json:"fieldId"`
 	Name    string `json:"name"`
 	Type    string `json:"type"`
+	Scope   string `json:"scope"`
 }
 
 // CustomFieldValue is a custom field definition joined with a Test's value for
@@ -20,6 +41,7 @@ type CustomFieldValue struct {
 	Name    string `json:"name"`
 	Type    string `json:"type"`
 	Value   string `json:"value"`
+	Scope   string `json:"scope"`
 }
 
 // UpsertCustomFields stores the custom field definitions for a profile (FR-2.6).
@@ -31,17 +53,17 @@ func (r *Repository) UpsertCustomFields(profileID string, defs []CustomFieldDef)
 	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(
-		`INSERT INTO custom_field (profile_id, field_id, name, type)
-		 VALUES (?, ?, ?, ?)
+		`INSERT INTO custom_field (profile_id, field_id, name, type, scope)
+		 VALUES (?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, field_id) DO UPDATE SET
-		   name = excluded.name, type = excluded.type`)
+		   name = excluded.name, type = excluded.type, scope = excluded.scope`)
 	if err != nil {
 		return fmt.Errorf("prepare upsert custom field: %w", err)
 	}
 	defer stmt.Close()
 
 	for _, d := range defs {
-		if _, err := stmt.Exec(profileID, d.FieldID, d.Name, d.Type); err != nil {
+		if _, err := stmt.Exec(profileID, d.FieldID, d.Name, d.Type, fieldScope(d.Scope)); err != nil {
 			return fmt.Errorf("upsert custom field %s: %w", d.FieldID, err)
 		}
 	}
@@ -51,7 +73,7 @@ func (r *Repository) UpsertCustomFields(profileID string, defs []CustomFieldDef)
 // ListCustomFieldDefs returns the custom field definitions for a profile.
 func (r *Repository) ListCustomFieldDefs(profileID string) ([]CustomFieldDef, error) {
 	rows, err := r.db.Query(
-		`SELECT field_id, name, type FROM custom_field WHERE profile_id = ? ORDER BY name`,
+		`SELECT field_id, name, type, scope FROM custom_field WHERE profile_id = ? ORDER BY name`,
 		profileID)
 	if err != nil {
 		return nil, fmt.Errorf("list custom field defs: %w", err)
@@ -61,7 +83,7 @@ func (r *Repository) ListCustomFieldDefs(profileID string) ([]CustomFieldDef, er
 	out := []CustomFieldDef{}
 	for rows.Next() {
 		var d CustomFieldDef
-		if err := rows.Scan(&d.FieldID, &d.Name, &d.Type); err != nil {
+		if err := rows.Scan(&d.FieldID, &d.Name, &d.Type, &d.Scope); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -100,7 +122,7 @@ func (r *Repository) SetTestCustomFields(profileID, testKey string, values map[s
 // including fields the Test has no value for, ordered by name.
 func (r *Repository) ListTestCustomFields(profileID, testKey string) ([]CustomFieldValue, error) {
 	rows, err := r.db.Query(
-		`SELECT d.field_id, d.name, d.type, COALESCE(v.value, '')
+		`SELECT d.field_id, d.name, d.type, COALESCE(v.value, ''), d.scope
 		 FROM custom_field d
 		 LEFT JOIN test_custom_field v
 		   ON v.profile_id = d.profile_id AND v.field_id = d.field_id AND v.test_key = ?
@@ -115,7 +137,7 @@ func (r *Repository) ListTestCustomFields(profileID, testKey string) ([]CustomFi
 	out := []CustomFieldValue{}
 	for rows.Next() {
 		var v CustomFieldValue
-		if err := rows.Scan(&v.FieldID, &v.Name, &v.Type, &v.Value); err != nil {
+		if err := rows.Scan(&v.FieldID, &v.Name, &v.Type, &v.Value, &v.Scope); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -150,15 +172,23 @@ func (r *Repository) EditTestCustomField(profileID, testKey, fieldID, newValue s
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var defExists int
+	var defName, defScope string
 	if err := tx.QueryRow(
-		`SELECT 1 FROM custom_field WHERE profile_id = ? AND field_id = ?`,
+		`SELECT name, scope FROM custom_field WHERE profile_id = ? AND field_id = ?`,
 		profileID, fieldID,
-	).Scan(&defExists); err != nil {
+	).Scan(&defName, &defScope); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("unknown custom field %q", fieldID)
 		}
 		return fmt.Errorf("read custom field def: %w", err)
+	}
+	// Only a field on the test issue can be edited here. Commit pushes a
+	// custom field change as a Jira issue field update, so staging one against
+	// a field that lives on an execution or a step would queue a change Jira
+	// can only reject (#371 Phase 3). The UI renders those read-only; this is
+	// the guard behind it.
+	if fieldScope(defScope) != backend.FieldScopeIssue {
+		return fmt.Errorf("%s is not a field on the test, so it cannot be edited here", defName)
 	}
 
 	var baseVersion string

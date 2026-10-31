@@ -313,9 +313,9 @@ migration bridge moves a dataset between connections.
 
 **Zephyr Essential is the third backend, and it is partial.**
 `internal/backend/zephyr` connects, declares its capabilities, and reads tests,
-steps, cycles and run results. Writing anything Zephyr owns, and both custom
-field namespaces, answer `ErrUnsupported` until the phase that fills them
-(#371); `unsupported.go` groups them by phase and `absent.go` holds what
+steps, cycles, run results and both custom field namespaces. Writing anything
+Zephyr owns answers `ErrUnsupported` until the phase that fills it (#371);
+`unsupported.go` groups what is left by phase and `absent.go` holds what
 Essential does not have at all. It is Data Center only.
 
 It is shaped differently from the other two: a Zephyr test is an ordinary Jira
@@ -331,6 +331,21 @@ embedded adapter would satisfy the interface with those too. The boundary is a
 test rather than a convention: `TestTheDelegatedMethodsOnlyTalkToJira` drives
 every delegated method against a recording server and fails if one asks for
 anything outside `/rest/api`.
+
+**Custom fields have a scope, and it is on the shared model.** Jira's own
+fields are on the test issue and are the only editable ones, because a custom
+field edit commits as a Jira issue field update. Zephyr adds its own fields on
+an `EXECUTION` and on a `TESTSTEP`, which are a different namespace rather than
+more issue fields, so `backend.CustomFieldDef` carries a `Scope` and
+`custom_field.scope` stores it. Xray and Kiwi declare the issue scope and see
+no change; a definition with no scope reads as an issue field, which is what
+every one of them meant before the column existed.
+
+The guard behind it is in the store, not the UI: `EditTestCustomField` refuses
+a field that is not on the issue, naming it, so an edit that could only fail at
+commit is never queued. `customFieldScopes.ts` is the one place the detail
+panel decides which group a field belongs to and whether it is editable, and a
+profile with one namespace gets no group labels at all.
 
 Two things about it are worth knowing before touching it. The product names
 collide, because SmartBear renamed both apps in April 2025 and Essential is

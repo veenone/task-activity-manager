@@ -1268,7 +1268,7 @@ func (e *Engine) syncCustomFields(ctx context.Context, profileID, projectKey str
 	}
 	repoDefs := make([]testrepo.CustomFieldDef, len(defs))
 	for i, d := range defs {
-		repoDefs[i] = testrepo.CustomFieldDef{FieldID: d.ID, Name: d.Name, Type: d.Type}
+		repoDefs[i] = testrepo.CustomFieldDef{FieldID: d.ID, Name: d.Name, Type: d.Type, Scope: d.Scope}
 	}
 	return e.repo.UpsertCustomFields(profileID, repoDefs)
 }

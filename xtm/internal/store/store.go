@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 55
+const schemaVersion = 56
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -210,6 +210,7 @@ CREATE TABLE IF NOT EXISTS custom_field (
 	field_id   TEXT NOT NULL,
 	name       TEXT NOT NULL,
 	type       TEXT NOT NULL DEFAULT '',
+	scope      TEXT NOT NULL DEFAULT 'issue',
 	PRIMARY KEY (profile_id, field_id)
 );
 
@@ -1490,6 +1491,18 @@ func applyMigrations(db *sql.DB) error {
 	if current < 55 {
 		if _, err := db.Exec(parameterizedRunSchema); err != nil {
 			return fmt.Errorf("v55 create parameterized run cache: %w", err)
+		}
+	}
+	// v56: custom_field.scope says what a definition is attached to. Jira's
+	// own fields are on the test issue and are the only editable ones; a
+	// Zephyr profile also has fields on an execution and on a step. The
+	// default makes every row an existing database already holds an issue
+	// field, which is what all of them were (#371 Phase 3).
+	if current < 56 {
+		if _, err := db.Exec(
+			`ALTER TABLE custom_field ADD COLUMN scope TEXT NOT NULL DEFAULT 'issue'`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v56 add custom_field.scope: %w", err)
 		}
 	}
 	return nil

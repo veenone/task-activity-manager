@@ -224,7 +224,9 @@ func toTransitions(in []jira.Transition) []backend.Transition {
 }
 
 func toCustomFieldDef(f jira.CustomFieldDef) backend.CustomFieldDef {
-	return backend.CustomFieldDef{ID: f.ID, Name: f.Name, Type: f.Type}
+	// Every Xray custom field is a field on the Jira issue; the other two
+	// scopes exist for Zephyr, which has its own namespaces (#371 Phase 3).
+	return backend.CustomFieldDef{ID: f.ID, Name: f.Name, Type: f.Type, Scope: backend.FieldScopeIssue}
 }
 
 func toCustomFieldDefs(in []jira.CustomFieldDef) []backend.CustomFieldDef {
