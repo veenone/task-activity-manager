@@ -27,6 +27,8 @@ func zephyrServer(t *testing.T, override map[string]func(http.ResponseWriter)) *
 			_, _ = w.Write([]byte(`{"name":"qa.user","displayName":"QA User","emailAddress":"qa.user@example.internal"}`))
 		case apiPath + "/util/zephyrTestIssueType":
 			_, _ = w.Write([]byte(`{"testcaseIssueTypeId":"9"}`))
+		case "/rest/api/2/issuetype":
+			_, _ = w.Write([]byte(`[{"id":"1","name":"Bug"},{"id":"9","name":"Test"}]`))
 		case apiPath + "/util/testExecutionStatus", apiPath + "/util/teststepExecutionStatus":
 			_, _ = w.Write([]byte(measuredStatuses))
 		default:

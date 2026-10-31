@@ -312,14 +312,25 @@ than an Xray-only cache. Kiwi TCMS is supported alongside Xray via the
 migration bridge moves a dataset between connections.
 
 **Zephyr Essential is the third backend, and it is partial.**
-`internal/backend/zephyr` connects, declares its capabilities and reads this
-instance's status vocabularies; everything else answers `ErrUnsupported` until
-the phase that fills it (#371). It is Data Center only.
+`internal/backend/zephyr` connects, declares its capabilities, and reads tests,
+steps, cycles and run results. Writing anything Zephyr owns, and both custom
+field namespaces, answer `ErrUnsupported` until the phase that fills them
+(#371); `unsupported.go` groups them by phase and `absent.go` holds what
+Essential does not have at all. It is Data Center only.
 
 It is shaped differently from the other two: a Zephyr test is an ordinary Jira
 issue, so the adapter holds a Jira client beside its Zephyr one and most reads
 go through the Jira path XTM already has. Only cycles, executions, steps and
 step results sit behind `/rest/zapi/latest`.
+
+That Jira half is delegated to the Xray adapter method by method, in
+`jiraside.go`, rather than restating its conversions. Delegation is explicit
+and never by embedding, because the Xray adapter also answers Xray's own
+endpoints under `/rest/raven`, which a Zephyr instance does not serve, and an
+embedded adapter would satisfy the interface with those too. The boundary is a
+test rather than a convention: `TestTheDelegatedMethodsOnlyTalkToJira` drives
+every delegated method against a recording server and fails if one asks for
+anything outside `/rest/api`.
 
 Two things about it are worth knowing before touching it. The product names
 collide, because SmartBear renamed both apps in April 2025 and Essential is
