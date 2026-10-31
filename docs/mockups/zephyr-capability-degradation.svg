@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="560" viewBox="0 0 880 560" role="img" aria-label="Mockup of the XTM sidebar on a Zephyr profile, showing which views are unavailable and why">
+  <title>Which views a Zephyr profile can show</title>
+  <desc>The XTM window on a Zephyr Essential profile. The sidebar marks Repository, Preconditions, Datasets and Test Plans as unavailable, and the main pane shows the empty state for Repository: a plain sentence naming the backend limit, the Zephyr concept that is not a substitute, and a link to the backend comparison in the guide.</desc>
+
+  <defs>
+    <style>
+      .t      { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .mono   { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; }
+      .title  { font-size: 16px; font-weight: 600; fill: #1f2933; }
+      .h2     { font-size: 14px; font-weight: 600; fill: #1f2933; }
+      .lbl    { font-size: 11px; fill: #8b949e; letter-spacing: .4px; }
+      .body   { font-size: 13px; fill: #1f2933; }
+      .muted  { font-size: 13px; fill: #6b7280; }
+      .small  { font-size: 12px; fill: #6b7280; }
+      .off    { font-size: 13px; fill: #9aa4b0; }
+      .tag    { font-size: 10px; fill: #8a4b0f; }
+      .link   { font-size: 12px; fill: #1f6feb; }
+      .chrome { fill: #ffffff; stroke: #d6dbe1; }
+      .side   { fill: #f6f8fa; stroke: #e3e8ee; }
+      .selrow { fill: #e8f0fe; }
+      .offbox { fill: #fdf6ec; stroke: #f0dcc0; }
+      .empty  { fill: #fafbfc; stroke: #e3e8ee; }
+      .pill   { fill: #fdf6ec; stroke: #e8d4b4; }
+    </style>
+  </defs>
+
+  <rect width="880" height="560" fill="#eef1f4"/>
+  <rect x="16" y="16" width="848" height="528" rx="6" class="chrome"/>
+
+  <rect x="16" y="16" width="848" height="40" rx="6" fill="#ffffff"/>
+  <text x="34" y="42" class="t title">Xray Test Manager</text>
+  <rect x="236" y="26" width="178" height="21" rx="10" class="pill"/>
+  <text x="248" y="41" class="t tag">Zephyr (DC)  ·  ZEPHYR ESSENTIAL</text>
+  <line x1="16" y1="56" x2="864" y2="56" stroke="#e3e8ee"/>
+
+  <rect x="16" y="56" width="212" height="488" class="side"/>
+
+  <text x="32" y="80" class="t lbl">AVAILABLE</text>
+  <rect x="22" y="88" width="200" height="26" rx="4" class="selrow"/>
+  <text x="38" y="106" class="t body">Tests</text>
+  <text x="38" y="132" class="t body">Test Executions</text>
+  <text x="38" y="158" class="t body">Requirements</text>
+  <text x="38" y="184" class="t body">Defects</text>
+  <text x="38" y="210" class="t body">Spellcheck</text>
+
+  <text x="32" y="252" class="t lbl">NOT ON THIS BACKEND</text>
+  <rect x="22" y="260" width="200" height="118" rx="4" class="offbox"/>
+  <text x="38" y="280" class="t off">Repository</text>
+  <text x="38" y="304" class="t off">Preconditions</text>
+  <text x="38" y="328" class="t off">Datasets</text>
+  <text x="38" y="352" class="t off">Test Plans</text>
+  <text x="38" y="372" class="t small">Zephyr Essential has none</text>
+
+  <text x="32" y="412" class="t lbl">GAINED ON THIS BACKEND</text>
+  <text x="38" y="434" class="t body">Step results</text>
+  <text x="38" y="452" class="t small">per step, with comments</text>
+  <text x="38" y="470" class="t small">and defect links</text>
+
+  <text x="252" y="88" class="t title">Repository</text>
+  <rect x="252" y="104" width="594" height="300" rx="5" class="empty"/>
+
+  <text x="288" y="150" class="t h2">There is no test repository on a Zephyr Essential profile.</text>
+
+  <text x="288" y="184" class="t muted">Zephyr Essential does not organise test cases into folders. The</text>
+  <text x="288" y="204" class="t muted">instance answers 404 for the repository, so there is nothing to show</text>
+  <text x="288" y="224" class="t muted">here rather than something that failed to load.</text>
+
+  <text x="288" y="262" class="t h2">Zephyr folders are not a substitute</text>
+  <text x="288" y="286" class="t muted">Zephyr does have folders, but they live inside a test cycle and</text>
+  <text x="288" y="306" class="t muted">group executions, not test cases. You will find them under Test</text>
+  <text x="288" y="326" class="t muted">Executions, where they belong.</text>
+
+  <text x="288" y="366" class="t link">What each backend supports</text>
+
+  <text x="252" y="432" class="t lbl">THE SAME SHAPE SERVES THE OTHER THREE</text>
+  <text x="252" y="456" class="t small">Preconditions, Datasets and Test Plans each say what is missing, name the</text>
+  <text x="252" y="474" class="t small">Zephyr concept that is not a substitute, and link to the same comparison.</text>
+  <text x="252" y="498" class="t small">A view that is empty because the backend lacks the feature must not look</text>
+  <text x="252" y="516" class="t small">like a view that is empty because a request failed.</text>
+</svg>

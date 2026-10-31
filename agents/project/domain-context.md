@@ -410,3 +410,67 @@ write that matters is not the CSV import.
   existed. It takes `multipart/form-data` with a `.csv` filename, and answers
   200 with an empty body. A non-CSV filename is refused with
   `{"error":"The file extension is not valid. Please use a CSV file."}`.
+
+## Zephyr Essential over REST
+
+Measured against `jira.example.internal` (Jira 10.3.18 Server) on 2026-10-30 while
+scoping a third backend. Read-only probes; no write was attempted. Full
+analysis in `docs/superpowers/specs/2026-10-30-zephyr-essential-bridge-design.md`.
+
+- **The names are a trap.** SmartBear renamed its Jira apps in April 2025.
+  Zephyr Essential is the former Zephyr **Squad**, the lighter tier; Zephyr is
+  the former Zephyr **Scale**. So Essential DC is the ZAPI-style API at
+  `{JIRA}/rest/zapi/latest`, documented under `zephyr-essential-dc` and still
+  titled "Zephyr Squad Server/DC REST API". The `zephyr` docs site and
+  `api.zephyrscale.smartbear.com/v2` belong to the other product. SmartBear's
+  own comparison page contradicts its release notes by heading one column
+  "Zephyr / Zephyr Essential"; the release notes are the correct reading.
+- **A Zephyr test is a Jira issue** of the Test type, so the Jira read, write,
+  workflow, requirement, defect and custom-field paths XTM already has apply
+  unchanged. The Test issue type id is per instance:
+  `GET /rest/zapi/latest/util/zephyrTestIssueType` answered
+  `{"testcaseIssueTypeId":"9"}` here. JQL works, so a saved scope carries over.
+- **Status ids are per instance and must be read, never hardcoded.**
+  `/util/testExecutionStatus` and `/util/teststepExecutionStatus` both answered
+  `-1 UNEXECUTED, 1 PASS, 2 FAIL, 3 WIP, 4 BLOCKED, 5 PASS WARNING`.
+  `PASS WARNING` is not among SmartBear's documented five. A hardcoded map
+  would write the wrong result silently rather than fail.
+- **Step results are first-class, which Xray's are not.**
+  `GET /stepResult?executionId=2001` returns a bare array of
+  `{id, stepId, executionId, status, comment, defects, ...}`, and
+  `PUT /stepResult/{id}` sets one. Each result has its own id, comment and
+  defect links. This is exactly what Xray lacks and what forced the #362, #364,
+  #367 and #369 work, so `SupportsParameterizedRunStepWrites` has a real second
+  answer now even though Essential has no datasets to use it on.
+- **Three response envelopes differ from the obvious shape.** Steps come
+  wrapped as `{"stepBeanCollection":[...]}`; one execution as
+  `{"execution":{...}}`; and `/cycle?projectId=&versionId=` returns an **object
+  keyed by cycle id**, not an array, including a `-1` pseudo-cycle for ad-hoc
+  executions and an `environment` string per cycle.
+- **The steps endpoint needs the Jira issue id, not its key.**
+  `GET /rest/zapi/latest/teststep/10501` for `PROJ-101`. Traceability is the
+  exception and takes either:
+  `GET /rest/zapi/latest/traceability/executionsByTest?testIdOrKey=PROJ-101`.
+- **Four features are absent, confirmed by 404.** `/testrepository/{projectId}`,
+  `/dataset`, `/testparameter` and `/testplan` all answer 404, so there is no
+  test case repository, no datasets or parameters, and no test plans. `/folder`
+  answers 400 for missing arguments, so cycle folders do exist. Zephyr folders
+  group **executions inside a cycle**, not test cases, and are not a substitute
+  for the repository tree.
+- **An auth failure can arrive as `200`.** The DC docs state that invalid
+  authentication can return `200 OK` with an `errorId` of `"ERROR"` in the
+  body. A client that trusts status codes alone will read a failed auth as
+  success, so bodies need validating (I1).
+- **Adding tests to a cycle is asynchronous.**
+  `POST /rest/zapi/latest/execution/addTestsToCycle` with `method:1` and issue
+  keys returns a `jobProgressToken`, polled at
+  `/rest/zapi/latest/execution/jobProgress/{token}?type=bulk_execution_copy_move_job_progress`.
+  The commit engine is synchronous, so this needs the deferred-row pattern
+  rather than a blocking poll.
+- **Zephyr has its own custom fields** on `EXECUTION` and `TESTSTEP` entities,
+  separate from Jira's, read at `/customfield/entity?entityType=` and created
+  with types TEXT, LARGE_TEXT, NUMBER, RADIO_BUTTON, SINGLE_SELECT,
+  MULTI_SELECT, DATE, DATE_TIME. Two namespaces is a shape XTM's single flat
+  `ListCustomFields` does not model yet.
+- `systemInfo` and the plugin endpoint both need Jira admin and answered 403,
+  so the Zephyr plugin version was not established from the API.

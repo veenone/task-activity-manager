@@ -74,3 +74,29 @@ _Avoid_: definition of done, DoD, done rule, done criteria
 The reconstruction of one sprint from its issues' changelog: committed, added,
 removed, completed, carried over.
 _Avoid_: burndown, sprint summary
+
+**Zephyr Essential**:
+The former Zephyr Squad, SmartBear's lighter Jira test management tier,
+renamed April 2025. Its Data Center API is `{JIRA}/rest/zapi/latest`. It has
+no test case repository, datasets or test plans.
+_Avoid_: Zephyr, Zephyr Squad, Zephyr Scale, Essential
+
+**Zephyr**:
+The former Zephyr Scale, SmartBear's richer tier, whose API is
+`api.zephyrscale.smartbear.com/v2`. A different product from
+[Zephyr Essential](#zephyr-essential) with a different API and a wider feature
+set, so the bare word names this one and never the family.
+_Avoid_: Zephyr Scale, TM4J
+
+**Cycle**:
+Zephyr's only container kind, holding executions and grouping them in folders.
+It is the Zephyr counterpart of a Test Execution, not of a Test Plan or Test
+Set, neither of which Zephyr Essential has.
+_Avoid_: test cycle, sprint, run group
+
+**Step result**:
+One step's outcome within one execution. In Zephyr it is an entity with its
+own id, comment and defect links, addressable at `PUT /stepResult/{id}`. In
+Xray no such id exists and a step reports its iteration's status instead,
+which is why a step result cannot be written there.
+_Avoid_: step status, step execution, per-step result
