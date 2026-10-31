@@ -143,3 +143,27 @@ func TestDeleteProfileDeletesConnection(t *testing.T) {
 		t.Errorf("connection lookup after delete = %v, want connection.ErrNotFound", err)
 	}
 }
+
+// TestCreateZephyrProfileBackfillsZephyrConnection is the Zephyr twin of the
+// Kiwi case above. The connection row is what every connection-scoped call
+// routes on, so a profile that kept "zephyr" while its connection fell back to
+// "xray" would read its tests through the wrong backend (#371 Phase 1).
+func TestCreateZephyrProfileBackfillsZephyrConnection(t *testing.T) {
+	pm, cm := newManagerWithConnections(t)
+
+	p, err := pm.Create("Zephyr DC", "https://jira.example.com", "PROJ", "", "", "", "", "", false, "zephyr")
+	if err != nil {
+		t.Fatalf("create profile: %v", err)
+	}
+	if p.Backend != "zephyr" {
+		t.Fatalf("profile backend = %q, want 'zephyr'", p.Backend)
+	}
+
+	c, err := cm.Get(p.ID)
+	if err != nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	if c.Backend != "zephyr" {
+		t.Errorf("connection backend = %q, want 'zephyr'", c.Backend)
+	}
+}

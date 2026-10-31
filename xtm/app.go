@@ -27,6 +27,7 @@ import (
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
+	"agile-suite/xtm/internal/backend/zephyr"
 	"agile-suite/xtm/internal/bridge"
 	"agile-suite/xtm/internal/coverage"
 	"agile-suite/xtm/internal/jira"
@@ -557,7 +558,19 @@ func newBackend(backendType, jiraURL, token, caCert string, allowUntrusted bool)
 	if backendType == "kiwi" || kiwi.IsKiwiDemoURL(jiraURL) {
 		return kiwi.New(jiraURL, token, kiwi.WithTLS(caCert, allowUntrusted))
 	}
-	return xray.New(jira.NewClient(jiraURL, token, jiraTLSOptions(caCert, allowUntrusted)...))
+	opts := jiraTLSOptions(caCert, allowUntrusted)
+	// A Zephyr profile holds the same Jira URL and the same personal access
+	// token an Xray one does, so the backend type is the only thing that tells
+	// them apart. It gets two clients because Zephyr splits in two: a test is
+	// an ordinary Jira issue, and only cycles, executions and step results sit
+	// behind the Zephyr API (#371).
+	if backendType == "zephyr" {
+		return zephyr.New(
+			jira.NewClient(jiraURL, token, opts...),
+			zephyr.NewClient(jiraURL, token, opts...),
+		)
+	}
+	return xray.New(jira.NewClient(jiraURL, token, opts...))
 }
 
 // backendFor loads a profile and its stored credential and returns a Backend

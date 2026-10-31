@@ -10,6 +10,22 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Zephyr Essential can be chosen as a backend, and connects**
+- The profile form offers Zephyr Essential beside Xray and Kiwi TCMS. It takes
+  the same Jira URL and the same personal access token an Xray profile does,
+  stored in Windows Credential Manager as before (#371).
+- Connecting checks two things, not one: that the token works, and that Zephyr
+  is actually installed on the instance. A Zephyr profile pointed at a plain
+  Jira is refused with that said plainly, rather than connecting and then
+  showing an empty project.
+- The profile reads this instance's own execution and step statuses when it
+  connects. They are numeric ids configured per instance, so a status the
+  instance defines and SmartBear does not still resolves.
+- What a Zephyr profile can do is deliberately small so far: it connects and
+  reports its capabilities. Reading tests, cycles and executions is the next
+  step. The form says which views stay empty, because Zephyr Essential has no
+  test repository, preconditions, datasets or test plans at all.
+
 **Set iteration and step results in bulk**
 - Tick the iterations you mean and apply one result to all of them, with the
   header tick selecting every iteration and **Clear** dropping the selection

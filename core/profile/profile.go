@@ -49,7 +49,8 @@ type Profile struct {
 	// where no CA certificate is available.
 	AllowUntrustedTLS bool `json:"allowUntrustedTls"`
 	// Backend selects which system this profile talks to: "xray" (default,
-	// Jira Data Center + Xray Server/DC) or "kiwi" (Kiwi TCMS). A blank value
+	// Jira Data Center + Xray Server/DC), "kiwi" (Kiwi TCMS) or "zephyr"
+	// (Zephyr Essential on Jira Data Center). A blank value
 	// reads as "xray" (back-compat for rows written before this column
 	// existed). For a "kiwi" profile, the credential stored in the OS
 	// credential manager holds "username:password" (Kiwi session-login),
@@ -167,7 +168,7 @@ func (m *Manager) Get(id string) (Profile, error) {
 // lands in (blank mode defaults to "test"). caCert is an optional PEM-encoded CA
 // certificate to trust when connecting; allowUntrustedTLS disables certificate
 // verification (RND_P_4TFINT_05-243). backendType selects the connection
-// backend ("xray" default | "kiwi"); blank normalizes to "xray".
+// backend ("xray" default | "kiwi" | "zephyr"); blank normalizes to "xray".
 func (m *Manager) Create(name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey, caCert string, allowUntrustedTLS bool, backendType string) (Profile, error) {
 	p := Profile{
 		ID:                uuid.NewString(),
@@ -219,9 +220,15 @@ func bugProjectModeOrDefault(mode string) string {
 // backendOrDefault normalises the connection backend, falling back to "xray"
 // for blank or unrecognized values (back-compat for rows written before the
 // backend column existed).
+//
+// A new backend has to be added here as well as to the app's own routing. A
+// value this function does not know becomes "xray", so a profile saved for an
+// unrecognised backend connects to plain Jira and reports an empty project
+// instead of refusing (#371).
 func backendOrDefault(backendType string) string {
-	if strings.TrimSpace(backendType) == "kiwi" {
-		return "kiwi"
+	switch strings.TrimSpace(backendType) {
+	case "kiwi", "zephyr":
+		return strings.TrimSpace(backendType)
 	}
 	return "xray"
 }
@@ -232,7 +239,7 @@ func backendOrDefault(backendType string) string {
 // are managed separately. A blank bugIssueType defaults to "Bug"; a blank
 // bugProjectMode defaults to "test". caCert and allowUntrustedTLS update the
 // TLS trust settings (RND_P_4TFINT_05-243). backendType selects the connection
-// backend ("xray" default | "kiwi"); blank normalizes to "xray".
+// backend ("xray" default | "kiwi" | "zephyr"); blank normalizes to "xray".
 func (m *Manager) Update(id, name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey, caCert string, allowUntrustedTLS bool, backendType string) error {
 	res, err := m.db.Exec(
 		`UPDATE profiles SET name = ?, jira_url = ?, project_key = ?, scope_jql = ?, bug_issue_type = ?, bug_project_mode = ?, bug_project_key = ?, ca_cert = ?, allow_untrusted_tls = ?, backend = ? WHERE id = ?`,

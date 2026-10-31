@@ -2,15 +2,29 @@ import { useState } from "react";
 import type { CredentialOverride } from "@agile-suite/core";
 import type { Connection, Profile } from "../../api";
 
+// knownBackends are the values the Go side recognises. Anything else
+// normalises to "xray" there, so the form has to agree: seeding the select by
+// comparing against "kiwi" alone sent every other non-Xray backend back as
+// Xray, and editing a Zephyr profile re-saved it onto the wrong backend
+// (#371 Phase 1).
+function seedBackend(backend: string | undefined): string {
+  return backend === "kiwi" || backend === "zephyr" ? backend : "xray";
+}
+
 // useXtmProfileExtras holds what XTM's profile form adds to core's: the
-// backend (Xray or Kiwi), a connection's role, the Xray bug-filing fields and
-// cross-project sources, and Kiwi's username and password.
+// backend (Xray, Kiwi or Zephyr Essential), a connection's role, the Xray
+// bug-filing fields and cross-project sources, and Kiwi's username and
+// password.
 export function useXtmProfileExtras(profile: Profile | undefined, connection: Connection | undefined) {
   const seed = profile ?? connection;
   // New profiles default to Xray, so behaviour only changes when the user
-  // picks Kiwi.
-  const [backend, setBackend] = useState(seed?.backend === "kiwi" ? "kiwi" : "xray");
+  // picks another backend.
+  const [backend, setBackend] = useState(seedBackend(seed?.backend));
   const isKiwi = backend === "kiwi";
+  // Zephyr authenticates with the same Jira personal access token an Xray
+  // profile uses, so it shares every credential and URL field with Xray and
+  // only differs in what the backend can do.
+  const isZephyr = backend === "zephyr";
   // A connection's role: "source", "target" or "both". New connections are
   // targets, the common bridge case beside the workspace's primary one.
   const [role, setRole] = useState(connection?.role || "target");
@@ -48,7 +62,7 @@ export function useXtmProfileExtras(profile: Profile | undefined, connection: Co
   }
 
   return {
-    backend, setBackend, isKiwi, role, setRole, crossProjectSources, setCrossProjectSources,
+    backend, setBackend, isKiwi, isZephyr, role, setRole, crossProjectSources, setCrossProjectSources,
     bugIssueType, setBugIssueType, bugProjectMode, setBugProjectMode, bugProjectKey, setBugProjectKey, bugProjKey,
     kiwiUsername, setKiwiUsername, kiwiPassword, setKiwiPassword, showPassword, setShowPassword,
     kiwiCredInvalid, credential, copyFrom,
