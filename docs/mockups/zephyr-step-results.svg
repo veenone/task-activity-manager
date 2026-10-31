@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" role="img" aria-label="Snapshot of a test row in a Zephyr cycle expanded to show its per-step results">
+  <title>Step results on a plain execution</title>
+  <desc>The Containers view on a Zephyr Essential profile. A member row of a test cycle is expanded, and below it a table lists the test's four steps with the result recorded against each one and the executor's comment. Two steps are ticked and a bulk bar above the table offers one result to apply to both. The result dropdowns offer the instance's own names, UNEXECUTED, PASS, FAIL, WIP, BLOCKED and PASS WARNING. One step shows a "not committed" mark beside its result, because the pick is journalled locally and waits for Commit. A note says an Xray profile shows dataset iterations in the same place instead.</desc>
+
+  <defs>
+    <style>
+      .t     { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .h     { font-size: 14px; font-weight: 600; fill: #1f2933; }
+      .lbl   { font-size: 11px; fill: #6b7280; letter-spacing: .4px; }
+      .body  { font-size: 12px; fill: #1f2933; }
+      .note  { font-size: 11px; fill: #6b7280; }
+      .mono  { font-size: 12px; font-family: Consolas, "Cascadia Mono", monospace; fill: #1f2933; }
+      .card  { fill: #ffffff; stroke: #d6dbe1; }
+      .field { fill: #ffffff; stroke: #c3cad2; }
+      .head  { fill: #f3f4f6; stroke: #e5e7eb; }
+      .panel { fill: #f8f9fa; stroke: #e5e7eb; }
+      .bulk  { fill: #e8f0fe; stroke: #c6d8f7; }
+      .pend  { fill: #fdf3d8; stroke: #e6cf92; }
+      .rule  { stroke: #e5e7eb; }
+    </style>
+  </defs>
+
+  <rect width="880" height="520" fill="#eef1f4"/>
+  <rect x="20" y="16" width="840" height="488" rx="6" class="card"/>
+
+  <text x="40" y="44" class="t h">Zephyr Essential profile</text>
+  <text x="40" y="66" class="t lbl">CYCLE MEMBERS &#183; REGRESSION CYCLE</text>
+
+  <!-- member row header -->
+  <rect x="40" y="78" width="800" height="24" class="head"/>
+  <text x="52" y="95" class="t note">Test</text>
+  <text x="300" y="95" class="t note">Summary</text>
+  <text x="650" y="95" class="t note">Result</text>
+
+  <!-- the expanded member row -->
+  <text x="52" y="124" class="t mono">&#9662; 4 steps</text>
+  <text x="150" y="124" class="t mono">PROJ-101</text>
+  <text x="300" y="124" class="t body">Gateway rejects an unsigned payload</text>
+  <rect x="646" y="108" width="130" height="24" rx="4" class="field"/>
+  <text x="656" y="125" class="t body">WIP</text>
+  <path d="M 758 118 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <line x1="40" y1="140" x2="840" y2="140" class="rule"/>
+
+  <!-- the step result panel -->
+  <rect x="56" y="152" width="768" height="296" rx="4" class="panel"/>
+
+  <!-- bulk bar -->
+  <rect x="72" y="168" width="420" height="30" rx="4" class="bulk"/>
+  <text x="86" y="187" class="t body">2 selected</text>
+  <rect x="168" y="172" width="150" height="22" rx="3" class="field"/>
+  <text x="178" y="188" class="t body">PASS WARNING</text>
+  <path d="M 300 181 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <rect x="328" y="172" width="60" height="22" rx="3" fill="#1b64c8"/>
+  <text x="344" y="188" class="t body" fill="#ffffff">Apply</text>
+  <rect x="396" y="172" width="56" height="22" rx="3" class="field"/>
+  <text x="410" y="188" class="t body">Clear</text>
+
+  <!-- step table header -->
+  <rect x="72" y="212" width="736" height="24" class="head"/>
+  <text x="86" y="229" class="t note">&#9745;</text>
+  <text x="112" y="229" class="t note">Step</text>
+  <text x="152" y="229" class="t note">Action</text>
+  <text x="372" y="229" class="t note">Expected</text>
+  <text x="560" y="229" class="t note">Result</text>
+  <text x="700" y="229" class="t note">Comment</text>
+
+  <!-- step 1: a local pick waiting for Commit -->
+  <rect x="84" y="248" width="12" height="12" rx="2" class="field"/>
+  <text x="112" y="259" class="t body">1</text>
+  <text x="152" y="259" class="t body">Open the gateway</text>
+  <text x="372" y="259" class="t body">the console loads</text>
+  <rect x="556" y="244" width="118" height="22" rx="3" class="field"/>
+  <text x="566" y="260" class="t body">FAIL</text>
+  <path d="M 656 253 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <text x="700" y="259" class="t note">gateway returned</text>
+  <text x="700" y="273" class="t note">no response</text>
+
+  <!-- step 2: selected -->
+  <rect x="84" y="292" width="12" height="12" rx="2" fill="#1b64c8"/>
+  <path d="M 87 298 l 3 3 l 6 -6" fill="none" stroke="#ffffff" stroke-width="1.6"/>
+  <text x="112" y="303" class="t body">2</text>
+  <text x="152" y="303" class="t body">Submit an unsigned payload</text>
+  <text x="372" y="303" class="t body">401 Unauthorized</text>
+  <rect x="556" y="288" width="118" height="22" rx="3" class="field"/>
+  <text x="566" y="304" class="t body">UNEXECUTED</text>
+  <path d="M 656 297 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <text x="700" y="303" class="t note">-</text>
+
+  <!-- step 3: selected, and journalled locally -->
+  <rect x="84" y="336" width="12" height="12" rx="2" fill="#1b64c8"/>
+  <path d="M 87 342 l 3 3 l 6 -6" fill="none" stroke="#ffffff" stroke-width="1.6"/>
+  <text x="112" y="347" class="t body">3</text>
+  <text x="152" y="347" class="t body">Re-send with a valid signature</text>
+  <text x="372" y="347" class="t body">202 Accepted</text>
+  <rect x="556" y="332" width="118" height="22" rx="3" class="field"/>
+  <text x="566" y="348" class="t body">PASS</text>
+  <path d="M 656 341 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <rect x="556" y="358" width="92" height="17" rx="3" class="pend"/>
+  <text x="563" y="371" class="t note">not committed</text>
+  <text x="700" y="347" class="t note">-</text>
+
+  <!-- step 4 -->
+  <rect x="84" y="394" width="12" height="12" rx="2" class="field"/>
+  <text x="112" y="405" class="t body">4</text>
+  <text x="152" y="405" class="t body">Check the audit entry</text>
+  <text x="372" y="405" class="t body">one entry, signed</text>
+  <rect x="556" y="390" width="118" height="22" rx="3" class="field"/>
+  <text x="566" y="406" class="t body">BLOCKED</text>
+  <path d="M 656 399 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <text x="700" y="405" class="t note">audit service</text>
+  <text x="700" y="419" class="t note">unavailable</text>
+
+  <text x="40" y="472" class="t note">The results offered are the ones this instance defines, so PASS WARNING is among them and TODO is not.</text>
+  <text x="40" y="490" class="t note">On an Xray profile the same expansion shows dataset iterations instead: Xray has step results only inside one.</text>
+</svg>

@@ -411,7 +411,8 @@ What Zephyr Essential does not have, and what therefore stays empty or hidden:
   than organising test cases.
 - **No preconditions.** The Preconditions tab is not offered.
 - **No datasets or parameterized runs.** The Datasets tab is not offered, and
-  a test has no iterations.
+  a test has no iterations. Per-step results do not depend on a dataset here,
+  so you still get them; see below.
 - **No Test Sets and no Test Plans.** A cycle is the only container kind, so
   the Containers view offers Test Execution alone and Browse drops those two
   groupings.
@@ -431,12 +432,29 @@ offers your instance's own names rather than Xray's: if your instance calls a
 result PASS WARNING, that is what you pick, and a name your instance does not
 define is refused instead of being written as something approximate.
 
+**Each step keeps its own result.** This is the one thing Zephyr Essential
+does that Xray cannot. Expand a test's row in a cycle and you get its steps
+with the result recorded against each one, plus whatever comment the executor
+left. Pick a result on any step, or tick several steps and set them together
+with the bar above the table, and the picks are journalled and pushed on
+Commit like every other edit. The results offered are your instance's own
+names, for the same reason as the run result above.
+
+On an Xray profile the same expansion shows dataset iterations instead, since
+that is the only place Xray has step results. A test with no steps, or one that
+has not been executed in that cycle, simply shows nothing to expand.
+
+A step result's comment is shown and not editable, and Commit reports rather
+than fails a step whose result the backend has stopped reporting: a step
+deleted from the test since it was executed cannot be written by its old id,
+and nothing you do locally would change that.
+
 Adding tests to a cycle is a background job on Zephyr's side, so XTM waits for
 it to finish before reporting the commit. If the job is still running when it
 stops waiting, the commit is reported as done and the next sync shows what
 landed, which is safer than adding every test a second time on a retry.
 
-Two limits to know about this release. Editing a step, deleting a cycle,
+Two limits to know about this release. Editing a step's text, deleting a cycle,
 removing a test from one, and run-level defects and remarks are not available
 on a Zephyr profile yet: those endpoints have not been verified, and a wrong
 guess at a delete loses records. And the searches look for a Jira issue type

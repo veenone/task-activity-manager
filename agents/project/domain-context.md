@@ -440,8 +440,13 @@ analysis in `docs/superpowers/specs/2026-10-30-zephyr-essential-bridge-design.md
   `{id, stepId, executionId, status, comment, defects, ...}`, and
   `PUT /stepResult/{id}` sets one. Each result has its own id, comment and
   defect links. This is exactly what Xray lacks and what forced the #362, #364,
-  #367 and #369 work, so `SupportsParameterizedRunStepWrites` has a real second
-  answer now even though Essential has no datasets to use it on.
+  #367 and #369 work. `SupportsParameterizedRunStepWrites` is the wrong flag
+  for it, because that one asks what a step INSIDE an iteration can do and
+  Essential has no iterations: #371 Phase 6 added `SupportsRunStepResults` and
+  the `backend.RunStepResultManager` side interface instead, so step results
+  hang off an execution rather than a dataset. The read was measured; the
+  `PUT` body is not, and mirrors the read's `status` field, which is the same
+  standing as the three writes in `write.go`.
 - **Three response envelopes differ from the obvious shape.** Steps come
   wrapped as `{"stepBeanCollection":[...]}`; one execution as
   `{"execution":{...}}`; and `/cycle?projectId=&versionId=` returns an **object
