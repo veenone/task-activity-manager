@@ -260,6 +260,7 @@ Earlier releases added commit **conflict management** (three-way merge),
 
 1. [Installation & first launch](#installation-first-launch)
 2. [Connecting to Jira (profiles)](#connecting-to-jira-profiles)
+   - [Working with a Zephyr Essential profile](#working-with-a-zephyr-essential-profile)
    - [Demo mode, without a Jira connection](#demo-mode-try-it-without-jira)
 3. [The main window](#the-main-window)
 4. [Browsing tests](#browsing-tests)
@@ -379,6 +380,47 @@ was cached from the last successful sync stays in place.
 To turn bug reporting off again, clear both the bug tracker URL and the
 project key and save. This asks for confirmation, since it deletes the stored
 connection and its credential.
+
+### Working with a Zephyr Essential profile
+
+Zephyr Essential is SmartBear's lighter Jira app, the one that used to be
+called Zephyr Squad. Choose **Backend: Zephyr Essential** and give the profile
+the same Jira base URL and personal access token an Xray profile takes: a
+Zephyr test is an ordinary Jira issue, so there is no second connection to set
+up. Only Data Center and Server are supported; Zephyr Essential Cloud
+authenticates differently and is not covered.
+
+Connecting checks two things, your token and whether the Zephyr app is
+installed, so a profile pointed at a plain Jira is refused at that point rather
+than syncing into an empty project. It also reads the instance's own result
+vocabulary, because Zephyr lets each instance define its statuses. A run on
+your instance may read UNEXECUTED or PASS WARNING where an Xray profile reads
+TODO or PASS.
+
+What a Zephyr profile shows: the project's tests with their fields, labels,
+components, steps and workflow, the requirements they cover, the defects raised
+against them, and the test cycles each test has been executed in with its
+result in each one. Editing a test's own fields and committing them works as it
+does for Xray, since those are Jira writes.
+
+What Zephyr Essential does not have, and what therefore stays empty or hidden:
+
+- **No test repository.** Essential has no folder tree for test cases, so
+  Browse's folder sidebar says so and the grouping falls back accordingly.
+  Zephyr does have folders, but they group executions inside a cycle rather
+  than organising test cases.
+- **No preconditions.** The Preconditions tab is not offered.
+- **No datasets or parameterized runs.** The Datasets tab is not offered, and
+  a test has no iterations.
+- **No Test Sets and no Test Plans.** A cycle is the only container kind, so
+  the Containers view offers Test Execution alone and Browse drops those two
+  groupings.
+
+Two limits to know about this release. Setting a result, creating a cycle or
+editing a step on a Zephyr profile is not available yet, so results are shown
+rather than changed. And the searches look for a Jira issue type named `Test`:
+if your instance renamed the type Zephyr uses, connecting reports it by name
+instead of leaving you with a project that looks empty.
 
 ### Demo mode — try it without Jira
 

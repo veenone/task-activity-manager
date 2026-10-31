@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Health, SetTourSeenVersion, errMsg, isDemoUrl, demoVariant } from "../api";
 import type { HealthInfo, Profile, PendingChange, CommitResult } from "../api";
 import { useCapabilities } from "../features";
+
 import { clearViewState } from "../lib/viewState";
 import { useProfile } from "../contexts/ProfileContext";
 import { useSync } from "../contexts/SyncContext";
@@ -13,7 +14,7 @@ import { usePendingChanges } from "../queries/pending";
 import { useSyncState, useFolders, useComponents, useGroupContainers } from "../queries/app";
 import { invalidateProfileData } from "../queries/invalidate";
 import { keys } from "../queries/keys";
-import { visibleViews } from "../views";
+import { visibleViews, browseGrouping } from "../views";
 import { usePrompt } from "../components/usePrompt";
 import { useConfirm } from "../components/useConfirm";
 import { useNotice } from "../components/useNotice";
@@ -303,6 +304,13 @@ export function useAppState() {
   // actually supports (Kiwi, etc.) — defaultCapabilities (all true) while
   // loading, so an Xray profile is never affected (P6.2a).
   const caps = useCapabilities(activeId);
+
+  // The grouping dimension is remembered per profile, so one that this
+  // backend does not have has to be corrected rather than rendered empty.
+  useEffect(() => {
+    const next = browseGrouping(groupBy, caps);
+    if (next !== groupBy) setGroupBy(next as typeof groupBy);
+  }, [caps, groupBy, setGroupBy]);
 
   // The tab bar and the navigation rail render this same list, so a view can
   // never appear in one and not the other (#171).

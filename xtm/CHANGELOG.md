@@ -21,10 +21,24 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 - The profile reads this instance's own execution and step statuses when it
   connects. They are numeric ids configured per instance, so a status the
   instance defines and SmartBear does not still resolves.
-- What a Zephyr profile can do is deliberately small so far: it connects and
-  reports its capabilities. Reading tests, cycles and executions is the next
-  step. The form says which views stay empty, because Zephyr Essential has no
-  test repository, preconditions, datasets or test plans at all.
+- The form says which views stay empty, because Zephyr Essential has no test
+  repository, preconditions, datasets or test plans at all.
+
+**A Zephyr profile reads its tests, their steps and its test cycles**
+- Tests, their fields, their workflow, the requirements they cover and the
+  defects raised against them all come through the Jira path XTM already has,
+  because a Zephyr test is an ordinary Jira issue (#371).
+- A test's steps are read from Zephyr, which keeps them outside the issue.
+- The Containers view lists the project's test cycles, including the bucket
+  Zephyr keeps for executions that belong to no cycle, and shows each test's
+  result in a cycle. Results read in this instance's own vocabulary, so a run
+  can show UNEXECUTED or PASS WARNING rather than Xray's TODO.
+- Setting a result, creating a cycle and editing a step are not available on a
+  Zephyr profile yet. Editing a test's own fields and committing them works,
+  since those are Jira writes.
+- Connecting now also refuses an instance whose test issue type was renamed,
+  naming what it is called. The searches look for an issue type named Test, so
+  that profile would otherwise sync cleanly and report no tests at all.
 
 **Set iteration and step results in bulk**
 - Tick the iterations you mean and apply one result to all of them, with the
@@ -62,6 +76,13 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   mark that goes with it.
 
 ### Fixed
+
+**The container type picker offered kinds the backend does not have**
+- The Containers view offered Test Set and Test Plan on every profile,
+  although only Xray has them, and it remembered the chosen kind per profile.
+  A Kiwi or Zephyr profile could therefore open on a kind that can never hold
+  anything, which reads as a sync that did not run. Browse's Group by menu
+  offered the same two (#371).
 
 **A step result held its test in a conflict nothing could clear**
 - Committing a step result could report a conflict that neither **Resolve &

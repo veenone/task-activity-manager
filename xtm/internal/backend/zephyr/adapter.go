@@ -18,9 +18,11 @@ import (
 // client rather than reimplementing those reads is what keeps this backend
 // smaller than the Kiwi one.
 //
-// Phase 1 (#371) implements the connection test and the capability
-// declaration. Every other method answers backend.ErrUnsupported until the
-// phase that fills it; see unsupported.go.
+// Phase 1 (#371) implemented the connection test and the capability
+// declaration, Phase 2 the read path: the Jira half in jiraside.go, steps in
+// steps.go, cycles and executions in containers.go. What is left answers
+// backend.ErrUnsupported until the phase that fills it, in unsupported.go, or
+// permanently, in absent.go.
 type Adapter struct {
 	j *jira.Client
 	z *Client
@@ -52,6 +54,12 @@ func (a *Adapter) TestConnection(ctx context.Context) (*backend.User, error) {
 		return nil, err
 	}
 	if _, err := a.z.TestIssueTypeID(ctx); err != nil {
+		return nil, err
+	}
+	// And that the type Zephyr named is the one the Jira searches look for.
+	// Without this the profile connects, syncs, and reports a project with no
+	// tests in it; see verifyTestIssueTypeName.
+	if err := a.verifyTestIssueTypeName(ctx); err != nil {
 		return nil, err
 	}
 	if _, err := a.z.ExecutionStatuses(ctx); err != nil {

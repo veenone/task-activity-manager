@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" role="img" aria-label="Snapshot of the container type picker and the Browse grouping menu, each offering only the kinds the backend has">
+  <title>Container kinds, narrowed to what the backend has</title>
+  <desc>Two side by side comparisons. On the left, an Xray profile: the Containers view type picker is open with Test Set, Test Plan and Test Execution, and Browse's Group by menu offers Folder, Test Set, Test Plan and Component. On the right, a Zephyr Essential profile: the same picker offers Test Execution alone, and Group by offers Component only, because Essential has no test sets, no test plans and no test repository. The removed options are shown struck through and labelled as not offered.</desc>
+
+  <defs>
+    <style>
+      .t     { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .h     { font-size: 14px; font-weight: 600; fill: #1f2933; }
+      .lbl   { font-size: 11px; fill: #6b7280; letter-spacing: .4px; }
+      .body  { font-size: 13px; fill: #1f2933; }
+      .gone  { font-size: 13px; fill: #9aa3ad; text-decoration: line-through; }
+      .note  { font-size: 12px; fill: #6b7280; }
+      .card  { fill: #ffffff; stroke: #d6dbe1; }
+      .field { fill: #ffffff; stroke: #c3cad2; }
+      .menu  { fill: #ffffff; stroke: #b6bec8; }
+      .sel   { fill: #e8f0fe; }
+    </style>
+  </defs>
+
+  <rect width="760" height="420" fill="#eef1f4"/>
+
+  <!-- Xray profile -->
+  <rect x="20" y="16" width="340" height="388" rx="6" class="card"/>
+  <text x="40" y="44" class="t h">Xray profile</text>
+
+  <text x="40" y="76" class="t lbl">CONTAINERS: TYPE</text>
+  <rect x="40" y="84" width="200" height="28" rx="4" class="field"/>
+  <text x="50" y="103" class="t body">Test Execution</text>
+  <path d="M 222 96 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <rect x="40" y="116" width="200" height="88" rx="4" class="menu"/>
+  <text x="54" y="138" class="t body">Test Set</text>
+  <text x="54" y="166" class="t body">Test Plan</text>
+  <rect x="41" y="176" width="198" height="27" class="sel"/>
+  <text x="54" y="194" class="t body">Test Execution</text>
+
+  <text x="40" y="240" class="t lbl">BROWSE: GROUP BY</text>
+  <rect x="40" y="248" width="200" height="28" rx="4" class="field"/>
+  <text x="50" y="267" class="t body">Group by: Folder</text>
+  <path d="M 222 260 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <rect x="40" y="280" width="200" height="112" rx="4" class="menu"/>
+  <rect x="41" y="282" width="198" height="26" class="sel"/>
+  <text x="54" y="300" class="t body">Folder</text>
+  <text x="54" y="328" class="t body">Test Set</text>
+  <text x="54" y="356" class="t body">Test Plan</text>
+  <text x="54" y="384" class="t body">Component</text>
+
+  <!-- Zephyr profile -->
+  <rect x="400" y="16" width="340" height="388" rx="6" class="card"/>
+  <text x="420" y="44" class="t h">Zephyr Essential profile</text>
+
+  <text x="420" y="76" class="t lbl">CONTAINERS: TYPE</text>
+  <rect x="420" y="84" width="200" height="28" rx="4" class="field"/>
+  <text x="430" y="103" class="t body">Test Execution</text>
+  <path d="M 602 96 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <rect x="420" y="116" width="200" height="32" rx="4" class="menu"/>
+  <rect x="421" y="118" width="198" height="29" class="sel"/>
+  <text x="434" y="137" class="t body">Test Execution</text>
+  <text x="420" y="170" class="t gone">Test Set</text>
+  <text x="420" y="190" class="t gone">Test Plan</text>
+  <text x="500" y="170" class="t note">not offered: Essential</text>
+  <text x="500" y="190" class="t note">has neither</text>
+
+  <text x="420" y="240" class="t lbl">BROWSE: GROUP BY</text>
+  <rect x="420" y="248" width="200" height="28" rx="4" class="field"/>
+  <text x="430" y="267" class="t body">Group by: Component</text>
+  <path d="M 602 260 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+  <rect x="420" y="280" width="200" height="32" rx="4" class="menu"/>
+  <rect x="421" y="282" width="198" height="29" class="sel"/>
+  <text x="434" y="301" class="t body">Component</text>
+  <text x="420" y="334" class="t gone">Folder</text>
+  <text x="420" y="354" class="t gone">Test Set</text>
+  <text x="420" y="374" class="t gone">Test Plan</text>
+  <text x="500" y="334" class="t note">the folder sidebar says</text>
+  <text x="500" y="354" class="t note">the backend has none</text>
+</svg>

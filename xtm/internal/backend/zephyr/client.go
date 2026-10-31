@@ -47,6 +47,7 @@ type Client struct {
 	issueType    cache[string]
 	execStatuses cache[*StatusVocabulary]
 	stepStatuses cache[*StatusVocabulary]
+	issueIDs     keyedCache
 }
 
 // NewClient builds a client for the Jira instance at baseURL, authenticated

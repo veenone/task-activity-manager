@@ -88,6 +88,20 @@ func (a *Adapter) DeletePrecondition(ctx context.Context, preconditionKey string
 	return backend.ErrUnsupported
 }
 
+func (a *Adapter) SearchPreconditionsAcrossProjects(ctx context.Context, projectKeys []string, query string, offset, limit int) ([]backend.Precondition, int, error) {
+	return nil, 0, backend.ErrUnsupported
+}
+
+// --- test calls: not in Essential ---
+//
+// "Call to test to reuse test steps" is an Xray feature and is absent from
+// Essential, so a step here always holds manual content. steps.go reads one
+// accordingly.
+
+func (a *Adapter) CreateCalledTestStep(ctx context.Context, key, calledTestKey, calledTestID string) (string, error) {
+	return "", backend.ErrUnsupported
+}
+
 // --- folders: not in Essential ---
 //
 // /testrepository answers 404: there is no test case tree. Zephyr does have

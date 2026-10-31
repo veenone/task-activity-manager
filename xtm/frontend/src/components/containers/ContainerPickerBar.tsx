@@ -1,7 +1,6 @@
 import { SyncContainers, errMsg } from "../../api";
 import { SearchableSelect } from "../SearchableSelect";
 import { Menu } from "../Menu";
-import { KINDS } from "./constants";
 import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
@@ -9,7 +8,7 @@ import type { ContainerActions, ContainerViewProps } from "./useContainerActions
 // label filters, the container itself, and the create / sync / actions buttons.
 export function ContainerPickerBar({ s, a, p }: { s: ContainerState; a: ContainerActions; p: ContainerViewProps }) {
   const {
-    kind, setKind, cStatus, setCStatus, cLabel, setCLabel, selected, setSelected, setError,
+    kind, setKind, kinds, cStatus, setCStatus, cLabel, setCLabel, selected, setSelected, setError,
     seeding, syncing, setSyncing, setShowJUnitNewExec, setDetailKey, profileId, loading, kindLabel,
     statusOptions, statusCounts, viewContainers, labelOptions,
   } = s;
@@ -29,7 +28,7 @@ export function ContainerPickerBar({ s, a, p }: { s: ContainerState; a: Containe
               setDetailKey(null);
             }}
           >
-            {KINDS.map((k) => (
+            {kinds.map((k) => (
               <option key={k.value} value={k.value}>
                 {k.label}
               </option>

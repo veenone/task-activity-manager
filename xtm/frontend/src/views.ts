@@ -1,4 +1,5 @@
 import type { View } from "./contexts/NavContext";
+import { offeredKinds } from "./components/containers/constants";
 
 // The views XTM offers, in the order they are shown.
 //
@@ -71,6 +72,31 @@ export const VIEWS: ViewDef[] = [
   },
   { id: "misspellings", label: "Spellcheck", tour: "tab-misspellings" },
 ];
+
+// GroupingContext is what decides which dimensions Browse can group tests by:
+// the container kinds this backend has, and whether it has a folder tree.
+export interface GroupingContext {
+  containerKinds: string[];
+  supportsFolders: boolean;
+}
+
+// browseGrouping is the dimension Browse's sidebar should group by: the
+// remembered one while this backend has it, and the first one it does have
+// otherwise.
+//
+// The dimension is remembered per profile, so without this a profile on a
+// backend with no test plans (Kiwi, Zephyr Essential) or no folder tree
+// (Zephyr Essential) opens on a grouping that can never hold anything, which
+// reads as a sync that did not run rather than as a dimension this backend
+// does not have (#371 Phase 2).
+export function browseGrouping(groupBy: string, c: GroupingContext): string {
+  const kinds = offeredKinds(c.containerKinds).map((k) => k.value);
+  const offered =
+    groupBy === "component" ||
+    (groupBy === "folder" ? c.supportsFolders : kinds.includes(groupBy));
+  if (offered) return groupBy;
+  return c.supportsFolders ? "folder" : "component";
+}
 
 // visibleViews is the list for this profile. Both the tab bar and the rail
 // call it, so a view hidden from one is hidden from the other.
