@@ -155,8 +155,16 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsBugLinks:            true,
 		SupportsTags:                true,
 
-		SupportsDatasets:                   false,
-		SupportsDatasetWrites:              false,
+		SupportsDatasets:      false,
+		SupportsDatasetWrites: false,
+
+		// Step results are addressable here, on any execution. This is the one
+		// capability Essential has and Xray does not: a step result carries
+		// its own id, its own status and its own comment, so #371 Phase 6 gave
+		// XTM somewhere to put them. The parameterized trio below stays off
+		// because there is no dataset, which is a different question.
+		SupportsRunStepResults: true,
+
 		SupportsParameterizedRunDetail:     false,
 		SupportsParameterizedRunWrites:     false,
 		SupportsParameterizedRunStepWrites: false,
