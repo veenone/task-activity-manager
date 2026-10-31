@@ -43,28 +43,18 @@ func (a *Adapter) MoveTestStep(ctx context.Context, key, stepID string, index in
 	return backend.ErrUnsupported
 }
 
-// --- containers and runs: writes ---
+// --- containers and runs: the writes that are still unproven ---
 //
-// TODO(xtm) #371 Phase 5. Two of these are more than a mapping. Setting a run
-// status needs the execution id and this instance's numeric status id, so it
-// resolves both before writing; and adding tests to a cycle is asynchronous,
-// returning a job token to poll, which the synchronous commit engine cannot
-// wait on. Both are why the write path is a phase of its own rather than the
-// second half of this one.
-
-func (a *Adapter) CreateContainer(ctx context.Context, projectKey, kind, summary string) (string, error) {
-	return "", backend.ErrUnsupported
-}
-
-func (a *Adapter) AddTestsToContainer(ctx context.Context, kind, containerKey string, testKeys []string) error {
-	return backend.ErrUnsupported
-}
+// TODO(xtm) #371 Phase 5 landed the three whose request shapes are documented:
+// a run result, a cycle, and the tests in one, all in write.go. What is left
+// here is every write SmartBear documents without a measured request or
+// response, and all but one of them is a delete.
+//
+// They wait on Phase 4, which needs a scratch project. A wrong guess at these
+// removes someone's executions or their cycle, and unlike a wrong guess at a
+// create there is nothing to inspect afterwards.
 
 func (a *Adapter) RemoveTestsFromContainer(ctx context.Context, kind, containerKey string, testKeys []string) error {
-	return backend.ErrUnsupported
-}
-
-func (a *Adapter) SetTestRunStatus(ctx context.Context, execKey, testKey, status string) error {
 	return backend.ErrUnsupported
 }
 

@@ -1033,7 +1033,7 @@ func (e *Engine) flattenStepsToText(profileID, testKey string) (string, error) {
 	return strings.Join(parts, "\n\n"), nil
 }
 
-// commitRuns pushes Test-run result updates to Xray. Each pending row is keyed
+// commitRuns pushes Test-run result updates to the backend. Each pending row is keyed
 // by "<execKey>:<testKey>"; reported under the Test key.
 func (e *Engine) commitRuns(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
 	for _, c := range rows {
@@ -1047,7 +1047,7 @@ func (e *Engine) commitRuns(ctx context.Context, profileID string, rows []testre
 			continue
 		}
 		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
-			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "Xray accepted the result but local cleanup failed: " + err.Error()})
+			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "the backend accepted the result but local cleanup failed: " + err.Error()})
 			continue
 		}
 		result.Succeeded = append(result.Succeeded, testKey)
