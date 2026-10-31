@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { RUN_STATUSES, PAGE_SIZE_OPTIONS } from "./constants";
+import { PAGE_SIZE_OPTIONS } from "./constants";
 import { ExecRunCells, DefectsCell, RemarksCell } from "./RunCells";
 import { ParameterizedRunIndicator, ParameterizedRunRows } from "./ParameterizedRunRows";
 import type { ContainerState } from "./useContainerState";
@@ -23,6 +23,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
     pageSize,
     setPageSize,
     caps,
+    runStatuses,
     profileId,
     selected,
     expandedRuns,
@@ -47,7 +48,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
           <span className="bulk-count">{selectedRuns.size} selected</span>
           <span className="muted">Set result:</span>
           <select className="run-select" value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
-            {RUN_STATUSES.map((s) => (
+            {runStatuses.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -209,7 +210,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                               title={parameterized ? "Calculated from dataset iterations" : "Set this test's result in this execution"}
                             >
                               {!r.runStatus && <option value="">Set result…</option>}
-                              {RUN_STATUSES.map((s) => (
+                              {runStatuses.map((s) => (
                                 <option key={s} value={s}>
                                   {s}
                                 </option>

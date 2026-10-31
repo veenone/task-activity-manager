@@ -156,6 +156,15 @@ type cache[T any] struct {
 	done bool
 }
 
+// peek returns what has already been loaded, without loading it. Capabilities()
+// takes no context and must not make a request, so it reads the vocabulary this
+// way and falls back when the cache is still cold.
+func (c *cache[T]) peek() (T, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.val, c.done
+}
+
 func (c *cache[T]) get(load func() (T, error)) (T, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

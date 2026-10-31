@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemberTable } from "./MemberTable";
+import { RUN_STATUSES } from "./constants";
 import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
@@ -34,6 +35,7 @@ function fixture() {
     setSelectedRuns: vi.fn(),
     bulkStatus: "PASS",
     setBulkStatus: vi.fn(),
+    runStatuses: RUN_STATUSES,
     setBoardPage: vi.fn(),
     memberFvFilter: "",
     setDetailKey: vi.fn(),

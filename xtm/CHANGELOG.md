@@ -40,6 +40,26 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   naming what it is called. The searches look for an issue type named Test, so
   that profile would otherwise sync cleanly and report no tests at all.
 
+**A Zephyr profile can set results, create cycles and add tests to them**
+- Setting a test's result in a cycle, creating a cycle and adding tests to one
+  all work on a Zephyr profile, journalled locally and pushed on Commit as on
+  any other backend (#371).
+- Adding tests to a cycle is a background job on Zephyr's side, so the commit
+  waits for it. A job that fails leaves the change pending and says so; a job
+  still running when the wait ends is reported as done, because the add was
+  accepted and a retry would add every test twice.
+- Editing a step, deleting a cycle, removing a test from one, and run-level
+  defects and remarks are still unavailable on a Zephyr profile. Those
+  endpoints have not been verified against an instance.
+
+**The result dropdown offers your backend's own result names**
+- It offered Xray's six on every profile, so a Zephyr or Kiwi user could pick
+  a result their backend has no id for and only find out when the commit
+  failed. Each backend now declares its own, and Zephyr's come from the
+  instance, which configures them (#371).
+- An Xray profile is unchanged. A Kiwi profile still shows Xray's names, which
+  needs a Kiwi instance to read its own list from.
+
 **Custom fields say where they live, on every backend**
 - A Zephyr profile reads custom fields from both places they exist: Jira's own
   fields on the test issue, and Zephyr's fields on an execution and on a step

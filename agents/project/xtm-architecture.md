@@ -313,10 +313,12 @@ migration bridge moves a dataset between connections.
 
 **Zephyr Essential is the third backend, and it is partial.**
 `internal/backend/zephyr` connects, declares its capabilities, and reads tests,
-steps, cycles, run results and both custom field namespaces. Writing anything
-Zephyr owns answers `ErrUnsupported` until the phase that fills it (#371);
-`unsupported.go` groups what is left by phase and `absent.go` holds what
-Essential does not have at all. It is Data Center only.
+steps, cycles, run results and both custom field namespaces. It writes three
+things: a run result, a cycle, and the tests in one, in `write.go`. Every other
+write answers `ErrUnsupported` until the phase that fills it (#371), and all
+but one of those is a delete whose request shape has never been measured;
+`unsupported.go` groups what is left and `absent.go` holds what Essential does
+not have at all. It is Data Center only.
 
 It is shaped differently from the other two: a Zephyr test is an ordinary Jira
 issue, so the adapter holds a Jira client beside its Zephyr one and most reads
@@ -331,6 +333,27 @@ embedded adapter would satisfy the interface with those too. The boundary is a
 test rather than a convention: `TestTheDelegatedMethodsOnlyTalkToJira` drives
 every delegated method against a recording server and fails if one asks for
 anything outside `/rest/api`.
+
+**The result vocabulary is per backend, not shared.** Xray has six names,
+Kiwi has its own, and Zephyr configures them per instance: this one defines
+UNEXECUTED, PASS, FAIL, WIP, BLOCKED and PASS WARNING. `Capabilities` carries
+`RunStatuses` and the member table offers what the backend declared, so a user
+can no longer pick a result their backend has no id for and find out at commit.
+A backend that declares none is offered Xray's, which Kiwi still is.
+
+Zephyr's list comes from the vocabulary read at connect. `Capabilities()` takes
+no context and must not make a request, and `GetCapabilities` does not promise
+a connection test ran on the same backend first, so a cold cache falls back to
+the six the probed instance declared rather than to Xray's.
+
+**Two writes are more than a mapping.** Setting a result resolves the numeric
+execution id through traceability and the numeric status id through the
+instance vocabulary before writing, because the neutral call carries neither.
+Adding tests to a cycle is asynchronous: Zephyr answers with a job token, and
+`awaitJob` follows it because the commit engine reads a nil error as "this
+landed". A job still running when the wait runs out is reported as done on
+purpose, since the add was accepted and the worse outcome is a retry that adds
+every test twice.
 
 **Custom fields have a scope, and it is on the shared model.** Jira's own
 fields are on the test issue and are the only editable ones, because a custom

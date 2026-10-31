@@ -486,5 +486,17 @@ analysis in `docs/superpowers/specs/2026-10-30-zephyr-essential-bridge-design.md
 - **`/execution?cycleId=` is documented but still unproven.** It is how a
   cycle's members are found, so `ListContainers` logs and lists a cycle without
   members when it fails rather than failing the whole walk.
+- **The three writes XTM makes use documented paths with unmeasured bodies.**
+  `PUT /execution/{id}/execute` carries the numeric status id, `POST /cycle`
+  carries `name`, `projectId` and `versionId`, and
+  `POST /execution/addTestsToCycle` carries `cycleId`, `projectId`,
+  `versionId`, `method` and `issues`. The paths are documented; none of the
+  request bodies was confirmed against an instance, so a wrong field name
+  shows up as a refused write rather than as a wrong one.
+- **A cycle's project and version are not derivable from its id.** `/cycle`
+  answers for one version at a time, so finding the version a cycle belongs to
+  means walking the project's versions and checking each list. The cycle's own
+  `versionId` is preferred where it reports one, because a cycle can come back
+  under more than one version.
 - `systemInfo` and the plugin endpoint both need Jira admin and answered 403,
   so the Zephyr plugin version was not established from the API.

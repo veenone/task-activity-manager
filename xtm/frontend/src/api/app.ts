@@ -80,6 +80,9 @@ export interface Capabilities {
   supportsContainers: boolean;
   containerKinds: string[];
   supportsTestRuns: boolean;
+  // The result vocabulary this backend accepts, in the order to offer it in.
+  // Empty means the backend declares none, and Xray's six are offered.
+  runStatuses: string[];
   statusModel: string;
   supportsWorkflowTransitions: boolean;
   supportsBugCreation: boolean;
