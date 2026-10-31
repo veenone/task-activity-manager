@@ -135,3 +135,35 @@ func (a *Adapter) DeleteFolder(ctx context.Context, projectKey, path string) err
 func (a *Adapter) MoveTestToFolder(ctx context.Context, projectKey, testKey, folderID string) error {
 	return backend.ErrUnsupported
 }
+
+// --- the Xray-specific field resolvers: nothing here to resolve ---
+//
+// Each of these resolves a value to the instance-specific Jira custom field
+// Xray keeps it in. Essential has no test type, no Gherkin or generic test
+// body and no preconditions, so there is no field to resolve to and never
+// will be.
+//
+// They answer ok=false with no error rather than ErrUnsupported, as Kiwi's do:
+// the commit engine reads ok=false as "this backend has no such field, skip
+// it" and carries on with the rest of the change, which is right here. An
+// error would fail a commit over a field the user never set.
+
+func (a *Adapter) ExecTypeFieldValue(ctx context.Context, execType string) (fieldID string, value any, ok bool, err error) {
+	return "", nil, false, nil
+}
+
+func (a *Adapter) CucumberScenarioFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
+	return "", nil, false, nil
+}
+
+func (a *Adapter) CucumberTypeFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
+	return "", nil, false, nil
+}
+
+func (a *Adapter) GenericDefinitionFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
+	return "", nil, false, nil
+}
+
+func (a *Adapter) ConditionFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
+	return "", nil, false, nil
+}

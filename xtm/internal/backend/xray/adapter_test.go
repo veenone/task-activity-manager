@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/jira"
 )
 
@@ -93,5 +94,25 @@ func TestAdapterSmokeDemo(t *testing.T) {
 	}
 	if len(caps.ContainerKinds) != 3 {
 		t.Fatalf("expected 3 container kinds, got %v", caps.ContainerKinds)
+	}
+}
+
+// TestCustomFieldsAreIssueScoped pins the one thing #371 Phase 3 changed for
+// an Xray profile. The scope was added for Zephyr, which also has custom
+// fields on an execution and on a step, and a definition that arrived without
+// one would be grouped as neither and would lose its editor: Xray's fields all
+// live on the Jira issue, so they all declare that scope.
+func TestCustomFieldsAreIssueScoped(t *testing.T) {
+	defs, err := New(jira.NewClient("demo", "")).ListCustomFields(context.Background(), "DEMO")
+	if err != nil {
+		t.Fatalf("ListCustomFields: %v", err)
+	}
+	if len(defs) == 0 {
+		t.Fatal("demo mode reported no custom fields, so this proves nothing")
+	}
+	for _, d := range defs {
+		if d.Scope != backend.FieldScopeIssue {
+			t.Errorf("field %s has scope %q, want the Jira issue scope", d.ID, d.Scope)
+		}
 	}
 }

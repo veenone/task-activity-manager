@@ -80,6 +80,11 @@ func TestTheDelegatedMethodsOnlyTalkToJira(t *testing.T) {
 	_, _ = a.CreateBug(ctx, "PROJ", "Bug", "a defect", "", "", nil, nil)
 	_ = a.CreateBugLink(ctx, "PROJ-101", "PROJ-900")
 	_, _ = a.GetBugDetail(ctx, "PROJ-900")
+	// The Jira half of the custom fields. ListCustomFields is deliberately not
+	// here: it reads Zephyr's own namespaces too, which is the whole point of
+	// customfields.go, so it would fail this test by design.
+	_, _ = a.GetTestCustomFields(ctx, "PROJ-101")
+	_, _, _ = a.CustomFieldValue(ctx, "customfield_10102", "Automated")
 
 	mu.Lock()
 	defer mu.Unlock()

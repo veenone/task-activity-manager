@@ -317,11 +317,16 @@ export interface TestCallLink {
   stepIndex: number;
 }
 
-// CustomFieldValue mirrors testrepo.CustomFieldValue — a Jira custom field on
-// the Test issue type with this Test's value (FR-2.6).
+// CustomFieldValue mirrors testrepo.CustomFieldValue: one custom field the
+// backend reports, with this Test's value for it (FR-2.6).
+//
+// scope says what the field is attached to, and only "issue" can be edited
+// here. It mirrors backend.FieldScope* and is empty on a definition cached
+// before the scope existed, which customFieldScopes.ts reads as "issue".
 export interface CustomFieldValue {
   fieldId: string;
   name: string;
   type: string;
   value: string;
+  scope: string;
 }

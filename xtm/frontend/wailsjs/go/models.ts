@@ -2149,6 +2149,7 @@ export namespace testrepo {
 	    name: string;
 	    type: string;
 	    value: string;
+	    scope: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CustomFieldValue(source);
@@ -2160,6 +2161,7 @@ export namespace testrepo {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.value = source["value"];
+	        this.scope = source["scope"];
 	    }
 	}
 	export class DatasetParameter {

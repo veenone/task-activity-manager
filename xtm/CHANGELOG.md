@@ -40,6 +40,22 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   naming what it is called. The searches look for an issue type named Test, so
   that profile would otherwise sync cleanly and report no tests at all.
 
+**Custom fields say where they live, on every backend**
+- A Zephyr profile reads custom fields from both places they exist: Jira's own
+  fields on the test issue, and Zephyr's fields on an execution and on a step
+  (#371).
+- The detail panel groups them under **On the test**, **On an execution** and
+  **On a step**. Only the first is editable, because an edit here commits as a
+  change to the Jira issue and there is nothing on the issue for the others to
+  change. A profile with one set, which is every Xray and Kiwi profile, shows
+  no group labels and looks exactly as it did.
+- Editing a field that is not on the test is refused by name rather than
+  accepted and then failing at commit.
+- A Zephyr profile's sync no longer stops at the custom fields stage, which it
+  did because that stage is a hard failure and the backend answered it with
+  "unsupported". The stage ran after the containers, so the sync reported an
+  error and never recorded its state.
+
 **Set iteration and step results in bulk**
 - Tick the iterations you mean and apply one result to all of them, with the
   header tick selecting every iteration and **Clear** dropping the selection

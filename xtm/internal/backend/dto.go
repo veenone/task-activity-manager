@@ -147,11 +147,32 @@ type Transition struct {
 	Fields []FieldDef `json:"fields"`
 }
 
+// Custom field scopes: what a field is attached to.
+//
+// Xray and Kiwi have one namespace, the Jira issue, and declare FieldScopeIssue
+// for every definition. Zephyr Essential also has its own fields on an
+// execution and on a test step, which are a separate namespace rather than
+// more issue fields: an edit to an issue field commits as a Jira issue update,
+// and the other two have no write path at all (#371 Phase 3).
+//
+// The alternative was one flat list with prefixed ids, and it was rejected
+// because a prefix encodes meaning in a string every consumer then has to
+// parse.
+const (
+	FieldScopeIssue     = "issue"
+	FieldScopeExecution = "execution"
+	FieldScopeStep      = "step"
+)
+
 // CustomFieldDef describes a custom field available on the backend.
 type CustomFieldDef struct {
 	ID   string
 	Name string
 	Type string
+	// Scope is one of the FieldScope* values above. A backend that leaves it
+	// empty is read as FieldScopeIssue, which is what every backend meant
+	// before the scope existed.
+	Scope string
 }
 
 // Folder is a node in the Test Repository folder tree.
