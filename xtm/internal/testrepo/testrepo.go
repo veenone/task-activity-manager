@@ -4880,6 +4880,9 @@ const (
 	entityTestRunIteration       = "test_run_iteration"
 	entityTestRunIterStep        = "test_run_iteration_step"
 	entityTestRunIterationImport = "test_run_iteration_import"
+	// A step result on a plain execution, which belongs to no iteration
+	// (#371 Phase 6).
+	entityTestRunStep = "test_run_step"
 	entityTestRunDefect          = "test_run_defect"
 	entityTestRunComment         = "test_run_comment"
 	entityRequirementSet         = "requirement_set"

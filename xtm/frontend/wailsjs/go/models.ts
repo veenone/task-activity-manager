@@ -24,6 +24,7 @@ export namespace backend {
 	    supportsTags: boolean;
 	    supportsDatasets: boolean;
 	    supportsDatasetWrites: boolean;
+	    supportsRunStepResults: boolean;
 	    supportsParameterizedRunDetail: boolean;
 	    supportsParameterizedRunWrites: boolean;
 	    supportsParameterizedRunStepWrites: boolean;
@@ -58,6 +59,7 @@ export namespace backend {
 	        this.supportsTags = source["supportsTags"];
 	        this.supportsDatasets = source["supportsDatasets"];
 	        this.supportsDatasetWrites = source["supportsDatasetWrites"];
+	        this.supportsRunStepResults = source["supportsRunStepResults"];
 	        this.supportsParameterizedRunDetail = source["supportsParameterizedRunDetail"];
 	        this.supportsParameterizedRunWrites = source["supportsParameterizedRunWrites"];
 	        this.supportsParameterizedRunStepWrites = source["supportsParameterizedRunStepWrites"];
@@ -243,6 +245,34 @@ export namespace backend {
 		}
 	}
 	
+	export class RunStepResult {
+	    id: string;
+	    definitionId: string;
+	    rank: number;
+	    status: string;
+	    action: string;
+	    data: string;
+	    expected: string;
+	    comment: string;
+	    uncommitted: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunStepResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.definitionId = source["definitionId"];
+	        this.rank = source["rank"];
+	        this.status = source["status"];
+	        this.action = source["action"];
+	        this.data = source["data"];
+	        this.expected = source["expected"];
+	        this.comment = source["comment"];
+	        this.uncommitted = source["uncommitted"];
+	    }
+	}
 	export class User {
 	    name: string;
 	    displayName: string;

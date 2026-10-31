@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 56
+const schemaVersion = 57
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -706,6 +706,31 @@ CREATE TABLE IF NOT EXISTS test_run_iteration_step (
 	data              TEXT NOT NULL DEFAULT '',
 	expected          TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, exec_key, test_key, iteration_id, step_result_id)
+);
+`
+
+// test_run_step caches the step results of a plain execution: Zephyr's step
+// results are their own entities and do not belong to an iteration, so they
+// cannot live in test_run_iteration_step, whose primary key requires one
+// (#371 Phase 6).
+//
+// step_result_id is the backend's own id for the result and is what a write
+// addresses. step_definition_id is the step on the test, which two executions
+// of the same test share.
+const runStepResultSchema = `
+CREATE TABLE IF NOT EXISTS test_run_step (
+	profile_id         TEXT NOT NULL,
+	exec_key           TEXT NOT NULL,
+	test_key           TEXT NOT NULL,
+	step_result_id     TEXT NOT NULL,
+	step_definition_id TEXT NOT NULL,
+	rank               INTEGER NOT NULL,
+	status             TEXT NOT NULL,
+	action             TEXT NOT NULL DEFAULT '',
+	data               TEXT NOT NULL DEFAULT '',
+	expected           TEXT NOT NULL DEFAULT '',
+	comment            TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, exec_key, test_key, step_result_id)
 );
 `
 
@@ -1503,6 +1528,13 @@ func applyMigrations(db *sql.DB) error {
 			`ALTER TABLE custom_field ADD COLUMN scope TEXT NOT NULL DEFAULT 'issue'`,
 		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return fmt.Errorf("v56 add custom_field.scope: %w", err)
+		}
+	}
+	// v57: step results on a plain execution, for a backend whose step results
+	// are addressable without a dataset (#371 Phase 6).
+	if current < 57 {
+		if _, err := db.Exec(runStepResultSchema); err != nil {
+			return fmt.Errorf("v57 create run step result cache: %w", err)
 		}
 	}
 	return nil
