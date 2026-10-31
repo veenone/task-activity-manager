@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { KINDS, offeredKinds } from "./constants";
+import { KINDS, RUN_STATUSES, offeredKinds, offeredRunStatuses } from "./constants";
 
 describe("offeredKinds", () => {
   it("offers only the kinds the backend reports", () => {
@@ -22,5 +22,26 @@ describe("offeredKinds", () => {
 
   it("ignores a kind this build has no view for", () => {
     expect(offeredKinds(["testexec", "testcycle"]).map((k) => k.value)).toEqual(["testexec"]);
+  });
+});
+
+describe("offeredRunStatuses", () => {
+  it("offers the backend's own result vocabulary", () => {
+    // Zephyr's statuses are configured per instance and read at connect. A
+    // dropdown offering Xray's TODO or ABORTED there resolves to no id and
+    // fails at commit, for a result the user was explicitly offered.
+    expect(offeredRunStatuses(["UNEXECUTED", "PASS", "FAIL", "WIP"])).toEqual([
+      "UNEXECUTED",
+      "PASS",
+      "FAIL",
+      "WIP",
+    ]);
+  });
+
+  it("falls back to Xray's six when the backend declares none", () => {
+    // Capabilities load after the first render, and Kiwi still declares none,
+    // so nothing should disappear and come back and no profile should lose
+    // its dropdown.
+    expect(offeredRunStatuses([])).toEqual(RUN_STATUSES);
   });
 });

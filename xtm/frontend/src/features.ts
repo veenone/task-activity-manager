@@ -37,6 +37,7 @@ export const defaultCapabilities: Capabilities = {
   supportsContainers: true,
   containerKinds: ["testset", "testplan", "testexec"],
   supportsTestRuns: true,
+  runStatuses: [],
   statusModel: "workflow",
   supportsWorkflowTransitions: true,
   supportsBugCreation: true,

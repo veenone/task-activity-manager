@@ -116,3 +116,20 @@ func TestCustomFieldsAreIssueScoped(t *testing.T) {
 		}
 	}
 }
+
+// TestCapabilitiesReportXraysRunStatuses pins the other half of the change
+// that let a Zephyr profile declare its own result vocabulary. Xray's six are
+// the ones the UI used to hardcode, so an Xray profile has to keep offering
+// exactly them.
+func TestCapabilitiesReportXraysRunStatuses(t *testing.T) {
+	got := New(jira.NewClient("demo", "")).Capabilities().RunStatuses
+	want := backend.DefaultRunStatuses
+	if len(got) != len(want) {
+		t.Fatalf("RunStatuses = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("RunStatuses = %v, want %v", got, want)
+		}
+	}
+}

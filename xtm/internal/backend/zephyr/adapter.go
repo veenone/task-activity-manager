@@ -74,6 +74,35 @@ func (a *Adapter) TestConnection(ctx context.Context) (*backend.User, error) {
 	return &backend.User{Name: u.Name, DisplayName: u.DisplayName, Email: u.Email}, nil
 }
 
+// runStatusNames is the result vocabulary to offer for this instance.
+//
+// Zephyr configures its statuses per instance, so the names come from the
+// vocabulary read at connect. Capabilities() takes no context and must not
+// make a request, and app.go's GetCapabilities does not promise a connection
+// test ran on this same backend first, so a cold cache falls back to the six
+// the probed instance declared. Offering Xray's names instead would let a user
+// pick a result Zephyr has no id for and find out only at commit.
+func (a *Adapter) runStatusNames() []string {
+	// Capabilities() is the one method callers reach for without having built
+	// a Zephyr client, so it answers rather than panicking.
+	if a.z == nil {
+		return documentedRunStatuses
+	}
+	if v, ok := a.z.execStatuses.peek(); ok {
+		if names := v.Names(); len(names) > 0 {
+			return names
+		}
+	}
+	return documentedRunStatuses
+}
+
+// documentedRunStatuses is what the probed instance returned. It is a fallback
+// for a capability read that happens before the connection test, not an
+// assumption about every instance: an instance that renamed one of these is
+// read correctly as soon as the vocabulary has been fetched, and a name it
+// does not define is refused by IDFor rather than written as a guess.
+var documentedRunStatuses = []string{"UNEXECUTED", "PASS", "FAIL", "WIP", "BLOCKED", "PASS WARNING"}
+
 // IsDemo is always false. There is no offline Zephyr instance to generate, as
 // there is for Kiwi.
 func (a *Adapter) IsDemo() bool { return false }
@@ -118,6 +147,7 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsContainers: true,
 		ContainerKinds:     []string{backend.KindTestExec},
 		SupportsTestRuns:   true,
+		RunStatuses:        a.runStatusNames(),
 
 		StatusModel:                 "workflow",
 		SupportsWorkflowTransitions: true,

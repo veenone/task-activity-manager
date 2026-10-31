@@ -15,6 +15,7 @@ export namespace backend {
 	    supportsContainers: boolean;
 	    containerKinds: string[];
 	    supportsTestRuns: boolean;
+	    runStatuses: string[];
 	    statusModel: string;
 	    supportsWorkflowTransitions: boolean;
 	    supportsBugCreation: boolean;
@@ -48,6 +49,7 @@ export namespace backend {
 	        this.supportsContainers = source["supportsContainers"];
 	        this.containerKinds = source["containerKinds"];
 	        this.supportsTestRuns = source["supportsTestRuns"];
+	        this.runStatuses = source["runStatuses"];
 	        this.statusModel = source["statusModel"];
 	        this.supportsWorkflowTransitions = source["supportsWorkflowTransitions"];
 	        this.supportsBugCreation = source["supportsBugCreation"];
