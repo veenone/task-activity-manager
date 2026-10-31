@@ -201,3 +201,17 @@ func (a *Adapter) AddComment(ctx context.Context, issueKey, body string) error {
 func (a *Adapter) FieldsForJira(updates map[string]string) map[string]any {
 	return a.jiraSide().FieldsForJira(updates)
 }
+
+// --- custom fields: the Jira namespace ---
+//
+// Zephyr's own namespaces are in customfields.go, which calls the delegation
+// below for this half. These two are the issue half and nothing more: the
+// values live on the Jira issue and the typing is Jira's.
+
+func (a *Adapter) GetTestCustomFields(ctx context.Context, testKey string) (map[string]string, error) {
+	return a.jiraSide().GetTestCustomFields(ctx, testKey)
+}
+
+func (a *Adapter) CustomFieldValue(ctx context.Context, fieldID, value string) (string, any, error) {
+	return a.jiraSide().CustomFieldValue(ctx, fieldID, value)
+}

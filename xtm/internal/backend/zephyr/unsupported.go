@@ -6,10 +6,9 @@
 // read groups, which are now in jiraside.go, steps.go and containers.go. What
 // Essential does not have at all is in absent.go instead.
 //
-// What is left is the write path and the custom field namespaces. The writes
-// wait on #371 Phase 4, whose whole purpose is to run the six endpoints
-// SmartBear documents but nobody has measured, before any adapter depends on
-// them.
+// What is left is the write path. It waits on #371 Phase 4, whose whole
+// purpose is to run the six endpoints SmartBear documents but nobody has
+// measured, before any adapter depends on them.
 //
 // Phases are from docs/superpowers/plans/2026-10-30-zephyr-essential-bridge.md.
 
@@ -42,48 +41,6 @@ func (a *Adapter) DeleteTestStep(ctx context.Context, key, stepID string) error 
 
 func (a *Adapter) MoveTestStep(ctx context.Context, key, stepID string, index int, action, data, expected string) error {
 	return backend.ErrUnsupported
-}
-
-// --- custom fields ---
-//
-// TODO(xtm) #371 Phase 3: two namespaces, Jira's own fields and Zephyr's
-// fields on an EXECUTION or a TESTSTEP entity. That is why CustomFieldDef
-// grows a scope rather than ids carrying a prefix.
-//
-// The five resolvers below return ok=false with no error, as Kiwi's do: they
-// resolve Xray-specific fields that have no counterpart here, and the commit
-// engine already reads ok=false as "skip this field".
-
-func (a *Adapter) ListCustomFields(ctx context.Context, projectKey string) ([]backend.CustomFieldDef, error) {
-	return nil, backend.ErrUnsupported
-}
-
-func (a *Adapter) GetTestCustomFields(ctx context.Context, testKey string) (map[string]string, error) {
-	return nil, backend.ErrUnsupported
-}
-
-func (a *Adapter) CustomFieldValue(ctx context.Context, fieldID, value string) (string, any, error) {
-	return "", nil, backend.ErrUnsupported
-}
-
-func (a *Adapter) ExecTypeFieldValue(ctx context.Context, execType string) (fieldID string, value any, ok bool, err error) {
-	return "", nil, false, nil
-}
-
-func (a *Adapter) CucumberScenarioFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
-	return "", nil, false, nil
-}
-
-func (a *Adapter) CucumberTypeFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
-	return "", nil, false, nil
-}
-
-func (a *Adapter) GenericDefinitionFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
-	return "", nil, false, nil
-}
-
-func (a *Adapter) ConditionFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error) {
-	return "", nil, false, nil
 }
 
 // --- containers and runs: writes ---

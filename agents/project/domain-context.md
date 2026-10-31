@@ -470,7 +470,21 @@ analysis in `docs/superpowers/specs/2026-10-30-zephyr-essential-bridge-design.md
 - **Zephyr has its own custom fields** on `EXECUTION` and `TESTSTEP` entities,
   separate from Jira's, read at `/customfield/entity?entityType=` and created
   with types TEXT, LARGE_TEXT, NUMBER, RADIO_BUTTON, SINGLE_SELECT,
-  MULTI_SELECT, DATE, DATE_TIME. Two namespaces is a shape XTM's single flat
-  `ListCustomFields` does not model yet.
+  MULTI_SELECT, DATE, DATE_TIME. The entity endpoint answered 200 but its
+  **body was never captured**, so the reader accepts a bare array and an array
+  wrapped in an object, and reads the type from either `customFieldType` or
+  `type`. `backend.CustomFieldDef` now carries the scope that tells the two
+  namespaces apart.
+- **An execution's status arrives in three shapes**, depending on the build: an
+  object with a name, a bare name, or the numeric id. Only the last needs the
+  per-instance vocabulary, and an id the instance does not define is shown as
+  itself rather than as nothing.
+- **`/cycle` mixes non-cycle keys into its map.** The response is an object
+  keyed by cycle id, and it carries counters under keys that are not numbers.
+  A key that does not parse as an integer is not a cycle; reading one as a
+  cycle puts a container named after a record count in the view.
+- **`/execution?cycleId=` is documented but still unproven.** It is how a
+  cycle's members are found, so `ListContainers` logs and lists a cycle without
+  members when it fails rather than failing the whole walk.
 - `systemInfo` and the plugin endpoint both need Jira admin and answered 403,
   so the Zephyr plugin version was not established from the API.

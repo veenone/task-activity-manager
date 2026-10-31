@@ -81,10 +81,10 @@ func (c *Client) TestIssueTypeName(ctx context.Context) (string, error) {
 // searches return nothing at all, which reads as a sync that did not run
 // rather than as a configuration XTM cannot follow.
 //
-// TODO(xtm) #371 Phase 3: the searches could take the id rather than the name,
-// which would remove the restriction instead of reporting it. That means
-// changing the JQL the Jira client builds for every backend, so it is not a
-// Phase 2 change.
+// TODO(xtm) #371: the searches could take the id rather than the name, which
+// would remove the restriction instead of reporting it. That means changing
+// the JQL the Jira client builds for every backend, so it belongs to no phase
+// of this plan and needs an issue of its own.
 func (a *Adapter) verifyTestIssueTypeName(ctx context.Context) error {
 	name, err := a.z.TestIssueTypeName(ctx)
 	if err != nil {
