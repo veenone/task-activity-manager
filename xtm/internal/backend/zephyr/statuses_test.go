@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"agile-suite/xtm/internal/backend"
 )
 
 // measuredStatuses is the vocabulary the probed instance returned from both
@@ -159,5 +161,73 @@ func TestTheVocabularyIsReadOncePerClient(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Errorf("the execution status endpoint was read %d times, want 1", calls)
+	}
+}
+
+// TestCapabilitiesReportThisInstancesRunStatuses is what makes a Zephyr result
+// settable at all.
+//
+// The result dropdown offered Xray's six names on every profile, and this
+// instance defines different ones, so picking one of Xray's on a Zephyr
+// profile would resolve to no id and fail at commit, for a result the user was
+// explicitly offered. So the backend declares its own vocabulary and the UI
+// offers that.
+func TestCapabilitiesReportThisInstancesRunStatuses(t *testing.T) {
+	// Deliberately NOT the probed instance's names. The fallback for a cold
+	// cache is those, so a fixture that repeated them would pass whether the
+	// vocabulary was read or not: removing the read entirely was the mutation
+	// this assertion missed on the first attempt.
+	const renamed = `[
+  {"id":-1,"name":"NOT RUN"},
+  {"id":1,"name":"PASSED"},
+  {"id":2,"name":"FAILED"},
+  {"id":3,"name":"IN PROGRESS"}
+]`
+	srv := zephyrServer(t, map[string]func(http.ResponseWriter){
+		apiPath + "/util/testExecutionStatus":     func(w http.ResponseWriter) { _, _ = w.Write([]byte(renamed)) },
+		apiPath + "/util/teststepExecutionStatus": func(w http.ResponseWriter) { _, _ = w.Write([]byte(renamed)) },
+	})
+	defer srv.Close()
+	a := newTestAdapter(srv)
+
+	if _, err := a.TestConnection(context.Background()); err != nil {
+		t.Fatalf("TestConnection: %v", err)
+	}
+	got := a.Capabilities().RunStatuses
+	want := []string{"NOT RUN", "PASSED", "FAILED", "IN PROGRESS"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("RunStatuses = %v, want this instance's own vocabulary %v", got, want)
+	}
+}
+
+// TestCapabilitiesReportTheDocumentedStatusesBeforeConnecting covers the order
+// the app can ask in: Capabilities() takes no context and cannot read the
+// instance, and GetCapabilities does not promise a connection test ran on the
+// same backend first. An empty list there would leave the dropdown on Xray's
+// names, which is the defect this fixes.
+func TestCapabilitiesReportTheDocumentedStatusesBeforeConnecting(t *testing.T) {
+	srv := zephyrServer(t, nil)
+	defer srv.Close()
+
+	got := newTestAdapter(srv).Capabilities().RunStatuses
+	if len(got) == 0 {
+		t.Fatal("a backend that has not connected yet reports no statuses, so the dropdown falls back to Xray's")
+	}
+	// Zephyr shares PASS, FAIL and BLOCKED with Xray, so the test is not that
+	// the two lists differ everywhere. It is that the fallback carries at
+	// least one name Xray does not have, because a fallback that did not
+	// would be Xray's vocabulary wearing a new label.
+	xray := map[string]bool{}
+	for _, name := range backend.DefaultRunStatuses {
+		xray[name] = true
+	}
+	own := 0
+	for _, name := range got {
+		if !xray[name] {
+			own++
+		}
+	}
+	if own == 0 {
+		t.Errorf("the fallback %v is entirely Xray's vocabulary, which Zephyr has no ids for", got)
 	}
 }

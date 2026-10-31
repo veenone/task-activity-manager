@@ -8,7 +8,7 @@ import type { ExecMemberRun, RollupMember } from "../../api";
 import { keyCompare, cmpStr, applyDir } from "../../sort";
 import { useContainers, useContainerBoard, useContainerBugs, useContainerMembers, useContainerRollup } from "../../queries/containers";
 import { useCapabilities } from "../../features";
-import { KINDS, offeredKinds } from "./constants";
+import { KINDS, offeredKinds, offeredRunStatuses } from "./constants";
 
 // useContainerState holds what the Containers view knows: the chosen kind and
 // container with their filters, the queries behind them, the member table's
@@ -126,6 +126,9 @@ export function useContainerState() {
   // profile on a backend with executions alone would otherwise keep whichever
   // kind was last picked on another profile and show an empty view.
   const kinds = useMemo(() => offeredKinds(caps.containerKinds), [caps.containerKinds]);
+  // The results this backend accepts. Zephyr configures them per instance, so
+  // offering Xray's names would let a user pick one it has no id for (#371).
+  const runStatuses = useMemo(() => offeredRunStatuses(caps.runStatuses), [caps.runStatuses]);
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
   const selectedContainer = containers.find((c) => c.key === selected) ?? null;
 
@@ -347,7 +350,7 @@ export function useContainerState() {
     (safePage + 1) * pageSize,
   );
 
-  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
+  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, runStatuses, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
 }
 
 export type ContainerState = ReturnType<typeof useContainerState>;

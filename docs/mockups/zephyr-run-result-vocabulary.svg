@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="430" viewBox="0 0 780 430" role="img" aria-label="Snapshot of the execution member table's result dropdown, offering each backend's own result names">
+  <title>Result names come from the backend</title>
+  <desc>Two side by side comparisons of the Containers view member table. On the left, an Xray profile: the result dropdown for a test is open showing TODO, EXECUTING, PASS, FAIL, ABORTED and BLOCKED. On the right, a Zephyr Essential profile: the same dropdown shows the names that instance defines, UNEXECUTED, PASS, FAIL, WIP, BLOCKED and PASS WARNING, with a note that they are read from the instance at connect and that a name it does not define is refused rather than approximated.</desc>
+
+  <defs>
+    <style>
+      .t    { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .h    { font-size: 14px; font-weight: 600; fill: #1f2933; }
+      .lbl  { font-size: 11px; fill: #6b7280; letter-spacing: .4px; }
+      .body { font-size: 12px; fill: #1f2933; }
+      .note { font-size: 11px; fill: #6b7280; }
+      .card { fill: #ffffff; stroke: #d6dbe1; }
+      .field{ fill: #ffffff; stroke: #c3cad2; }
+      .menu { fill: #ffffff; stroke: #b6bec8; }
+      .sel  { fill: #e8f0fe; }
+      .head { fill: #f3f4f6; stroke: #e5e7eb; }
+    </style>
+  </defs>
+
+  <rect width="780" height="430" fill="#eef1f4"/>
+
+  <!-- Xray profile -->
+  <rect x="20" y="16" width="350" height="398" rx="6" class="card"/>
+  <text x="40" y="44" class="t h">Xray profile</text>
+  <text x="40" y="70" class="t lbl">EXECUTION MEMBERS</text>
+
+  <rect x="40" y="80" width="290" height="24" class="head"/>
+  <text x="50" y="97" class="t note">Test</text>
+  <text x="190" y="97" class="t note">Result</text>
+
+  <text x="50" y="126" class="t body">PROJ-101</text>
+  <rect x="186" y="110" width="144" height="24" rx="4" class="field"/>
+  <text x="196" y="127" class="t body">PASS</text>
+  <path d="M 312 120 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+
+  <rect x="186" y="138" width="144" height="156" rx="4" class="menu"/>
+  <text x="200" y="158" class="t body">TODO</text>
+  <text x="200" y="182" class="t body">EXECUTING</text>
+  <rect x="187" y="190" width="142" height="24" class="sel"/>
+  <text x="200" y="207" class="t body">PASS</text>
+  <text x="200" y="231" class="t body">FAIL</text>
+  <text x="200" y="255" class="t body">ABORTED</text>
+  <text x="200" y="279" class="t body">BLOCKED</text>
+
+  <text x="40" y="330" class="t note">Xray's six, which the UI used to show on</text>
+  <text x="40" y="348" class="t note">every profile. Unchanged here.</text>
+
+  <!-- Zephyr profile -->
+  <rect x="410" y="16" width="350" height="398" rx="6" class="card"/>
+  <text x="430" y="44" class="t h">Zephyr Essential profile</text>
+  <text x="430" y="70" class="t lbl">CYCLE MEMBERS</text>
+
+  <rect x="430" y="80" width="290" height="24" class="head"/>
+  <text x="440" y="97" class="t note">Test</text>
+  <text x="580" y="97" class="t note">Result</text>
+
+  <text x="440" y="126" class="t body">PROJ-101</text>
+  <rect x="576" y="110" width="144" height="24" rx="4" class="field"/>
+  <text x="586" y="127" class="t body">WIP</text>
+  <path d="M 702 120 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+
+  <rect x="576" y="138" width="144" height="156" rx="4" class="menu"/>
+  <text x="590" y="158" class="t body">UNEXECUTED</text>
+  <text x="590" y="182" class="t body">PASS</text>
+  <text x="590" y="206" class="t body">FAIL</text>
+  <rect x="577" y="214" width="142" height="24" class="sel"/>
+  <text x="590" y="231" class="t body">WIP</text>
+  <text x="590" y="255" class="t body">BLOCKED</text>
+  <text x="590" y="279" class="t body">PASS WARNING</text>
+
+  <text x="430" y="330" class="t note">Read from the instance when the profile</text>
+  <text x="430" y="348" class="t note">connects, because Zephyr configures them.</text>
+  <text x="430" y="372" class="t note">PASS WARNING is this instance's own: it is not</text>
+  <text x="430" y="390" class="t note">one SmartBear documents.</text>
+</svg>

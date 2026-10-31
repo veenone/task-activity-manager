@@ -551,6 +551,7 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsRequirementObjects:  true,
 		SupportsIssueLinkTypes:      true,
 		SupportsEnvironments:        true,
+		RunStatuses:                 backend.DefaultRunStatuses,
 		SupportsContainers:          true,
 		ContainerKinds:              []string{jira.KindTestSet, jira.KindTestPlan, jira.KindTestExec},
 		SupportsTestRuns:            true,

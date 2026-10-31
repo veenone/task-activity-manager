@@ -424,9 +424,23 @@ read-only, because an edit here is committed as a change to the Jira issue and
 there is nothing on the issue for them to change. With a single set, which is
 what an Xray profile has, the panel shows no group labels at all.
 
-Two limits to know about this release. Setting a result, creating a cycle or
-editing a step on a Zephyr profile is not available yet, so results are shown
-rather than changed. And the searches look for a Jira issue type named `Test`:
+**Setting results and filling cycles works.** You can set a test's result in
+a cycle, create a cycle, and add tests to one, all of it journalled locally and
+pushed when you Commit, exactly as on an Xray profile. The result dropdown
+offers your instance's own names rather than Xray's: if your instance calls a
+result PASS WARNING, that is what you pick, and a name your instance does not
+define is refused instead of being written as something approximate.
+
+Adding tests to a cycle is a background job on Zephyr's side, so XTM waits for
+it to finish before reporting the commit. If the job is still running when it
+stops waiting, the commit is reported as done and the next sync shows what
+landed, which is safer than adding every test a second time on a retry.
+
+Two limits to know about this release. Editing a step, deleting a cycle,
+removing a test from one, and run-level defects and remarks are not available
+on a Zephyr profile yet: those endpoints have not been verified, and a wrong
+guess at a delete loses records. And the searches look for a Jira issue type
+named `Test`:
 if your instance renamed the type Zephyr uses, connecting reports it by name
 instead of leaving you with a project that looks empty.
 
