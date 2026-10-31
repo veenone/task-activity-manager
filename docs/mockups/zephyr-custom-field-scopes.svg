@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="470" viewBox="0 0 780 470" role="img" aria-label="Snapshot of the test detail panel's Custom Fields section, grouped by what each field is attached to">
+  <title>Custom fields, grouped by what they are attached to</title>
+  <desc>Two side by side comparisons of the test detail panel's Custom Fields section. On the left, an Xray profile: three fields with editable inputs and no group labels, because every field is on the test issue. On the right, a Zephyr Essential profile: the same section split into three labelled groups, On the test with an editable input, On an execution and On a step with read-only values and a note saying those fields belong to a run rather than to the test.</desc>
+
+  <defs>
+    <style>
+      .t     { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .h     { font-size: 14px; font-weight: 600; fill: #1f2933; }
+      .sect  { font-size: 13px; font-weight: 600; fill: #1f2933; }
+      .lbl   { font-size: 12px; fill: #4b5563; }
+      .body  { font-size: 12px; fill: #1f2933; }
+      .ro    { font-size: 12px; fill: #6b7280; }
+      .note  { font-size: 11px; fill: #6b7280; }
+      .count { font-size: 11px; fill: #6b7280; }
+      .card  { fill: #ffffff; stroke: #d6dbe1; }
+      .field { fill: #ffffff; stroke: #c3cad2; }
+      .flat  { fill: #f3f4f6; stroke: #e5e7eb; }
+    </style>
+  </defs>
+
+  <rect width="780" height="470" fill="#eef1f4"/>
+
+  <!-- Xray profile -->
+  <rect x="20" y="16" width="350" height="438" rx="6" class="card"/>
+  <text x="40" y="44" class="t h">Xray profile</text>
+
+  <text x="40" y="78" class="t sect">&#9660; Custom Fields</text>
+  <text x="168" y="78" class="t count">3</text>
+
+  <text x="40" y="112" class="t lbl">Automation</text>
+  <rect x="40" y="120" width="290" height="26" rx="4" class="field"/>
+  <text x="50" y="138" class="t body">Automated</text>
+
+  <text x="40" y="176" class="t lbl">Test Level</text>
+  <rect x="40" y="184" width="290" height="26" rx="4" class="field"/>
+  <text x="50" y="202" class="t body">Integration</text>
+
+  <text x="40" y="240" class="t lbl">Owner Team</text>
+  <rect x="40" y="248" width="290" height="26" rx="4" class="field"/>
+  <text x="50" y="266" class="t body">Platform</text>
+
+  <text x="40" y="312" class="t note">No group labels: every field is on the test issue,</text>
+  <text x="40" y="330" class="t note">so this profile looks exactly as it did.</text>
+
+  <!-- Zephyr profile -->
+  <rect x="410" y="16" width="350" height="438" rx="6" class="card"/>
+  <text x="430" y="44" class="t h">Zephyr Essential profile</text>
+
+  <text x="430" y="78" class="t sect">&#9660; Custom Fields</text>
+  <text x="558" y="78" class="t count">3</text>
+
+  <text x="430" y="106" class="t note">On the test</text>
+  <text x="430" y="134" class="t lbl">Automation</text>
+  <rect x="430" y="142" width="290" height="26" rx="4" class="field"/>
+  <text x="440" y="160" class="t body">Automated</text>
+
+  <text x="430" y="198" class="t note">On an execution. Read-only here: these fields</text>
+  <text x="430" y="214" class="t note">belong to a run, not to the test.</text>
+  <text x="430" y="242" class="t lbl">Build number</text>
+  <rect x="430" y="250" width="290" height="26" rx="4" class="flat"/>
+  <text x="440" y="268" class="t ro">(none)</text>
+
+  <text x="430" y="306" class="t note">On a step. Read-only here: these fields belong</text>
+  <text x="430" y="322" class="t note">to a run, not to the test.</text>
+  <text x="430" y="350" class="t lbl">Evidence</text>
+  <rect x="430" y="358" width="290" height="26" rx="4" class="flat"/>
+  <text x="440" y="376" class="t ro">(none)</text>
+
+  <text x="430" y="414" class="t note">Editing one of these is refused by name rather</text>
+  <text x="430" y="432" class="t note">than queued and failed at commit.</text>
+</svg>

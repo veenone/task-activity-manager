@@ -416,6 +416,14 @@ What Zephyr Essential does not have, and what therefore stays empty or hidden:
   the Containers view offers Test Execution alone and Browse drops those two
   groupings.
 
+**Custom fields come from two places.** Jira's own custom fields sit on the
+test issue and you can edit them. Zephyr keeps its own custom fields on an
+execution and on a test step, and those are a different set: the detail panel
+lists them under **On an execution** and **On a step** and leaves them
+read-only, because an edit here is committed as a change to the Jira issue and
+there is nothing on the issue for them to change. With a single set, which is
+what an Xray profile has, the panel shows no group labels at all.
+
 Two limits to know about this release. Setting a result, creating a cycle or
 editing a step on a Zephyr profile is not available yet, so results are shown
 rather than changed. And the searches look for a Jira issue type named `Test`:
