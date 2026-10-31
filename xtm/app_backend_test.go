@@ -5,6 +5,7 @@ import (
 
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
+	"agile-suite/xtm/internal/backend/zephyr"
 )
 
 // TestNewBackendRouting verifies newBackend routes on backendType (a
@@ -30,5 +31,13 @@ func TestNewBackendRouting(t *testing.T) {
 	}
 	if _, ok := newBackend("xray", "kiwi-demo", "tok", "", false).(*kiwi.Adapter); !ok {
 		t.Error(`newBackend("xray", "kiwi-demo") did not return a *kiwi.Adapter`)
+	}
+
+	// A Zephyr profile keeps the Jira URL and the Jira personal access token,
+	// so nothing in its form values tells the two apart: only the backend type
+	// does. Routing it to Xray would connect, report no tests, and look like an
+	// empty project (#371 Phase 1).
+	if _, ok := newBackend("zephyr", "https://jira.example.com", "tok", "", false).(*zephyr.Adapter); !ok {
+		t.Error(`newBackend("zephyr", real URL) did not return a *zephyr.Adapter`)
 	}
 }

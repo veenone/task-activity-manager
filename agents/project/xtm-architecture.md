@@ -311,4 +311,22 @@ than an Xray-only cache. Kiwi TCMS is supported alongside Xray via the
 `backend.Backend` interface, each backend advertises its capabilities, and a
 migration bridge moves a dataset between connections.
 
+**Zephyr Essential is the third backend, and it is partial.**
+`internal/backend/zephyr` connects, declares its capabilities and reads this
+instance's status vocabularies; everything else answers `ErrUnsupported` until
+the phase that fills it (#371). It is Data Center only.
+
+It is shaped differently from the other two: a Zephyr test is an ordinary Jira
+issue, so the adapter holds a Jira client beside its Zephyr one and most reads
+go through the Jira path XTM already has. Only cycles, executions, steps and
+step results sit behind `/rest/zapi/latest`.
+
+Two things about it are worth knowing before touching it. The product names
+collide, because SmartBear renamed both apps in April 2025 and Essential is
+the former Squad, not the former Scale; `agents/project/glossary.md` has it.
+And statuses are numeric ids configured per instance, so they are read at
+connect time and never compiled in: the probed instance defines a sixth status
+SmartBear does not document, and a hardcoded map would have written the wrong
+result without failing.
+
 See `CHANGELOG.md` for what has shipped and what is pending release.

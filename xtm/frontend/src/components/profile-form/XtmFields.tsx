@@ -27,7 +27,14 @@ export function BackendFields({ x, isConnection, onBackendChange }: { x: XtmProf
         >
           <option value="xray">Xray / Jira</option>
           <option value="kiwi">Kiwi TCMS</option>
+          <option value="zephyr">Zephyr Essential</option>
         </select>
+        {x.isZephyr && (
+          <span className="field-hint">
+            Zephyr Essential has no test repository, preconditions, datasets or
+            test plans, so those views stay empty on this profile.
+          </span>
+        )}
       </label>
     </>
   );

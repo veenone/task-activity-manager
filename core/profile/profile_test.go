@@ -325,3 +325,23 @@ func TestCreateCarriesTLSSettings(t *testing.T) {
 		t.Errorf("after reload: CACert=%q AllowUntrustedTLS=%v", got.CACert, got.AllowUntrustedTLS)
 	}
 }
+
+// TestAZephyrBackendPersists guards the normalisation in backendOrDefault,
+// which turns any value it does not recognise into "xray". A Zephyr profile
+// saved while "zephyr" was unrecognised came back as an Xray one, so it
+// connected to plain Jira and reported a project with no tests rather than
+// refusing to connect (#371 Phase 1).
+func TestAZephyrBackendPersists(t *testing.T) {
+	m := newManager(t)
+
+	p, err := m.Create("Zephyr DC", "https://jira.example.com", "PROJ", "", "", "", "", "", false, "zephyr")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if p.Backend != "zephyr" {
+		t.Fatalf("Backend = %q, want 'zephyr'", p.Backend)
+	}
+	if reread, err := m.Get(p.ID); err != nil || reread.Backend != "zephyr" {
+		t.Errorf("persisted Backend = %q (err %v), want 'zephyr'", reread.Backend, err)
+	}
+}

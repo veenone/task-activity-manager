@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="416" viewBox="0 0 720 416" role="img" aria-label="Snapshot of the profile form's backend selector with Zephyr Essential added as a third option">
+  <title>Profile form, backend selector with Zephyr Essential</title>
+  <desc>The XTM profile form's Backend field, open, showing three options: Xray / Jira, Kiwi TCMS, and the newly added Zephyr Essential. Zephyr is selected, and a hint under the field names the four features Zephyr Essential does not have. The Jira base URL and personal access token fields below are the Xray ones unchanged, because a Zephyr profile authenticates the same way.</desc>
+
+  <defs>
+    <style>
+      .t      { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .mono   { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; }
+      .title  { font-size: 15px; font-weight: 600; fill: #1f2933; }
+      .lbl    { font-size: 12px; fill: #6b7280; }
+      .body   { font-size: 13px; fill: #1f2933; }
+      .hint   { font-size: 12px; fill: #6b7280; }
+      .new    { font-size: 11px; font-weight: 600; fill: #1b6b3a; }
+      .card   { fill: #ffffff; stroke: #d6dbe1; }
+      .field  { fill: #ffffff; stroke: #c3cad2; }
+      .menu   { fill: #ffffff; stroke: #b6bec8; }
+      .sel    { fill: #e8f0fe; }
+      .added  { fill: #eef7f0; }
+    </style>
+  </defs>
+
+  <rect width="720" height="416" fill="#eef1f4"/>
+  <rect x="20" y="16" width="680" height="384" rx="6" class="card"/>
+
+  <text x="40" y="44" class="t title">New profile</text>
+  <line x1="20" y1="58" x2="700" y2="58" stroke="#e3e8ee"/>
+
+  <text x="40" y="84" class="t lbl">PROFILE NAME</text>
+  <rect x="40" y="92" width="300" height="28" rx="4" class="field"/>
+  <text x="50" y="111" class="t body">Zephyr (DC)</text>
+
+  <text x="40" y="146" class="t lbl">BACKEND</text>
+  <rect x="40" y="154" width="300" height="28" rx="4" class="field"/>
+  <text x="50" y="173" class="t body">Zephyr Essential</text>
+  <path d="M 322 166 l 5 6 l 5 -6" fill="none" stroke="#6b7280" stroke-width="1.4"/>
+
+  <rect x="40" y="186" width="300" height="88" rx="4" class="menu"/>
+  <text x="54" y="208" class="t body">Xray / Jira</text>
+  <text x="54" y="236" class="t body">Kiwi TCMS</text>
+  <rect x="41" y="246" width="298" height="27" class="added"/>
+  <text x="54" y="264" class="t body">Zephyr Essential</text>
+  <text x="258" y="264" class="t new">NEW</text>
+
+  <text x="40" y="300" class="t hint">Zephyr Essential has no test repository, preconditions, datasets or</text>
+  <text x="40" y="316" class="t hint">test plans, so those views stay empty on this profile.</text>
+
+  <text x="380" y="146" class="t lbl">JIRA BASE URL</text>
+  <rect x="380" y="154" width="280" height="28" rx="4" class="field"/>
+  <text x="390" y="173" class="t mono body">https://jira.example.com</text>
+
+  <text x="380" y="212" class="t lbl">PERSONAL ACCESS TOKEN</text>
+  <rect x="380" y="220" width="280" height="28" rx="4" class="field"/>
+  <text x="390" y="239" class="t mono body">••••••••••••••••••••</text>
+  <text x="380" y="266" class="t hint">The same Jira token an Xray profile uses.</text>
+
+  <line x1="20" y1="344" x2="700" y2="344" stroke="#e3e8ee"/>
+  <text x="40" y="372" class="t hint">Connecting checks the token, then that Zephyr is installed on the instance.</text>
+</svg>

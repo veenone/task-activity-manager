@@ -28,7 +28,8 @@ type Connection struct {
 	WorkspaceID string `json:"workspaceId"`
 	Name        string `json:"name"`
 	// Backend selects which system this connection talks to: "xray" (Jira Data
-	// Center + Xray Server/DC) or "kiwi" (Kiwi TCMS).
+	// Center + Xray Server/DC), "kiwi" (Kiwi TCMS) or "zephyr" (Zephyr
+	// Essential on Jira Data Center).
 	Backend           string `json:"backend"`
 	URL               string `json:"url"`
 	ProjectKey        string `json:"projectKey"`

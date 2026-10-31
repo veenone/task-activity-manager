@@ -317,3 +317,44 @@ describe("ProfileForm bug tracker", () => {
     );
   });
 });
+
+describe("ProfileForm Zephyr backend", () => {
+  const zephyrProfile: Profile = {
+    ...kiwiProfile,
+    id: "p2",
+    name: "Zephyr profile",
+    jiraUrl: "https://jira.example.com",
+    backend: "zephyr",
+  };
+
+  // Zephyr Essential is the third backend (#371). Without the option there is
+  // no way to create such a profile at all.
+  it("offers Zephyr Essential as a backend", () => {
+    render(<ProfileForm onCreated={() => {}} />);
+
+    const select = screen.getByLabelText(/backend/i);
+    expect(
+      within(select).getByRole("option", { name: /zephyr essential/i }),
+    ).toBeInTheDocument();
+  });
+
+  // The form seeded its backend by comparing against "kiwi" alone, so any
+  // other non-Xray value fell back to "xray". Editing a saved Zephyr profile
+  // would then have re-saved it as an Xray one, which connects to plain Jira
+  // and reports an empty project.
+  it("keeps a saved Zephyr profile on its own backend", () => {
+    render(<ProfileForm profile={zephyrProfile} onCreated={() => {}} />);
+
+    expect(screen.getByLabelText(/backend/i)).toHaveValue("zephyr");
+  });
+
+  // A Zephyr profile authenticates exactly as an Xray one does, with a Jira
+  // personal access token, so it must not be offered Kiwi's username and
+  // password pair.
+  it("asks for a Jira token rather than a username and password", () => {
+    render(<ProfileForm profile={zephyrProfile} onCreated={() => {}} />);
+
+    expect(screen.queryByLabelText(/kiwi username/i)).toBeNull();
+    expect(screen.getByLabelText(/jira base url/i)).toBeInTheDocument();
+  });
+});
