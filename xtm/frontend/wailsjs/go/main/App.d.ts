@@ -275,6 +275,8 @@ export function GetRunRollup(arg1:string,arg2:string):Promise<testrepo.RunRollup
 
 export function GetRunRollupBreakdown(arg1:string,arg2:string):Promise<Array<testrepo.RollupMember>>;
 
+export function GetRunStepResults(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<Array<backend.RunStepResult>>;
+
 export function GetSettings():Promise<settings.Settings>;
 
 export function GetStatistics(arg1:string,arg2:string,arg3:string,arg4:string):Promise<testrepo.Statistics>;
@@ -506,6 +508,8 @@ export function SetRequirementLinkType(arg1:string):Promise<void>;
 export function SetRequirementLinks(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<void>;
 
 export function SetRequirementSource(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function SetRunStepStatus(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function SetShowCoverage(arg1:boolean):Promise<void>;
 

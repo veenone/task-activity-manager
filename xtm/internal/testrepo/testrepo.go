@@ -4880,6 +4880,7 @@ const (
 	entityTestRunIteration       = "test_run_iteration"
 	entityTestRunIterStep        = "test_run_iteration_step"
 	entityTestRunIterationImport = "test_run_iteration_import"
+	entityTestRunStep            = "test_run_step"
 	entityTestRunDefect          = "test_run_defect"
 	entityTestRunComment         = "test_run_comment"
 	entityRequirementSet         = "requirement_set"

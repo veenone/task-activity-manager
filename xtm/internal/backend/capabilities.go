@@ -92,6 +92,21 @@ type Capabilities struct {
 	// change rather than failing it (#277 W1).
 	SupportsDatasetWrites bool `json:"supportsDatasetWrites"`
 
+	// SupportsRunStepResults: the backend's step results are addressable on an
+	// ORDINARY execution, with no dataset and no iteration involved. Zephyr
+	// Essential is the only one: each result has its own id, status and
+	// comment, so a step can be read and written individually (#371 Phase 6).
+	//
+	// It is not the parameterized pair below. Those ask what a step inside an
+	// iteration can do, and Essential has no iterations at all. A backend that
+	// declares this implements RunStepResultManager.
+	//
+	// One flag, not a read/write pair: the pair below exists because Xray
+	// reads iteration steps it cannot write, and the only backend that
+	// declares this one can do both. Split it when a backend can read these
+	// and not write them.
+	SupportsRunStepResults bool `json:"supportsRunStepResults"`
+
 	SupportsParameterizedRunDetail bool `json:"supportsParameterizedRunDetail"`
 	SupportsParameterizedRunWrites bool `json:"supportsParameterizedRunWrites"`
 	// StepWrites is separate because Xray takes an iteration result but not a

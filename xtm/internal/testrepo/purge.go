@@ -54,6 +54,7 @@ var profileScopedTables = []string{
 	"test_run",
 	"test_run_iteration",
 	"test_run_iteration_step",
+	"test_run_step",
 	"exec_plan",
 
 	// Coverage parameters, their values and what they publish to.

@@ -195,6 +195,17 @@ writes by the stable iteration ID returned by the backend. Source drift and
 zero or multiple matches produce a conflict that keeps the pending row. The
 deferred payload does not treat a preview-only signature hash as a server ID.
 
+**Step results on a plain execution are their own surface.** A backend whose
+step results carry their own ids reports them through
+`backend.RunStepResultManager`, gated on `SupportsRunStepResults`.
+`test_run_step` caches them and journals a pick, and
+`syncer/commit_run_step.go` pushes it by the result's stable id with the same
+conflict rules as the iteration path. They deliberately do NOT reuse
+`test_run_iteration_step`, whose primary key requires an iteration that
+Essential has none of. Xray keeps the iteration path and declares this flag
+off; the two are mutually exclusive in the member row, which offers whichever
+expansion the profile's backend declares.
+
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then
 rewrites dependent pending rows (e.g. associations) to the real key before the
@@ -314,7 +325,11 @@ migration bridge moves a dataset between connections.
 **Zephyr Essential is the third backend, and it is partial.**
 `internal/backend/zephyr` connects, declares its capabilities, and reads tests,
 steps, cycles, run results and both custom field namespaces. It writes three
-things: a run result, a cycle, and the tests in one, in `write.go`. Every other
+things: a run result, a cycle, and the tests in one, in `write.go`, and one
+more in `runsteps.go`: the result of a single step on an ordinary execution.
+That last one is the only capability Essential has and Xray does not, and it
+reaches XTM through `backend.RunStepResultManager`, a side interface rather
+than two more methods on the 87-method `Backend` (#371 Phase 6). Every other
 write answers `ErrUnsupported` until the phase that fills it (#371), and all
 but one of those is a delete whose request shape has never been measured;
 `unsupported.go` groups what is left and `absent.go` holds what Essential does

@@ -522,6 +522,10 @@ export function GetRunRollupBreakdown(arg1, arg2) {
   return window['go']['main']['App']['GetRunRollupBreakdown'](arg1, arg2);
 }
 
+export function GetRunStepResults(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetRunStepResults'](arg1, arg2, arg3, arg4);
+}
+
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
@@ -984,6 +988,10 @@ export function SetRequirementLinks(arg1, arg2, arg3, arg4) {
 
 export function SetRequirementSource(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SetRequirementSource'](arg1, arg2, arg3, arg4);
+}
+
+export function SetRunStepStatus(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetRunStepStatus'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SetShowCoverage(arg1) {

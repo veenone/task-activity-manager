@@ -58,8 +58,13 @@ const (
 	// (#336). The row stays pending and is reported rather than failed, so it
 	// does not read as an error the user could fix (#364).
 	skipReasonIterationStepWrites = "backend cannot write a result for a single step"
-	skipReasonDatasetWrites       = "backend does not support dataset writes"
-	skipReasonIterationWrites     = "backend does not support parameterized run writes"
+	// Step results on a plain execution: only a backend whose step results
+	// carry their own ids can write one, and the row is kept rather than
+	// failed for the same reason as the iteration case above (#371 Phase 6).
+	skipReasonRunStepWrites   = "backend cannot write a step result on an execution"
+	skipReasonRunStepGone     = "the backend no longer reports this step result"
+	skipReasonDatasetWrites   = "backend does not support dataset writes"
+	skipReasonIterationWrites = "backend does not support parameterized run writes"
 )
 
 // CreatedTest records that a locally-created Test (TempKey, "NEW-N") was created
@@ -257,6 +262,7 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	datasetRows := make([]testrepo.PendingChange, 0)
 	// Parameterized results use stable run, iteration and step-result ids.
 	iterationRows := make([]testrepo.PendingChange, 0)
+	runStepRows := make([]testrepo.PendingChange, 0)
 	// New-execution JUnit imports resolve a parameter signature only after the
 	// backend has created the execution and allocated its test runs.
 	deferredIterationRows := make([]testrepo.PendingChange, 0)
@@ -332,6 +338,10 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "test_run_iteration" || c.EntityType == "test_run_iteration_step" {
 			iterationRows = append(iterationRows, c)
+			continue
+		}
+		if c.EntityType == "test_run_step" {
+			runStepRows = append(runStepRows, c)
 			continue
 		}
 		if c.EntityType == "test_run_iteration_import" {
@@ -912,6 +922,11 @@ testLoop:
 		e.commitIterations(ctx, profileID, iterationRows, caps, &result)
 	} else {
 		e.skipRows(iterationRows, skipReasonIterationWrites, &result)
+	}
+	if caps.SupportsRunStepResults {
+		e.commitRunSteps(ctx, profileID, runStepRows, &result)
+	} else {
+		e.skipRows(runStepRows, skipReasonRunStepWrites, &result)
 	}
 	// Run-level defect links + remarks are Xray raven-specific (RND_P_4TFINT_05-296),
 	// gated behind issueBackedWrites like reviews/comments: Xray runs them, a

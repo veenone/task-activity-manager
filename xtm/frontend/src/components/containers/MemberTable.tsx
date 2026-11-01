@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { PAGE_SIZE_OPTIONS } from "./constants";
 import { ExecRunCells, DefectsCell, RemarksCell } from "./RunCells";
 import { ParameterizedRunIndicator, ParameterizedRunRows } from "./ParameterizedRunRows";
+import { RunStepIndicator, RunStepRows } from "./RunStepRows";
 import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
@@ -175,6 +176,23 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                               }
                             />
                           )}
+                          {kind === "testexec" && caps.supportsRunStepResults && (
+                            <RunStepIndicator
+                              profileId={profileId}
+                              execKey={selected}
+                              testKey={r.testKey}
+                              expanded={expanded}
+                              onLoaded={() => undefined}
+                              onToggle={() =>
+                                setExpandedRuns((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(resultKey)) next.delete(resultKey);
+                                  else next.add(resultKey);
+                                  return next;
+                                })
+                              }
+                            />
+                          )}
                           {r.testKey}
                           {r.isExternal && (
                             <span className="ext-badge" title="This test lives in a different Jira project than this profile">
@@ -256,6 +274,19 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                           </button>
                         </td>
                       </tr>
+                      {kind === "testexec" && caps.supportsRunStepResults && expanded && (
+                        <tr className="parameterized-detail-row">
+                          <td colSpan={12}>
+                            <RunStepRows
+                              profileId={profileId}
+                              execKey={selected}
+                              testKey={r.testKey}
+                              expanded={expanded}
+                              runStatuses={runStatuses}
+                            />
+                          </td>
+                        </tr>
+                      )}
                       {kind === "testexec" && caps.supportsParameterizedRunDetail && parameterized && expanded && (
                         <tr className="parameterized-detail-row">
                           <td colSpan={12}>

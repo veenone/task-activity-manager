@@ -105,6 +105,9 @@ export interface Capabilities {
   // from supportsDatasets so a read-only backend still shows the table while
   // the editor stays away.
   supportsDatasetWrites: boolean;
+  // The backend's step results are addressable on an ordinary execution, so
+  // a member row can show and set them without a dataset (#371 Phase 6).
+  supportsRunStepResults: boolean;
   supportsParameterizedRunDetail: boolean;
   supportsParameterizedRunWrites: boolean;
 }

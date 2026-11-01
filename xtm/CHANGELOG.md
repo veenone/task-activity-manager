@@ -52,6 +52,23 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   defects and remarks are still unavailable on a Zephyr profile. Those
   endpoints have not been verified against an instance.
 
+**Every step keeps its own result, where the backend has them**
+- Expanding a test's row in a cycle on a Zephyr profile shows its steps with
+  the result recorded against each one and the comment the executor left. Pick
+  a result on one step, or tick several and apply one result to all of them;
+  the picks are journalled and pushed on Commit like every other edit (#371).
+- This is the one capability Zephyr Essential has and Xray does not. XTM only
+  had step results inside a dataset iteration, which is the only place Xray
+  has them, so a Zephyr step result had nowhere to go at all.
+- The results offered come from the instance, as the run result's do. A result
+  the instance has since renamed stays selectable rather than being shown as
+  some other step's.
+- An Xray profile is unchanged: the same expansion shows dataset iterations,
+  and the two are never offered together.
+- Commit reports rather than fails a step whose result the backend has stopped
+  reporting. A step deleted from the test since it ran cannot be written by
+  its old id, and nothing done locally would change that.
+
 **The result dropdown offers your backend's own result names**
 - It offered Xray's six on every profile, so a Zephyr or Kiwi user could pick
   a result their backend has no id for and only find out when the commit

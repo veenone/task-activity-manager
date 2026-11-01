@@ -99,7 +99,7 @@ func (a *Adapter) executionID(ctx context.Context, cycleID, testKey string) (str
 			return id, nil
 		}
 	}
-	return "", fmt.Errorf("%s has no execution in cycle %s, so there is no result to set; add it to the cycle first", testKey, cycleID)
+	return "", fmt.Errorf("%s has no execution in cycle %s, so it has no results there; add it to the cycle first", testKey, cycleID)
 }
 
 // CreateContainer creates a test cycle. It is the only container kind

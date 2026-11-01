@@ -19,6 +19,10 @@ export const REVIEW_ENABLED = false;
 // behavior as after it resolves: nothing gates OFF prematurely.
 export const defaultCapabilities: Capabilities = {
   name: "xray",
+  // False before the fetch resolves, unlike the flags around it. A step
+  // expansion offered on a backend that cannot address step results would
+  // fail on open, which is worse than appearing a moment late (#371 Phase 6).
+  supportsRunStepResults: false,
   idStyle: "opaque",
   supportsJqlScope: true,
   stepModel: "objects",
