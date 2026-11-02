@@ -231,16 +231,20 @@ func TestComputeGaps_DatasetsTheTargetCannotReceive(t *testing.T) {
 }
 
 // The real pair #378 is about, with both backends' own Capabilities(). Both
-// constructors are pure, so this needs no network. It pins the two findings
-// rather than the whole list, which the hand-built tests above already fix.
-func TestComputeGaps_XrayToZephyrBlocksAndReportsDatasets(t *testing.T) {
+// constructors are pure, so this needs no network.
+//
+// Zephyr can append a step since #378, so this pair no longer blocks: it is a
+// publish with losses the user acknowledges. The blocking rule itself is held
+// by the hand-built tests above, which is where it belongs, because this one
+// stops asserting it the moment a backend gains the capability.
+func TestComputeGaps_XrayToZephyrIsLossyAndNoLongerBlocked(t *testing.T) {
 	source := xray.New(nil).Capabilities()
 	target := zephyr.New(nil, nil).Capabilities()
 
 	gaps := bridge.ComputeGaps(source, target)
 
 	want := []string{
-		"folders", "stepWrites", "datasets", "preconditions", "environments",
+		"folders", "datasets", "preconditions", "environments",
 		"testTypes", "containerKind:testplan", "containerKind:testset",
 	}
 	if got := featureKeys(gaps); !reflect.DeepEqual(got, want) {
@@ -250,9 +254,9 @@ func TestComputeGaps_XrayToZephyrBlocksAndReportsDatasets(t *testing.T) {
 	bySeverity := map[string]string{}
 	for _, g := range gaps {
 		bySeverity[g.Feature] = g.Severity
-	}
-	if bySeverity["stepWrites"] != bridge.SeverityBlocking {
-		t.Errorf("stepWrites = %q, want blocking: Zephyr's CreateTestStep refuses, so a publish leaves stubs", bySeverity["stepWrites"])
+		if g.Severity == bridge.SeverityBlocking {
+			t.Errorf("gap %q blocks, so the wizard refuses a publish Zephyr can now take: %+v", g.Feature, g)
+		}
 	}
 	if bySeverity["datasets"] != bridge.SeverityLossy {
 		t.Errorf("datasets = %q, want lossy: Xray has datasets and Essential has none", bySeverity["datasets"])
