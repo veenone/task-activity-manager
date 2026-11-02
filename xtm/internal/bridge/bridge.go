@@ -72,6 +72,30 @@ func ComputeGaps(source, target backend.Capabilities) []Gap {
 			Message:  "Step objects (action / data / expected result) will be flattened into a single inline text field.",
 		})
 	}
+	// The only rule that refuses the run. Everything else here is a loss the
+	// user can accept, but a target that cannot write steps cannot be
+	// published to at all: publishOne records external_ref as soon as
+	// CreateTest succeeds and before the steps, so each test lands as a stub
+	// that the next run reports as already published rather than repairing.
+	// Acknowledging that would leave a half-populated target no retry can fix
+	// (#378).
+	if source.StepModel != "" && !target.SupportsStepWrites {
+		gaps = append(gaps, Gap{
+			Feature:  "stepWrites",
+			Severity: SeverityBlocking,
+			Message:  "The target cannot create test steps, so published tests would arrive without any, and re-running would skip them rather than add them. Publishing is refused until the target supports step writes.",
+		})
+	}
+	// Whether the target can RECEIVE a dataset, which is why this reads the
+	// write flag: a target that reads datasets but cannot create them loses
+	// them just as completely as one with no dataset concept.
+	if source.SupportsDatasets && !target.SupportsDatasetWrites {
+		gaps = append(gaps, Gap{
+			Feature:  "datasets",
+			Severity: SeverityLossy,
+			Message:  "Datasets and their iterations will not be published. Parameterized tests arrive as plain tests, and their parameters and rows stay in the hub only.",
+		})
+	}
 	if source.SupportsWorkflowTransitions && !target.SupportsWorkflowTransitions {
 		gaps = append(gaps, Gap{
 			Feature:  "statusModel",

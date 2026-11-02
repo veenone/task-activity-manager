@@ -5,6 +5,7 @@ export namespace backend {
 	    idStyle: string;
 	    supportsJqlScope: boolean;
 	    stepModel: string;
+	    supportsStepWrites: boolean;
 	    supportsTestTypes: boolean;
 	    supportsFolders: boolean;
 	    supportsFolderWrites: boolean;
@@ -40,6 +41,7 @@ export namespace backend {
 	        this.idStyle = source["idStyle"];
 	        this.supportsJqlScope = source["supportsJqlScope"];
 	        this.stepModel = source["stepModel"];
+	        this.supportsStepWrites = source["supportsStepWrites"];
 	        this.supportsTestTypes = source["supportsTestTypes"];
 	        this.supportsFolders = source["supportsFolders"];
 	        this.supportsFolderWrites = source["supportsFolderWrites"];

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="560" viewBox="0 0 880 560" role="img" aria-label="Snapshot of the bridge wizard refusing a Zephyr target because it cannot write test steps">
+  <title>The gap step refuses a target that cannot write steps</title>
+  <desc>The bridge wizard's gap step, publishing from an Xray connection to a Zephyr Essential connection. A blocking group at the top says the target cannot create test steps and that publishing is refused, so the Publish button is disabled and the loss acknowledgement is greyed out. Below it a lossy group lists folders, datasets, preconditions, environments, Test Plans and Test Sets, and an info group lists test types. Before this change no rule produced a blocking gap, the datasets line was absent entirely, and the Publish button was enabled once the loss box was ticked.</desc>
+
+  <defs>
+    <style>
+      .t     { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .h     { font-size: 14px; font-weight: 600; fill: #1f2933; }
+      .lbl   { font-size: 11px; fill: #6b7280; letter-spacing: .4px; }
+      .body  { font-size: 12px; fill: #1f2933; }
+      .note  { font-size: 11px; fill: #6b7280; }
+      .mono  { font-size: 12px; font-family: Consolas, "Cascadia Mono", monospace; fill: #1f2933; }
+      .card  { fill: #ffffff; stroke: #d6dbe1; }
+      .field { fill: #ffffff; stroke: #c3cad2; }
+      .block { fill: #fdecec; stroke: #e0a3a3; }
+      .lossy { fill: #fdf3d8; stroke: #e6cf92; }
+      .panel { fill: #f8f9fa; stroke: #e5e7eb; }
+      .bad   { font-size: 12px; font-weight: 600; fill: #a52020; }
+      .warn  { font-size: 12px; font-weight: 600; fill: #8a6d1f; }
+      .rule  { stroke: #e5e7eb; }
+    </style>
+  </defs>
+
+  <rect width="880" height="560" fill="#eef1f4"/>
+  <rect x="20" y="16" width="840" height="528" rx="6" class="card"/>
+
+  <text x="40" y="44" class="t h">Publish to another connection</text>
+  <text x="40" y="66" class="t lbl">STEP 2 OF 3 &#183; GAP</text>
+
+  <text x="40" y="92" class="t body">Publishing from <tspan font-weight="600">Xray (production)</tspan> to <tspan font-weight="600">Zephyr Essential (old-jira)</tspan>.</text>
+  <line x1="40" y1="104" x2="840" y2="104" class="rule"/>
+
+  <!-- blocking group -->
+  <rect x="40" y="118" width="800" height="86" rx="4" class="block"/>
+  <text x="56" y="140" class="t bad">Blocking: the target can't represent this, so publishing is disabled.</text>
+  <text x="56" y="162" class="t body">&#8226; The target cannot create test steps, so published tests would arrive without</text>
+  <text x="66" y="178" class="t body">any, and re-running would skip them rather than add them. Publishing is</text>
+  <text x="66" y="194" class="t body">refused until the target supports step writes.</text>
+
+  <!-- lossy group -->
+  <rect x="40" y="216" width="800" height="176" rx="4" class="lossy"/>
+  <text x="56" y="238" class="t warn">Lossy: publishing will lose or degrade this.</text>
+  <text x="56" y="260" class="t body">&#8226; Test Repository folder placement is not preserved.</text>
+  <text x="56" y="282" class="t body">&#8226; Datasets and their iterations will not be published. Parameterized tests arrive</text>
+  <text x="66" y="298" class="t body">as plain tests, and their parameters and rows stay in the hub only.</text>
+  <text x="56" y="320" class="t body">&#8226; Preconditions will not be published as first-class objects.</text>
+  <text x="56" y="342" class="t body">&#8226; Execution environments will be dropped.</text>
+  <text x="56" y="364" class="t body">&#8226; Container kind "testplan" is not supported by the target.</text>
+  <text x="56" y="384" class="t body">&#8226; Container kind "testset" is not supported by the target.</text>
+
+  <!-- info group -->
+  <rect x="40" y="404" width="800" height="44" rx="4" class="panel"/>
+  <text x="56" y="424" class="t note">Info: handled, for reference.</text>
+  <text x="56" y="440" class="t note">&#8226; Test type (Manual / Automated) will not be preserved as a distinct field.</text>
+
+  <!-- acknowledgement and actions, both inert while blocked -->
+  <rect x="40" y="466" width="14" height="14" rx="2" class="field"/>
+  <text x="64" y="478" class="t note">I accept the losses listed above</text>
+
+  <rect x="628" y="462" width="96" height="26" rx="4" class="field"/>
+  <text x="652" y="479" class="t note">Back</text>
+  <rect x="736" y="462" width="104" height="26" rx="4" fill="#e8eaed" stroke="#d2d6da"/>
+  <text x="752" y="479" class="t note">Publish tests</text>
+
+  <text x="40" y="512" class="t note">The step-write refusal is the first rule to produce a blocking gap. The wizard already had the group and</text>
+  <text x="40" y="528" class="t note">the disabled button; nothing ever filled it, so a Zephyr target used to pass once the loss box was ticked.</text>
+</svg>

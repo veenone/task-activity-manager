@@ -27,6 +27,19 @@ type Capabilities struct {
 	// StepModel is how test steps are represented ("objects" for Xray steps).
 	StepModel string `json:"stepModel"`
 
+	// SupportsStepWrites advertises that a test's steps can be CREATED, not
+	// only read. StepModel answers what a step looks like, which is a
+	// different question: Zephyr Essential models steps as objects and reads
+	// them fine, while CreateTestStep refuses, so a caller that wants to write
+	// steps cannot infer the answer from the model. Separate for the reason
+	// SupportsFolders and SupportsFolderWrites separated.
+	//
+	// The bridge needs it because the publish engine writes steps through
+	// CreateTestStep: a target that refuses leaves every published test a stub
+	// whose external_ref is already recorded, so a retry skips it rather than
+	// repairing it (#378).
+	SupportsStepWrites bool `json:"supportsStepWrites"`
+
 	SupportsTestTypes bool `json:"supportsTestTypes"`
 	// SupportsFolders advertises that the backend can REPORT a folder
 	// structure. It does not promise the folders can be created, renamed or

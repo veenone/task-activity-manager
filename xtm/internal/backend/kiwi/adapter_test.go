@@ -99,6 +99,7 @@ func TestCapabilitiesBaseValues(t *testing.T) {
 		IDStyle:                     "numeric",
 		SupportsJQLScope:            false,
 		StepModel:                   "inline-text",
+		SupportsStepWrites:          true,
 		SupportsTestTypes:           true,
 		SupportsFolders:             true,
 		SupportsFolderWrites:        false,
