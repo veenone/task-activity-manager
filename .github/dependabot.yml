@@ -31,3 +31,14 @@ updates:
     groups:
       frontend:
         patterns: ["*"]
+    ignore:
+      # eslint 10 cannot be installed here: eslint-plugin-jsx-a11y stops at a
+      # peer range of eslint 9 and 6.10.2 is its latest release, so the whole
+      # grouped PR fails at npm ci (#344, which split #292 to get the rest of
+      # the updates in). Accessibility lints are an invariant (I3) and
+      # eslint_a11y is a ratchet counter, so the plugin stays and eslint waits.
+      # Drop these two entries once jsx-a11y ships support for eslint 10.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]

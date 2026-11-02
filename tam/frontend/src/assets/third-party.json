@@ -340,231 +340,231 @@
   },
   {
    "name": "@tanstack/query-core",
-   "version": "5.102.4",
+   "version": "5.104.5",
    "license": "MIT",
    "kind": "npm",
    "text": "277d2a8e4597"
   },
   {
    "name": "@tanstack/react-query",
-   "version": "5.102.4",
+   "version": "5.104.5",
    "license": "MIT",
    "kind": "npm",
    "text": "277d2a8e4597"
   },
   {
    "name": "@tiptap/core",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-blockquote",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-bold",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-bubble-menu",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-bullet-list",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-code",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-code-block",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-document",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-dropcursor",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-floating-menu",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-gapcursor",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-hard-break",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-heading",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-horizontal-rule",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-italic",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-link",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-list",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-list-item",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-list-keymap",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-ordered-list",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-paragraph",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-strike",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-table",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-text",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extension-underline",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/extensions",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/pm",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/react",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@tiptap/starter-kit",
-   "version": "3.31.3",
+   "version": "3.32.0",
    "license": "MIT",
    "kind": "npm",
    "text": "06728620f4ee"
   },
   {
    "name": "@types/react",
-   "version": "19.2.17",
+   "version": "19.3.0",
    "license": "MIT",
    "kind": "npm",
    "text": "ff82c90f8494"
   },
   {
    "name": "@types/react-dom",
-   "version": "19.2.3",
+   "version": "19.3.0",
    "license": "MIT",
    "kind": "npm",
    "text": "ff82c90f8494"
@@ -585,7 +585,7 @@
   },
   {
    "name": "driver.js",
-   "version": "1.8.0",
+   "version": "1.10.2",
    "license": "MIT",
    "kind": "npm",
    "text": "ec3ce3a08736"
@@ -599,14 +599,14 @@
   },
   {
    "name": "linkifyjs",
-   "version": "4.3.3",
+   "version": "4.4.0",
    "license": "MIT",
    "kind": "npm",
    "text": "699b4f57c568"
   },
   {
    "name": "marked",
-   "version": "18.0.13",
+   "version": "18.1.1",
    "license": "MIT",
    "kind": "npm",
    "text": "dd923de97698"
@@ -620,7 +620,7 @@
   },
   {
    "name": "prosemirror-changeset",
-   "version": "2.4.2",
+   "version": "2.4.4",
    "license": "MIT",
    "kind": "npm",
    "text": "940ef9fe4ef9"
@@ -634,7 +634,7 @@
   },
   {
    "name": "prosemirror-dropcursor",
-   "version": "1.8.3",
+   "version": "1.8.4",
    "license": "MIT",
    "kind": "npm",
    "text": "32b18408ca2d"
@@ -648,7 +648,7 @@
   },
   {
    "name": "prosemirror-history",
-   "version": "1.5.0",
+   "version": "1.5.1",
    "license": "MIT",
    "kind": "npm",
    "text": "32b18408ca2d"
@@ -669,7 +669,7 @@
   },
   {
    "name": "prosemirror-model",
-   "version": "1.25.11",
+   "version": "1.25.12",
    "license": "MIT",
    "kind": "npm",
    "text": "32b18408ca2d"
@@ -697,28 +697,28 @@
   },
   {
    "name": "prosemirror-transform",
-   "version": "1.12.1",
+   "version": "1.12.4",
    "license": "MIT",
    "kind": "npm",
    "text": "32b18408ca2d"
   },
   {
    "name": "prosemirror-view",
-   "version": "1.42.3",
+   "version": "1.42.7",
    "license": "MIT",
    "kind": "npm",
    "text": "32b18408ca2d"
   },
   {
    "name": "react",
-   "version": "19.2.7",
+   "version": "19.3.1",
    "license": "MIT",
    "kind": "npm",
    "text": "cf9b17822d1f"
   },
   {
    "name": "react-dom",
-   "version": "19.2.7",
+   "version": "19.3.1",
    "license": "MIT",
    "kind": "npm",
    "text": "cf9b17822d1f"
@@ -732,7 +732,7 @@
   },
   {
    "name": "scheduler",
-   "version": "0.27.0",
+   "version": "0.28.0",
    "license": "MIT",
    "kind": "npm",
    "text": "cf9b17822d1f"
