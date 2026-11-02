@@ -136,11 +136,11 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsJQLScope: true,
 		StepModel:        "objects",
 
-		// Steps read as objects and do not write: CreateTestStep is in
-		// unsupported.go, bundled with update, delete and reorder by plan
-		// Phase 5 item 4. Nothing can publish tests here until it lands
-		// (#378).
-		SupportsStepWrites: false,
+		// A step can be appended (steps.go). Changing, deleting and reordering
+		// one still refuse, waiting on Phase 4, so this answers the narrow
+		// question it asks: whether a test's steps can be CREATED, which is
+		// what a bridge publish needs (#378).
+		SupportsStepWrites: true,
 
 		SupportsTestTypes:           false,
 		SupportsFolders:             false,

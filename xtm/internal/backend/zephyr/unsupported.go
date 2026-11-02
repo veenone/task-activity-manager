@@ -20,16 +20,14 @@ import (
 	"agile-suite/xtm/internal/backend"
 )
 
-// --- steps: writes ---
+// --- steps: the writes that reshape an existing step ---
 //
-// TODO(xtm) #371 Phase 5: a step create is documented against
-// POST /teststep/{issueId}, and the update, delete and reorder endpoints are
-// documented but unproven. Phase 4 runs them against a scratch project first,
-// because a wrong guess at a step write reshapes someone's test.
-
-func (a *Adapter) CreateTestStep(ctx context.Context, key, action, data, expected string) (string, error) {
-	return "", backend.ErrUnsupported
-}
+// TODO(xtm) #371 Phase 4: the update, delete and reorder endpoints are
+// documented and unproven, and Phase 4 runs them against a scratch project
+// first, because a wrong guess at any of them reshapes a step someone wrote.
+//
+// The create moved to steps.go (#378): appending a step can be inspected and
+// removed, and a publish cannot write a test's steps without it.
 
 func (a *Adapter) UpdateTestStep(ctx context.Context, key, stepID string, fields map[string]string) error {
 	return backend.ErrUnsupported

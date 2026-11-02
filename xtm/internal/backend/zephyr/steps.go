@@ -6,8 +6,11 @@
 // fields step, data and result where XTM uses action, data and expected, which
 // is a rename rather than a difference in meaning.
 //
-// Writing a step waits for #371 Phase 5, which waits for Phase 4 to run the
-// three endpoints SmartBear documents but nobody has measured.
+// Creating a step is here. Changing, deleting and reordering one are not: they
+// wait for Phase 4 to run the three endpoints SmartBear documents but nobody
+// has measured, because each of those reshapes a step that already exists.
+// Appending one can be inspected and removed, which is the same asymmetry that
+// let Phase 6 ship a step-result write while the deletes stayed refused.
 
 package zephyr
 
@@ -59,4 +62,39 @@ func (a *Adapter) GetTestSteps(ctx context.Context, key string) ([]backend.Step,
 		})
 	}
 	return steps, nil
+}
+
+// CreateTestStep appends one manual step to a test.
+//
+// The two adaptations GetTestSteps makes apply here unchanged: the endpoint
+// takes the Jira issue id, and the three fields are named step, data and
+// result. No orderId is sent, so the step lands at the end, which is where
+// Zephyr's own editor puts a new one and the order a publish walks its steps
+// in.
+//
+// The path and the field names are measured. The ANSWER's shape is not, which
+// is why an unreadable one is not an error: see the comment on the id below.
+func (a *Adapter) CreateTestStep(ctx context.Context, key, action, data, expected string) (string, error) {
+	id, err := a.z.JiraIssueID(ctx, key)
+	if err != nil {
+		return "", err
+	}
+	var created struct {
+		ID json.RawMessage `json:"id"`
+	}
+	body := map[string]any{"step": action, "data": data, "result": expected}
+	if err := a.z.writeJSON(ctx, "POST", "/teststep/"+id, body, &created); err != nil {
+		return "", fmt.Errorf("add a step to %s: %w", key, err)
+	}
+	// An id the answer does not carry is reported as empty rather than as a
+	// failure. backend.Backend allows it (syncer's createStep returns the id
+	// "when Jira reports one" and its caller guards on a non-empty string,
+	// reconciling the placeholder on the next refresh), and the write has
+	// already landed: failing here would stop a bridge publish at this step
+	// and drop the rest of the test's steps for a write that succeeded.
+	//
+	// CreateContainer makes the opposite choice on purpose. A caller journals
+	// pending work against a cycle id, so a cycle it cannot name is useless;
+	// nothing keys anything by a step id.
+	return jsonString(created.ID), nil
 }
