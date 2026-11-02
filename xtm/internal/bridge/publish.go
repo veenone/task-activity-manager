@@ -214,6 +214,21 @@ func (p *Publisher) PublishTests(ctx context.Context, workspaceID, sourceConnect
 	}
 
 	caps := p.Target.Capabilities()
+
+	// Refuse a target that cannot take steps, before anything is created.
+	// ComputeGaps reports this as blocking, but a gap only reaches the wizard
+	// and this is an IPC entry point, so the check belongs where the write
+	// happens (I1). Fail-fast rather than per test: publishOne records
+	// external_ref as soon as CreateTest succeeds, so continuing would leave
+	// stubs a re-run reports as already published instead of repairing (#378).
+	//
+	// This also refuses a workspace whose tests happen to have no steps at
+	// all, which such a target could in principle take. That case is not worth
+	// a second path: it reads as a migration that silently dropped the steps.
+	if !caps.SupportsStepWrites {
+		return result, fmt.Errorf("the target backend (%s) cannot create test steps, so tests would be published without them and a re-run would not add them: publishing is refused", caps.Name)
+	}
+
 	total := len(tests)
 
 	for i, t := range tests {

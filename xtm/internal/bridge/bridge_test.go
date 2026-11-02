@@ -7,6 +7,7 @@ import (
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
+	"agile-suite/xtm/internal/backend/zephyr"
 	"agile-suite/xtm/internal/bridge"
 )
 
@@ -34,6 +35,9 @@ func TestComputeGaps_XrayToKiwi(t *testing.T) {
 	want := []string{
 		"folders",
 		"steps",
+		// Kiwi models no dataset, so a parameterized Xray test publishes as a
+		// plain one. It writes steps, so it is not blocked (#378).
+		"datasets",
 		"statusModel",
 		"preconditions",
 		"requirements",
@@ -69,6 +73,7 @@ func TestComputeGaps_XrayToKiwi(t *testing.T) {
 	wantSeverity := map[string]string{
 		"folders":               bridge.SeverityLossy,
 		"steps":                 bridge.SeverityLossy,
+		"datasets":              bridge.SeverityLossy,
 		"statusModel":           bridge.SeverityInfo,
 		"preconditions":         bridge.SeverityLossy,
 		"requirements":          bridge.SeverityLossy,
@@ -101,6 +106,9 @@ func TestComputeGaps_XrayToXray(t *testing.T) {
 func TestComputeGaps_AllRulesFire(t *testing.T) {
 	source := backend.Capabilities{
 		StepModel:                   "objects",
+		SupportsStepWrites:          true,
+		SupportsDatasets:            true,
+		SupportsDatasetWrites:       true,
 		SupportsTestTypes:           true,
 		SupportsFolders:             true,
 		SupportsPreconditionObjects: true,
@@ -118,13 +126,136 @@ func TestComputeGaps_AllRulesFire(t *testing.T) {
 
 	gaps := bridge.ComputeGaps(source, target)
 	want := []string{
-		"folders", "steps", "statusModel", "preconditions", "requirements",
-		"issueLinkTypes", "environments", "testTypes", "tags", "bugCreation",
-		"testRuns", "containerKind:testexec", "containerKind:testplan", "containerKind:testset",
+		"folders", "steps", "stepWrites", "datasets", "statusModel", "preconditions",
+		"requirements", "issueLinkTypes", "environments", "testTypes", "tags",
+		"bugCreation", "testRuns", "containerKind:testexec", "containerKind:testplan",
+		"containerKind:testset",
 	}
 	got := featureKeys(gaps)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("gap features = %v, want %v", got, want)
+	}
+}
+
+// A target that cannot write steps is the one gap that must stop a run rather
+// than be acknowledged. The publish engine records external_ref as soon as
+// CreateTest succeeds and before it writes steps, so a refusing target leaves
+// every test a stub that a retry reports as already published instead of
+// repairing (#378). SeverityBlocking existed from the start with no rule
+// producing it, which is why BridgeWizard let this through.
+func TestComputeGaps_TargetThatCannotWriteStepsBlocksTheRun(t *testing.T) {
+	source := backend.Capabilities{StepModel: "objects", SupportsStepWrites: true}
+	target := backend.Capabilities{StepModel: "objects"} // reads steps, refuses to write them
+
+	gaps := bridge.ComputeGaps(source, target)
+
+	var got *bridge.Gap
+	for i := range gaps {
+		if gaps[i].Feature == "stepWrites" {
+			got = &gaps[i]
+		}
+	}
+	if got == nil {
+		t.Fatalf("no stepWrites gap for a target that cannot write steps: %v", featureKeys(gaps))
+	}
+	if got.Severity != bridge.SeverityBlocking {
+		t.Errorf("stepWrites severity = %q, want %q: a lossy gap is acknowledgeable and would still run", got.Severity, bridge.SeverityBlocking)
+	}
+	if got.Message == "" {
+		t.Error("stepWrites gap has an empty message")
+	}
+
+	// Same step model on both sides, so the flatten rule must stay quiet: the
+	// two rules answer different questions and a target can fail either.
+	for _, f := range featureKeys(gaps) {
+		if f == "steps" {
+			t.Error("the flatten rule fired for an objects-to-objects pair")
+		}
+	}
+}
+
+// A target that writes steps must not be blocked, or publishing to Kiwi and to
+// another Xray connection would refuse.
+func TestComputeGaps_TargetThatWritesStepsIsNotBlocked(t *testing.T) {
+	source := backend.Capabilities{StepModel: "objects", SupportsStepWrites: true}
+	target := backend.Capabilities{StepModel: "inline-text", SupportsStepWrites: true}
+
+	for _, g := range bridge.ComputeGaps(source, target) {
+		if g.Feature == "stepWrites" {
+			t.Fatalf("stepWrites gap raised for a target that can write steps: %+v", g)
+		}
+		if g.Severity == bridge.SeverityBlocking {
+			t.Fatalf("a flatten-only pair must not block: %+v", g)
+		}
+	}
+}
+
+// Datasets had no rule at all, so a target without them produced no gap and
+// the wizard stayed silent about the largest loss in an Xray-to-Zephyr
+// publish (#378). The question the rule asks is whether the target can RECEIVE
+// a dataset, so it reads SupportsDatasetWrites: a target that reads datasets
+// but cannot create them loses them just the same.
+func TestComputeGaps_DatasetsTheTargetCannotReceive(t *testing.T) {
+	source := backend.Capabilities{SupportsDatasets: true, SupportsDatasetWrites: true}
+
+	for _, tc := range []struct {
+		name   string
+		target backend.Capabilities
+	}{
+		{"no dataset concept at all", backend.Capabilities{}},
+		{"reads datasets, cannot create them", backend.Capabilities{SupportsDatasets: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gaps := bridge.ComputeGaps(source, tc.target)
+			var got *bridge.Gap
+			for i := range gaps {
+				if gaps[i].Feature == "datasets" {
+					got = &gaps[i]
+				}
+			}
+			if got == nil {
+				t.Fatalf("no datasets gap: %v", featureKeys(gaps))
+			}
+			if got.Severity != bridge.SeverityLossy {
+				t.Errorf("datasets severity = %q, want %q", got.Severity, bridge.SeverityLossy)
+			}
+		})
+	}
+
+	// A target that can receive a dataset is not a gap.
+	for _, g := range bridge.ComputeGaps(source, source) {
+		if g.Feature == "datasets" {
+			t.Errorf("datasets gap raised against a target that writes datasets: %+v", g)
+		}
+	}
+}
+
+// The real pair #378 is about, with both backends' own Capabilities(). Both
+// constructors are pure, so this needs no network. It pins the two findings
+// rather than the whole list, which the hand-built tests above already fix.
+func TestComputeGaps_XrayToZephyrBlocksAndReportsDatasets(t *testing.T) {
+	source := xray.New(nil).Capabilities()
+	target := zephyr.New(nil, nil).Capabilities()
+
+	gaps := bridge.ComputeGaps(source, target)
+
+	want := []string{
+		"folders", "stepWrites", "datasets", "preconditions", "environments",
+		"testTypes", "containerKind:testplan", "containerKind:testset",
+	}
+	if got := featureKeys(gaps); !reflect.DeepEqual(got, want) {
+		t.Fatalf("gap features = %v, want %v (in this exact order)", got, want)
+	}
+
+	bySeverity := map[string]string{}
+	for _, g := range gaps {
+		bySeverity[g.Feature] = g.Severity
+	}
+	if bySeverity["stepWrites"] != bridge.SeverityBlocking {
+		t.Errorf("stepWrites = %q, want blocking: Zephyr's CreateTestStep refuses, so a publish leaves stubs", bySeverity["stepWrites"])
+	}
+	if bySeverity["datasets"] != bridge.SeverityLossy {
+		t.Errorf("datasets = %q, want lossy: Xray has datasets and Essential has none", bySeverity["datasets"])
 	}
 }
 
