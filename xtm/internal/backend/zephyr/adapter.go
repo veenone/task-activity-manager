@@ -136,6 +136,12 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsJQLScope: true,
 		StepModel:        "objects",
 
+		// Steps read as objects and do not write: CreateTestStep is in
+		// unsupported.go, bundled with update, delete and reorder by plan
+		// Phase 5 item 4. Nothing can publish tests here until it lands
+		// (#378).
+		SupportsStepWrites: false,
+
 		SupportsTestTypes:           false,
 		SupportsFolders:             false,
 		SupportsFolderWrites:        false,
