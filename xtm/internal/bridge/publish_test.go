@@ -159,6 +159,7 @@ func settableCaps() backend.Capabilities {
 	return backend.Capabilities{
 		Name:                        "kiwi",
 		StepModel:                   "inline-text",
+		SupportsStepWrites:          true,
 		StatusModel:                 "settable",
 		SupportsWorkflowTransitions: false,
 	}
@@ -182,6 +183,43 @@ func containsCreated(created []bridge.PublishedTest, localKey string) bool {
 		}
 	}
 	return false
+}
+
+// A target that refuses step writes is refused before anything is created.
+//
+// The gap report says blocking for this pair, but ComputeGaps only reaches the
+// wizard: PublishToTarget never consulted it, so the IPC boundary was
+// unguarded (I1) and any caller could still half-populate a target. The damage
+// is unrepairable by a retry, because external_ref is recorded before the
+// steps and a second run then reports the stub as already published (#378).
+func TestPublishTestsRefusesATargetThatCannotWriteSteps(t *testing.T) {
+	hub := newFakeHub()
+	hub.tests["ws1"] = []bridge.HubTest{{Key: "QA-1", Summary: "First"}}
+	hub.steps["ws1/QA-1"] = []bridge.HubStep{{Action: "Open it", Expected: "it opens"}}
+	refs := newFakeRefStore()
+
+	caps := settableCaps()
+	caps.SupportsStepWrites = false
+	target := newFakeTarget(caps)
+	mapping := bridge.Mapping{StatusMap: map[string]string{}, StepMode: bridge.StepModePassthrough}
+	pub := bridge.NewPublisher(target, "PROJ", hub, refs, mapping)
+
+	_, err := pub.PublishTests(context.Background(), "ws1", "src", "tgt", nil)
+	if err == nil {
+		t.Fatal("PublishTests succeeded against a target that cannot write steps")
+	}
+	if !strings.Contains(err.Error(), "step") {
+		t.Errorf("error does not say what is wrong: %v", err)
+	}
+
+	// Nothing may be created, and no ref may be recorded: a stub plus a ref is
+	// exactly the state no retry can fix.
+	if create, step, update := target.callCounts(); create != 0 || step != 0 || update != 0 {
+		t.Errorf("wrote to the target anyway: %d creates, %d steps, %d updates", create, step, update)
+	}
+	if _, ok, _ := refs.ExternalRef("ws1", "test", "QA-1", "tgt"); ok {
+		t.Error("recorded an external_ref for a test it never created")
+	}
 }
 
 // TestPublishTestsCreatesThenResumableRerunSkipsAll proves the core publish +

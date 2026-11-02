@@ -1311,11 +1311,12 @@ func (a *Adapter) AddComment(ctx context.Context, issueKey, body string) error {
 // ensureDetected now delivers regardless of what Capabilities() reports.
 func (a *Adapter) Capabilities() backend.Capabilities {
 	caps := backend.Capabilities{
-		Name:              "kiwi",
-		IDStyle:           "numeric", // Kiwi pks are ints (spec §4.1; see p4_1-report.md for the "integer" vs "numeric" note)
-		SupportsJQLScope:  false,     // Product/Version/Build + ORM filters, not JQL
-		StepModel:         "inline-text",
-		SupportsTestTypes: true, // is_automated -> Manual/Automated
+		Name:               "kiwi",
+		IDStyle:            "numeric", // Kiwi pks are ints (spec §4.1; see p4_1-report.md for the "integer" vs "numeric" note)
+		SupportsJQLScope:   false,     // Product/Version/Build + ORM filters, not JQL
+		StepModel:          "inline-text",
+		SupportsStepWrites: true,
+		SupportsTestTypes:  true, // is_automated -> Manual/Automated
 
 		// Categories read as a flat folder set; they cannot be reshaped.
 		SupportsFolders:             true,

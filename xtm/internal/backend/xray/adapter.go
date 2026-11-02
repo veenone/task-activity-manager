@@ -544,6 +544,7 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		IDStyle:                     "opaque",
 		SupportsJQLScope:            true,
 		StepModel:                   "objects",
+		SupportsStepWrites:          true,
 		SupportsTestTypes:           true,
 		SupportsFolders:             true,
 		SupportsFolderWrites:        true,
