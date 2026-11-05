@@ -93,7 +93,12 @@ export default function App() {
                 id="pie-profile"
                 className="profile-select"
                 value={profileId}
-                onChange={(e) => setProfileId(e.target.value)}
+                disabled={running}
+                onChange={(e) => {
+                  setProfileId(e.target.value);
+                  setResult(null);
+                  setError("");
+                }}
               >
                 {profiles?.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -101,7 +106,7 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-ghost" onClick={() => void deleteProfile()}>
+              <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteProfile()}>
                 Delete profile
               </button>
             </>

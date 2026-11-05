@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="500" viewBox="0 0 1280 500" font-family="Segoe UI, Roboto, sans-serif" font-size="13" role="img" aria-label="Project Issue Explorer with a JQL box, a Run button and a table of query results from several projects">
+  <rect width="1280" height="500" fill="#161d28"/>
+
+  <rect width="1280" height="44" fill="#1b2639"/>
+  <text x="14" y="28" fill="#e6e9ee" font-size="15" font-weight="600">Project Issue Explorer</text>
+  <rect x="976" y="8" width="80" height="28" rx="4" fill="#25324a" stroke="#3a4a66"/>
+  <text x="989" y="27" fill="#e6e9ee">Quality</text>
+  <path d="M1041 20l4 4 4-4" fill="none" stroke="#e6e9ee" stroke-width="1.5"/>
+  <text x="1077" y="27" fill="#e6e9ee">Delete profile</text>
+  <text x="1189" y="27" fill="#e6e9ee">Add profile</text>
+
+  <text x="14" y="77" fill="#ccd4e0" font-size="12" font-weight="600">JQL</text>
+  <rect x="14.5" y="90.5" width="1251" height="80" rx="4" fill="#1b2331" stroke="#3a4a66"/>
+  <text x="23" y="109" fill="#e6e9ee" font-family="Consolas, monospace" font-size="12">category = EXAMPLE AND issuetype = Bug OR filter = 12345</text>
+
+  <rect x="14" y="189" width="50" height="27" rx="4" fill="#5b73f0"/>
+  <text x="27" y="207" fill="#ffffff">Run</text>
+  <text x="74" y="207" fill="#94a3b8">3 issues</text>
+
+  <rect x="14.5" y="228.5" width="1251" height="257" fill="none" stroke="#2e3a4d"/>
+  <rect x="15" y="229" width="1250" height="28" fill="#161d28"/>
+  <g fill="#94a3b8" font-size="12" font-weight="600">
+    <text x="25" y="248">Key</text>
+    <text x="111" y="248">Project</text>
+    <text x="176" y="248">Type</text>
+    <text x="225" y="248">Summary</text>
+    <text x="1027" y="248">Status</text>
+    <text x="1117" y="248">Priority</text>
+    <text x="1182" y="248">Updated</text>
+  </g>
+  <path d="M15 257.5h1250M15 287.5h1250M15 317.5h1250M15 347.5h1250" stroke="#242f3e"/>
+  <g fill="#e6e9ee">
+    <text x="25" y="277" font-family="Consolas, monospace" font-size="12">ALPHA-412</text>
+    <text x="111" y="277">ALPHA</text><text x="176" y="277">Bug</text>
+    <text x="225" y="277">Device fails to attach after profile switch</text>
+    <text x="1027" y="277">Open</text><text x="1117" y="277">Critical</text><text x="1182" y="277">2026-11-05</text>
+    <text x="25" y="307" font-family="Consolas, monospace" font-size="12">BRAVO-88</text>
+    <text x="111" y="307">BRAVO</text><text x="176" y="307">Bug</text>
+    <text x="225" y="307">Attach retry count ignored on second switch</text>
+    <text x="1027" y="307">In Progress</text><text x="1117" y="307">Major</text><text x="1182" y="307">2026-11-04</text>
+    <text x="25" y="337" font-family="Consolas, monospace" font-size="12">DELTA-97</text>
+    <text x="111" y="337">DELTA</text><text x="176" y="337">Bug</text>
+    <text x="225" y="337">Session timeout too short after update</text>
+    <text x="1027" y="337">Closed</text><text x="1117" y="337">Minor</text><text x="1182" y="337">2026-10-30</text>
+  </g>
+</svg>

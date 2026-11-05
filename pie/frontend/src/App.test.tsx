@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogProvider } from "@agile-suite/core";
 import App from "./App";
@@ -84,6 +84,34 @@ describe("running a query", () => {
     show();
     await screen.findByLabelText("JQL");
     expect(await screen.findByRole("button", { name: "Run" })).toBeDisabled();
+  });
+
+  // Two accounts see different projects, so one account's rows under another's
+  // name would read as a false answer.
+  it("clears the rows and the error when the profile changes", async () => {
+    vi.mocked(api.ListProfiles).mockResolvedValue([quality, { ...quality, id: "p2", name: "Mine" }] as never);
+    vi.mocked(api.RunQuery).mockResolvedValue({ total: 1, truncated: false, issues: [issue] } as never);
+    show();
+    await runJql("x");
+    await screen.findByRole("cell", { name: "ALPHA-1" });
+
+    await userEvent.setup().selectOptions(screen.getByLabelText("Profile"), "Mine");
+
+    expect(screen.queryByRole("cell", { name: "ALPHA-1" })).not.toBeInTheDocument();
+    expect(screen.queryByText("1 issue")).not.toBeInTheDocument();
+  });
+
+  it("keeps the profile fixed while a query runs", async () => {
+    let finish!: (r: never) => void;
+    vi.mocked(api.RunQuery).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    show();
+    await runJql("x");
+
+    expect(await screen.findByLabelText("Profile")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete profile" })).toBeDisabled();
+
+    finish({ total: 0, truncated: false, issues: [] } as never);
+    await waitFor(() => expect(screen.getByLabelText("Profile")).toBeEnabled());
   });
 });
 
