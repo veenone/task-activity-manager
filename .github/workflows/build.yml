@@ -33,6 +33,9 @@ jobs:
       - name: Go tests (tam)
         working-directory: tam
         run: go test ./internal/...
+      - name: Go tests (pie)
+        working-directory: pie
+        run: go test ./internal/...
 
   frontend:
     runs-on: ubuntu-latest
@@ -76,6 +79,9 @@ jobs:
       - name: Build TAM (.exe)
         working-directory: tam
         run: wails build
+      - name: Build PIE (.exe)
+        working-directory: pie
+        run: wails build
 
   build-macos:
     runs-on: macos-latest
@@ -97,4 +103,7 @@ jobs:
         run: wails build -platform darwin/universal
       - name: Build TAM universal .app
         working-directory: tam
+        run: wails build -platform darwin/universal
+      - name: Build PIE universal .app
+        working-directory: pie
         run: wails build -platform darwin/universal

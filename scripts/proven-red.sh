@@ -26,7 +26,7 @@ SKIP_TYPES='docs chore ci refactor build style test'
 # frontend-only change would be rubber-stamped without running anything.
 # Go tests run by package, so map those files to dirs. Vitest resolves specs
 # from its own workspace root, so group those by workspace and strip the prefix.
-VITEST_WORKSPACES=${GT_VITEST_WORKSPACES:-'frontend/core tam/frontend xtm/frontend'}
+VITEST_WORKSPACES=${GT_VITEST_WORKSPACES:-'frontend/core tam/frontend xtm/frontend pie/frontend'}
 run_tests() {   # $@ = changed unit test paths relative to APP_DIR
   run_status=0
   go_files=''

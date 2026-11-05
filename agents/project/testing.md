@@ -6,14 +6,15 @@ Read before writing tests, UI work, or platform checks.
 
 | Area | Files | Run |
 |---|---|---|
-| Go, all three modules | `*_test.go` beside the source | `go test ./... -count=1` from the module |
-| Frontend, three workspaces | `*.test.ts`, `*.test.tsx` beside the source | `npm test --workspaces --if-present` from the root |
+| Go, all four modules | `*_test.go` beside the source | `go test ./... -count=1` from the module |
+| Frontend, four workspaces | `*.test.ts`, `*.test.tsx` beside the source | `npm test --workspaces --if-present` from the root |
 
-`xtm` runs `go test ./internal/...` in CI rather than `./...`.
+`xtm` and `pie` run `go test ./internal/...` in CI rather than `./...`.
 
 ## Counts to beat, never lower
 
-261 in `frontend/core`, 159 in `xtm/frontend`, 1072 in `tam/frontend`. A
+261 in `frontend/core`, 159 in `xtm/frontend`, 1072 in `tam/frontend`, 8 in
+`pie/frontend`. A
 change that lowers one has deleted coverage; say so in the commit message or
 put it back. `frontend/core` is one lower than earlier on this branch, and
 the reason is in the commit: StatusBadge's glyph override and the case that

@@ -56,7 +56,7 @@ fan-out in `git remote -v`; `git remote set-url --push origin
 git@github.com:veenone/task-activity-manager.git` clears it.
 
 Releases are tagged per app: `xtm/vX.Y.Z` for XTM (see `xtm/README.md`) and
-`tam/vX.Y.Z` for TAM. The tag's prefix is what tells
+`tam/vX.Y.Z` for TAM, and `pie/vX.Y.Z` for Project Issue Explorer. The tag's prefix is what tells
 `.github/workflows/release.yml` which app to build, and
 `scripts/release-app.ps1 -App <app> -Version X.Y.Z` is the same build run
 locally. Each app's user guide is a folder of its own, one file for each View menu

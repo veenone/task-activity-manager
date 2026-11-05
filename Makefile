@@ -7,11 +7,13 @@ gates: vet test typecheck lint ratchet
 vet:
 	cd core && go vet ./...
 	cd tam && go vet ./...
+	cd pie && go vet ./...
 	cd xtm && go vet ./...
 
 test:
 	cd core && go test ./... -count=1
 	cd tam && go test ./... -count=1
+	cd pie && go test ./internal/... -count=1
 	cd xtm && go test ./internal/... -count=1
 	npm test --workspaces --if-present
 

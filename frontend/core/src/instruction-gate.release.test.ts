@@ -16,7 +16,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(__dirname, '../../..');
 /** Go module roots; the ones with a wails.json are the buildable apps. */
-const GO_DIRS = ['core', 'tam', 'xtm'];
+const GO_DIRS = ['core', 'tam', 'xtm', 'pie'];
 
 function read(rel: string): string {
   return fs.readFileSync(path.join(repoRoot, rel), 'utf8');

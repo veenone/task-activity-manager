@@ -118,7 +118,7 @@ describe('core design tokens', () => {
 // The stylesheets of every workspace: core's styles and each app's src tree.
 function stylesheets(): { file: string; css: string }[] {
   const root = path.resolve(__dirname, '../../..');
-  const dirs = ['frontend/core/styles', 'frontend/core/src', 'tam/frontend/src', 'xtm/frontend/src'];
+  const dirs = ['frontend/core/styles', 'frontend/core/src', 'tam/frontend/src', 'xtm/frontend/src', 'pie/frontend/src'];
   const out: { file: string; css: string }[] = [];
   const walk = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

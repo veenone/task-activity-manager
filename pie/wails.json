@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "project-issue-explorer",
+  "outputfilename": "project-issue-explorer",
+  "frontend:install": "npm install --prefix ../..",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Achmad Fienan Rahardianto",
+    "email": "veenone@gmail.com"
+  },
+  "info": {
+    "companyName": "Achmad Fienan Rahardianto",
+    "productName": "Project Issue Explorer",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 Achmad Fienan Rahardianto. Licensed under GPL-3.0-only",
+    "comments": "Cross-project issue analysis for Jira Data Center"
+  }
+}

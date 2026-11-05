@@ -28,6 +28,11 @@ const APPS: { name: string; sheets: string[]; tsx: string[] }[] = [
     sheets: ['frontend/core/styles', 'frontend/core/src', 'xtm/frontend/src'],
     tsx: ['frontend/core/src', 'xtm/frontend/src'],
   },
+  {
+    name: 'pie',
+    sheets: ['frontend/core/styles', 'frontend/core/src', 'pie/frontend/src'],
+    tsx: ['frontend/core/src', 'pie/frontend/src'],
+  },
 ];
 
 function files(dir: string, ext: RegExp, acc: string[] = []): string[] {
@@ -80,7 +85,7 @@ describe('shared stylesheets (#212)', () => {
   // Both apps take their tokens and primitives from core, ahead of their own
   // sheet so an app rule can still override a primitive. A copy kept in step
   // by hand drifted before; there is now only the one.
-  for (const app of ['tam', 'xtm']) {
+  for (const app of ['tam', 'xtm', 'pie']) {
     it(`${app} loads core's tokens and primitives before its own stylesheet`, () => {
       const imports = [...source(`${app}/frontend/src/main.tsx`).matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map(
         (m) => m[1],

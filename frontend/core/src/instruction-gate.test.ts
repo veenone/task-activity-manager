@@ -22,15 +22,15 @@ import path from 'node:path';
 // ---- config ---------------------------------------------------------------
 const repoRoot = path.resolve(__dirname, '../../..');
 /** Every workspace source tree contracts talk about. */
-const SRC_DIRS = ['frontend/core/src', 'tam/frontend/src', 'xtm/frontend/src'];
+const SRC_DIRS = ['frontend/core/src', 'tam/frontend/src', 'xtm/frontend/src', 'pie/frontend/src'];
 /** Go module roots, for the contracts that talk about Go. */
-const GO_DIRS = ['core', 'tam', 'xtm'];
+const GO_DIRS = ['core', 'tam', 'xtm', 'pie'];
 const SOURCE_EXT = /\.(ts|tsx)$/;
 const GO_EXT = /\.go$/;
 /** Project-specific tokens that must never appear in the portable core. */
 const FORBIDDEN_IN_CORE = [
   'agile-suite', 'Jira', 'Confluence', 'Wails', 'TAM', 'XTM',
-  'tam/', 'xtm/', 'agents/project',
+  'tam/', 'xtm/', 'pie/', 'agents/project',
 ];
 /** Current always-loaded count is 1,596. Raising this needs a reason in the commit message (C7). */
 const WORD_BUDGET = 2500;
@@ -50,9 +50,9 @@ const GREP_GATES: { name: string; dirs: string[]; ext: RegExp; pattern: RegExp; 
     name: 'Module privacy: no cross-module internal imports',
     dirs: GO_DIRS,
     ext: GO_EXT,
-    pattern: /"agile-suite\/(tam|xtm)\/internal/,
+    pattern: /"agile-suite\/(tam|xtm|pie)\/internal/,
     // A module may import its own internal tree.
-    exempt: (rel) => rel.startsWith('tam/') || rel.startsWith('xtm/'),
+    exempt: (rel) => rel.startsWith('tam/') || rel.startsWith('xtm/') || rel.startsWith('pie/'),
   },
   {
     // The Credentials contract named this gate before it existed (M1).
