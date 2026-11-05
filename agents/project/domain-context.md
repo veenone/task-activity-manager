@@ -59,6 +59,67 @@ commit hash behind it; the instruction gate checks the hash exists.
   `docs.atlassian.com/software/jira/docs/api/REST/<version>/` is plain HTML
   and answers these questions; it is large, so read it at an offset.
 
+## Searching Jira across projects
+
+Measured on 5 November 2026 with read-only searches against one Data Center
+instance, for PIE's Phase 0. Nothing here has been checked against a second
+instance. The counts are what one connector account can see, and a Quality team
+account may see a different set.
+
+- A component name is checked against the whole instance, not the projects in
+  the query. A name that exists somewhere answers 0 rows for a project that
+  lacks it. A name that exists nowhere answers 400, `The value 'X' does not
+  exist for the field 'component'.`
+- One unknown name in `component in ("real", "unknown")` fails the whole search
+  with that same 400, rather than matching on the real name. Ask about one name
+  per search if the names were typed by hand.
+- `text ~ "two words"` without inner quotes matches far more than the phrase:
+  335 issues against 34 for one pair of words, and 75 against 2 for another.
+  Inner quotes are written `text ~ "\"two words\""`.
+- `[word` and `word!` answer 400 when unquoted. The same text inside inner quotes
+  is accepted, and so is the backslash-escaped form. `a:b`, `*word` and
+  parentheses raise no error, but `a:b` matched thousands of issues and
+  `*word` matched about as many as the plain word, so no error does not mean a
+  literal match. Send analyst text as an inner-quoted phrase.
+- Quoting also narrows a single word. The quoted forms of `word!` and `[word`
+  each matched 630 issues where the plain word and both escaped forms matched
+  5,584. The plain word in inner quotes was not run.
+- Xray Tests can swamp a single word. One quoted word matched 575 issues outside
+  its source project, and the 15 newest were all Tests from one project. The
+  unquoted word excluding Tests matched 29, and the quoted word limited to Bugs
+  matched 6. Filter by issue type before showing text matches as evidence.
+- Multi-word phrases taken from real bug summaries were sparse: 2 and 0 matches
+  outside the source project. Neither of the 2 looked related from its summary,
+  and the descriptions were not read. Three phrases is a small sample.
+- Do not assume a customer field exists. Of the 591 fields returned by
+  `fields=*all&expand=names`, none has "customer" in its name. Two "client"
+  fields exist, an option field and a free-text one, and the free text sometimes
+  names a customer in prose. The people who fill these fields in have to say
+  whether any of them identifies the customer.
+- A field name can be valid in JQL and still hold nothing the account can see.
+  `"Field" is not EMPTY` answered 0 without an error for an origin field, a
+  source field and a tenant field.
+- `filter = <id>` answers 400 for a filter the account cannot see, with `A value
+  with ID 'N' does not exist for the field 'filter'.`, and that fails the whole
+  search even when the clause is one side of an `OR`. The wording does not
+  separate a filter that was never there from one that is not shared with this
+  account.
+- `AND` binds tighter than `OR`, so in `a AND b OR filter = 1` the filter's rows
+  are not limited by `a` or `b`.
+- Accounts differ widely in what they can see. `GET /rest/api/2/project` answered
+  57 projects to a developer's token and 902 to a Quality team token, so a count
+  taken with one account says little about another.
+- `GET /rest/api/2/mypermissions?projectKey=&permissions=` ignored the
+  `permissions` filter here and answered the full list, each entry with
+  `havePermission`. Read the entries you need by key.
+- Being able to create an issue does not mean being able to assign it. In the one
+  project compared, the Quality token had create, edit, comment and link, but
+  `ASSIGN_ISSUES`, `ASSIGNABLE_USER` and `WORK_ON_ISSUES` were false. All three
+  were true for the developer's token. Both tokens had `PROJECT_ADMIN` there, so
+  that project may be more open than most.
+- On Windows, curl's schannel backend stops with `CRYPT_E_REVOCATION_OFFLINE` if
+  it cannot reach the revocation server. `--ssl-no-revoke` skips only that check.
+
 ## Jira dashboards
 
 - A Jira dashboard and a TAM dashboard share a word and nothing else. A Jira

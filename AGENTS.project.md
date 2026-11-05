@@ -3,8 +3,8 @@
 Read `AGENTS.md` first. Contracts, project rules, verification, playbooks.
 The sanctioned path is the only path; a bypass is a bug even when it works.
 
-Monorepo: three Go modules (`core`, `tam`, `xtm`) tied by `go.work`, three npm
-workspaces (`frontend/core`, `tam/frontend`, `xtm/frontend`).
+Monorepo: four Go modules (`core`, `tam`, `xtm`, `pie`) tied by `go.work`, four npm
+workspaces (`frontend/core`, `tam/frontend`, `xtm/frontend`, `pie/frontend`).
 
 ## Architecture contracts
 

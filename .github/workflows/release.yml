@@ -13,14 +13,14 @@ name: Release
 
 on:
   push:
-    tags: ["xtm/v*", "tam/v*"]
+    tags: ["xtm/v*", "tam/v*", "pie/v*"]
   workflow_dispatch:
     inputs:
       app:
         description: "App to build"
         required: true
         type: choice
-        options: [xtm, tam]
+        options: [xtm, tam, pie]
       version:
         description: "Version to build (x.y.z), no leading v"
         required: true

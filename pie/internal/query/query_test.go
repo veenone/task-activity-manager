@@ -1,0 +1,145 @@
+package query
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
+	"testing"
+
+	corejira "agile-suite/core/jira"
+)
+
+// jiraWith serves /rest/api/2/search from total issues, at most serverCap per
+// page however many were asked for, because Jira imposes its own limit.
+func jiraWith(t *testing.T, total, serverCap int, seen *[]string) *corejira.Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if seen != nil {
+			*seen = append(*seen, q.Get("jql"))
+		}
+		start, _ := strconv.Atoi(q.Get("startAt"))
+		var issues []map[string]any
+		for i := start; i < total && i < start+serverCap; i++ {
+			issues = append(issues, map[string]any{"key": fmt.Sprintf("A-%d", i), "fields": map[string]any{}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"total": total, "issues": issues})
+	}))
+	t.Cleanup(srv.Close)
+	return corejira.NewClient(srv.URL, "token")
+}
+
+func TestRunFetchesEveryPageWhenTheServerCapsThem(t *testing.T) {
+	var seen []string
+	res, err := Run(context.Background(), jiraWith(t, 250, 40, &seen), "category = X")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 250 || len(res.Issues) != 250 || res.Truncated {
+		t.Fatalf("total %d, rows %d, truncated %v", res.Total, len(res.Issues), res.Truncated)
+	}
+	if res.Issues[249].Key != "A-249" {
+		t.Fatalf("last row is %s", res.Issues[249].Key)
+	}
+	if seen[0] != "category = X" {
+		t.Fatalf("sent %q", seen[0])
+	}
+}
+
+func TestRunMapsTheFieldsAnAnalystReads(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"total":1,"issues":[{"key":"A-1","fields":{
+			"summary":"Fails","project":{"key":"A"},"issuetype":{"name":"Bug"},
+			"status":{"name":"Open"},"priority":{"name":"High"},"updated":"2026-11-05T10:00:00.000+0700"}}]}`))
+	}))
+	defer srv.Close()
+	res, err := Run(context.Background(), corejira.NewClient(srv.URL, "t"), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Issue{Key: "A-1", Project: "A", Type: "Bug", Summary: "Fails", Status: "Open", Priority: "High", Updated: "2026-11-05T10:00:00.000+0700"}
+	if res.Issues[0] != want {
+		t.Fatalf("got %+v", res.Issues[0])
+	}
+}
+
+// Priority is optional on an instance, and a field of the wrong shape is
+// routine at a trust boundary (I1): the row still has to come through.
+func TestRunKeepsARowWhoseFieldsAreMissingOrMalformed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"total":1,"issues":[{"key":"A-1","fields":{"priority":null,"status":"odd","summary":7}}]}`))
+	}))
+	defer srv.Close()
+	res, err := Run(context.Background(), corejira.NewClient(srv.URL, "t"), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Issues[0] != (Issue{Key: "A-1"}) {
+		t.Fatalf("got %+v", res.Issues[0])
+	}
+}
+
+func TestRunStopsAtTheRowLimitAndSaysSo(t *testing.T) {
+	res, err := Run(context.Background(), jiraWith(t, MaxRows+500, 100, nil), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Issues) != MaxRows || res.Total != MaxRows+500 || !res.Truncated {
+		t.Fatalf("rows %d, total %d, truncated %v", len(res.Issues), res.Total, res.Truncated)
+	}
+}
+
+// A server that claims more than it will serve must end the walk, not spin.
+func TestRunEndsWhenAPageComesBackEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"total":10,"issues":[]}`))
+	}))
+	defer srv.Close()
+	res, err := Run(context.Background(), corejira.NewClient(srv.URL, "t"), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Truncated || len(res.Issues) != 0 {
+		t.Fatalf("truncated %v, rows %d", res.Truncated, len(res.Issues))
+	}
+}
+
+// The case the team's own query hits: a saved filter this account cannot see
+// fails the whole search, and only Jira's sentence says which one.
+func TestRunShowsJirasOwnMessageForARefusedQuery(t *testing.T) {
+	const msg = "A value with ID '12345' does not exist for the field 'filter'."
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, `{"errorMessages":[%q],"errors":{}}`, msg)
+	}))
+	defer srv.Close()
+	_, err := Run(context.Background(), corejira.NewClient(srv.URL, "t"), "filter = 12345")
+	if err == nil || err.Error() != msg {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestRunExplainsARejectedToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	_, err := Run(context.Background(), corejira.NewClient(srv.URL, "t"), "x")
+	if err == nil || !strings.Contains(err.Error(), "token") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestRunRefusesEmptyJQLWithoutAskingJira(t *testing.T) {
+	var seen []string
+	if _, err := Run(context.Background(), jiraWith(t, 1, 1, &seen), "  \n"); err == nil {
+		t.Fatal("no error")
+	}
+	if len(seen) != 0 {
+		t.Fatalf("asked Jira %d times", len(seen))
+	}
+}

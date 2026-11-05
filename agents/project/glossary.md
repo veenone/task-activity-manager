@@ -35,6 +35,12 @@ _Avoid_: verified failing, shown failing
 
 ## agile-suite
 
+**PIE**:
+Project Issue Explorer, the Quality team's app in `pie/`. It starts from a
+JQL filter, not from a project, so its profiles have no project key and live
+in its own database rather than the shared one.
+_Avoid_: project explorer, the third app
+
 **TAM**:
 Task Activity Manager, the app in `tam/`. Syncs a Jira project's issues and
 shows them in the Backlog, Epics, Boards, Sprints, Reports and Rituals views.

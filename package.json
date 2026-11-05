@@ -4,7 +4,8 @@
   "workspaces": [
     "frontend/core",
     "xtm/frontend",
-    "tam/frontend"
+    "tam/frontend",
+    "pie/frontend"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",

@@ -1,0 +1,75 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+}
+
+.pie-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.pie-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px;
+}
+
+.pie-query {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The shared input is width: 100% plus its padding, which runs past this form. */
+.pie-query .detail-input {
+  box-sizing: border-box;
+}
+
+.pie-results {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+}
+
+.pie-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pie-table th,
+.pie-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.pie-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pie-table td:not(:nth-child(4)) {
+  white-space: nowrap;
+}
+
+.pie-table tbody tr:hover {
+  background: var(--row-hover);
+}
