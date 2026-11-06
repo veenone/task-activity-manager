@@ -41,9 +41,12 @@ export function CaseDetail({
   const [error, setError] = useState("");
   const names = result ? projectNames(result) : new Map<string, string>();
 
+  // show takes the case Go returns. A reason still being typed is kept: the
+  // server only knows the reasons already saved, and the one it was just
+  // sent equals the draft anyway.
   function show(d: cases.Detail) {
     setDetail(d);
-    setReasons(Object.fromEntries(d.projects.map((p) => [p.key, p.reason])));
+    setReasons((drafts) => Object.fromEntries(d.projects.map((p) => [p.key, drafts[p.key] ?? p.reason])));
   }
 
   useEffect(() => {
@@ -62,7 +65,7 @@ export function CaseDetail({
   }, [profileId, id]);
 
   // change stores one edit, shows the case Go returns, and tells the list.
-  async function change(edit: () => Promise<cases.Detail | void>) {
+  async function change(edit: () => Promise<cases.Detail | void | undefined>) {
     setError("");
     try {
       const d = await edit();
@@ -95,7 +98,8 @@ export function CaseDetail({
       <div className="form-actions">
         <button type="button" className="btn" disabled={notes === detail.notes} onClick={() => void change(async () => {
           await SetCaseNotes(profileId, id, notes);
-          return { ...detail, notes } as cases.Detail;
+          // Only the notes changed; the rest of the case on screen stays as it is.
+          setDetail((d) => d && ({ ...d, notes } as cases.Detail));
         })}>
           Save notes
         </button>

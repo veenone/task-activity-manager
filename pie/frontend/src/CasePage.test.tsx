@@ -89,6 +89,17 @@ describe("Cases page", () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
+  it("keeps a reason being typed when another project's verdict changes", async () => {
+    vi.mocked(api.GetCase).mockResolvedValue(detail([{ key: "ALPHA" }, { key: "BETA" }]));
+    vi.mocked(api.SetVerdict).mockResolvedValue(detail([{ key: "ALPHA" }, { key: "BETA", verdict: "affected" }]));
+    const user = show();
+    const page = await openFirst(user);
+    await user.type(within(page).getByLabelText("Reason for ALPHA"), "Half written");
+    await user.selectOptions(within(page).getByLabelText("Verdict for BETA"), "affected");
+    expect(api.SetVerdict).toHaveBeenLastCalledWith("p1", 1, "BETA", "affected", "");
+    expect(within(page).getByLabelText("Reason for ALPHA")).toHaveValue("Half written");
+  });
+
   it("removes a project only after confirming", async () => {
     vi.mocked(api.RemoveCaseProject).mockResolvedValue(detail([]));
     const user = show();
