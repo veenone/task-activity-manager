@@ -30,12 +30,20 @@ export function LastRun(arg1, arg2) {
   return window['go']['main']['App']['LastRun'](arg1, arg2);
 }
 
+export function ListCases(arg1) {
+  return window['go']['main']['App']['ListCases'](arg1);
+}
+
 export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
 }
 
 export function ListQueries(arg1) {
   return window['go']['main']['App']['ListQueries'](arg1);
+}
+
+export function OpenCases(arg1, arg2) {
+  return window['go']['main']['App']['OpenCases'](arg1, arg2);
 }
 
 export function RunQuery(arg1, arg2, arg3, arg4) {

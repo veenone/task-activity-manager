@@ -3,6 +3,7 @@
 import {profile} from '../models';
 import {saved} from '../models';
 import {jira} from '../models';
+import {cases} from '../models';
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string):Promise<profile.Profile>;
 
@@ -18,9 +19,13 @@ export function JiraFilters(arg1:string):Promise<Array<jira.RawFilter>>;
 
 export function LastRun(arg1:string,arg2:number):Promise<saved.Run>;
 
+export function ListCases(arg1:string):Promise<Array<cases.Case>>;
+
 export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListQueries(arg1:string):Promise<Array<saved.Query>>;
+
+export function OpenCases(arg1:string,arg2:Array<string>):Promise<Array<cases.Case>>;
 
 export function RunQuery(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<saved.Run>;
 

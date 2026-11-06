@@ -1,3 +1,28 @@
+export namespace cases {
+	
+	export class Case {
+	    id: number;
+	    key: string;
+	    state: string;
+	    notes: string;
+	    openedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Case(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.key = source["key"];
+	        this.state = source["state"];
+	        this.notes = source["notes"];
+	        this.openedAt = source["openedAt"];
+	    }
+	}
+
+}
+
 export namespace jira {
 	
 	export class RawFilter {

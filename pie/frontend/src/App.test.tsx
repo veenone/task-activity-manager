@@ -17,6 +17,8 @@ vi.mock("../wailsjs/go/main/App", () => ({
   LastRun: vi.fn(),
   Fields: vi.fn(),
   SetFields: vi.fn(),
+  ListCases: vi.fn(),
+  OpenCases: vi.fn(),
 }));
 
 const quality = { id: "p1", name: "Quality", jiraUrl: "https://jira.example.com" };
@@ -49,6 +51,7 @@ async function runJql(jql: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(api.Fields).mockResolvedValue({ productBase: "", clientVisibility: "", clientImpact: "" } as never);
+  vi.mocked(api.ListCases).mockResolvedValue([]);
   vi.mocked(api.StartupError).mockResolvedValue("");
   vi.mocked(api.ListQueries).mockResolvedValue([]);
   vi.mocked(api.ListProfiles).mockResolvedValue([quality] as never);

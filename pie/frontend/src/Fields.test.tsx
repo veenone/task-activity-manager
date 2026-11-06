@@ -17,6 +17,8 @@ vi.mock("../wailsjs/go/main/App", () => ({
   LastRun: vi.fn(),
   Fields: vi.fn(),
   SetFields: vi.fn(),
+  ListCases: vi.fn(),
+  OpenCases: vi.fn(),
 }));
 
 function show() {
@@ -34,6 +36,7 @@ beforeEach(() => {
   vi.mocked(api.ListProfiles).mockResolvedValue([{ id: "p1", name: "Q", jiraUrl: "demo" }] as never);
   vi.mocked(api.ListQueries).mockResolvedValue([]);
   vi.mocked(api.Fields).mockResolvedValue({ productBase: "Old base", clientVisibility: "", clientImpact: "" } as never);
+  vi.mocked(api.ListCases).mockResolvedValue([]);
 });
 
 async function fill(user: ReturnType<typeof userEvent.setup>) {

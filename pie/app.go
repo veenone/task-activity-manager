@@ -11,6 +11,7 @@ import (
 	corejira "agile-suite/core/jira"
 	"agile-suite/core/profile"
 	"agile-suite/core/store"
+	"agile-suite/pie/internal/cases"
 	"agile-suite/pie/internal/demo"
 	"agile-suite/pie/internal/pieprofile"
 	"agile-suite/pie/internal/query"
@@ -25,6 +26,7 @@ type App struct {
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
 	queries    *saved.Store
+	cases      *cases.Store
 	startupErr string
 }
 
@@ -45,6 +47,7 @@ func (a *App) startup(ctx context.Context) {
 	a.profiles = profile.NewManager(a.db.DB())
 	a.creds = profile.NewCredentialStore()
 	a.queries = saved.New(a.db.DB())
+	a.cases = cases.New(a.db.DB())
 }
 
 func (a *App) shutdown(context.Context) {
@@ -180,6 +183,25 @@ func (a *App) SetFields(profileID string, f saved.Fields) error {
 		}
 	}
 	return a.queries.SetFields(profileID, f)
+}
+
+// ListCases returns the profile's cases.
+func (a *App) ListCases(profileID string) ([]cases.Case, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.cases.List(profileID)
+}
+
+// OpenCases opens a case for each issue key and returns the profile's cases.
+func (a *App) OpenCases(profileID string, keys []string) ([]cases.Case, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := a.cases.Open(profileID, keys, time.Now()); err != nil {
+		return nil, err
+	}
+	return a.cases.List(profileID)
 }
 
 // JiraFilters lists the saved filters the profile's account has starred.

@@ -170,6 +170,22 @@ Until a product base field is set, Statistics leaves product bases out. Demo
 has invented fields named **Product base**, **Client visibility** and
 **Client impact**.
 
+## Open cases
+
+A case is an issue you have picked for analysis. PIE never opens one by
+itself. Tick the rows you want in Results, or the box in the header for every
+row on the page, and choose **Open N as cases**. An issue that already has a
+case keeps it, with the date it was first opened.
+
+Rows with a case show **Case**, and the **Case** filter shows all rows, only
+those with a case, or only those without. Cases are kept on this computer for
+the profile and survive a restart and a new run. When a run doesn't match an
+issue that has a case, the case stays, and PIE lists its key above the views.
+Deleting the profile deletes its cases.
+
+For now a case is only a marker. Notes, evidence and per-project verdicts come
+later.
+
 ## Issue details
 
 Choose an issue's key in Results to open its details beside the table: its

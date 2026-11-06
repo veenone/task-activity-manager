@@ -1,6 +1,7 @@
 // Package saved keeps an analyst's named queries and the last run of each, so
 // PIE opens with the rows it showed last time without asking Jira. It also
-// keeps each profile's settings, which share its schema and purge list.
+// keeps each profile's settings, and holds PIE's whole schema and purge list,
+// case_item included: one file is what the purge gate reads.
 package saved
 
 import (
@@ -40,13 +41,22 @@ CREATE TABLE IF NOT EXISTS profile_field (
 );
 INSERT OR IGNORE INTO profile_field (profile_id, role, name)
 	SELECT profile_id, 'product', product_field FROM profile_setting WHERE product_field != '';
+CREATE TABLE IF NOT EXISTS case_item (
+	id         INTEGER PRIMARY KEY,
+	profile_id TEXT NOT NULL,
+	source_key TEXT NOT NULL,
+	state      TEXT NOT NULL DEFAULT 'open',
+	notes      TEXT NOT NULL DEFAULT '',
+	opened_at  TEXT NOT NULL,
+	UNIQUE (profile_id, source_key)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
 // checks that each profile-keyed table above is named here. profile_setting
 // held the product base name before profile_field; the copy above reads it
 // on every open, so it stays until a migration can drop it.
-var purged = []string{"saved_query", "profile_setting", "profile_field"}
+var purged = []string{"saved_query", "profile_setting", "profile_field", "case_item"}
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
 // are created if missing, so a pie.db from before this opens unchanged.

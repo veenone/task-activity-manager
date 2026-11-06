@@ -20,6 +20,7 @@ import { ResultsTable } from "./ResultsTable";
 import { RunNotes } from "./RunNotes";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
+import { useCases } from "./useCases";
 
 type View = "results" | "trace" | "map" | "stats";
 const VIEWS = [
@@ -58,6 +59,7 @@ export default function App() {
   const [runAt, setRunAt] = useState("");
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
+  const cases = useCases(profileId, setError);
   // null until the stored names arrive, so the dialog cannot save blanks over them.
   const [fields, setFields] = useState<saved.Fields | null>(null);
   const [editingFields, setEditingFields] = useState(false);
@@ -337,7 +339,7 @@ export default function App() {
           </form>
         )}
 
-        <RunNotes change={change} error={error} result={result} />
+        <RunNotes change={change} error={error} result={result} caseKeys={cases.keys} />
 
         {result && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
 
@@ -353,7 +355,9 @@ export default function App() {
         )}
 
         {result && view === "stats" && <Statistics result={result} productField={fields?.productBase ?? ""} />}
-        {result && view === "results" && matched.length > 0 && <ResultsTable issues={matched} />}
+        {result && view === "results" && matched.length > 0 && (
+          <ResultsTable issues={matched} caseKeys={cases.keys} onOpenCases={cases.open} />
+        )}
       </main>
 
       {editingFields && fields && (
