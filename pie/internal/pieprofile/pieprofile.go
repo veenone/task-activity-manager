@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"agile-suite/core/shareddb"
+	"agile-suite/pie/internal/demo"
 )
 
 // DefaultPath is PIE's database, beside the suite's shared one.
@@ -25,6 +26,9 @@ func DefaultPath() (string, error) {
 func ValidateNew(name, jiraURL, token string) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("a profile needs a name")
+	}
+	if demo.Is(jiraURL) {
+		return nil // invented data: no server, so no token
 	}
 	u, err := url.Parse(strings.TrimSpace(jiraURL))
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {

@@ -19,6 +19,19 @@ You can keep several profiles, for example one for each Jira account, and switch
 between them from the list at the top of the window. **Delete profile** removes
 the selected profile and its saved token from this computer.
 
+## Try PIE without Jira
+
+Enter `demo` as the Jira URL to make a demo profile. It needs no token, and
+the header shows a yellow DEMO chip while it is selected. A demo profile never
+contacts Jira and saves nothing in the credential manager.
+
+Demo answers every query with the same 63 invented issues in six invented
+projects, because it has no JQL engine. There are two exceptions. `key in
+(...)` returns just the issues it names, including one linked issue that a
+plain query never lists. `filter = 99999` is refused, so you can see how PIE
+shows Jira's message. Dates are counted back from today, so ages look the
+same whenever you run it.
+
 ## Run a query
 
 Paste JQL into the box and choose **Run**. The table shows each issue's key,

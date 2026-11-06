@@ -19,6 +19,8 @@ func TestValidateNew(t *testing.T) {
 		{"url without a scheme", "Q", "jira.example.com", "tok", false},
 		{"unsupported scheme", "Q", "ftp://jira.example.com", "tok", false},
 		{"blank token", "Q", "https://jira.example.com", " ", false},
+		{"demo needs no token", "Demo", " Demo ", "", true},
+		{"demo still needs a name", " ", "demo", "", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

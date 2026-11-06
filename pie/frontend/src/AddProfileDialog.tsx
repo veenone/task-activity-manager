@@ -9,6 +9,11 @@ export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+// isDemo matches demo.Is in pie/internal/demo: the URL that selects invented data.
+export function isDemo(url: string): boolean {
+  return url.trim().toLowerCase() === "demo";
+}
+
 export function AddProfileDialog({
   onClose,
   onSaved,
@@ -21,12 +26,13 @@ export function AddProfileDialog({
   const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const demo = isDemo(url);
 
   async function save() {
     setSaving(true);
     setError("");
     try {
-      onSaved(await CreateProfile(name, url, token));
+      onSaved(await CreateProfile(name, url, demo ? "" : token));
     } catch (e) {
       setError(errorText(e));
       setSaving(false);
@@ -51,10 +57,14 @@ export function AddProfileDialog({
           Jira URL
           <input value={url} placeholder="https://jira.example.com" onChange={(e) => setUrl(e.target.value)} />
         </label>
-        <label>
-          Personal access token
-          <input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
-        </label>
+        {demo ? (
+          <p className="muted">Demo shows invented issues and needs no token.</p>
+        ) : (
+          <label>
+            Personal access token
+            <input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
+          </label>
+        )}
         {error && <p className="error-text">{error}</p>}
         <div className="form-actions form-actions-end">
           <button type="button" className="btn" onClick={onClose}>
