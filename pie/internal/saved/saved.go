@@ -32,11 +32,21 @@ CREATE TABLE IF NOT EXISTS profile_setting (
 	profile_id    TEXT PRIMARY KEY,
 	product_field TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS profile_field (
+	profile_id TEXT NOT NULL,
+	role       TEXT NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, role)
+);
+INSERT OR IGNORE INTO profile_field (profile_id, role, name)
+	SELECT profile_id, 'product', product_field FROM profile_setting WHERE product_field != '';
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
-// checks that each profile-keyed table above is named here.
-var purged = []string{"saved_query", "profile_setting"}
+// checks that each profile-keyed table above is named here. profile_setting
+// held the product base name before profile_field; the copy above reads it
+// on every open, so it stays until a migration can drop it.
+var purged = []string{"saved_query", "profile_setting", "profile_field"}
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
 // are created if missing, so a pie.db from before this opens unchanged.
@@ -160,24 +170,57 @@ func (s *Store) Record(profileID string, id int64, jql string, res query.Result,
 	return run, nil
 }
 
-// ProductField is the name of the profile's product base field, or "" if it
-// has none.
-func (s *Store) ProductField(profileID string) (string, error) {
-	var name string
-	err := s.db.QueryRow(`SELECT product_field FROM profile_setting WHERE profile_id = ?`, profileID).Scan(&name)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	return name, err
+// Fields are the names of the Jira custom fields a profile reads. "" is a
+// field the profile does not use.
+type Fields struct {
+	ProductBase      string `json:"productBase"`
+	ClientVisibility string `json:"clientVisibility"`
+	ClientImpact     string `json:"clientImpact"`
 }
 
-// SetProductField stores the name of the profile's product base field. ""
-// clears it. Checking the name against Jira is the caller's job.
-func (s *Store) SetProductField(profileID, name string) error {
-	_, err := s.db.Exec(`INSERT INTO profile_setting (profile_id, product_field) VALUES (?, ?)
-		ON CONFLICT (profile_id) DO UPDATE SET product_field = excluded.product_field`,
-		profileID, strings.TrimSpace(name))
-	return err
+// roles names each field as profile_field stores it.
+func (f *Fields) roles() map[string]*string {
+	return map[string]*string{"product": &f.ProductBase, "visibility": &f.ClientVisibility, "impact": &f.ClientImpact}
+}
+
+// Fields returns the profile's field names.
+func (s *Store) Fields(profileID string) (Fields, error) {
+	var f Fields
+	rows, err := s.db.Query(`SELECT role, name FROM profile_field WHERE profile_id = ?`, profileID)
+	if err != nil {
+		return f, err
+	}
+	defer rows.Close()
+	into := f.roles()
+	for rows.Next() {
+		var role, name string
+		if err := rows.Scan(&role, &name); err != nil {
+			return Fields{}, err
+		}
+		if p := into[role]; p != nil {
+			*p = name
+		}
+	}
+	return f, rows.Err()
+}
+
+// SetFields stores all three names at once. A cleared name is stored as "",
+// not deleted, so the carry-over in tables never brings an old one back.
+// Checking the names against Jira is the caller's job.
+func (s *Store) SetFields(profileID string, f Fields) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for role, name := range f.roles() {
+		if _, err := tx.Exec(`INSERT INTO profile_field (profile_id, role, name) VALUES (?, ?, ?)
+			ON CONFLICT (profile_id, role) DO UPDATE SET name = excluded.name`,
+			profileID, role, strings.TrimSpace(*name)); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // Purge removes everything the profile owns in PIE's tables.

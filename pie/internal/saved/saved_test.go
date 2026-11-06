@@ -190,30 +190,58 @@ func TestAnOlderPieDatabaseGainsTheTable(t *testing.T) {
 	}
 }
 
-func TestTheProductFieldIsKeptPerProfileAndPurged(t *testing.T) {
+func TestFieldNamesAreKeptPerProfileAndPurged(t *testing.T) {
 	s := open(t)
-	if got, err := s.ProductField("p1"); err != nil || got != "" {
-		t.Fatalf("unset field = %q, %v", got, err)
+	if got, err := s.Fields("p1"); err != nil || got != (Fields{}) {
+		t.Fatalf("unset fields = %+v, %v", got, err)
 	}
-	if err := s.SetProductField("p1", " Product base "); err != nil {
+	want := Fields{ProductBase: "Base", ClientVisibility: "Visibility", ClientImpact: "Impact"}
+	if err := s.SetFields("p1", Fields{ProductBase: " Old ", ClientVisibility: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetProductField("p1", "Base"); err != nil {
+	if err := s.SetFields("p1", Fields{ProductBase: " Base ", ClientVisibility: "Visibility", ClientImpact: "Impact"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetProductField("p2", "Other"); err != nil {
+	if err := s.SetFields("p2", Fields{ClientImpact: "Other"}); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.ProductField("p1"); got != "Base" {
-		t.Fatalf("p1 field = %q", got)
+	if got, _ := s.Fields("p1"); got != want {
+		t.Fatalf("p1 fields = %+v", got)
+	}
+	if err := s.SetFields("p1", Fields{ProductBase: "Base"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Fields("p1"); got != (Fields{ProductBase: "Base"}) {
+		t.Fatalf("an empty name did not clear: %+v", got)
 	}
 	if err := s.Purge("p1"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.ProductField("p1"); got != "" {
-		t.Fatalf("purge left %q", got)
+	if got, _ := s.Fields("p1"); got != (Fields{}) {
+		t.Fatalf("purge left %+v", got)
 	}
-	if got, _ := s.ProductField("p2"); got != "Other" {
-		t.Fatalf("purge reached p2: %q", got)
+	if got, _ := s.Fields("p2"); got.ClientImpact != "Other" {
+		t.Fatalf("purge reached p2: %+v", got)
+	}
+}
+
+// The product base name set before the fields table existed carries over.
+func TestAnEarlierProductFieldCarriesOver(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pie.db")
+	db, err := store.Open(path, Schema())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DB().Exec(`INSERT INTO profile_setting (profile_id, product_field) VALUES ('p1', 'Product base')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	db, err = store.Open(path, Schema())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if got, _ := New(db.DB()).Fields("p1"); got.ProductBase != "Product base" {
+		t.Fatalf("fields = %+v", got)
 	}
 }

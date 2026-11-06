@@ -14,6 +14,10 @@ export function DeleteQuery(arg1, arg2) {
   return window['go']['main']['App']['DeleteQuery'](arg1, arg2);
 }
 
+export function Fields(arg1) {
+  return window['go']['main']['App']['Fields'](arg1);
+}
+
 export function LastRun(arg1, arg2) {
   return window['go']['main']['App']['LastRun'](arg1, arg2);
 }
@@ -26,10 +30,6 @@ export function ListQueries(arg1) {
   return window['go']['main']['App']['ListQueries'](arg1);
 }
 
-export function ProductField(arg1) {
-  return window['go']['main']['App']['ProductField'](arg1);
-}
-
 export function RunQuery(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['RunQuery'](arg1, arg2, arg3, arg4);
 }
@@ -38,8 +38,8 @@ export function SaveQuery(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveQuery'](arg1, arg2, arg3);
 }
 
-export function SetProductField(arg1, arg2) {
-  return window['go']['main']['App']['SetProductField'](arg1, arg2);
+export function SetFields(arg1, arg2) {
+  return window['go']['main']['App']['SetFields'](arg1, arg2);
 }
 
 export function StartupError() {

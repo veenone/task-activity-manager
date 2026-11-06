@@ -78,6 +78,22 @@ var category = map[string]string{
 
 var projects = []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"}
 
+// visibilityField and impactField are demo's invented client fields: an option
+// and free text. Only some reports carry them, as on a real instance.
+const (
+	visibilityField = "customfield_10501"
+	impactField     = "customfield_10502"
+)
+
+var clientSeen = map[string][2]string{ // key: visibility, impact
+	"ALPHA-101": {"Visible", "A customer lost access after three PIN retries at two branches."},
+	"BRAVO-201": {"Visible", "Reported by the same customer on the newer reader model."},
+	"BRAVO-202": {"Possible", "One site saw the wrong code during a field update; not yet reproduced."},
+	"ALPHA-104": {"Visible", "Sessions slow down after a day of use; the customer restarts readers nightly."},
+	"DELTA-403": {"Possible", ""},
+	"BRAVO-204": {"Not visible", "Found in internal testing."},
+}
+
 // projectNames are invented, like the keys.
 var projectNames = map[string]string{
 	"ALPHA": "Card Platform", "BRAVO": "Reader Firmware", "CHARLIE": "Mobile Wallet",
@@ -154,6 +170,14 @@ func render(now time.Time) []corejira.RawIssue {
 			"resolutiondate": nil,
 			"issuelinks":     append([]any{}, issueLinks[r.key]...),
 			baseField:        map[string]any{"value": bases[projectOf(r.key)]},
+			visibilityField:  nil,
+			impactField:      nil,
+		}
+		if c, ok := clientSeen[r.key]; ok {
+			f[visibilityField] = map[string]any{"value": c[0]}
+			if c[1] != "" {
+				f[impactField] = c[1]
+			}
 		}
 		if r.resolved > 0 {
 			f["resolutiondate"] = day(r.resolved)

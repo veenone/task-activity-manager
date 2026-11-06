@@ -192,7 +192,7 @@ func field(t *testing.T, f map[string]json.RawMessage, path ...string) string {
 }
 
 func TestExploreFindsTheSeedsSevenSets(t *testing.T) {
-	res, err := query.Explore(context.Background(), demo.Client(), "anything", true, "")
+	res, err := query.Explore(context.Background(), demo.Client(), "anything", true, query.Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestDemoHasAProductBaseField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := query.Explore(ctx, client, "anything", true, id)
+	res, err := query.Explore(ctx, client, "anything", true, query.Fields{Base: id})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,5 +234,34 @@ func TestDemoHasAProductBaseField(t *testing.T) {
 	}
 	if bases["ALPHA-101"] != bases["BRAVO-201"] || bases["ALPHA-101"] == bases["CHARLIE-301"] || bases["ECHO-502"] == "" {
 		t.Fatalf("bases %v", bases)
+	}
+}
+
+func TestDemoHasClientFields(t *testing.T) {
+	ctx := context.Background()
+	client := demo.Client()
+	var ids query.Fields
+	var err error
+	if ids.Visibility, err = client.CustomFieldID(ctx, "client visibility"); err != nil {
+		t.Fatal(err)
+	}
+	if ids.Impact, err = client.CustomFieldID(ctx, "client impact"); err != nil {
+		t.Fatal(err)
+	}
+	res, err := query.Explore(ctx, client, "anything", true, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, is := range res.Issues {
+		if is.ClientVisibility != "" {
+			seen++
+		}
+		if is.Key == "ALPHA-101" && (is.ClientVisibility == "" || is.ClientImpact == "") {
+			t.Errorf("ALPHA-101 = %+v", is)
+		}
+	}
+	if seen == 0 || seen == len(res.Issues) {
+		t.Fatalf("%d of %d issues have a client visibility; demo needs some with and some without", seen, len(res.Issues))
 	}
 }

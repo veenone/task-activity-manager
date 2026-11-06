@@ -9,18 +9,18 @@ export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteQuery(arg1:string,arg2:number):Promise<void>;
 
+export function Fields(arg1:string):Promise<saved.Fields>;
+
 export function LastRun(arg1:string,arg2:number):Promise<saved.Run>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListQueries(arg1:string):Promise<Array<saved.Query>>;
 
-export function ProductField(arg1:string):Promise<string>;
-
 export function RunQuery(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<saved.Run>;
 
 export function SaveQuery(arg1:string,arg2:string,arg3:string):Promise<saved.Query>;
 
-export function SetProductField(arg1:string,arg2:string):Promise<void>;
+export function SetFields(arg1:string,arg2:saved.Fields):Promise<void>;
 
 export function StartupError():Promise<string>;

@@ -6,18 +6,20 @@ import {
   LastRun,
   ListProfiles,
   ListQueries,
-  ProductField,
+  Fields,
   RunQuery,
   SaveQuery,
-  SetProductField,
   StartupError,
 } from "../wailsjs/go/main/App";
 import type { profile, query, saved } from "../wailsjs/go/models";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
+import { FieldsDialog } from "./FieldsDialog";
 import { ProjectMap } from "./ProjectMap";
 import { ResultsTable } from "./ResultsTable";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
+
+const NO_FIELDS: saved.Fields = { productBase: "", clientVisibility: "", clientImpact: "" };
 
 type View = "results" | "trace" | "map" | "stats";
 const VIEWS = [
@@ -56,7 +58,8 @@ export default function App() {
   const [runAt, setRunAt] = useState("");
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
-  const [productField, setProductField] = useState("");
+  const [fields, setFields] = useState<saved.Fields>(NO_FIELDS);
+  const [editingFields, setEditingFields] = useState(false);
   // The key whose linked set Trace opens; the map sets it when a key is chosen.
   const [focus, setFocus] = useState<string | null>(null);
 
@@ -80,7 +83,7 @@ export default function App() {
     setRunAt("");
     setChange(null);
     setQueries([]);
-    setProductField("");
+    setFields(NO_FIELDS);
     if (!profileId) return;
     // A slow answer for a profile no longer selected must not land.
     let current = true;
@@ -88,8 +91,8 @@ export default function App() {
       (list) => current && setQueries(list),
       (e) => current && setError(errorText(e)),
     );
-    ProductField(profileId).then(
-      (name) => current && setProductField(name),
+    Fields(profileId).then(
+      (f) => current && setFields(f),
       (e) => current && setError(errorText(e)),
     );
     return () => {
@@ -182,17 +185,6 @@ export default function App() {
     }
   }
 
-  async function chooseProductField() {
-    const name = await prompt({ title: "Product base field", defaultValue: productField, placeholder: "Custom field name", submitLabel: "Save" });
-    if (name === null) return;
-    setError("");
-    try {
-      await SetProductField(profileId, name);
-      setProductField(name.trim());
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }
 
   async function deleteProfile() {
     const target = profiles?.find((p) => p.id === profileId);
@@ -257,8 +249,8 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void chooseProductField()}>
-                Product base field
+              <button type="button" className="btn btn-ghost" disabled={running} onClick={() => setEditingFields(true)}>
+                Jira fields
               </button>
               <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteProfile()}>
                 Delete profile
@@ -373,10 +365,21 @@ export default function App() {
           />
         )}
 
-        {result && view === "stats" && <Statistics result={result} productField={productField} />}
+        {result && view === "stats" && <Statistics result={result} productField={fields.productBase} />}
         {result && view === "results" && matched.length > 0 && <ResultsTable issues={matched} />}
       </main>
 
+      {editingFields && (
+        <FieldsDialog
+          profileId={profileId}
+          fields={fields}
+          onClose={() => setEditingFields(false)}
+          onSaved={(f) => {
+            setEditingFields(false);
+            setFields(f);
+          }}
+        />
+      )}
       {adding && (
         <AddProfileDialog
           onClose={() => setAdding(false)}

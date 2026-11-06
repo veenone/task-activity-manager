@@ -135,18 +135,34 @@ with nothing to measure shows as a dash.
 
 The **Project** and **Created** filters apply to every number on the page.
 
-### Product base field
+## Jira fields
 
-Jira has no product base field of its own, so you tell PIE which custom field
-holds it. Choose **Product base field** and enter the field's name as Jira
-shows it. PIE checks the name against Jira's field list and refuses one Jira
-does not have, or one that two custom fields share. Each profile keeps its own
-field, and deleting the profile deletes it. Leave the name empty to clear it.
+Jira has no product base or client fields of its own, so you tell PIE which
+custom fields hold them. Choose **Jira fields** and enter each field's name as
+Jira shows it:
 
-The field is read when a query runs, so run the query again after setting it.
-Until a field is set, Statistics leaves product bases out. A field with
-several options gives an issue several product bases. Demo has an invented
-**Product base** field.
+- **Product base**, counted on the Statistics page. A field with several
+  options gives an issue several product bases.
+- **Client visibility**, an option such as how likely a customer is to see
+  the problem. Results gets a column and a filter for it.
+- **Client impact**, free text about what the customer saw. It shows in the
+  issue's details.
+
+PIE checks every name against Jira's field list when you save. If one is
+missing in Jira, or two custom fields share it, PIE says which and saves none
+of them. Leave a name empty if the profile doesn't use that field. Each
+profile keeps its own names, and deleting the profile deletes them.
+
+The fields are read when a query runs, so run the query again after a change.
+Until a product base field is set, Statistics leaves product bases out. Demo
+has invented fields named **Product base**, **Client visibility** and
+**Client impact**.
+
+## Issue details
+
+Choose an issue's key in Results to open its details beside the table: its
+summary, project, status, priority, client visibility and the full client
+impact text. **Close details** or Escape closes them.
 
 Only a saved query's last run is kept. Other results are gone when you close
 PIE or run another query, and PIE needs a connection to Jira to run one.

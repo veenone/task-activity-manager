@@ -90,6 +90,8 @@ export namespace query {
 	    resolved: string;
 	    links: Link[];
 	    bases: string[];
+	    clientVisibility: string;
+	    clientImpact: string;
 	    matched: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -111,6 +113,8 @@ export namespace query {
 	        this.resolved = source["resolved"];
 	        this.links = this.convertValues(source["links"], Link);
 	        this.bases = source["bases"];
+	        this.clientVisibility = source["clientVisibility"];
+	        this.clientImpact = source["clientImpact"];
 	        this.matched = source["matched"];
 	    }
 	
@@ -196,6 +200,22 @@ export namespace query {
 
 export namespace saved {
 	
+	export class Fields {
+	    productBase: string;
+	    clientVisibility: string;
+	    clientImpact: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Fields(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.productBase = source["productBase"];
+	        this.clientVisibility = source["clientVisibility"];
+	        this.clientImpact = source["clientImpact"];
+	    }
+	}
 	export class Query {
 	    id: number;
 	    name: string;

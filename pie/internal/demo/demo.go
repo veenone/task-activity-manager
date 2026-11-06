@@ -46,7 +46,9 @@ type transport struct{}
 // no query engine.
 func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Path == "/rest/api/2/field" {
-		return reply(req, http.StatusOK, `[{"id":"`+baseField+`","name":"Product base","custom":true}]`), nil
+		return reply(req, http.StatusOK, `[{"id":"`+baseField+`","name":"Product base","custom":true},`+
+			`{"id":"`+visibilityField+`","name":"Client visibility","custom":true},`+
+			`{"id":"`+impactField+`","name":"Client impact","custom":true}]`), nil
 	}
 	if req.URL.Path != "/rest/api/2/search" {
 		return reply(req, http.StatusNotFound, `{"errorMessages":["demo answers searches only"]}`), nil

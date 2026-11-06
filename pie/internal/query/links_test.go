@@ -92,7 +92,7 @@ func TestExploreFollowsLinksAcrossHopsAndEndsOnACycle(t *testing.T) {
 		"C-1": {"new", []string{"B-1"}}, // B and C link each other twice: a cycle
 	}
 	var seen []string
-	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, ""), "q", true, "")
+	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, ""), "q", true, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestExploreFollowsLinksAcrossHopsAndEndsOnACycle(t *testing.T) {
 func TestExploreIgnoresLinksInsideOneProject(t *testing.T) {
 	graph := map[string]node{"A-1": {"new", []string{"A-2"}}, "A-2": {"new", nil}}
 	var seen []string
-	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, ""), "q", true, "")
+	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, ""), "q", true, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestExploreAsksForAHundredKeysAtATime(t *testing.T) {
 		graph["A-1"] = n
 	}
 	var seen []string
-	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, ""), "q", true, "")
+	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, ""), "q", true, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestExploreStopsAtTheCeilingAndSaysSo(t *testing.T) {
 		graph[k] = node{"done", nil}
 	}
 	var seen []string
-	res, err := Explore(context.Background(), linkedJira(t, graph, matched, &seen, ""), "q", true, "")
+	res, err := Explore(context.Background(), linkedJira(t, graph, matched, &seen, ""), "q", true, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestExploreKeepsTheRowsWhenALinkSearchFails(t *testing.T) {
 	const msg = "An issue with key 'B-1' does not exist for field 'key'."
 	graph := map[string]node{"A-1": {"new", []string{"B-1"}}, "B-1": {"done", nil}}
 	var seen []string
-	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, msg), "q", true, "")
+	res, err := Explore(context.Background(), linkedJira(t, graph, []string{"A-1"}, &seen, msg), "q", true, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}

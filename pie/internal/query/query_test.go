@@ -97,7 +97,7 @@ func TestRunStopsAtTheRowLimitAndSaysSo(t *testing.T) {
 
 func TestExploreAsksBeforeALargeFetch(t *testing.T) {
 	var seen []string
-	res, err := Explore(context.Background(), jiraWith(t, AskAbove+1, 100, &seen), "x", false, "")
+	res, err := Explore(context.Background(), jiraWith(t, AskAbove+1, 100, &seen), "x", false, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestExploreAsksBeforeALargeFetch(t *testing.T) {
 		t.Fatalf("confirm %v, total %d, rows %d, searches %d", res.NeedsConfirm, res.Total, len(res.Issues), len(seen))
 	}
 
-	res, err = Explore(context.Background(), jiraWith(t, AskAbove+1, 100, nil), "x", true, "")
+	res, err = Explore(context.Background(), jiraWith(t, AskAbove+1, 100, nil), "x", true, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestExploreAsksBeforeALargeFetch(t *testing.T) {
 }
 
 func TestExploreDoesNotAskAtTheThreshold(t *testing.T) {
-	res, err := Explore(context.Background(), jiraWith(t, AskAbove, 100, nil), "x", false, "")
+	res, err := Explore(context.Background(), jiraWith(t, AskAbove, 100, nil), "x", false, Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestExploreReadsTheProductBaseField(t *testing.T) {
 			{"key":"A-4","fields":{"customfield_1":null}}]}`))
 	}))
 	defer srv.Close()
-	res, err := Explore(context.Background(), corejira.NewClient(srv.URL, "t"), "x", true, "customfield_1")
+	res, err := Explore(context.Background(), corejira.NewClient(srv.URL, "t"), "x", true, Fields{Base: "customfield_1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,5 +200,31 @@ func TestExploreReadsTheProductBaseField(t *testing.T) {
 		if !reflect.DeepEqual(is.Bases, want[i]) {
 			t.Errorf("%s bases %q, want %q", is.Key, is.Bases, want[i])
 		}
+	}
+}
+
+// Client visibility is an option and client impact free text; both are read
+// as text, an option giving its value.
+func TestExploreReadsTheClientFields(t *testing.T) {
+	var fields string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fields = r.URL.Query().Get("fields")
+		_, _ = w.Write([]byte(`{"total":2,"issues":[
+			{"key":"A-1","fields":{"customfield_2":{"value":"Visible"},"customfield_3":"Seen at two sites."}},
+			{"key":"A-2","fields":{"customfield_2":null,"customfield_3":null}}]}`))
+	}))
+	defer srv.Close()
+	res, err := Explore(context.Background(), corejira.NewClient(srv.URL, "t"), "x", true, Fields{Visibility: "customfield_2", Impact: "customfield_3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(fields, ",customfield_2,customfield_3") {
+		t.Fatalf("asked for fields %q", fields)
+	}
+	if got := res.Issues[0]; got.ClientVisibility != "Visible" || got.ClientImpact != "Seen at two sites." {
+		t.Fatalf("A-1 = %+v", got)
+	}
+	if got := res.Issues[1]; got.ClientVisibility != "" || got.ClientImpact != "" {
+		t.Fatalf("A-2 = %+v", got)
 	}
 }

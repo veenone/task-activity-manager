@@ -394,3 +394,65 @@ body,
   width: 4em;
   text-align: center;
 }
+
+/* Issue details beside Results */
+.pie-results-split {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+
+.pie-results-split .pie-results {
+  min-width: 0;
+}
+
+.pie-row-open {
+  background: var(--accent-soft);
+}
+
+.pie-detail {
+  flex: none;
+  width: 340px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.pie-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pie-detail h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.pie-detail h3 {
+  margin: 12px 0 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.pie-detail-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.pie-detail-facts dt {
+  color: var(--text-muted);
+}
+
+.pie-detail-facts dd {
+  margin: 0;
+}
+
+.pie-detail-impact {
+  white-space: pre-wrap;
+}
