@@ -14,7 +14,7 @@ const RANGES = [
 
 const dayText = (n: number | null) => (n === null ? "-" : `${n} days`);
 
-function Card({ value, label }: { value: number | string; label: string }) {
+export function Card({ value, label }: { value: number | string; label: string }) {
   return (
     <li className="pie-stat">
       <strong>{value}</strong> <span>{label}</span>

@@ -160,8 +160,9 @@ describe("pages and project names in the views", () => {
     expect(within(screen.getByRole("table", { name: "Per project" })).getAllByRole("row")).toHaveLength(6);
   });
 
-  it("pages the map's rows and names its columns", () => {
+  it("pages the map's rows and names its columns", async () => {
     render(<ProjectMap profileId="p1" result={many} onOpen={() => {}} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Table" }));
     expect(screen.getByRole("columnheader", { name: "B name (B)" })).toBeVisible();
     expect(within(screen.getByRole("table", { name: "Project map" })).getAllByRole("row")).toHaveLength(26);
   });

@@ -70,6 +70,7 @@ async function runAndOpen(view: "Trace" | "Project map", res: object = result) {
   await user.type(await screen.findByLabelText("JQL"), "q");
   await user.click(screen.getByRole("button", { name: "Run" }));
   await user.click(await screen.findByRole("button", { name: view }));
+  if (view === "Project map") await user.click(screen.getByRole("button", { name: "Table" }));
   return user;
 }
 
