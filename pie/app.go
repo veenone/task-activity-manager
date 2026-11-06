@@ -116,7 +116,7 @@ func (a *App) DeleteProfile(id string) error {
 	return nil
 }
 
-// RunQuery runs JQL with a profile's connection.
+// RunQuery runs JQL with a profile's connection and follows its links.
 func (a *App) RunQuery(profileID, jql string) (query.Result, error) {
 	if err := a.requireStore(); err != nil {
 		return query.Result{}, err
@@ -126,11 +126,11 @@ func (a *App) RunQuery(profileID, jql string) (query.Result, error) {
 		return query.Result{}, err
 	}
 	if demo.Is(p.JiraURL) {
-		return query.Run(a.ctx, demo.Client(), jql)
+		return query.Explore(a.ctx, demo.Client(), jql)
 	}
 	token, err := a.creds.Load(p.ID)
 	if err != nil {
 		return query.Result{}, fmt.Errorf("load the profile's token: %w", err)
 	}
-	return query.Run(a.ctx, corejira.NewClient(p.JiraURL, token), jql)
+	return query.Explore(a.ctx, corejira.NewClient(p.JiraURL, token), jql)
 }

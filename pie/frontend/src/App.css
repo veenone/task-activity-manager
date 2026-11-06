@@ -73,3 +73,180 @@ body,
 .pie-table tbody tr:hover {
   background: var(--row-hover);
 }
+
+/* Trace and Project map */
+.pie-linked {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.pie-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pie-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.pie-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pie-out-of-step {
+  color: var(--warn-text);
+  font-weight: 600;
+}
+
+.pie-not-matched {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+
+.pie-map-key {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pie-map-key:hover {
+  text-decoration: underline;
+}
+
+.pie-map-key:focus-visible,
+.pie-set:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.pie-trace {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.pie-trace-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 300px;
+  min-height: 0;
+}
+
+.pie-set-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+}
+
+.pie-set {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pie-set:hover {
+  background: var(--row-hover);
+}
+
+.pie-set-open {
+  background: var(--accent-soft);
+}
+
+.pie-set .muted {
+  grid-column: 1;
+  font-size: var(--fs-sm);
+}
+
+.pie-set .pie-out-of-step,
+.pie-set .muted:last-child {
+  grid-row: 1;
+  grid-column: 2;
+  font-size: var(--fs-sm);
+}
+
+.pie-trace-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.pie-trace-detail h2 {
+  margin: 0 0 10px;
+  font-size: var(--fs-lg);
+}
+
+.pie-trace-project {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+}
+
+.pie-trace-project h3 {
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.pie-trace-issue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pie-trace-focus {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.pie-trace-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pie-trace-links {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* Row headers name a set; only the column headers stay pinned. */
+.pie-map tbody th {
+  position: static;
+  background: none;
+  color: var(--text);
+}

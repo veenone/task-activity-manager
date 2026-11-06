@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -61,8 +62,9 @@ func TestRunMapsTheFieldsAnAnalystReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Issue{Key: "A-1", Project: "A", Type: "Bug", Summary: "Fails", Status: "Open", Priority: "High", Updated: "2026-11-05T10:00:00.000+0700"}
-	if res.Issues[0] != want {
+	want := Issue{Key: "A-1", Project: "A", Type: "Bug", Summary: "Fails", Status: "Open", Priority: "High",
+		Updated: "2026-11-05T10:00:00.000+0700", Matched: true}
+	if !reflect.DeepEqual(res.Issues[0], want) {
 		t.Fatalf("got %+v", res.Issues[0])
 	}
 }
@@ -78,7 +80,7 @@ func TestRunKeepsARowWhoseFieldsAreMissingOrMalformed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Issues[0] != (Issue{Key: "A-1"}) {
+	if !reflect.DeepEqual(res.Issues[0], Issue{Key: "A-1", Matched: true}) {
 		t.Fatalf("got %+v", res.Issues[0])
 	}
 }

@@ -22,6 +22,7 @@ const issue = {
   status: "Open",
   priority: "High",
   updated: "2026-11-05T10:00:00.000+0700",
+  matched: true,
 };
 
 function show() {

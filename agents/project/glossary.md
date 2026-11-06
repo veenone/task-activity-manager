@@ -106,3 +106,14 @@ own id, comment and defect links, addressable at `PUT /stepResult/{id}`. In
 Xray no such id exists and a step reports its iteration's status instead,
 which is why a step result cannot be written there.
 _Avoid_: step status, step execution, per-step result
+
+**Linked set**:
+In PIE, the issues joined by links that cross projects, followed in either
+direction and built from every link type. Links inside one project do not
+join a set.
+_Avoid_: family (taken by subtask rows), link group, cluster
+
+**Out of step**:
+A linked set where at least one issue is in Jira's `done` status category and
+at least one is not. Differing status names alone do not make a set out of step.
+_Avoid_: out of sync, inconsistent, mismatched

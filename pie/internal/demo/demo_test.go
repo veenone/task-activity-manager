@@ -190,3 +190,24 @@ func field(t *testing.T, f map[string]json.RawMessage, path ...string) string {
 	_ = json.Unmarshal(cur, &s)
 	return s
 }
+
+func TestExploreFindsTheSeedsSevenSets(t *testing.T) {
+	res, err := query.Explore(context.Background(), demo.Client(), "anything")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := 0
+	for _, s := range res.Sets {
+		if s.OutOfStep {
+			out++
+		}
+	}
+	if len(res.Sets) != 7 || out != 5 || res.LinkError != "" || res.LinksTruncated {
+		t.Fatalf("%d sets, %d out of step, link error %q", len(res.Sets), out, res.LinkError)
+	}
+	for _, is := range res.Issues {
+		if is.Matched == (is.Key == "ECHO-502") {
+			t.Errorf("%s matched = %v", is.Key, is.Matched)
+		}
+	}
+}

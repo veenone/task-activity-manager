@@ -1,0 +1,143 @@
+package query
+
+import (
+	"context"
+	"slices"
+	"strings"
+
+	corejira "agile-suite/core/jira"
+)
+
+// keysPerSearch keeps a key in (...) clause well inside the length of a URL.
+const keysPerSearch = 100
+
+// Set is a linked set: issues joined by links that cross projects, followed in
+// either direction. It is out of step when at least one issue is in Jira's done
+// category and at least one is not.
+type Set struct {
+	Keys      []string `json:"keys"`
+	Projects  []string `json:"projects"`
+	OutOfStep bool     `json:"outOfStep"`
+}
+
+// Explore runs the JQL, then fetches the issues its rows link to in other
+// projects, and theirs, until no new key appears or MaxRows is reached.
+//
+// ponytail: everything is fetched again on every run and held only in memory;
+// the bundle 01 cache replaces this once results are stored locally.
+func Explore(ctx context.Context, client *corejira.Client, jql string) (Result, error) {
+	res, err := Run(ctx, client, jql)
+	if err != nil {
+		return Result{}, err
+	}
+	have := map[string]bool{}
+	for _, is := range res.Issues {
+		have[is.Key] = true
+	}
+	asked := map[string]bool{}
+	for {
+		var pending []string
+		for _, is := range res.Issues {
+			for _, l := range is.Links {
+				if crosses(is, l) && !have[l.Key] && !asked[l.Key] {
+					asked[l.Key] = true
+					pending = append(pending, l.Key)
+				}
+			}
+		}
+		if len(pending) == 0 {
+			break
+		}
+		if room := MaxRows - len(res.Issues); len(pending) > room {
+			pending, res.LinksTruncated = pending[:room], true
+		}
+		for batch := range slices.Chunk(pending, keysPerSearch) {
+			got, err := Run(ctx, client, "key in ("+strings.Join(batch, ", ")+")")
+			if err != nil {
+				res.LinkError = err.Error()
+				res.Sets = Sets(res.Issues)
+				return res, nil
+			}
+			for _, is := range got.Issues {
+				if !have[is.Key] {
+					have[is.Key] = true
+					is.Matched = false
+					res.Issues = append(res.Issues, is)
+				}
+			}
+		}
+		if res.LinksTruncated {
+			break
+		}
+	}
+	res.Sets = Sets(res.Issues)
+	return res, nil
+}
+
+// Sets groups issues into linked sets, in the order their first issue appears.
+// A link to an issue that was not fetched is left out.
+func Sets(issues []Issue) []Set {
+	index := map[string]int{}
+	for i, is := range issues {
+		index[is.Key] = i
+	}
+	parent := make([]int, len(issues))
+	for i := range parent {
+		parent[i] = i
+	}
+	var root func(int) int
+	root = func(i int) int {
+		for parent[i] != i {
+			parent[i] = parent[parent[i]]
+			i = parent[i]
+		}
+		return i
+	}
+	for i, is := range issues {
+		for _, l := range is.Links {
+			if j, ok := index[l.Key]; ok && crosses(is, l) {
+				parent[root(j)] = root(i)
+			}
+		}
+	}
+	members := map[int][]int{}
+	var order []int
+	for i := range issues {
+		r := root(i)
+		if members[r] == nil {
+			order = append(order, r)
+		}
+		members[r] = append(members[r], i)
+	}
+	var out []Set
+	for _, r := range order {
+		if len(members[r]) < 2 {
+			continue
+		}
+		var s Set
+		done, open := false, false
+		for _, i := range members[r] {
+			is := issues[i]
+			s.Keys = append(s.Keys, is.Key)
+			if !slices.Contains(s.Projects, is.Project) {
+				s.Projects = append(s.Projects, is.Project)
+			}
+			if is.StatusCategory == "done" {
+				done = true
+			} else {
+				open = true
+			}
+		}
+		slices.Sort(s.Projects)
+		s.OutOfStep = done && open
+		out = append(out, s)
+	}
+	return out
+}
+
+// crosses reports whether a link leaves the issue's project. A key's project
+// is everything before its last dash.
+func crosses(is Issue, l Link) bool {
+	i := strings.LastIndex(l.Key, "-")
+	return i > 0 && l.Key[:i] != is.Project
+}
