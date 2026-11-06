@@ -58,6 +58,9 @@ type Link struct {
 	Key   string `json:"key"`
 	Type  string `json:"type"`
 	Words string `json:"words"`
+	// Outward is true when this issue is the link's outward end, so Words is
+	// the type's outward wording and the link points from here to Key.
+	Outward bool `json:"outward"`
 }
 
 // Result is what a run fetched. Truncated means Total is more than the query's
@@ -179,7 +182,7 @@ func links(raw json.RawMessage) []Link {
 	for _, l := range ls {
 		switch {
 		case l.Outward != nil && l.Outward.Key != "":
-			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward})
+			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward, Outward: true})
 		case l.Inward != nil && l.Inward.Key != "":
 			out = append(out, Link{Key: l.Inward.Key, Type: l.Type.Name, Words: l.Type.Inward})
 		}

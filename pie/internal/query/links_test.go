@@ -224,7 +224,7 @@ func TestRunReadsDatesCategoryAndLinkWording(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := res.Issues[0]
-	want := []Link{{Key: "A-1", Type: "Cloners", Words: "clones"}, {Key: "C-1", Type: "Cloners", Words: "is cloned by"}}
+	want := []Link{{Key: "A-1", Type: "Cloners", Words: "clones", Outward: true}, {Key: "C-1", Type: "Cloners", Words: "is cloned by"}}
 	if got.StatusCategory != "done" || got.Created != "2026-01-02T10:00:00.000+0700" || got.Resolved != "" || !slices.Equal(got.Links, want) {
 		t.Fatalf("got %+v", got)
 	}
