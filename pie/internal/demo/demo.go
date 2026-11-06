@@ -41,14 +41,31 @@ var (
 
 type transport struct{}
 
-// RoundTrip answers /rest/api/2/search and the field list, and nothing else.
-// The JQL is ignored apart from key in (...) and the refused filter: demo has
-// no query engine.
+// filters are demo's saved filters by id: two starred, one only reachable by
+// its id. Demo ignores JQL, so running any of them lists the whole seed.
+var filters = map[string]string{
+	"4200": `{"id":"4200","name":"Client reports, open","jql":"issuetype = Bug AND statusCategory != Done","owner":{"name":"demo"}}`,
+	"4201": `{"id":"4201","name":"Clones out of step","jql":"issueLinkType = Cloners","owner":{"name":"quality"}}`,
+	"4300": `{"id":"4300","name":"Unstarred team filter","jql":"project in (ALPHA, BRAVO)","owner":{"name":"lead"}}`,
+}
+
+// RoundTrip answers /rest/api/2/search, the field list and saved filters,
+// and nothing else. The JQL is ignored apart from key in (...) and the
+// refused filter: demo has no query engine.
 func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Path == "/rest/api/2/field" {
 		return reply(req, http.StatusOK, `[{"id":"`+baseField+`","name":"Product base","custom":true},`+
 			`{"id":"`+visibilityField+`","name":"Client visibility","custom":true},`+
 			`{"id":"`+impactField+`","name":"Client impact","custom":true}]`), nil
+	}
+	if req.URL.Path == "/rest/api/2/filter/favourite" {
+		return reply(req, http.StatusOK, "["+filters["4200"]+","+filters["4201"]+"]"), nil
+	}
+	if id, ok := strings.CutPrefix(req.URL.Path, "/rest/api/2/filter/"); ok {
+		if f, found := filters[id]; found {
+			return reply(req, http.StatusOK, f), nil
+		}
+		return reply(req, http.StatusNotFound, `{"errorMessages":["The selected filter is not available to you."]}`), nil
 	}
 	if req.URL.Path != "/rest/api/2/search" {
 		return reply(req, http.StatusNotFound, `{"errorMessages":["demo answers searches only"]}`), nil

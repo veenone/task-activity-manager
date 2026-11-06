@@ -63,6 +63,18 @@ fetches at most 5,000 issues from one run. When a query matches more, the count
 above the table says how many of the total it fetched, so narrow the query to
 see the rest.
 
+## Start from a Jira filter
+
+**From a Jira filter** lists the filters you have starred in Jira, with their
+JQL. Choose one to put `filter = <id>` into the JQL box. A run then follows
+the filter as its owner changes it. Nothing runs until you choose **Run**, and
+the JQL counts as unsaved until you save it.
+
+Jira lists only starred filters. To use a filter you have not starred, type
+the number from its Jira address into **Filter id** and choose **Open**. If
+Jira has no filter with that id that your account can see, PIE says so.
+Demo has two starred filters and one more with the id 4300.
+
 ## Save a query
 
 **Save as...** keeps the JQL in the box under a name, for the selected profile.

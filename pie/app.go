@@ -182,6 +182,30 @@ func (a *App) SetFields(profileID string, f saved.Fields) error {
 	return a.queries.SetFields(profileID, f)
 }
 
+// JiraFilters lists the saved filters the profile's account has starred.
+func (a *App) JiraFilters(profileID string) ([]corejira.RawFilter, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	client, err := a.client(profileID)
+	if err != nil {
+		return nil, err
+	}
+	return query.Starred(a.ctx, client)
+}
+
+// JiraFilter reads one saved filter by id, which reaches a filter nobody starred.
+func (a *App) JiraFilter(profileID, id string) (corejira.RawFilter, error) {
+	if err := a.requireStore(); err != nil {
+		return corejira.RawFilter{}, err
+	}
+	client, err := a.client(profileID)
+	if err != nil {
+		return corejira.RawFilter{}, err
+	}
+	return query.Filter(a.ctx, client, id)
+}
+
 // client is the Jira connection for a profile: demo's, or the instance's with
 // the token from the credential store.
 func (a *App) client(profileID string) (*corejira.Client, error) {

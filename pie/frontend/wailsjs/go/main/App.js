@@ -18,6 +18,14 @@ export function Fields(arg1) {
   return window['go']['main']['App']['Fields'](arg1);
 }
 
+export function JiraFilter(arg1, arg2) {
+  return window['go']['main']['App']['JiraFilter'](arg1, arg2);
+}
+
+export function JiraFilters(arg1) {
+  return window['go']['main']['App']['JiraFilters'](arg1);
+}
+
 export function LastRun(arg1, arg2) {
   return window['go']['main']['App']['LastRun'](arg1, arg2);
 }

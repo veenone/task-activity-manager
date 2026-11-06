@@ -265,3 +265,20 @@ func TestDemoHasClientFields(t *testing.T) {
 		t.Fatalf("%d of %d issues have a client visibility; demo needs some with and some without", seen, len(res.Issues))
 	}
 }
+
+func TestDemoHasJiraFilters(t *testing.T) {
+	ctx := context.Background()
+	starred, err := query.Starred(ctx, demo.Client())
+	if err != nil || len(starred) < 2 {
+		t.Fatalf("starred %+v, %v", starred, err)
+	}
+	if _, err := query.Filter(ctx, demo.Client(), starred[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := query.Filter(ctx, demo.Client(), "4300"); err != nil {
+		t.Fatalf("the unstarred demo filter: %v", err)
+	}
+	if _, err := query.Filter(ctx, demo.Client(), "99999"); err == nil {
+		t.Fatal("demo answered a filter it does not hold")
+	}
+}

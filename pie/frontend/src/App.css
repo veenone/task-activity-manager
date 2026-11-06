@@ -456,3 +456,30 @@ body,
 .pie-detail-impact {
   white-space: pre-wrap;
 }
+
+/* Jira filter picker */
+.pie-filter-list {
+  max-height: 16em;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.pie-filter-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pie-filter-list .muted {
+  font-size: var(--fs-sm);
+}
+
+.pie-filter-id {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
