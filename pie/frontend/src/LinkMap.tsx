@@ -14,7 +14,7 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
   const issues = byKey(result);
   const names = projectNames(result);
   const label = (p: string) => projectLabel(p, names.get(p));
-  const { edges, types, directed } = edgesOf(result.issues);
+  const { edges, types, stale } = edgesOf(result.issues);
   const ends = (e: Edge) => [projectOf(e.from, issues), projectOf(e.to, issues)] as const;
   const shown = edges.filter((e) => {
     const [pf, pt] = ends(e);
@@ -28,7 +28,7 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
     return t?.outward || t?.inward || type;
   };
 
-  if (edges.length > 0 && !directed) {
+  if (stale) {
     return (
       <p role="alert" className="error-text">
         This run was stored before PIE kept the direction of each link. Run the query again to see the Link map.

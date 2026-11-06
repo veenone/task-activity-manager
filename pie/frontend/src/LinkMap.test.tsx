@@ -95,3 +95,8 @@ it("asks for a new run when the stored one has no link direction", () => {
   show({ ...result, issues: result.issues.map((i) => ({ ...i, links: i.links.map((l) => ({ ...l, outward: false })) })) });
   expect(screen.getByRole("alert")).toHaveTextContent("Run the query again");
 });
+
+it("does not take a run whose links all point to unfetched outward ends for an old one", () => {
+  show({ issues: [issue("B-1", "Open", [link("A-1", "Cloners", "is cloned by", false)])], sets: [] });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
