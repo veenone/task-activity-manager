@@ -55,7 +55,7 @@ export function MapFlow({
     })),
   ];
   const name = new Map(columns.flat().map((c) => [c.id, c.label]));
-  const { nodes, bands } = sankey(columns, [...pairs.values()], {
+  const { nodes, bands, height } = sankey(columns, [...pairs.values()], {
     width: WIDTH - LEFT - RIGHT,
     height: HEIGHT,
     gap: 14,
@@ -67,7 +67,7 @@ export function MapFlow({
     <div className="pie-flow">
       <svg
         className="pie-flow-svg"
-        viewBox={`${-LEFT} -10 ${WIDTH} ${HEIGHT + 20}`}
+        viewBox={`${-LEFT} -10 ${WIDTH} ${height + 20}`}
         role="img"
         aria-label="Issues by baseline, project and fix state. The table view lists the same sets."
       >

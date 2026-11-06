@@ -110,3 +110,14 @@ it("stacks a node's bands without overlap and sizes nodes by their issues", () =
   // The band to q leaves x where the band to p ends.
   expect(bands[1].path.startsWith(`M${x.x + 12},75 `)).toBe(true);
 });
+
+it("grows the chart rather than squash a column of many nodes", () => {
+  const column = Array.from({ length: 30 }, (_, i) => ({ id: `n${i}`, label: `n${i}` }));
+  const { nodes, height } = sankey(
+    [[{ id: "x", label: "x" }], column],
+    column.map((c) => ({ from: "x", to: c.id, keys: [c.id] })),
+    { width: 200, height: 100, gap: 10 },
+  );
+  expect(nodes.every((n) => n.h > 0)).toBe(true);
+  expect(nodes.at(-1)!.y + nodes.at(-1)!.h).toBeLessThanOrEqual(height);
+});
