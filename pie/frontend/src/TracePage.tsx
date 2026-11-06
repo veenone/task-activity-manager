@@ -22,12 +22,21 @@ export function TracePage({
   const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
   const issues = byKey(result);
   const names = projectNames(result);
-  const sets = result.sets.filter(
-    (s) => (project === "" || s.projects.includes(project)) && (!onlyOutOfStep || s.outOfStep),
-  );
-  const open = sets.find((s) => focus !== null && s.keys.includes(focus)) ?? sets[0];
+  const shownBy = (p: string, only: boolean) =>
+    result.sets.filter((s) => (p === "" || s.projects.includes(p)) && (!only || s.outOfStep));
+  // The open set is the focused one if it is shown, else the first shown.
+  const openIndex = (list: query.Set[]) => Math.max(0, list.findIndex((s) => focus !== null && s.keys.includes(focus)));
+  const sets = shownBy(project, onlyOutOfStep);
+  const open = sets[openIndex(sets)];
   // Trace mounts when the map opens a key, so the list starts on that key's page.
-  const { rows, pager } = usePaged(sets, Math.max(0, sets.indexOf(open)));
+  const { rows, pager } = usePaged(sets, openIndex(sets));
+
+  // A filter change turns the list to the page holding the set left open.
+  function refilter(p: string, only: boolean) {
+    setProject(p);
+    setOnlyOutOfStep(only);
+    pager.onPage(Math.floor(openIndex(shownBy(p, only)) / pager.pageSize));
+  }
 
   return (
     <div className="pie-linked pie-trace">
@@ -35,7 +44,7 @@ export function TracePage({
         <div className="pie-filters">
           <label>
             Project
-            <select value={project} onChange={(e) => setProject(e.target.value)}>
+            <select value={project} onChange={(e) => refilter(e.target.value, onlyOutOfStep)}>
               <option value="">All projects</option>
               {allProjects(result.sets).map((p) => (
                 <option key={p} value={p}>
@@ -45,7 +54,7 @@ export function TracePage({
             </select>
           </label>
           <label className="pie-check">
-            <input type="checkbox" checked={onlyOutOfStep} onChange={(e) => setOnlyOutOfStep(e.target.checked)} />
+            <input type="checkbox" checked={onlyOutOfStep} onChange={(e) => refilter(project, e.target.checked)} />
             Out of step only
           </label>
         </div>
@@ -88,7 +97,9 @@ function SetDetail({
   names: Map<string, string>;
   focus: string | null;
 }) {
-  const { rows, pager } = usePaged(set.projects, 0, GROUP_SIZES);
+  // A key opened from the map may sit in a project past the first page.
+  const focused = set.projects.indexOf(issues.get(focus ?? "")?.project ?? "");
+  const { rows, pager } = usePaged(set.projects, Math.max(0, focused), GROUP_SIZES);
   return (
     <section className="pie-trace-detail" aria-labelledby="pie-trace-heading">
       <h2 id="pie-trace-heading">Linked set of {set.keys[0]}</h2>

@@ -124,6 +124,39 @@ describe("pages and project names in the views", () => {
     expect(screen.getByRole("group", { name: "Project A name (A)" })).toBeVisible();
   });
 
+  it("turns Trace's list to the open set when a filter changes", async () => {
+    const user = userEvent.setup();
+    render(<TracePage result={many} focus={null} onFocus={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("26-30 of 30")).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Project"), "B");
+    expect(screen.getByText("1-25 of 30")).toBeVisible();
+    const list = screen.getByRole("list", { name: "Linked sets" });
+    expect(within(list).getByRole("button", { current: true })).toHaveTextContent("A-1");
+  });
+
+  it("opens the set's project groups on the page holding the chosen key", () => {
+    const keys = Array.from({ length: 6 }, (_, i) => `P${i + 1}-1`);
+    const wide = {
+      total: 6,
+      issues: keys.map((k) => issue(k)),
+      sets: [{ keys, projects: keys.map((k) => k.split("-")[0]), outOfStep: false }],
+    } as unknown as query.Result;
+    render(<TracePage result={wide} focus="P6-1" onFocus={() => {}} />);
+    expect(screen.getByRole("group", { name: "Project P6 name (P6)" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Project P1 name (P1)" })).not.toBeInTheDocument();
+  });
+
+  it("pages the Statistics per-project table", async () => {
+    const user = userEvent.setup();
+    const projects = { total: 30, issues: Array.from({ length: 30 }, (_, i) => issue(`P${i + 1}-1`)), sets: [] } as unknown as query.Result;
+    render(<Statistics result={projects} productField="" />);
+    const nav = screen.getByRole("navigation", { name: "Per project pages" });
+    expect(within(nav).getByText("1-25 of 30")).toBeVisible();
+    await user.click(within(nav).getByRole("button", { name: "Next page" }));
+    expect(within(screen.getByRole("table", { name: "Per project" })).getAllByRole("row")).toHaveLength(6);
+  });
+
   it("pages the map's rows and names its columns", () => {
     render(<ProjectMap result={many} onOpen={() => {}} />);
     expect(screen.getByRole("columnheader", { name: "B name (B)" })).toBeVisible();
