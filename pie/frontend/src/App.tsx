@@ -344,6 +344,7 @@ export default function App() {
         {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
         {result && view === "map" && (
           <ProjectMap
+            profileId={profileId}
             result={result}
             onOpen={(key) => {
               setFocus(key);

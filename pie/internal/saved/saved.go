@@ -82,6 +82,12 @@ CREATE TABLE IF NOT EXISTS project_group_member (
 	project_key TEXT NOT NULL,
 	PRIMARY KEY (profile_id, group_id, project_key)
 );
+CREATE TABLE IF NOT EXISTS product_baseline (
+	profile_id   TEXT NOT NULL,
+	project_key  TEXT NOT NULL,
+	baseline_key TEXT NOT NULL,
+	PRIMARY KEY (profile_id, project_key)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
@@ -91,6 +97,7 @@ CREATE TABLE IF NOT EXISTS project_group_member (
 var purged = []string{
 	"saved_query", "profile_setting", "profile_field",
 	"case_item", "case_project", "project_group", "project_group_member", "evidence",
+	"product_baseline",
 }
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables

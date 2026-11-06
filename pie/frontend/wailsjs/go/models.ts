@@ -1,5 +1,19 @@
 export namespace cases {
 	
+	export class Baseline {
+	    key: string;
+	    descendants: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Baseline(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.descendants = source["descendants"];
+	    }
+	}
 	export class Case {
 	    id: number;
 	    key: string;

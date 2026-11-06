@@ -6,11 +6,17 @@ import {profile} from '../models';
 import {saved} from '../models';
 import {jira} from '../models';
 
+export function AddBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
+
 export function AddCaseProjects(arg1:string,arg2:number,arg3:Array<string>):Promise<cases.Detail>;
+
+export function AddDescendants(arg1:string,arg2:string,arg3:Array<string>):Promise<Array<cases.Baseline>>;
 
 export function AddEvidenceIssue(arg1:string,arg2:number,arg3:string,arg4:string):Promise<Array<evidence.Item>>;
 
 export function AddEvidenceNote(arg1:string,arg2:number,arg3:string,arg4:string):Promise<Array<evidence.Item>>;
+
+export function Baselines(arg1:string):Promise<Array<cases.Baseline>>;
 
 export function CaseGrid(arg1:string):Promise<Array<cases.Detail>>;
 
@@ -48,7 +54,11 @@ export function OpenCases(arg1:string,arg2:Array<string>):Promise<Array<cases.Ca
 
 export function ProjectGroups(arg1:string):Promise<Array<cases.Group>>;
 
+export function RemoveBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
+
 export function RemoveCaseProject(arg1:string,arg2:number,arg3:string):Promise<cases.Detail>;
+
+export function RemoveDescendant(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
 
 export function RemoveEvidence(arg1:string,arg2:number,arg3:number):Promise<Array<evidence.Item>>;
 

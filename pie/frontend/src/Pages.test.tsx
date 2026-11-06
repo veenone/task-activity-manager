@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { query } from "../wailsjs/go/models";
@@ -7,6 +7,9 @@ import { ProjectMap } from "./ProjectMap";
 import { ResultsTable } from "./ResultsTable";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
+
+// The map reads the profile's baselines; none here.
+vi.mock("../wailsjs/go/main/App", () => ({ Baselines: vi.fn(async () => []) }));
 
 function Numbers({ count, start }: { count: number; start?: number }) {
   const { rows, pager } = usePaged(
@@ -158,7 +161,7 @@ describe("pages and project names in the views", () => {
   });
 
   it("pages the map's rows and names its columns", () => {
-    render(<ProjectMap result={many} onOpen={() => {}} />);
+    render(<ProjectMap profileId="p1" result={many} onOpen={() => {}} />);
     expect(screen.getByRole("columnheader", { name: "B name (B)" })).toBeVisible();
     expect(within(screen.getByRole("table", { name: "Project map" })).getAllByRole("row")).toHaveLength(26);
   });

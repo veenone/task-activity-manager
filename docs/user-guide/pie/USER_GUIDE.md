@@ -122,6 +122,23 @@ case PIE is for: a fix made in one project but not in another. A Rejected
 issue counts as finished, so a Rejected clone beside an open one is out of
 step. Both pages can show only the sets that are out of step.
 
+### Baselines
+
+**Baselines** on the Project map keeps your own mapping of Jira projects for
+the selected profile: which projects are product baselines, and which projects
+were derived from each. Type a project key (the list offers Jira's projects by
+key and name) and choose **Add baseline**, then add descendants under it. A
+project sits under one baseline at most, and a baseline cannot be a
+descendant; PIE says where a project already sits if you try. **Remove
+baseline** asks first and takes its descendants out of the mapping with it.
+Nothing in Jira changes.
+
+With at least one baseline, the Project map orders its columns by baseline:
+each baseline, then its descendants, under a header naming the baseline.
+Projects under no baseline come last, under **No baseline**. The mapping is
+separate from the Product base field, which Statistics still reads from each
+issue.
+
 Following links stops when a run reaches 5,000 issues in all, and PIE says so.
 If Jira refuses one of the searches for linked issues, PIE shows Jira's
 message and keeps your results, but the sets may be incomplete.
