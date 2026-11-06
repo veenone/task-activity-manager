@@ -66,3 +66,10 @@ it("keeps the dialog open and says why Jira refused a name", async () => {
   expect(await within(dialog).findByText(/no custom field named "Impact"/)).toBeVisible();
   expect(within(dialog).getByLabelText("Client impact")).toHaveValue("Impact");
 });
+
+// Opening the dialog before the stored names arrive would let Save blank them.
+it("waits for the stored names before the dialog can open", async () => {
+  vi.mocked(api.Fields).mockReturnValue(new Promise(() => {}));
+  show();
+  expect(await screen.findByRole("button", { name: "Jira fields" })).toBeDisabled();
+});

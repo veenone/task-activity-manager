@@ -19,8 +19,6 @@ import { ResultsTable } from "./ResultsTable";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
 
-const NO_FIELDS: saved.Fields = { productBase: "", clientVisibility: "", clientImpact: "" };
-
 type View = "results" | "trace" | "map" | "stats";
 const VIEWS = [
   { id: "results", label: "Results" },
@@ -58,7 +56,8 @@ export default function App() {
   const [runAt, setRunAt] = useState("");
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
-  const [fields, setFields] = useState<saved.Fields>(NO_FIELDS);
+  // null until the stored names arrive, so the dialog cannot save blanks over them.
+  const [fields, setFields] = useState<saved.Fields | null>(null);
   const [editingFields, setEditingFields] = useState(false);
   // The key whose linked set Trace opens; the map sets it when a key is chosen.
   const [focus, setFocus] = useState<string | null>(null);
@@ -83,7 +82,7 @@ export default function App() {
     setRunAt("");
     setChange(null);
     setQueries([]);
-    setFields(NO_FIELDS);
+    setFields(null);
     if (!profileId) return;
     // A slow answer for a profile no longer selected must not land.
     let current = true;
@@ -249,7 +248,7 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-ghost" disabled={running} onClick={() => setEditingFields(true)}>
+              <button type="button" className="btn btn-ghost" disabled={running || fields === null} onClick={() => setEditingFields(true)}>
                 Jira fields
               </button>
               <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteProfile()}>
@@ -365,11 +364,11 @@ export default function App() {
           />
         )}
 
-        {result && view === "stats" && <Statistics result={result} productField={fields.productBase} />}
+        {result && view === "stats" && <Statistics result={result} productField={fields?.productBase ?? ""} />}
         {result && view === "results" && matched.length > 0 && <ResultsTable issues={matched} />}
       </main>
 
-      {editingFields && (
+      {editingFields && fields && (
         <FieldsDialog
           profileId={profileId}
           fields={fields}
