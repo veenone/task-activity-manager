@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="477" viewBox="0 0 1280 477" font-family="Segoe UI, Roboto, sans-serif" font-size="13" role="img" aria-label="Project Issue Explorer on a demo profile: a yellow DEMO chip in the header and the first invented issues of the seed">
+  <rect width="1280" height="477" fill="#161d28"/>
+
+  <rect width="1280" height="44" fill="#1b2639"/>
+  <text x="14" y="28" fill="#e6e9ee" font-size="15" font-weight="600">Project Issue Explorer</text>
+  <rect x="190" y="14" width="40" height="17" rx="3" fill="#f4b942"/>
+  <text x="196" y="27" fill="#1b2638" font-size="10" font-weight="700" letter-spacing="0.5">DEMO</text>
+  <rect x="976" y="8" width="80" height="28" rx="4" fill="#25324a" stroke="#3a4a66"/>
+  <text x="989" y="27" fill="#e6e9ee">Demo</text>
+  <path d="M1041 20l4 4 4-4" fill="none" stroke="#e6e9ee" stroke-width="1.5"/>
+  <text x="1077" y="27" fill="#e6e9ee">Delete profile</text>
+  <text x="1189" y="27" fill="#e6e9ee">Add profile</text>
+
+  <text x="14" y="77" fill="#ccd4e0" font-size="12" font-weight="600">JQL</text>
+  <rect x="14.5" y="90.5" width="1251" height="80" rx="4" fill="#1b2331" stroke="#3a4a66"/>
+  <text x="23" y="109" fill="#e6e9ee" font-family="Consolas, monospace" font-size="12">issuetype = Bug</text>
+
+  <rect x="14" y="189" width="50" height="27" rx="4" fill="#5b73f0"/>
+  <text x="27" y="207" fill="#ffffff">Run</text>
+  <text x="74" y="207" fill="#94a3b8">63 issues</text>
+
+  <rect x="14.5" y="228.5" width="1251" height="234" fill="none" stroke="#2e3a4d"/>
+  <g fill="#94a3b8" font-size="12" font-weight="600">
+    <text x="25" y="248">Key</text>
+    <text x="111" y="248">Project</text>
+    <text x="186" y="248">Type</text>
+    <text x="235" y="248">Summary</text>
+    <text x="1027" y="248">Status</text>
+    <text x="1117" y="248">Priority</text>
+    <text x="1182" y="248">Updated</text>
+  </g>
+  <path d="M15 257.5h1250M15 287.5h1250M15 317.5h1250M15 347.5h1250M15 377.5h1250M15 407.5h1250" stroke="#242f3e"/>
+  <g fill="#e6e9ee">
+    <text x="25" y="277" font-family="Consolas, monospace" font-size="12">ALPHA-101</text>
+    <text x="111" y="277">ALPHA</text><text x="186" y="277">Bug</text>
+    <text x="235" y="277">Card reset loses the PIN retry counter</text>
+    <text x="1027" y="277">Closed</text><text x="1117" y="277">High</text><text x="1182" y="277">2026-04-20</text>
+    <text x="25" y="307" font-family="Consolas, monospace" font-size="12">BRAVO-201</text>
+    <text x="111" y="307">BRAVO</text><text x="186" y="307">Bug</text>
+    <text x="235" y="307">Card reset loses the PIN retry counter</text>
+    <text x="1027" y="307">Open</text><text x="1117" y="307">High</text><text x="1182" y="307">2026-06-26</text>
+    <text x="25" y="337" font-family="Consolas, monospace" font-size="12">CHARLIE-301</text>
+    <text x="111" y="337">CHARLIE</text><text x="186" y="337">Bug</text>
+    <text x="235" y="337">Card reset loses the PIN retry counter</text>
+    <text x="1027" y="337">Postponed</text><text x="1117" y="337">Medium</text><text x="1182" y="337">2026-07-03</text>
+    <text x="25" y="367" font-family="Consolas, monospace" font-size="12">ALPHA-102</text>
+    <text x="111" y="367">ALPHA</text><text x="186" y="367">Bug</text>
+    <text x="235" y="367">Log export truncates long entries</text>
+    <text x="1027" y="367">Closed</text><text x="1117" y="367">Medium</text><text x="1182" y="367">2026-06-09</text>
+    <text x="25" y="397" font-family="Consolas, monospace" font-size="12">DELTA-401</text>
+    <text x="111" y="397">DELTA</text><text x="186" y="397">Bug</text>
+    <text x="235" y="397">Log export truncates long entries</text>
+    <text x="1027" y="397">Closed</text><text x="1117" y="397">Medium</text><text x="1182" y="397">2026-07-09</text>
+    <text x="25" y="427" font-family="Consolas, monospace" font-size="12">BRAVO-202</text>
+    <text x="111" y="427">BRAVO</text><text x="186" y="427">Bug</text>
+    <text x="235" y="427">Wrong error code after a failed update</text>
+    <text x="1027" y="427">Corrected</text><text x="1117" y="427">High</text><text x="1182" y="427">2026-08-15</text>
+  </g>
+</svg>

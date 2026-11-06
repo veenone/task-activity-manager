@@ -133,6 +133,29 @@ describe("profiles", () => {
     expect(screen.queryByLabelText("Personal access token")).not.toBeInTheDocument();
   });
 
+  it("creates a demo profile without asking for a token", async () => {
+    vi.mocked(api.CreateProfile).mockResolvedValue({ id: "d1", name: "Demo", jiraUrl: "demo" } as never);
+    show();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Add profile" }));
+    await user.type(screen.getByLabelText("Name"), "Demo");
+    await user.type(screen.getByLabelText("Jira URL"), "demo");
+
+    expect(screen.queryByLabelText("Personal access token")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(api.CreateProfile).toHaveBeenCalledWith("Demo", "demo", "");
+  });
+
+  it("marks a demo profile in the header while it is selected", async () => {
+    vi.mocked(api.ListProfiles).mockResolvedValue([quality, { id: "d1", name: "Demo", jiraUrl: "demo" }] as never);
+    show();
+    await screen.findByRole("option", { name: "Demo" });
+    expect(screen.queryByText("DEMO")).not.toBeInTheDocument();
+
+    await userEvent.setup().selectOptions(screen.getByLabelText("Profile"), "Demo");
+    expect(screen.getByText("DEMO")).toBeVisible();
+  });
+
   it("keeps the form open and shows why when a profile cannot be saved", async () => {
     vi.mocked(api.CreateProfile).mockRejectedValue("a profile needs a name");
     show();

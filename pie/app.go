@@ -11,6 +11,7 @@ import (
 	"agile-suite/core/profile"
 	"agile-suite/core/shareddb"
 	"agile-suite/core/store"
+	"agile-suite/pie/internal/demo"
 	"agile-suite/pie/internal/pieprofile"
 	"agile-suite/pie/internal/query"
 )
@@ -82,6 +83,9 @@ func (a *App) CreateProfile(name, jiraURL, token string) (profile.Profile, error
 	if err != nil {
 		return profile.Profile{}, err
 	}
+	if demo.Is(p.JiraURL) {
+		return p, nil // no token to keep
+	}
 	if err := a.creds.Save(p.ID, strings.TrimSpace(token)); err != nil {
 		if delErr := a.profiles.Delete(p.ID); delErr != nil {
 			log.Printf("pie: rollback profile %s after credential save failure: %v", p.ID, delErr)
@@ -96,8 +100,15 @@ func (a *App) DeleteProfile(id string) error {
 	if err := a.requireStore(); err != nil {
 		return err
 	}
+	p, err := a.profiles.Get(id)
+	if err != nil {
+		return err
+	}
 	if err := a.profiles.Delete(id); err != nil {
 		return err
+	}
+	if demo.Is(p.JiraURL) {
+		return nil
 	}
 	if err := a.creds.Delete(id); err != nil {
 		log.Printf("pie: delete credentials for %s: %v", id, err)
@@ -113,6 +124,9 @@ func (a *App) RunQuery(profileID, jql string) (query.Result, error) {
 	p, err := a.profiles.Get(profileID)
 	if err != nil {
 		return query.Result{}, err
+	}
+	if demo.Is(p.JiraURL) {
+		return query.Run(a.ctx, demo.Client(), jql)
 	}
 	token, err := a.creds.Load(p.ID)
 	if err != nil {

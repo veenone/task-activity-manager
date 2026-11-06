@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useConfirm } from "@agile-suite/core";
 import { ListProfiles, DeleteProfile, RunQuery, StartupError } from "../wailsjs/go/main/App";
 import type { profile, query } from "../wailsjs/go/models";
-import { AddProfileDialog, errorText } from "./AddProfileDialog";
+import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
 
 function countText(res: query.Result): string {
   if (res.truncated) return `Showing the first ${res.issues.length} of ${res.total} issues`;
@@ -78,11 +78,13 @@ export default function App() {
   }
 
   const hasProfile = profileId !== "";
+  const selected = profiles?.find((p) => p.id === profileId);
 
   return (
     <div className="app">
       <header className="topbar">
         <span className="brand">Project Issue Explorer</span>
+        {selected && isDemo(selected.jiraUrl) && <span className="demo-chip">DEMO</span>}
         <div className="pie-topbar-actions">
           {hasProfile && (
             <>
