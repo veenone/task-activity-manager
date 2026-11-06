@@ -96,3 +96,11 @@ func (a *App) DeleteProjectGroup(profileID string, id int64) error {
 	}
 	return a.cases.DeleteGroup(profileID, id)
 }
+
+// CaseGrid returns every case with its projects and verdicts, for the grid.
+func (a *App) CaseGrid(profileID string) ([]cases.Detail, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.cases.Grid(profileID)
+}

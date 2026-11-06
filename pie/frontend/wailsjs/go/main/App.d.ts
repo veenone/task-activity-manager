@@ -12,6 +12,8 @@ export function AddEvidenceIssue(arg1:string,arg2:number,arg3:string,arg4:string
 
 export function AddEvidenceNote(arg1:string,arg2:number,arg3:string,arg4:string):Promise<Array<evidence.Item>>;
 
+export function CaseGrid(arg1:string):Promise<Array<cases.Detail>>;
+
 export function CreateProfile(arg1:string,arg2:string,arg3:string):Promise<profile.Profile>;
 
 export function DeleteProfile(arg1:string):Promise<void>;

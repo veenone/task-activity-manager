@@ -228,6 +228,13 @@ Evidence helps you decide a verdict but never changes one. Demo has links,
 components, a fix version and summaries for every kind to find: try
 ALPHA-101 with the phrase "retry counter".
 
+### Cases by project
+
+**Grid** on the Cases tab puts every case against every project on any case.
+Each cell gives that case's verdict for the project, or a dash when the
+project is not on the case. The last row counts how many cases have affected
+each project. Choose a case's key to open it in the list. **List** goes back.
+
 ## Issue details
 
 Choose an issue's key in Results to open its details beside the table: its

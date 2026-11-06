@@ -14,6 +14,10 @@ export function AddEvidenceNote(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['AddEvidenceNote'](arg1, arg2, arg3, arg4);
 }
 
+export function CaseGrid(arg1) {
+  return window['go']['main']['App']['CaseGrid'](arg1);
+}
+
 export function CreateProfile(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3);
 }
