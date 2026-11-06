@@ -73,9 +73,19 @@ func (s *Store) AddDescendants(profileID, baseline string, keys []string) error 
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, k := range keys {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO product_baseline (profile_id, project_key, baseline_key) VALUES (?, ?, ?)`,
-			profileID, k, baseline); err != nil {
+		// The baseline may have gone since the check above; a descendant row
+		// without it would have nothing to sit under.
+		r, err := tx.Exec(`INSERT OR IGNORE INTO product_baseline (profile_id, project_key, baseline_key)
+			SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM product_baseline WHERE profile_id = ? AND project_key = ? AND baseline_key = ?)`,
+			profileID, k, baseline, profileID, baseline, baseline)
+		if err != nil {
 			return err
+		}
+		if n, _ := r.RowsAffected(); n == 0 {
+			var one int
+			if tx.QueryRow(`SELECT 1 FROM product_baseline WHERE profile_id = ? AND project_key = ?`, profileID, baseline).Scan(&one) != nil {
+				return fmt.Errorf("%s is not a baseline", baseline)
+			}
 		}
 	}
 	return tx.Commit()
