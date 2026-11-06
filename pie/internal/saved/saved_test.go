@@ -84,7 +84,7 @@ func TestARunIsKeptAndComparedWithTheNext(t *testing.T) {
 	// B-9 came only through a link, so it is neither added nor dropped.
 	next := result("A-1", "C-1")
 	next.Issues = append(next.Issues, query.Issue{Key: "B-9"})
-	second, err := s.Record("p1", q.ID, "x AND y", next, at.Add(time.Hour))
+	second, err := s.Record("p1", q.ID, " x ", next, at.Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,8 +99,25 @@ func TestARunIsKeptAndComparedWithTheNext(t *testing.T) {
 	if last.RunAt != "2026-11-06T11:00:00Z" || !reflect.DeepEqual(last.Result, next) {
 		t.Fatalf("last run %+v", last)
 	}
+}
+
+// Rows from different JQL say nothing about what changed in Jira, so an
+// edited query keeps the JQL it ran and reports no comparison.
+func TestEditedJQLIsKeptAndNotCompared(t *testing.T) {
+	s := open(t)
+	q, _ := s.Save("p1", "Q", "x")
+	if _, err := s.Record("p1", q.ID, "x", result("A-1"), at); err != nil {
+		t.Fatal(err)
+	}
+	run, err := s.Record("p1", q.ID, "x AND y", result("B-1"), at.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Added != nil || run.Dropped != nil {
+		t.Fatalf("compared runs of different JQL: added %v, dropped %v", run.Added, run.Dropped)
+	}
 	list, _ := s.List("p1")
-	if list[0].JQL != "x AND y" || list[0].RunAt != last.RunAt {
+	if list[0].JQL != "x AND y" || list[0].RunAt != run.RunAt {
 		t.Fatalf("the query keeps the JQL it last ran: %+v", list[0])
 	}
 }

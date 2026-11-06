@@ -73,7 +73,17 @@ export default function App() {
     setQueryId(0);
     setRunAt("");
     setChange(null);
-    if (profileId) ListQueries(profileId).then(setQueries, (e) => setError(errorText(e)));
+    setQueries([]);
+    if (!profileId) return;
+    // A slow answer for a profile no longer selected must not land.
+    let current = true;
+    ListQueries(profileId).then(
+      (list) => current && setQueries(list),
+      (e) => current && setError(errorText(e)),
+    );
+    return () => {
+      current = false;
+    };
   }, [profileId]);
 
   function showRun(r: saved.Run) {
@@ -89,10 +99,12 @@ export default function App() {
     setChange(null);
     if (id === 0) return;
     setJql(queries.find((q) => q.id === id)?.jql ?? "");
+    // The rows on screen belong to whatever was open before.
+    setResult(null);
+    setRunAt("");
     try {
       const r = await LastRun(profileId, id);
-      showRun(r);
-      if (!r.runAt) setResult(null);
+      if (r.runAt) showRun(r);
     } catch (e) {
       setError(errorText(e));
     }

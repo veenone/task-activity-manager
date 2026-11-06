@@ -58,7 +58,8 @@ saved query does not contact Jira, so it works offline.
 Running a saved query replaces its stored run. If you edited the JQL first, the
 saved query keeps the edited JQL. Below the form, PIE says how many issues the
 run added and dropped compared with the previous run; open the line to see
-their keys. Only issues the query matched count, not the ones reached through
+their keys. After an edit there is no comparison, because the two runs asked
+Jira different questions. Only issues the query matched count, not the ones reached through
 links.
 
 JQL run while **Unsaved query** is selected is not stored. **Delete query**

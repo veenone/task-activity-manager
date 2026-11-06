@@ -127,25 +127,30 @@ func (s *Store) Last(profileID string, id int64) (Run, error) {
 }
 
 // Record stores res as the query's run, with the JQL that produced it, and
-// returns it compared with the run it replaces.
+// returns it compared with the run it replaces. Runs of different JQL are not
+// compared: their difference says nothing about what changed in Jira.
 func (s *Store) Record(profileID string, id int64, jql string, res query.Result, at time.Time) (Run, error) {
 	before, err := s.Last(profileID, id)
 	if err != nil {
 		return Run{}, err
 	}
+	var beforeJQL string
+	if err := s.db.QueryRow(`SELECT jql FROM saved_query WHERE profile_id = ? AND id = ?`, profileID, id).Scan(&beforeJQL); err != nil {
+		return Run{}, err
+	}
+	jql = strings.TrimSpace(jql)
 	raw, err := json.Marshal(res)
 	if err != nil {
 		return Run{}, err
 	}
 	run := Run{Result: res, RunAt: at.UTC().Format(time.RFC3339)}
 	r, err := s.db.Exec(`UPDATE saved_query SET jql = ?, run_at = ?, result = ? WHERE profile_id = ? AND id = ?`,
-		strings.TrimSpace(jql), run.RunAt, string(raw), profileID, id)
+		jql, run.RunAt, string(raw), profileID, id)
 	if err := oneRow(r, err); err != nil {
 		return Run{}, err
 	}
-	if before.RunAt != "" {
+	if before.RunAt != "" && beforeJQL == jql {
 		run.Added, run.Dropped = missing(before.Result, res), missing(res, before.Result)
-		run.Added, run.Dropped = orEmpty(run.Added), orEmpty(run.Dropped)
 	}
 	return run, nil
 }
@@ -166,20 +171,13 @@ func missing(other, res query.Result) []string {
 	for _, is := range other.Issues {
 		had[is.Key] = is.Matched
 	}
-	var out []string
+	out := []string{}
 	for _, is := range res.Issues {
 		if is.Matched && !had[is.Key] {
 			out = append(out, is.Key)
 		}
 	}
 	return out
-}
-
-func orEmpty(keys []string) []string {
-	if keys == nil {
-		return []string{}
-	}
-	return keys
 }
 
 func oneRow(r sql.Result, err error) error {

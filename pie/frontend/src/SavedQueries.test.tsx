@@ -60,6 +60,19 @@ it("opens a saved query's last run without asking Jira", async () => {
   expect(api.RunQuery).not.toHaveBeenCalled();
 });
 
+it("drops the rows on screen when a saved query's run cannot be read", async () => {
+  vi.mocked(api.RunQuery).mockResolvedValue({ result: rows("A-1"), runAt: "", added: null, dropped: null } as never);
+  vi.mocked(api.LastRun).mockRejectedValue("read the stored run: unexpected end of JSON input");
+  const user = show();
+  await user.type(await screen.findByLabelText("JQL"), "x");
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  await screen.findByRole("cell", { name: "A-1" });
+
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  expect(await screen.findByRole("alert")).toHaveTextContent("read the stored run");
+  expect(screen.queryByRole("cell", { name: "A-1" })).not.toBeInTheDocument();
+});
+
 it("saves the JQL under a name and selects it", async () => {
   vi.mocked(api.ListQueries).mockResolvedValueOnce([]);
   vi.mocked(api.SaveQuery).mockResolvedValue({ ...weekly, runAt: "" } as never);
