@@ -30,7 +30,10 @@ export function ResultsTable({ issues }: { issues: query.Issue[] }) {
             <select
               className="detail-input pie-filter-select"
               value={active(field)}
-              onChange={(e) => setChosen({ ...chosen, [field]: e.target.value })}
+              onChange={(e) => {
+                setChosen({ ...chosen, [field]: e.target.value });
+                pager.onPage(0);
+              }}
             >
               <option value="">All</option>
               {values(field).map((v) => (
@@ -41,7 +44,9 @@ export function ResultsTable({ issues }: { issues: query.Issue[] }) {
             </select>
           </label>
         ))}
-        {shown.length < issues.length && <span className="muted">{`Showing ${shown.length} of ${issues.length} issues`}</span>}
+        <span className="muted" role="status">
+          {shown.length < issues.length ? `Showing ${shown.length} of ${issues.length} issues` : ""}
+        </span>
       </div>
       <div className="pie-results">
         <table className="pie-table" aria-label="Query results">

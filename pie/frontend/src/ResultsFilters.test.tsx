@@ -49,6 +49,16 @@ it("narrows the rows by project, status and priority together", async () => {
   expect(screen.getByText("Showing 1 of 4 issues")).toBeVisible();
 });
 
+it("starts again at the first page when a filter changes", async () => {
+  const user = userEvent.setup();
+  const many = Array.from({ length: 60 }, (_, i) => issue(`A-${i + 1}`, i % 3 ? "Open" : "Closed", "High"));
+  render(<ResultsTable issues={many} />);
+  await user.click(screen.getByRole("button", { name: "Next page" }));
+  await user.selectOptions(screen.getByLabelText("Status"), "Open");
+  expect(screen.getByText("1-25 of 40")).toBeVisible();
+  expect(screen.getByRole("status")).toHaveTextContent("Showing 40 of 60 issues");
+});
+
 it("drops a filter value the next run does not hold", async () => {
   const user = userEvent.setup();
   const { rerender } = render(<ResultsTable issues={issues} />);
