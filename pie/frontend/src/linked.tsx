@@ -21,6 +21,16 @@ export function byKey(result: query.Result): Map<string, query.Issue> {
   return new Map(result.issues.map((i) => [i.key, i]));
 }
 
+// projectNames maps each project key in the run to the name Jira gives it. A
+// run stored before names were read has none, and its keys stand alone.
+export function projectNames(result: query.Result): Map<string, string> {
+  return new Map(result.issues.filter((i) => i.projectName).map((i) => [i.project, i.projectName]));
+}
+
+export function projectLabel(key: string, name?: string): string {
+  return name ? `${name} (${key})` : key;
+}
+
 export function allProjects(sets: query.Set[]): string[] {
   return [...new Set(sets.flatMap((s) => s.projects))].sort();
 }

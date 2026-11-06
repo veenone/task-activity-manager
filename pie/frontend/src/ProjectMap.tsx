@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
-import { OutOfStep, allProjects, byKey } from "./linked";
+import { OutOfStep, allProjects, byKey, projectLabel, projectNames } from "./linked";
+import { Pager, usePaged } from "./Pager";
 
 // ProjectMap puts every linked set against every project it touches, so a
 // status that moved in one project and not in another shows in one row.
@@ -8,7 +9,9 @@ export function ProjectMap({ result, onOpen }: { result: query.Result; onOpen: (
   const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
   const issues = byKey(result);
   const projects = allProjects(result.sets);
+  const names = projectNames(result);
   const sets = result.sets.filter((s) => !onlyOutOfStep || s.outOfStep);
+  const { rows, pager } = usePaged(sets);
 
   return (
     <div className="pie-linked">
@@ -23,14 +26,14 @@ export function ProjectMap({ result, onOpen }: { result: query.Result; onOpen: (
               <th scope="col">Linked set</th>
               {projects.map((p) => (
                 <th key={p} scope="col">
-                  {p}
+                  {projectLabel(p, names.get(p))}
                 </th>
               ))}
               <th scope="col">State</th>
             </tr>
           </thead>
           <tbody>
-            {sets.map((s) => (
+            {rows.map((s) => (
               <tr key={s.keys[0]}>
                 <th scope="row" className="mono">
                   {s.keys[0]}
@@ -57,6 +60,7 @@ export function ProjectMap({ result, onOpen }: { result: query.Result; onOpen: (
           </tbody>
         </table>
       </div>
+      <Pager label="Project map" {...pager} />
       {sets.length === 0 && <p className="muted">No linked sets to show.</p>}
     </div>
   );

@@ -37,6 +37,16 @@ same whenever you run it.
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
 project, type, summary, status, priority and last update.
 
+Wherever PIE names a project, it gives the project's name with its key in
+brackets, for example "Card Platform (ALPHA)". A saved query's run from before
+PIE read project names shows the key alone until the query runs again.
+
+Long lists come a page at a time: Results, the linked sets and project groups
+in Trace, the Project map and the per-project table in Statistics. Below each
+list, choose how many rows a page holds, move to the first, previous, next or
+last page, or type a page number. When a filter or a new run leaves fewer
+pages, PIE shows the last page that is left.
+
 If Jira refuses the query, PIE shows Jira's own message and leaves the previous
 results on screen. A query that names a saved filter with `filter = 12345` fails
 as a whole if your account cannot see that filter, even when the filter is only
@@ -82,7 +92,8 @@ your query matched. The two other pages show the sets:
   marked "Not in the query".
 - **Project map** has a row for each set and a column for each project. A
   cell gives the key and status of each issue the set has in that project, or
-  a dash when it has none. Choose a key to open its set in Trace.
+  a dash when it has none. Choose a key to open its set in Trace, where the set list opens on the page
+  that holds it.
 
 A set is **out of step** when at least one of its issues is finished in Jira
 (its status is in Jira's done category) and at least one is not. That is the
