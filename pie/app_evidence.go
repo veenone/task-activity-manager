@@ -36,7 +36,7 @@ func (a *App) FindEvidence(profileID string, caseID int64, phrases []string) ([]
 
 // SetEvidenceState accepts or dismisses a suggestion.
 func (a *App) SetEvidenceState(profileID string, caseID, id int64, state string) ([]evidence.Item, error) {
-	return a.afterEvidence(profileID, caseID, func() error { return a.evidence.SetState(profileID, id, state) })
+	return a.afterEvidence(profileID, caseID, func() error { return a.evidence.SetState(profileID, caseID, id, state) })
 }
 
 // AddEvidenceNote records a note for one project on a case.
@@ -51,7 +51,7 @@ func (a *App) AddEvidenceIssue(profileID string, caseID int64, project, key stri
 
 // RemoveEvidence deletes evidence added by hand.
 func (a *App) RemoveEvidence(profileID string, caseID, id int64) ([]evidence.Item, error) {
-	return a.afterEvidence(profileID, caseID, func() error { return a.evidence.Remove(profileID, id) })
+	return a.afterEvidence(profileID, caseID, func() error { return a.evidence.Remove(profileID, caseID, id) })
 }
 
 func (a *App) afterEvidence(profileID string, caseID int64, change func() error) ([]evidence.Item, error) {

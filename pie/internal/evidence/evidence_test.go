@@ -126,10 +126,10 @@ func TestFindAgainKeepsWhatTheAnalystDecided(t *testing.T) {
 	f, client := setup(t)
 	_, _ = Find(context.Background(), client, f.ev, "p1", f.id, "A-1", nil)
 	items, _ := f.ev.List("p1", f.id)
-	if err := f.ev.SetState("p1", items[0].ID, Accepted); err != nil {
+	if err := f.ev.SetState("p1", f.id, items[0].ID, Accepted); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.ev.SetState("p1", items[1].ID, Dismissed); err != nil {
+	if err := f.ev.SetState("p1", f.id, items[1].ID, Dismissed); err != nil {
 		t.Fatal(err)
 	}
 	n, err := Find(context.Background(), client, f.ev, "p1", f.id, "A-1", nil)
@@ -174,10 +174,10 @@ func TestEvidenceAddedByHand(t *testing.T) {
 	if len(items) != 2 || items[0].Detail != "Field team saw it too." || items[0].State != Accepted || items[1].Ref != "C-40" {
 		t.Fatalf("items %+v", items)
 	}
-	if err := f.ev.SetState("p1", items[0].ID, Dismissed); err == nil {
+	if err := f.ev.SetState("p1", f.id, items[0].ID, Dismissed); err == nil {
 		t.Error("dismissed a note added by hand")
 	}
-	if err := f.ev.Remove("p1", items[0].ID); err != nil {
+	if err := f.ev.Remove("p1", f.id, items[0].ID); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := f.ev.List("p1", f.id); len(got) != 1 {
@@ -189,7 +189,7 @@ func TestASuggestionCannotBeRemoved(t *testing.T) {
 	f, client := setup(t)
 	_, _ = Find(context.Background(), client, f.ev, "p1", f.id, "A-1", nil)
 	items, _ := f.ev.List("p1", f.id)
-	if err := f.ev.Remove("p1", items[0].ID); err == nil {
+	if err := f.ev.Remove("p1", f.id, items[0].ID); err == nil {
 		t.Fatal("removed a suggestion; dismiss it instead")
 	}
 }
@@ -203,12 +203,12 @@ func TestNoEvidenceActionChangesAVerdict(t *testing.T) {
 
 	_, _ = Find(context.Background(), client, f.ev, "p1", f.id, "A-1", []string{"PIN retry"})
 	items, _ := f.ev.List("p1", f.id)
-	_ = f.ev.SetState("p1", items[0].ID, Accepted)
-	_ = f.ev.SetState("p1", items[1].ID, Dismissed)
+	_ = f.ev.SetState("p1", f.id, items[0].ID, Accepted)
+	_ = f.ev.SetState("p1", f.id, items[1].ID, Dismissed)
 	_ = f.ev.AddNote("p1", f.id, "C", "affected for sure")
 	_ = f.ev.AddIssue("p1", f.id, "C", "C-9")
 	all, _ := f.ev.List("p1", f.id)
-	_ = f.ev.Remove("p1", all[len(all)-1].ID)
+	_ = f.ev.Remove("p1", f.id, all[len(all)-1].ID)
 
 	after, _ := f.cs.Get("p1", f.id)
 	if !reflect.DeepEqual(before.Projects, after.Projects) {
@@ -224,5 +224,17 @@ func TestPurgeTakesEvidence(t *testing.T) {
 	}
 	if got, _ := f.ev.List("p1", f.id); len(got) != 0 {
 		t.Fatalf("purge left %+v", got)
+	}
+}
+
+func TestEvidenceIsChangedOnlyThroughItsOwnCase(t *testing.T) {
+	f, _ := setup(t)
+	_ = f.ev.AddNote("p1", f.id, "B", "x")
+	items, _ := f.ev.List("p1", f.id)
+	if err := f.ev.Remove("p1", f.id+1, items[0].ID); err == nil {
+		t.Fatal("removed evidence through another case")
+	}
+	if got, _ := f.ev.List("p1", f.id); len(got) != 1 {
+		t.Fatalf("evidence gone: %+v", got)
 	}
 }

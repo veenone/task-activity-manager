@@ -158,7 +158,8 @@ func search(ctx context.Context, client *corejira.Client, jql string) ([]hit, er
 			Summary string               `json:"summary"`
 		}
 		b, _ := json.Marshal(is.Fields)
-		if json.Unmarshal(b, &f) == nil {
+		// A hit without a project cannot be placed on a case, so it is left out.
+		if json.Unmarshal(b, &f) == nil && f.Project.Key != "" {
 			out = append(out, hit{is.Key, f.Project.Key, f.Summary})
 		}
 	}

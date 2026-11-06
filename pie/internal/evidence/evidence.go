@@ -84,12 +84,12 @@ func (s *Store) List(profileID string, caseID int64) ([]Item, error) {
 
 // SetState accepts or dismisses a suggestion, or puts it back to suggested.
 // Evidence added by hand is removed rather than dismissed.
-func (s *Store) SetState(profileID string, id int64, state string) error {
+func (s *Store) SetState(profileID string, caseID, id int64, state string) error {
 	if state != Suggested && state != Accepted && state != Dismissed {
 		return fmt.Errorf("%q is not an evidence state", state)
 	}
-	r, err := s.db.Exec(`UPDATE evidence SET state = ? WHERE profile_id = ? AND id = ? AND kind NOT IN (?, ?)`,
-		state, profileID, id, Note, Issue)
+	r, err := s.db.Exec(`UPDATE evidence SET state = ? WHERE profile_id = ? AND case_id = ? AND id = ? AND kind NOT IN (?, ?)`,
+		state, profileID, caseID, id, Note, Issue)
 	return oneRow(r, err, errors.New("that suggestion no longer exists"))
 }
 
@@ -129,8 +129,8 @@ func (s *Store) addByHand(profileID string, caseID int64, project, kind, ref, de
 
 // Remove deletes evidence added by hand. A suggestion is dismissed instead,
 // so finding evidence again does not bring it back.
-func (s *Store) Remove(profileID string, id int64) error {
-	r, err := s.db.Exec(`DELETE FROM evidence WHERE profile_id = ? AND id = ? AND kind IN (?, ?)`, profileID, id, Note, Issue)
+func (s *Store) Remove(profileID string, caseID, id int64) error {
+	r, err := s.db.Exec(`DELETE FROM evidence WHERE profile_id = ? AND case_id = ? AND id = ? AND kind IN (?, ?)`, profileID, caseID, id, Note, Issue)
 	return oneRow(r, err, errors.New("only evidence added by hand can be removed; dismiss a suggestion instead"))
 }
 
