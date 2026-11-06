@@ -1,5 +1,5 @@
 import type { ReportDay } from "../../api";
-import { dayIndex, labelEvery, linear, niceTicks, spread } from "../../lib/chartScale";
+import { dayIndex, labelEvery, linear, niceTicks, spread } from "@agile-suite/core";
 import { calendarDay, points } from "../../lib/format";
 import { amount, dayLine, emptyDaysLine } from "../../lib/reportText";
 import { burndownTable } from "../../lib/reportTables";
