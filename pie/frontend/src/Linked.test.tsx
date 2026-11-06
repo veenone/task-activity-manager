@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogProvider } from "@agile-suite/core";
 import App from "./App";
+import { ageText } from "./linked";
 import * as api from "../wailsjs/go/main/App";
 
 vi.mock("../wailsjs/go/main/App", () => ({
@@ -141,4 +142,11 @@ it("keeps the rows and says why when the links could not all be followed", async
   await runAndOpen("Trace", { ...result, linkError: "An issue with key 'Z-9' does not exist." });
   expect(screen.getByRole("alert")).toHaveTextContent("Linked issues could not all be fetched: An issue with key 'Z-9' does not exist.");
   expect(screen.getByRole("region", { name: "Linked set of A-1" })).toBeVisible();
+});
+
+it("counts an issue's age in whole days from Jira's date", () => {
+  const now = new Date("2026-11-06T09:00:00Z");
+  expect(ageText("2026-11-05T23:30:00.000+0700", now)).toBe("1 day old");
+  expect(ageText("2026-10-07T10:00:00.000+0700", now)).toBe("30 days old");
+  expect(ageText("", now)).toBe("");
 });
