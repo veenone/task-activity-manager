@@ -19,6 +19,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "paths": {
+      "@agile-suite/core": ["../../frontend/core/src/index.ts"],
+      "@agile-suite/core/*": ["../../frontend/core/*"]
+    },
     "types": [
       "node"
     ]

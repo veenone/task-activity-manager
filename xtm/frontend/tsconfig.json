@@ -18,7 +18,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@agile-suite/core": ["../../frontend/core/src/index.ts"],
+      "@agile-suite/core/*": ["../../frontend/core/*"]
+    }
   },
   "include": [
     "src"
