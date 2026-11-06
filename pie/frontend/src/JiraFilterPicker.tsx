@@ -79,21 +79,27 @@ function FilterDialog({ profileId, onClose, onPick }: { profileId: string; onClo
             ))}
           </ul>
         )}
-        <form
-          className="pie-filter-id"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void openById();
-          }}
-        >
+        {/* No form here: the picker sits inside the query form, and a nested
+            form's submit would run the query too. */}
+        <div className="pie-filter-id">
           <label>
             Filter id
-            <input inputMode="numeric" value={id} onChange={(e) => setId(e.target.value)} />
+            <input
+              inputMode="numeric"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (id.trim() !== "") void openById();
+                }
+              }}
+            />
           </label>
-          <button type="submit" className="btn" disabled={id.trim() === ""}>
+          <button type="button" className="btn" disabled={id.trim() === ""} onClick={() => void openById()}>
             Open
           </button>
-        </form>
+        </div>
         {error && <p className="error-text">{error}</p>}
         <div className="form-actions form-actions-end">
           <button type="button" className="btn" onClick={onClose}>

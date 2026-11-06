@@ -61,6 +61,16 @@ it("reaches a filter nobody starred by its id", async () => {
   await user.click(within(dialog).getByRole("button", { name: "Open" }));
   expect(api.JiraFilter).toHaveBeenCalledWith("p1", "4300");
   expect(screen.getByLabelText("JQL")).toHaveValue("filter = 4300");
+  // The id form sits inside the query form in React's tree; its submit must not run the query.
+  expect(api.RunQuery).not.toHaveBeenCalled();
+});
+
+it("opens an id on Enter without running the query", async () => {
+  vi.mocked(api.JiraFilter).mockResolvedValue({ ...weekly, id: "4300" } as never);
+  const { user, dialog } = await openDialog();
+  await user.type(within(dialog).getByLabelText("Filter id"), "4300{Enter}");
+  expect(screen.getByLabelText("JQL")).toHaveValue("filter = 4300");
+  expect(api.RunQuery).not.toHaveBeenCalled();
 });
 
 it("keeps the dialog open with Jira's reason for a refused id", async () => {
