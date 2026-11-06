@@ -18,6 +18,7 @@ import { FieldsDialog } from "./FieldsDialog";
 import { JiraFilterPicker } from "./JiraFilterPicker";
 import { ProjectMap } from "./ProjectMap";
 import { ResultsTable } from "./ResultsTable";
+import { JqlField } from "./JqlField";
 import { RunNotes } from "./RunNotes";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
@@ -52,6 +53,7 @@ export default function App() {
   const [profileId, setProfileId] = useState("");
   const [adding, setAdding] = useState(false);
   const [jql, setJql] = useState("");
+  const [jqlOpen, setJqlOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<query.Result | null>(null);
@@ -118,6 +120,7 @@ export default function App() {
     setChange(null);
     if (id === 0) return;
     setJql(queries.find((q) => q.id === id)?.jql ?? "");
+    setJqlOpen(false);
     // The rows on screen belong to whatever was open before.
     setResult(null);
     setRunAt("");
@@ -319,17 +322,7 @@ export default function App() {
                 }}
               />
             </div>
-            <label className="field-label" htmlFor="pie-jql">
-              JQL
-            </label>
-            <textarea
-              id="pie-jql"
-              className="detail-input mono"
-              rows={4}
-              spellCheck={false}
-              value={jql}
-              onChange={(e) => setJql(e.target.value)}
-            />
+            <JqlField jql={jql} onChange={setJql} open={jqlOpen} onOpenChange={setJqlOpen} />
             <div className="form-actions">
               <button type="submit" className="btn btn-primary" disabled={running || jql.trim() === ""}>
                 Run

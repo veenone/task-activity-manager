@@ -37,6 +37,10 @@ same whenever you run it.
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
 project, type, summary, status, priority and last update.
 
+The JQL box folds away. When you open a saved query it folds, and the query
+shows on one line beside **JQL**. Click that line to edit it. **Run** works
+either way. With no JQL yet, the box stays open.
+
 The **Project**, **Status** and **Priority** filters above the table narrow
 the rows without contacting Jira. Each lists only the values in the run, and
 they combine. While any filter hides rows, PIE says how many it shows of how
