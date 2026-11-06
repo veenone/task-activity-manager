@@ -94,5 +94,43 @@ Following links stops when a run reaches 5,000 issues in all, and PIE says so.
 If Jira refuses one of the searches for linked issues, PIE shows Jira's
 message and keeps your results, but the sets may be incomplete.
 
+## Statistics
+
+The **Statistics** page counts the run on screen without contacting Jira. Only
+issues your query matched are counted. Issues reached through links count only
+towards how far an issue reaches.
+
+The numbers at the top are:
+
+- how many issues are not finished, and their median age in days
+- how many issues reach more than one project, meaning their linked set spans
+  more than one project
+- how many reach more than one product base (see below)
+- how many linked sets are out of step
+
+Three charts show issues created per month, the ages of unfinished issues, and
+how many projects each issue reaches. A table below them gives each project's
+issues, unfinished issues and median age. Another table lists each finished
+status with its issue count and its median time from creation to resolution.
+Closed and Rejected are listed apart, because a rejection is not a fix. Jira
+gives Corrected issues no resolution date, so Corrected is counted but has no
+time. An issue with no resolution date never enters a median, and a median
+with nothing to measure shows as a dash.
+
+The **Project** and **Created** filters apply to every number on the page.
+
+### Product base field
+
+Jira has no product base field of its own, so you tell PIE which custom field
+holds it. Choose **Product base field** and enter the field's name as Jira
+shows it. PIE checks the name against Jira's field list and refuses one Jira
+does not have, or one that two custom fields share. Each profile keeps its own
+field, and deleting the profile deletes it. Leave the name empty to clear it.
+
+The field is read when a query runs, so run the query again after setting it.
+Until a field is set, Statistics leaves product bases out. A field with
+several options gives an issue several product bases. Demo has an invented
+**Product base** field.
+
 Only a saved query's last run is kept. Other results are gone when you close
 PIE or run another query, and PIE needs a connection to Jira to run one.

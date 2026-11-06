@@ -78,6 +78,15 @@ var category = map[string]string{
 
 var projects = []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"}
 
+// baseField is demo's invented product base field. Projects share bases, so
+// the ALPHA-102 and DELTA-401 set crosses projects but stays in one base.
+const baseField = "customfield_10500"
+
+var bases = map[string]string{
+	"ALPHA": "Base One", "BRAVO": "Base One", "DELTA": "Base One",
+	"CHARLIE": "Base Two", "ECHO": "Base Three", "FOXTROT": "Base Three",
+}
+
 // unlinked fills the seed out to a realistic spread of statuses, ages and
 // times to resolve. The arithmetic only spreads the values; none of it means
 // anything.
@@ -138,6 +147,7 @@ func render(now time.Time) []corejira.RawIssue {
 			// Jira sends null, not an absent field, for an unresolved issue.
 			"resolutiondate": nil,
 			"issuelinks":     append([]any{}, issueLinks[r.key]...),
+			baseField:        map[string]any{"value": bases[projectOf(r.key)]},
 		}
 		if r.resolved > 0 {
 			f["resolutiondate"] = day(r.resolved)

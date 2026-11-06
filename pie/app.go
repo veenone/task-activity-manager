@@ -155,6 +155,63 @@ func (a *App) LastRun(profileID string, id int64) (saved.Run, error) {
 	return a.queries.Last(profileID, id)
 }
 
+// ProductField is the name of the profile's product base field, or "".
+func (a *App) ProductField(profileID string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	return a.queries.ProductField(profileID)
+}
+
+// SetProductField stores the profile's product base field after checking that
+// Jira has a custom field of that name. "" clears it without asking Jira.
+func (a *App) SetProductField(profileID, name string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if name = strings.TrimSpace(name); name != "" {
+		client, err := a.client(profileID)
+		if err != nil {
+			return err
+		}
+		if _, err := fieldID(a.ctx, client, name); err != nil {
+			return err
+		}
+	}
+	return a.queries.SetProductField(profileID, name)
+}
+
+// client is the Jira connection for a profile: demo's, or the instance's with
+// the token from the credential store.
+func (a *App) client(profileID string) (*corejira.Client, error) {
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return nil, err
+	}
+	if demo.Is(p.JiraURL) {
+		return demo.Client(), nil
+	}
+	token, err := a.creds.Load(p.ID)
+	if err != nil {
+		return nil, fmt.Errorf("load the profile's token: %w", err)
+	}
+	return corejira.NewClient(p.JiraURL, token), nil
+}
+
+// fieldID resolves the product base field's name, in words an analyst can act on.
+func fieldID(ctx context.Context, client *corejira.Client, name string) (string, error) {
+	id, err := client.CustomFieldID(ctx, name)
+	switch {
+	case errors.Is(err, corejira.ErrFieldNotFound):
+		return "", fmt.Errorf("Jira has no custom field named %q. Check the product base field's name", name)
+	case errors.Is(err, corejira.ErrFieldAmbiguous):
+		return "", fmt.Errorf("Jira has more than one custom field named %q, so PIE cannot tell which is the product base", name)
+	case err != nil:
+		return "", fmt.Errorf("read Jira's field list: %w", err)
+	}
+	return id, nil
+}
+
 // RunQuery runs JQL with a profile's connection and follows its links. With a
 // saved query's id the run is stored on it and compared with the last one; 0
 // runs the JQL without saving anything. confirmed says the analyst has agreed
@@ -163,19 +220,21 @@ func (a *App) RunQuery(profileID string, queryID int64, jql string, confirmed bo
 	if err := a.requireStore(); err != nil {
 		return saved.Run{}, err
 	}
-	p, err := a.profiles.Get(profileID)
+	client, err := a.client(profileID)
 	if err != nil {
 		return saved.Run{}, err
 	}
-	client := demo.Client()
-	if !demo.Is(p.JiraURL) {
-		token, err := a.creds.Load(p.ID)
-		if err != nil {
-			return saved.Run{}, fmt.Errorf("load the profile's token: %w", err)
-		}
-		client = corejira.NewClient(p.JiraURL, token)
+	name, err := a.queries.ProductField(profileID)
+	if err != nil {
+		return saved.Run{}, err
 	}
-	res, err := query.Explore(a.ctx, client, jql, confirmed)
+	var baseField string
+	if name != "" {
+		if baseField, err = fieldID(a.ctx, client, name); err != nil {
+			return saved.Run{}, err
+		}
+	}
+	res, err := query.Explore(a.ctx, client, jql, confirmed, baseField)
 	if err != nil || queryID == 0 || res.NeedsConfirm {
 		return saved.Run{Result: res}, err
 	}

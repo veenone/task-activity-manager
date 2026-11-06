@@ -1,5 +1,6 @@
 // Package saved keeps an analyst's named queries and the last run of each, so
-// PIE opens with the rows it showed last time without asking Jira.
+// PIE opens with the rows it showed last time without asking Jira. It also
+// keeps each profile's settings, which share its schema and purge list.
 package saved
 
 import (
@@ -27,11 +28,15 @@ CREATE TABLE IF NOT EXISTS saved_query (
 	result     TEXT NOT NULL DEFAULT '',
 	UNIQUE (profile_id, name)
 );
+CREATE TABLE IF NOT EXISTS profile_setting (
+	profile_id    TEXT PRIMARY KEY,
+	product_field TEXT NOT NULL DEFAULT ''
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
 // checks that each profile-keyed table above is named here.
-var purged = []string{"saved_query"}
+var purged = []string{"saved_query", "profile_setting"}
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
 // are created if missing, so a pie.db from before this opens unchanged.
@@ -153,6 +158,26 @@ func (s *Store) Record(profileID string, id int64, jql string, res query.Result,
 		run.Added, run.Dropped = missing(before.Result, res), missing(res, before.Result)
 	}
 	return run, nil
+}
+
+// ProductField is the name of the profile's product base field, or "" if it
+// has none.
+func (s *Store) ProductField(profileID string) (string, error) {
+	var name string
+	err := s.db.QueryRow(`SELECT product_field FROM profile_setting WHERE profile_id = ?`, profileID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return name, err
+}
+
+// SetProductField stores the name of the profile's product base field. ""
+// clears it. Checking the name against Jira is the caller's job.
+func (s *Store) SetProductField(profileID, name string) error {
+	_, err := s.db.Exec(`INSERT INTO profile_setting (profile_id, product_field) VALUES (?, ?)
+		ON CONFLICT (profile_id) DO UPDATE SET product_field = excluded.product_field`,
+		profileID, strings.TrimSpace(name))
+	return err
 }
 
 // Purge removes everything the profile owns in PIE's tables.
