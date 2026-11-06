@@ -45,6 +45,8 @@ export { call } from "./lib/apiCall";
 export { ApiError, normalizeError } from "./lib/apiError";
 export { errMsg } from "./lib/errMsg";
 export { onActivateKey } from "./lib/activate";
+export { band, dayIndex, labelEvery, linear, niceTicks, spread } from "./lib/chartScale";
+export type { Band } from "./lib/chartScale";
 export { applyTheme } from "./lib/theme";
 export { createQueryClient } from "./lib/queryClient";
 export {

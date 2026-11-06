@@ -41,9 +41,13 @@ var (
 
 type transport struct{}
 
-// RoundTrip answers /rest/api/2/search and nothing else. The JQL is ignored
-// apart from key in (...) and the refused filter: demo has no query engine.
+// RoundTrip answers /rest/api/2/search and the field list, and nothing else.
+// The JQL is ignored apart from key in (...) and the refused filter: demo has
+// no query engine.
 func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Path == "/rest/api/2/field" {
+		return reply(req, http.StatusOK, `[{"id":"`+baseField+`","name":"Product base","custom":true}]`), nil
+	}
 	if req.URL.Path != "/rest/api/2/search" {
 		return reply(req, http.StatusNotFound, `{"errorMessages":["demo answers searches only"]}`), nil
 	}

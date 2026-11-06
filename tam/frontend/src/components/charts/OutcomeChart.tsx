@@ -1,5 +1,5 @@
 import type { ReportSeries } from "../../api";
-import { band, linear, niceTicks } from "../../lib/chartScale";
+import { band, linear, niceTicks } from "@agile-suite/core";
 import { reportFigures } from "../../lib/reportFigures";
 import { amount, outcomeLine } from "../../lib/reportText";
 import { outcomeTable } from "../../lib/reportTables";

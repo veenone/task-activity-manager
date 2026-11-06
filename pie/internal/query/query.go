@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	corejira "agile-suite/core/jira"
@@ -39,6 +40,9 @@ type Issue struct {
 	Created        string `json:"created"`
 	Resolved       string `json:"resolved"`
 	Links          []Link `json:"links"`
+	// Bases are the values of the profile's product base field. An option field
+	// with several options gives several.
+	Bases []string `json:"bases"`
 	// Matched is false for an issue fetched only because another one links to it.
 	Matched bool `json:"matched"`
 }
@@ -67,20 +71,33 @@ type Result struct {
 
 // Run pages through every issue the JQL matches, up to MaxRows.
 func Run(ctx context.Context, client *corejira.Client, jql string) (Result, error) {
+	return run(ctx, client, jql, "")
+}
+
+// run is Run that also reads baseField, a custom field id, or "" for none.
+func run(ctx context.Context, client *corejira.Client, jql, baseField string) (Result, error) {
 	jql = strings.TrimSpace(jql)
 	if jql == "" {
 		return Result{}, errors.New("enter a JQL query to run")
 	}
+	want := fields
+	if baseField != "" {
+		want = append(slices.Clip(fields), baseField)
+	}
 	res := Result{Issues: []Issue{}}
 	for {
 		size := min(pageSize, MaxRows-len(res.Issues))
-		page, err := client.SearchIssues(ctx, jql, fields, nil, len(res.Issues), size)
+		page, err := client.SearchIssues(ctx, jql, want, nil, len(res.Issues), size)
 		if err != nil {
 			return Result{}, readable(err)
 		}
 		res.Total = page.Total
 		for _, raw := range page.Issues {
-			res.Issues = append(res.Issues, toIssue(raw))
+			is := toIssue(raw)
+			if baseField != "" {
+				is.Bases = values(raw.Fields[baseField])
+			}
+			res.Issues = append(res.Issues, is)
 		}
 		// An empty page ends the walk even if Total claims more: advancing by
 		// what the page held is what makes a server's own page limit harmless.
@@ -157,6 +174,26 @@ func text(raw json.RawMessage) string {
 		return ""
 	}
 	return s
+}
+
+// values reads a custom field as text: a string, an option's value, or each
+// option of a multi-select. Blank values are dropped.
+func values(raw json.RawMessage) []string {
+	var list []json.RawMessage
+	if json.Unmarshal(raw, &list) != nil {
+		list = []json.RawMessage{raw}
+	}
+	var out []string
+	for _, v := range list {
+		s := text(v)
+		if s == "" {
+			s = named(v, "value")
+		}
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func named(raw json.RawMessage, key string) string {

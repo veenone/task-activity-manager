@@ -88,6 +88,7 @@ export namespace query {
 	    created: string;
 	    resolved: string;
 	    links: Link[];
+	    bases: string[];
 	    matched: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -107,6 +108,7 @@ export namespace query {
 	        this.created = source["created"];
 	        this.resolved = source["resolved"];
 	        this.links = this.convertValues(source["links"], Link);
+	        this.bases = source["bases"];
 	        this.matched = source["matched"];
 	    }
 	

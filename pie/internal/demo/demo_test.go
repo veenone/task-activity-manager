@@ -192,7 +192,7 @@ func field(t *testing.T, f map[string]json.RawMessage, path ...string) string {
 }
 
 func TestExploreFindsTheSeedsSevenSets(t *testing.T) {
-	res, err := query.Explore(context.Background(), demo.Client(), "anything", true)
+	res, err := query.Explore(context.Background(), demo.Client(), "anything", true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,5 +209,30 @@ func TestExploreFindsTheSeedsSevenSets(t *testing.T) {
 		if is.Matched == (is.Key == "ECHO-502") {
 			t.Errorf("%s matched = %v", is.Key, is.Matched)
 		}
+	}
+}
+
+// Demo names an invented product base field, and an issue reached only
+// through a link carries it too, because reach counts those issues.
+func TestDemoHasAProductBaseField(t *testing.T) {
+	ctx := context.Background()
+	client := demo.Client()
+	id, err := client.CustomFieldID(ctx, "product base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := query.Explore(ctx, client, "anything", true, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bases := map[string]string{}
+	for _, is := range res.Issues {
+		if len(is.Bases) != 1 {
+			t.Fatalf("%s bases %q", is.Key, is.Bases)
+		}
+		bases[is.Key] = is.Bases[0]
+	}
+	if bases["ALPHA-101"] != bases["BRAVO-201"] || bases["ALPHA-101"] == bases["CHARLIE-301"] || bases["ECHO-502"] == "" {
+		t.Fatalf("bases %v", bases)
 	}
 }

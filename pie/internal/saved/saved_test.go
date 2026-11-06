@@ -189,3 +189,31 @@ func TestAnOlderPieDatabaseGainsTheTable(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTheProductFieldIsKeptPerProfileAndPurged(t *testing.T) {
+	s := open(t)
+	if got, err := s.ProductField("p1"); err != nil || got != "" {
+		t.Fatalf("unset field = %q, %v", got, err)
+	}
+	if err := s.SetProductField("p1", " Product base "); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetProductField("p1", "Base"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetProductField("p2", "Other"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.ProductField("p1"); got != "Base" {
+		t.Fatalf("p1 field = %q", got)
+	}
+	if err := s.Purge("p1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.ProductField("p1"); got != "" {
+		t.Fatalf("purge left %q", got)
+	}
+	if got, _ := s.ProductField("p2"); got != "Other" {
+		t.Fatalf("purge reached p2: %q", got)
+	}
+}

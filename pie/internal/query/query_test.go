@@ -97,7 +97,7 @@ func TestRunStopsAtTheRowLimitAndSaysSo(t *testing.T) {
 
 func TestExploreAsksBeforeALargeFetch(t *testing.T) {
 	var seen []string
-	res, err := Explore(context.Background(), jiraWith(t, AskAbove+1, 100, &seen), "x", false)
+	res, err := Explore(context.Background(), jiraWith(t, AskAbove+1, 100, &seen), "x", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestExploreAsksBeforeALargeFetch(t *testing.T) {
 		t.Fatalf("confirm %v, total %d, rows %d, searches %d", res.NeedsConfirm, res.Total, len(res.Issues), len(seen))
 	}
 
-	res, err = Explore(context.Background(), jiraWith(t, AskAbove+1, 100, nil), "x", true)
+	res, err = Explore(context.Background(), jiraWith(t, AskAbove+1, 100, nil), "x", true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestExploreAsksBeforeALargeFetch(t *testing.T) {
 }
 
 func TestExploreDoesNotAskAtTheThreshold(t *testing.T) {
-	res, err := Explore(context.Background(), jiraWith(t, AskAbove, 100, nil), "x", false)
+	res, err := Explore(context.Background(), jiraWith(t, AskAbove, 100, nil), "x", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,5 +172,33 @@ func TestRunRefusesEmptyJQLWithoutAskingJira(t *testing.T) {
 	}
 	if len(seen) != 0 {
 		t.Fatalf("asked Jira %d times", len(seen))
+	}
+}
+
+// A product base field may be text, one option, several options or empty.
+// Each option is a base of its own, so an issue can count towards two.
+func TestExploreReadsTheProductBaseField(t *testing.T) {
+	var fields string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fields = r.URL.Query().Get("fields")
+		_, _ = w.Write([]byte(`{"total":4,"issues":[
+			{"key":"A-1","fields":{"customfield_1":{"value":"One"}}},
+			{"key":"A-2","fields":{"customfield_1":[{"value":"One"},{"value":" Two "}]}},
+			{"key":"A-3","fields":{"customfield_1":"Plain"}},
+			{"key":"A-4","fields":{"customfield_1":null}}]}`))
+	}))
+	defer srv.Close()
+	res, err := Explore(context.Background(), corejira.NewClient(srv.URL, "t"), "x", true, "customfield_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(fields, ",customfield_1") {
+		t.Fatalf("asked for fields %q", fields)
+	}
+	want := [][]string{{"One"}, {"One", "Two"}, {"Plain"}, nil}
+	for i, is := range res.Issues {
+		if !reflect.DeepEqual(is.Bases, want[i]) {
+			t.Errorf("%s bases %q, want %q", is.Key, is.Bases, want[i])
+		}
 	}
 }

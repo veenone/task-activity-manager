@@ -1,5 +1,5 @@
 import type { VelocityRow } from "../../api";
-import { band, linear, niceTicks } from "../../lib/chartScale";
+import { band, linear, niceTicks } from "@agile-suite/core";
 import { points } from "../../lib/format";
 import { mixedUnitsLine, singleSprintLine, velocityLine } from "../../lib/reportText";
 import { velocityTable } from "../../lib/reportTables";

@@ -15,8 +15,12 @@ export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListQueries(arg1:string):Promise<Array<saved.Query>>;
 
+export function ProductField(arg1:string):Promise<string>;
+
 export function RunQuery(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<saved.Run>;
 
 export function SaveQuery(arg1:string,arg2:string,arg3:string):Promise<saved.Query>;
+
+export function SetProductField(arg1:string,arg2:string):Promise<void>;
 
 export function StartupError():Promise<string>;
