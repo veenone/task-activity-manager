@@ -47,7 +47,7 @@ const rowKeys = () =>
 describe("ResultsTable cases", () => {
   it("opens the selected rows as cases and clears the selection", async () => {
     const user = userEvent.setup();
-    const onOpenCases = vi.fn().mockResolvedValue(undefined);
+    const onOpenCases = vi.fn().mockResolvedValue(true);
     render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={onOpenCases} />);
     expect(screen.queryByRole("button", { name: /as cases/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: "Select A-1" }));
@@ -55,6 +55,14 @@ describe("ResultsTable cases", () => {
     await user.click(screen.getByRole("button", { name: "Open 2 as cases" }));
     expect(onOpenCases).toHaveBeenCalledWith(["A-1", "A-3"]);
     expect(screen.getByRole("checkbox", { name: "Select A-1" })).not.toBeChecked();
+  });
+
+  it("keeps the selection when the cases could not be opened", async () => {
+    const user = userEvent.setup();
+    render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={vi.fn().mockResolvedValue(false)} />);
+    await user.click(screen.getByRole("checkbox", { name: "Select A-2" }));
+    await user.click(screen.getByRole("button", { name: "Open 1 as cases" }));
+    expect(screen.getByRole("checkbox", { name: "Select A-2" })).toBeChecked();
   });
 
   it("selects every row on the page from the header", async () => {

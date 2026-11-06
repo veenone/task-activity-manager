@@ -34,7 +34,7 @@ const keys = () =>
 
 it("narrows the rows by project, status and priority together", async () => {
   const user = userEvent.setup();
-  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
   expect(within(screen.getByLabelText("Project")).getAllByRole("option").map((o) => o.textContent)).toEqual([
     "All",
     "A name (A)",
@@ -52,7 +52,7 @@ it("narrows the rows by project, status and priority together", async () => {
 it("starts again at the first page when a filter changes", async () => {
   const user = userEvent.setup();
   const many = Array.from({ length: 60 }, (_, i) => issue(`A-${i + 1}`, i % 3 ? "Open" : "Closed", "High"));
-  render(<ResultsTable issues={many} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  render(<ResultsTable issues={many} caseKeys={new Set()} onOpenCases={async () => true} />);
   await user.click(screen.getByRole("button", { name: "Next page" }));
   await user.selectOptions(screen.getByLabelText("Status"), "Open");
   expect(screen.getByText("1-25 of 40")).toBeVisible();
@@ -61,10 +61,10 @@ it("starts again at the first page when a filter changes", async () => {
 
 it("drops a filter value the next run does not hold", async () => {
   const user = userEvent.setup();
-  const { rerender } = render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  const { rerender } = render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
   await user.selectOptions(screen.getByLabelText("Status"), "Closed");
   expect(keys()).toEqual(["A-2"]);
-  rerender(<ResultsTable issues={issues.filter((i) => i.status === "Open")} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  rerender(<ResultsTable issues={issues.filter((i) => i.status === "Open")} caseKeys={new Set()} onOpenCases={async () => true} />);
   expect(screen.getByLabelText("Status")).toHaveValue("");
   expect(keys()).toEqual(["A-1", "B-1", "B-2"]);
   expect(screen.queryByText(/^Showing/)).not.toBeInTheDocument();

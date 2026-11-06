@@ -25,7 +25,9 @@ export function ResultsTable({
 }: {
   issues: query.Issue[];
   caseKeys: Set<string>;
-  onOpenCases: (keys: string[]) => Promise<void>;
+  // onOpenCases resolves true once the cases are stored; on false the
+  // selection stays so the analyst can try again.
+  onOpenCases: (keys: string[]) => Promise<boolean>;
 }) {
   const [chosen, setChosen] = useState<Record<Field, string>>({ project: "", status: "", priority: "", clientVisibility: "" });
   const [withCase, setWithCase] = useState<CaseFilter>("");
@@ -102,8 +104,7 @@ export function ResultsTable({
             type="button"
             className="btn btn-primary"
             onClick={() => {
-              void onOpenCases(selected);
-              setPicked(new Set());
+              void onOpenCases(selected).then((done) => done && setPicked(new Set()));
             }}
           >
             {`Open ${selected.length} as cases`}

@@ -105,13 +105,13 @@ const many = {
 
 describe("pages and project names in the views", () => {
   it("pages the results and names each project", () => {
-    render(<ResultsTable issues={many.issues} caseKeys={new Set()} onOpenCases={async () => {}} />);
+    render(<ResultsTable issues={many.issues} caseKeys={new Set()} onOpenCases={async () => true} />);
     expect(screen.getAllByRole("cell", { name: "A name (A)" })).toHaveLength(13);
     expect(screen.getByText("1-25 of 60")).toBeVisible();
   });
 
   it("keeps the key alone for a run stored before names were read", () => {
-    render(<ResultsTable issues={[issue("A-1", { projectName: "" })]} caseKeys={new Set()} onOpenCases={async () => {}} />);
+    render(<ResultsTable issues={[issue("A-1", { projectName: "" })]} caseKeys={new Set()} onOpenCases={async () => true} />);
     expect(screen.getByRole("cell", { name: "A" })).toBeVisible();
   });
 

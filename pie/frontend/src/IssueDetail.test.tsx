@@ -24,7 +24,7 @@ const issues = [issue("A-1", "Visible", "Seen at two sites."), issue("A-2", ""),
 
 it("shows client visibility as a column and a filter once the run holds it", async () => {
   const user = userEvent.setup();
-  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
   expect(screen.getByRole("columnheader", { name: "Client visibility" })).toBeVisible();
   await user.selectOptions(screen.getByLabelText("Client visibility"), "Possible");
   const rows = within(screen.getByRole("table", { name: "Query results" })).getAllByRole("row");
@@ -33,14 +33,14 @@ it("shows client visibility as a column and a filter once the run holds it", asy
 });
 
 it("leaves the column out when no issue has a value", () => {
-  render(<ResultsTable issues={[issue("A-2", "")]} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  render(<ResultsTable issues={[issue("A-2", "")]} caseKeys={new Set()} onOpenCases={async () => true} />);
   expect(screen.queryByRole("columnheader", { name: "Client visibility" })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Client visibility")).not.toBeInTheDocument();
 });
 
 it("opens an issue's details with its client impact, and closes on Escape", async () => {
   const user = userEvent.setup();
-  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => {}} />);
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
   await user.click(screen.getByRole("button", { name: "A-1" }));
   const panel = screen.getByRole("complementary", { name: "A-1 details" });
   expect(panel).toHaveTextContent("Summary of A-1");
