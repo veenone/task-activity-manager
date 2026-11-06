@@ -30,13 +30,13 @@ func Client() *corejira.Client {
 	return corejira.NewClientWithHTTP("http://demo.invalid", "", &http.Client{Transport: transport{}})
 }
 
-// RefusedFilter is the saved filter demo treats as one the account cannot see.
-const RefusedFilter = "99999"
+// refusedFilter is the saved filter demo treats as one the account cannot see.
+const refusedFilter = "99999"
 
 var (
 	keyIn       = regexp.MustCompile(`(?i)\bkey\s+in\s*\(([^)]*)\)`)
-	refusedJQL  = regexp.MustCompile(`(?i)\bfilter\s*=\s*` + RefusedFilter + `\b`)
-	refusedBody = `{"errorMessages":["A value with ID '` + RefusedFilter + `' does not exist for the field 'filter'."],"errors":{}}`
+	refusedJQL  = regexp.MustCompile(`(?i)\bfilter\s*=\s*` + refusedFilter + `\b`)
+	refusedBody = `{"errorMessages":["A value with ID '` + refusedFilter + `' does not exist for the field 'filter'."],"errors":{}}`
 )
 
 type transport struct{}

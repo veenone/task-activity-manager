@@ -24,7 +24,7 @@ func TestAnyQueryListsTheSeedThroughRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Total < 60 || res.Total != len(res.Issues) || res.Truncated {
+	if res.Total != 63 || res.Total != len(res.Issues) || res.Truncated {
 		t.Fatalf("total %d, fetched %d, truncated %v", res.Total, len(res.Issues), res.Truncated)
 	}
 	byKey := map[string]query.Issue{}
@@ -116,12 +116,10 @@ func TestSeedHoldsTheCasesTheViewsShow(t *testing.T) {
 	if !resolved("ALPHA-101") || resolved("BRAVO-201") {
 		t.Error("only finished issues other than Corrected carry a resolution date")
 	}
-	projects := map[string]bool{}
 	for _, k := range []string{"ALPHA-104", "BRAVO-203", "DELTA-402", "FOXTROT-601"} {
-		projects[strings.Split(k, "-")[0]] = len(links(t, issues[k])) > 0
-	}
-	if len(projects) != 4 || !projects["FOXTROT"] {
-		t.Error("the four-project set is missing a link")
+		if len(links(t, issues[k])) == 0 {
+			t.Errorf("%s has no link, so the four-project set is broken", k)
+		}
 	}
 	unlinked := 0
 	for _, f := range issues {
