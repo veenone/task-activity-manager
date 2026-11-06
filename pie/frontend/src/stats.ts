@@ -81,7 +81,7 @@ export function statistics(res: query.Result, filter: Filter, now: number): Stat
     (i) =>
       i.matched &&
       (filter.project === "" || i.project === filter.project) &&
-      (filter.withinDays === 0 || days(i.created, now) <= filter.withinDays),
+      (filter.withinDays === 0 || now - time(i.created) <= filter.withinDays * DAY),
   );
   const byKey = new Map(res.issues.map((i) => [i.key, i]));
   const setOf = new Map<string, query.Set>();

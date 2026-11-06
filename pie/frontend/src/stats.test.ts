@@ -82,6 +82,13 @@ describe("statistics", () => {
   });
 });
 
+it("keeps an issue a few hours past the range out of it", () => {
+  const late = { ...result, issues: [issue("A-1", "2026-08-07", "Open", "new", [])] } as unknown as query.Result;
+  // 2026-08-07 is 91 days before now; an hour later it is still not within 91.
+  expect(statistics(late, { project: "", withinDays: 91 }, now).issues).toBe(1);
+  expect(statistics(late, { project: "", withinDays: 91 }, now + 3_600_000).issues).toBe(0);
+});
+
 describe("median", () => {
   it.each([
     [[], null],

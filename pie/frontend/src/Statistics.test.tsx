@@ -65,6 +65,24 @@ describe("Statistics", () => {
     expect(screen.getByText(/Name the product base field/)).toBeVisible();
   });
 
+  // The field is read when a query runs, so a run from before it was set has
+  // no bases to count, and a 0 would read as a measurement.
+  it("asks for a new run when the field is set but the run has no bases", () => {
+    const old = { ...result, issues: result.issues.map((i) => ({ ...i, bases: [] })) } as unknown as query.Result;
+    render(<Statistics result={old} productField="Product base" />);
+    expect(screen.queryByText("reach more than one product base")).not.toBeInTheDocument();
+    expect(screen.getByText(/Run the query again to read the product base field/)).toBeVisible();
+  });
+
+  it("drops a project filter the next run does not contain", async () => {
+    const { rerender } = render(<Statistics result={result} productField="" />);
+    await userEvent.selectOptions(screen.getByLabelText("Project"), "B");
+    const onlyA = { ...result, issues: result.issues.filter((i) => i.project === "A"), sets: [] } as unknown as query.Result;
+    rerender(<Statistics result={onlyA} productField="" />);
+    expect(screen.getByLabelText("Project")).toHaveValue("");
+    expect(headline("not finished")).toHaveTextContent("2 not finished");
+  });
+
   it("gives each chart a table of its numbers", () => {
     render(<Statistics result={result} productField="" />);
     const ages = within(screen.getByRole("table", { name: "Age of unfinished issues, days" })).getAllByRole("row");

@@ -23,11 +23,14 @@ function Card({ value, label }: { value: number | string; label: string }) {
 // Statistics counts the run on screen. productField is the profile's product
 // base field; without one, product bases are left out rather than shown as 0.
 export function Statistics({ result, productField }: { result: query.Result; productField: string }) {
-  const [project, setProject] = useState("");
+  const [chosen, setProject] = useState("");
   const [withinDays, setWithinDays] = useState(0);
   const projects = [...new Set(result.issues.filter((i) => i.matched).map((i) => i.project))].sort();
+  // A filter on a project the new run does not hold would zero every number.
+  const project = projects.includes(chosen) ? chosen : "";
   const s = statistics(result, { project, withinDays }, Date.now());
-  const bases = productField !== "";
+  // The field is read when a query runs; a run from before it was set has none.
+  const bases = productField !== "" && result.issues.some((i) => (i.bases ?? []).length > 0);
 
   return (
     <section className="pie-stats" aria-label="Statistics">
@@ -68,7 +71,11 @@ export function Statistics({ result, productField }: { result: query.Result; pro
         <Card value={s.outOfStep} label="linked sets out of step" />
       </ul>
       {!bases && (
-        <p className="muted">Name the product base field with Product base field, then run the query again, to count product bases.</p>
+        <p className="muted">
+          {productField === ""
+            ? "Name the product base field with Product base field, then run the query again, to count product bases."
+            : "Run the query again to read the product base field."}
+        </p>
       )}
 
       <div className="pie-charts">
