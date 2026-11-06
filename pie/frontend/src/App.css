@@ -227,7 +227,6 @@ body,
 
 .pie-trace-focus {
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .pie-trace-line {
