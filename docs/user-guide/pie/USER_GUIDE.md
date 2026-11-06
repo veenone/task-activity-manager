@@ -46,5 +46,33 @@ PIE fetches at most 5,000 issues from one run. When a query matches more, the
 count above the table says how many of the total it fetched, so narrow the query
 to see the rest.
 
+## Follow linked issues across projects
+
+A run also follows the links your results have to issues in other projects,
+and the links those have in turn, until no new issue turns up. PIE fetches
+those issues even when your query did not match them. Links between issues in
+the same project are not followed.
+
+Issues joined this way form a linked set. **Results** lists only the issues
+your query matched. The two other pages show the sets:
+
+- **Trace** lists the linked sets on the left. Pick one to see its issues
+  project by project, with status, age and how each issue links to the others
+  (for example "clones ALPHA-101"). An issue your query did not match is
+  marked "Not in the query".
+- **Project map** has a row for each set and a column for each project. A
+  cell gives the key and status of each issue the set has in that project, or
+  a dash when it has none. Choose a key to open its set in Trace.
+
+A set is **out of step** when at least one of its issues is finished in Jira
+(its status is in Jira's done category) and at least one is not. That is the
+case PIE is for: a fix made in one project but not in another. A Rejected
+issue counts as finished, so a Rejected clone beside an open one is out of
+step. Both pages can show only the sets that are out of step.
+
+Following links stops when a run reaches 5,000 issues in all, and PIE says so.
+If Jira refuses one of the searches for linked issues, PIE shows Jira's
+message and keeps your results, but the sets may be incomplete.
+
 Results are not saved. They are gone when you close PIE or run another query, and
 PIE needs a connection to Jira to run one.

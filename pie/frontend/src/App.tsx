@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
-import { useConfirm } from "@agile-suite/core";
+import { ViewTabs, useConfirm } from "@agile-suite/core";
 import { ListProfiles, DeleteProfile, RunQuery, StartupError } from "../wailsjs/go/main/App";
 import type { profile, query } from "../wailsjs/go/models";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
+import { ProjectMap } from "./ProjectMap";
+import { TracePage } from "./TracePage";
 
-function countText(res: query.Result): string {
-  if (res.truncated) return `Showing the first ${res.issues.length} of ${res.total} issues`;
+type View = "results" | "trace" | "map";
+const VIEWS = [
+  { id: "results", label: "Results" },
+  { id: "trace", label: "Trace" },
+  { id: "map", label: "Project map" },
+] as const;
+
+function countText(res: query.Result, matched: number): string {
+  if (res.truncated) return `Showing the first ${matched} of ${res.total} issues`;
   return res.total === 1 ? "1 issue" : `${res.total} issues`;
 }
 
@@ -19,6 +28,9 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<query.Result | null>(null);
+  const [view, setView] = useState<View>("results");
+  // The key whose linked set Trace opens; the map sets it when a key is chosen.
+  const [focus, setFocus] = useState<string | null>(null);
 
   async function loadProfiles(select?: string) {
     const list = await ListProfiles();
@@ -40,6 +52,7 @@ export default function App() {
     setError("");
     try {
       setResult(await RunQuery(profileId, jql));
+      setFocus(null);
     } catch (e) {
       // The last good rows stay: a refused query says nothing about them.
       setError(errorText(e));
@@ -79,6 +92,9 @@ export default function App() {
 
   const hasProfile = profileId !== "";
   const selected = profiles?.find((p) => p.id === profileId);
+  // Issues reached only through a link belong to Trace and the map, not to the
+  // rows the analyst asked Jira for.
+  const matched = result?.issues.filter((i) => i.matched) ?? [];
 
   return (
     <div className="app">
@@ -145,7 +161,7 @@ export default function App() {
                 Run
               </button>
               {running && <span className="muted">Running...</span>}
-              {!running && result && <span className="muted">{countText(result)}</span>}
+              {!running && result && <span className="muted">{countText(result, matched.length)}</span>}
             </div>
           </form>
         )}
@@ -156,7 +172,29 @@ export default function App() {
           </p>
         )}
 
-        {result && result.issues.length > 0 && (
+        {result?.linkError && (
+          <p role="alert" className="error-text">
+            Linked issues could not all be fetched: {result.linkError}
+          </p>
+        )}
+        {result?.linksTruncated && (
+          <p className="muted">Links were followed only until 5000 issues were fetched, so some linked sets may be incomplete.</p>
+        )}
+
+        {result && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
+
+        {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
+        {result && view === "map" && (
+          <ProjectMap
+            result={result}
+            onOpen={(key) => {
+              setFocus(key);
+              setView("trace");
+            }}
+          />
+        )}
+
+        {result && view === "results" && matched.length > 0 && (
           <div className="pie-results">
             <table className="pie-table" aria-label="Query results">
               <thead>
@@ -171,7 +209,7 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {result.issues.map((issue) => (
+                {matched.map((issue) => (
                   <tr key={issue.key}>
                     <td className="mono">{issue.key}</td>
                     <td>{issue.project}</td>
