@@ -139,6 +139,10 @@ case PIE is for: a fix made in one project but not in another. A Rejected
 issue counts as finished, so a Rejected clone beside an open one is out of
 step. Both pages can show only the sets that are out of step.
 
+Following links stops when a run reaches 5,000 issues in all, and PIE says so.
+If Jira refuses one of the searches for linked issues, PIE shows Jira's
+message and keeps your results, but the sets may be incomplete.
+
 ### Baselines
 
 **Baselines** on the Project map keeps your own mapping of Jira projects for
@@ -177,10 +181,6 @@ the summary of the issue the link starts from. The button beside the title
 switches to the other direction and says how many links it has. Choose a key
 to open it in Trace. A run saved before PIE kept link direction asks you to
 run the query again.
-
-Following links stops when a run reaches 5,000 issues in all, and PIE says so.
-If Jira refuses one of the searches for linked issues, PIE shows Jira's
-message and keeps your results, but the sets may be incomplete.
 
 ## Statistics
 
