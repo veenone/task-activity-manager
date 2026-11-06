@@ -78,6 +78,28 @@ var category = map[string]string{
 
 var projects = []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"}
 
+// otherProjects hold no seed issues. They are there so the project picker
+// has more to search than the projects a run reaches.
+var otherProjects = map[string]string{
+	"GOLF": "Payment Terminals", "HOTEL": "Border Control", "INDIA": "Identity Wallet", "JULIET": "Factory Tooling",
+}
+
+// projectList is Jira's project list as demo answers it.
+func projectList() string {
+	var all []map[string]string
+	for _, k := range projects {
+		all = append(all, map[string]string{"key": k, "name": projectNames[k]})
+	}
+	for k, n := range otherProjects {
+		all = append(all, map[string]string{"key": k, "name": n})
+	}
+	b, err := json.Marshal(all)
+	if err != nil {
+		panic(err) // static strings always marshal
+	}
+	return string(b)
+}
+
 // visibilityField and impactField are demo's invented client fields: an option
 // and free text. Only some reports carry them, as on a real instance.
 const (

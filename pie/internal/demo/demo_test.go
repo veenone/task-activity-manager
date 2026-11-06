@@ -282,3 +282,17 @@ func TestDemoHasJiraFilters(t *testing.T) {
 		t.Fatal("demo answered a filter it does not hold")
 	}
 }
+
+func TestDemoListsProjectsBeyondTheSeed(t *testing.T) {
+	got, err := query.Projects(context.Background(), demo.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]string{}
+	for _, p := range got {
+		names[p.Key] = p.Name
+	}
+	if names["ALPHA"] != "Card Platform" || len(got) <= 6 {
+		t.Fatalf("projects %+v", got)
+	}
+}

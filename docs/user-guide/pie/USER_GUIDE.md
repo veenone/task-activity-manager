@@ -183,8 +183,29 @@ the profile and survive a restart and a new run. When a run doesn't match an
 issue that has a case, the case stays, and PIE lists its key above the views.
 Deleting the profile deletes its cases.
 
-For now a case is only a marker. Notes, evidence and per-project verdicts come
-later.
+## Work on a case
+
+The **Cases** tab lists your cases, with or without a run on screen. Each one
+shows its summary when the run on screen holds the issue, and how many of its
+projects have a verdict and how many are affected. Choose a case to open it.
+
+A case has notes, which you save with **Save notes**, and a list of projects
+to assess. **Add projects** searches Jira's project list by key or name.
+Tick the projects you want and add them. A project starts at *not assessed*.
+
+For each project, pick a verdict: *not assessed*, *investigating*,
+*affected* or *not affected*, and give a reason if you like. PIE stores the
+verdict as soon as you pick it, and a reason when you leave its box, with the
+time either was set. **Remove** takes a project and its verdict off the case,
+after asking.
+
+Projects you often assess together can be saved as a group: tick them and
+choose **Save as group...**. Choosing a group in the picker ticks all its
+projects. Deleting a group leaves the cases that used it as they are.
+
+Cases, verdicts and groups stay on this computer until you delete the profile.
+PIE never sets a verdict by itself and writes nothing to Jira. Evidence for a
+verdict comes later.
 
 ## Issue details
 

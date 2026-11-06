@@ -489,3 +489,9 @@ body,
   font-size: var(--fs-sm);
   font-weight: 600;
 }
+
+.pie-filter-list .pie-group {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}

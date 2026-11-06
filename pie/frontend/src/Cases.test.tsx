@@ -100,6 +100,18 @@ describe("cases in the app", () => {
     } as never);
   });
 
+  it("shows the Cases tab before any run", async () => {
+    render(
+      <DialogProvider>
+        <App />
+      </DialogProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(within(await screen.findByRole("navigation", { name: "Views" })).getByRole("button", { name: "Cases" }));
+    expect(await screen.findByRole("button", { name: /^Z-9/ })).toBeVisible();
+    expect(api.RunQuery).not.toHaveBeenCalled();
+  });
+
   it("stores the cases and names the ones this run did not match", async () => {
     vi.mocked(api.OpenCases).mockResolvedValue([
       { id: 1, key: "Z-9", state: "open", notes: "", openedAt: "" },

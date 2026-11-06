@@ -58,6 +58,9 @@ func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			`{"id":"`+visibilityField+`","name":"Client visibility","custom":true},`+
 			`{"id":"`+impactField+`","name":"Client impact","custom":true}]`), nil
 	}
+	if req.URL.Path == "/rest/api/2/project" {
+		return reply(req, http.StatusOK, projectList()), nil
+	}
 	if req.URL.Path == "/rest/api/2/filter/favourite" {
 		return reply(req, http.StatusOK, "["+filters["4200"]+","+filters["4201"]+"]"), nil
 	}

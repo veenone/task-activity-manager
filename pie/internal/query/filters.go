@@ -37,3 +37,12 @@ func Filter(ctx context.Context, client *corejira.Client, id string) (corejira.R
 	}
 	return f, nil
 }
+
+// Projects is every project the account can see.
+func Projects(ctx context.Context, client *corejira.Client) ([]corejira.Project, error) {
+	out, err := client.Projects(ctx)
+	if err != nil {
+		return nil, readable(err)
+	}
+	return out, nil
+}

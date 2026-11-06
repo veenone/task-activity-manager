@@ -18,6 +18,10 @@ type Case struct {
 	State    string `json:"state"`
 	Notes    string `json:"notes"`
 	OpenedAt string `json:"openedAt"`
+	// Assessed and Affected count the case's projects with a verdict other
+	// than not assessed, and with the verdict affected.
+	Assessed int `json:"assessed"`
+	Affected int `json:"affected"`
 }
 
 // issueKey is a Jira key: a project key of capitals, digits and underscores,
@@ -32,7 +36,10 @@ func New(db *sql.DB) *Store { return &Store{db: db} }
 
 // List returns a profile's cases by key.
 func (s *Store) List(profileID string) ([]Case, error) {
-	rows, err := s.db.Query(`SELECT id, source_key, state, notes, opened_at FROM case_item WHERE profile_id = ? ORDER BY source_key`, profileID)
+	rows, err := s.db.Query(`SELECT c.id, c.source_key, c.state, c.notes, c.opened_at,
+		(SELECT COUNT(*) FROM case_project p WHERE p.profile_id = c.profile_id AND p.case_id = c.id AND p.verdict != ?),
+		(SELECT COUNT(*) FROM case_project p WHERE p.profile_id = c.profile_id AND p.case_id = c.id AND p.verdict = ?)
+		FROM case_item c WHERE c.profile_id = ? ORDER BY c.source_key`, NotAssessed, Affected, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +47,7 @@ func (s *Store) List(profileID string) ([]Case, error) {
 	out := []Case{}
 	for rows.Next() {
 		var c Case
-		if err := rows.Scan(&c.ID, &c.Key, &c.State, &c.Notes, &c.OpenedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Key, &c.State, &c.Notes, &c.OpenedAt, &c.Assessed, &c.Affected); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

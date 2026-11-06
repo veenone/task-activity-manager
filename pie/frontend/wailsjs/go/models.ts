@@ -6,6 +6,8 @@ export namespace cases {
 	    state: string;
 	    notes: string;
 	    openedAt: string;
+	    assessed: number;
+	    affected: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Case(source);
@@ -18,6 +20,86 @@ export namespace cases {
 	        this.state = source["state"];
 	        this.notes = source["notes"];
 	        this.openedAt = source["openedAt"];
+	        this.assessed = source["assessed"];
+	        this.affected = source["affected"];
+	    }
+	}
+	export class Project {
+	    key: string;
+	    verdict: string;
+	    reason: string;
+	    assessedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Project(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.verdict = source["verdict"];
+	        this.reason = source["reason"];
+	        this.assessedAt = source["assessedAt"];
+	    }
+	}
+	export class Detail {
+	    id: number;
+	    key: string;
+	    state: string;
+	    notes: string;
+	    openedAt: string;
+	    assessed: number;
+	    affected: number;
+	    projects: Project[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Detail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.key = source["key"];
+	        this.state = source["state"];
+	        this.notes = source["notes"];
+	        this.openedAt = source["openedAt"];
+	        this.assessed = source["assessed"];
+	        this.affected = source["affected"];
+	        this.projects = this.convertValues(source["projects"], Project);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Group {
+	    id: number;
+	    name: string;
+	    projects: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Group(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.projects = source["projects"];
 	    }
 	}
 
@@ -25,6 +107,20 @@ export namespace cases {
 
 export namespace jira {
 	
+	export class Project {
+	    key: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Project(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.name = source["name"];
+	    }
+	}
 	export class RawFilter {
 	    id: string;
 	    name: string;

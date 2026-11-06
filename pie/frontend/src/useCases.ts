@@ -36,5 +36,14 @@ export function useCases(profileId: string, onError: (message: string) => void) 
     }
   }
 
-  return { keys: new Set(list.map((c) => c.key)), open };
+  // reload reads the list again after a case page changed its counts.
+  function reload() {
+    const from = profileId;
+    ListCases(from).then(
+      (l) => selected.current === from && setList(l),
+      (e) => onError(errorText(e)),
+    );
+  }
+
+  return { list, keys: new Set(list.map((c) => c.key)), open, reload };
 }

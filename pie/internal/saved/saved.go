@@ -50,13 +50,37 @@ CREATE TABLE IF NOT EXISTS case_item (
 	opened_at  TEXT NOT NULL,
 	UNIQUE (profile_id, source_key)
 );
+CREATE TABLE IF NOT EXISTS case_project (
+	profile_id  TEXT NOT NULL,
+	case_id     INTEGER NOT NULL,
+	project_key TEXT NOT NULL,
+	verdict     TEXT NOT NULL DEFAULT 'not assessed',
+	reason      TEXT NOT NULL DEFAULT '',
+	assessed_at TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, case_id, project_key)
+);
+CREATE TABLE IF NOT EXISTS project_group (
+	id         INTEGER PRIMARY KEY,
+	profile_id TEXT NOT NULL,
+	name       TEXT NOT NULL,
+	UNIQUE (profile_id, name)
+);
+CREATE TABLE IF NOT EXISTS project_group_member (
+	profile_id  TEXT NOT NULL,
+	group_id    INTEGER NOT NULL,
+	project_key TEXT NOT NULL,
+	PRIMARY KEY (profile_id, group_id, project_key)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
 // checks that each profile-keyed table above is named here. profile_setting
 // held the product base name before profile_field; the copy above reads it
 // on every open, so it stays until a migration can drop it.
-var purged = []string{"saved_query", "profile_setting", "profile_field", "case_item"}
+var purged = []string{
+	"saved_query", "profile_setting", "profile_field",
+	"case_item", "case_project", "project_group", "project_group_member",
+}
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
 // are created if missing, so a pie.db from before this opens unchanged.
