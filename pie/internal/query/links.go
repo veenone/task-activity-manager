@@ -21,11 +21,19 @@ type Set struct {
 }
 
 // Explore runs the JQL, then fetches the issues its rows link to in other
-// projects, and theirs, until no new key appears or MaxRows is reached.
-//
-// ponytail: everything is fetched again on every run and held only in memory;
-// the bundle 01 cache replaces this once results are stored locally.
-func Explore(ctx context.Context, client *corejira.Client, jql string) (Result, error) {
+// projects, and theirs, until no new key appears or MaxRows is reached. Unless
+// confirmed, a query matching more than AskAbove issues fetches nothing and
+// comes back with NeedsConfirm.
+func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed bool) (Result, error) {
+	if !confirmed && strings.TrimSpace(jql) != "" {
+		page, err := client.SearchIssues(ctx, jql, []string{"key"}, nil, 0, 1)
+		if err != nil {
+			return Result{}, readable(err)
+		}
+		if page.Total > AskAbove {
+			return Result{Total: page.Total, Issues: []Issue{}, NeedsConfirm: true}, nil
+		}
+	}
 	res, err := Run(ctx, client, jql)
 	if err != nil {
 		return Result{}, err

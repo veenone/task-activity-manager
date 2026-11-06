@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	corejira "agile-suite/core/jira"
 	"agile-suite/core/profile"
-	"agile-suite/core/shareddb"
 	"agile-suite/core/store"
 	"agile-suite/pie/internal/demo"
 	"agile-suite/pie/internal/pieprofile"
 	"agile-suite/pie/internal/query"
+	"agile-suite/pie/internal/saved"
 )
 
 // App is the backend bound to the React frontend. Every exported method here
@@ -23,6 +24,7 @@ type App struct {
 	db         *store.DB
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
+	queries    *saved.Store
 	startupErr string
 }
 
@@ -32,8 +34,8 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	path, err := pieprofile.DefaultPath()
 	if err == nil {
-		// Core's profile tables, in PIE's own file. See pieprofile.
-		a.db, err = shareddb.Open(path)
+		// Core's profile tables and PIE's own, in PIE's file. See pieprofile.
+		a.db, err = store.Open(path, saved.Schema())
 	}
 	if err != nil {
 		a.startupErr = fmt.Sprintf("open the database: %v", err)
@@ -42,6 +44,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.profiles = profile.NewManager(a.db.DB())
 	a.creds = profile.NewCredentialStore()
+	a.queries = saved.New(a.db.DB())
 }
 
 func (a *App) shutdown(context.Context) {
@@ -104,6 +107,10 @@ func (a *App) DeleteProfile(id string) error {
 	if err != nil {
 		return err
 	}
+	// Saved runs go first: if this fails the profile is still there to retry.
+	if err := a.queries.Purge(id); err != nil {
+		return err
+	}
 	if err := a.profiles.Delete(id); err != nil {
 		return err
 	}
@@ -116,21 +123,61 @@ func (a *App) DeleteProfile(id string) error {
 	return nil
 }
 
-// RunQuery runs JQL with a profile's connection and follows its links.
-func (a *App) RunQuery(profileID, jql string) (query.Result, error) {
+// ListQueries returns a profile's saved queries.
+func (a *App) ListQueries(profileID string) ([]saved.Query, error) {
 	if err := a.requireStore(); err != nil {
-		return query.Result{}, err
+		return nil, err
+	}
+	return a.queries.List(profileID)
+}
+
+// SaveQuery saves JQL under a name.
+func (a *App) SaveQuery(profileID, name, jql string) (saved.Query, error) {
+	if err := a.requireStore(); err != nil {
+		return saved.Query{}, err
+	}
+	return a.queries.Save(profileID, name, jql)
+}
+
+// DeleteQuery removes a saved query and its stored run.
+func (a *App) DeleteQuery(profileID string, id int64) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.queries.Delete(profileID, id)
+}
+
+// LastRun is a saved query's stored run. It does not contact Jira.
+func (a *App) LastRun(profileID string, id int64) (saved.Run, error) {
+	if err := a.requireStore(); err != nil {
+		return saved.Run{}, err
+	}
+	return a.queries.Last(profileID, id)
+}
+
+// RunQuery runs JQL with a profile's connection and follows its links. With a
+// saved query's id the run is stored on it and compared with the last one; 0
+// runs the JQL without saving anything. confirmed says the analyst has agreed
+// to a fetch larger than query.AskAbove.
+func (a *App) RunQuery(profileID string, queryID int64, jql string, confirmed bool) (saved.Run, error) {
+	if err := a.requireStore(); err != nil {
+		return saved.Run{}, err
 	}
 	p, err := a.profiles.Get(profileID)
 	if err != nil {
-		return query.Result{}, err
+		return saved.Run{}, err
 	}
-	if demo.Is(p.JiraURL) {
-		return query.Explore(a.ctx, demo.Client(), jql)
+	client := demo.Client()
+	if !demo.Is(p.JiraURL) {
+		token, err := a.creds.Load(p.ID)
+		if err != nil {
+			return saved.Run{}, fmt.Errorf("load the profile's token: %w", err)
+		}
+		client = corejira.NewClient(p.JiraURL, token)
 	}
-	token, err := a.creds.Load(p.ID)
-	if err != nil {
-		return query.Result{}, fmt.Errorf("load the profile's token: %w", err)
+	res, err := query.Explore(a.ctx, client, jql, confirmed)
+	if err != nil || queryID == 0 || res.NeedsConfirm {
+		return saved.Run{Result: res}, err
 	}
-	return query.Explore(a.ctx, corejira.NewClient(p.JiraURL, token), jql)
+	return a.queries.Record(profileID, queryID, jql, res, time.Now())
 }

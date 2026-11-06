@@ -250,3 +250,27 @@ body,
   background: none;
   color: var(--text);
 }
+
+/* Saved queries */
+.pie-saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pie-saved .detail-input {
+  width: auto;
+  min-width: 220px;
+  margin-bottom: 0;
+}
+
+.pie-change summary {
+  cursor: pointer;
+}
+
+.pie-change p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

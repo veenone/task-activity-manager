@@ -11,6 +11,10 @@ vi.mock("../wailsjs/go/main/App", () => ({
   CreateProfile: vi.fn(),
   DeleteProfile: vi.fn(),
   RunQuery: vi.fn(),
+  ListQueries: vi.fn(),
+  SaveQuery: vi.fn(),
+  DeleteQuery: vi.fn(),
+  LastRun: vi.fn(),
 }));
 
 const quality = { id: "p1", name: "Quality", jiraUrl: "https://jira.example.com" };
@@ -43,17 +47,18 @@ async function runJql(jql: string) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(api.StartupError).mockResolvedValue("");
+  vi.mocked(api.ListQueries).mockResolvedValue([]);
   vi.mocked(api.ListProfiles).mockResolvedValue([quality] as never);
 });
 
 describe("running a query", () => {
   it("sends the JQL with the selected profile and shows the rows", async () => {
-    vi.mocked(api.RunQuery).mockResolvedValue({ total: 1, truncated: false, issues: [issue] } as never);
+    vi.mocked(api.RunQuery).mockResolvedValue({ result: { total: 1, truncated: false, issues: [issue] } } as never);
     show();
     await runJql("category = X");
 
     const row = (await screen.findByRole("cell", { name: "ALPHA-1" })).closest("tr")!;
-    expect(api.RunQuery).toHaveBeenCalledWith("p1", "category = X");
+    expect(api.RunQuery).toHaveBeenCalledWith("p1", 0, "category = X", false);
     expect(within(row).getByRole("cell", { name: "Attach fails" })).toBeVisible();
     expect(within(row).getByRole("cell", { name: "2026-11-05" })).toBeVisible();
     expect(screen.getByText("1 issue")).toBeVisible();
@@ -61,7 +66,7 @@ describe("running a query", () => {
   });
 
   it("shows Jira's own message when the query is refused, and keeps the last rows", async () => {
-    vi.mocked(api.RunQuery).mockResolvedValueOnce({ total: 1, truncated: false, issues: [issue] } as never);
+    vi.mocked(api.RunQuery).mockResolvedValueOnce({ result: { total: 1, truncated: false, issues: [issue] } } as never);
     show();
     await runJql("category = X");
     await screen.findByRole("cell", { name: "ALPHA-1" });
@@ -75,7 +80,7 @@ describe("running a query", () => {
   });
 
   it("says when the result stopped short of the total", async () => {
-    vi.mocked(api.RunQuery).mockResolvedValue({ total: 7000, truncated: true, issues: [issue] } as never);
+    vi.mocked(api.RunQuery).mockResolvedValue({ result: { total: 7000, truncated: true, issues: [issue] } } as never);
     show();
     await runJql("x");
     expect(await screen.findByText("Showing the first 1 of 7000 issues")).toBeVisible();
@@ -91,7 +96,7 @@ describe("running a query", () => {
   // name would read as a false answer.
   it("clears the rows and the error when the profile changes", async () => {
     vi.mocked(api.ListProfiles).mockResolvedValue([quality, { ...quality, id: "p2", name: "Mine" }] as never);
-    vi.mocked(api.RunQuery).mockResolvedValue({ total: 1, truncated: false, issues: [issue] } as never);
+    vi.mocked(api.RunQuery).mockResolvedValue({ result: { total: 1, truncated: false, issues: [issue] } } as never);
     show();
     await runJql("x");
     await screen.findByRole("cell", { name: "ALPHA-1" });
@@ -111,7 +116,7 @@ describe("running a query", () => {
     expect(await screen.findByLabelText("Profile")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Delete profile" })).toBeDisabled();
 
-    finish({ total: 0, truncated: false, issues: [] } as never);
+    finish({ result: { total: 0, truncated: false, issues: [] } } as never);
     await waitFor(() => expect(screen.getByLabelText("Profile")).toBeEnabled());
   });
 });

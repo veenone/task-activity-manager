@@ -95,6 +95,35 @@ func TestRunStopsAtTheRowLimitAndSaysSo(t *testing.T) {
 	}
 }
 
+func TestExploreAsksBeforeALargeFetch(t *testing.T) {
+	var seen []string
+	res, err := Explore(context.Background(), jiraWith(t, AskAbove+1, 100, &seen), "x", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.NeedsConfirm || res.Total != AskAbove+1 || len(res.Issues) != 0 || len(seen) != 1 {
+		t.Fatalf("confirm %v, total %d, rows %d, searches %d", res.NeedsConfirm, res.Total, len(res.Issues), len(seen))
+	}
+
+	res, err = Explore(context.Background(), jiraWith(t, AskAbove+1, 100, nil), "x", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.NeedsConfirm || len(res.Issues) != AskAbove+1 {
+		t.Fatalf("after confirming: confirm %v, rows %d", res.NeedsConfirm, len(res.Issues))
+	}
+}
+
+func TestExploreDoesNotAskAtTheThreshold(t *testing.T) {
+	res, err := Explore(context.Background(), jiraWith(t, AskAbove, 100, nil), "x", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.NeedsConfirm || len(res.Issues) != AskAbove {
+		t.Fatalf("confirm %v, rows %d", res.NeedsConfirm, len(res.Issues))
+	}
+}
+
 // A server that claims more than it will serve must end the walk, not spin.
 func TestRunEndsWhenAPageComesBackEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
