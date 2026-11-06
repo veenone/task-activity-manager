@@ -65,6 +65,17 @@ CREATE TABLE IF NOT EXISTS project_group (
 	name       TEXT NOT NULL,
 	UNIQUE (profile_id, name)
 );
+CREATE TABLE IF NOT EXISTS evidence (
+	id          INTEGER PRIMARY KEY,
+	profile_id  TEXT NOT NULL,
+	case_id     INTEGER NOT NULL,
+	project_key TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	ref         TEXT NOT NULL,
+	detail      TEXT NOT NULL DEFAULT '',
+	state       TEXT NOT NULL,
+	UNIQUE (profile_id, case_id, project_key, kind, ref)
+);
 CREATE TABLE IF NOT EXISTS project_group_member (
 	profile_id  TEXT NOT NULL,
 	group_id    INTEGER NOT NULL,
@@ -79,7 +90,7 @@ CREATE TABLE IF NOT EXISTS project_group_member (
 // on every open, so it stays until a migration can drop it.
 var purged = []string{
 	"saved_query", "profile_setting", "profile_field",
-	"case_item", "case_project", "project_group", "project_group_member",
+	"case_item", "case_project", "project_group", "project_group_member", "evidence",
 }
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables

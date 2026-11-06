@@ -204,8 +204,29 @@ choose **Save as group...**. Choosing a group in the picker ticks all its
 projects. Deleting a group leaves the cases that used it as they are.
 
 Cases, verdicts and groups stay on this computer until you delete the profile.
-PIE never sets a verdict by itself and writes nothing to Jira. Evidence for a
-verdict comes later.
+PIE never sets a verdict by itself and writes nothing to Jira.
+
+### Evidence
+
+Below the projects, **Find evidence** reads the case's issue from Jira and
+suggests evidence for other projects:
+
+- its links to issues in other projects, labelled with the link's own words
+  (for example "is cloned by"). These are strong evidence.
+- other projects with a component or fix version of the same name. A shared
+  name may be a coincidence, so these are marked weak.
+- issues of the same type that match the phrases you type, one phrase per
+  line. Each phrase is searched in quotes. These are marked weak too, and a
+  phrase can't contain a double quote.
+
+Accept or dismiss each suggestion. Running **Find evidence** again adds what
+is new and keeps what you decided about the rest. You can also add a note or
+an issue key by hand for any project on the case, and remove what you added.
+Evidence for a project not yet on the case shows a button that adds it.
+
+Evidence helps you decide a verdict but never changes one. Demo has links,
+components, a fix version and summaries for every kind to find: try
+ALPHA-101 with the phrase "retry counter".
 
 ## Issue details
 

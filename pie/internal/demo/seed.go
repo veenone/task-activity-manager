@@ -116,6 +116,18 @@ var clientSeen = map[string][2]string{ // key: visibility, impact
 	"BRAVO-204": {"Not visible", "Found in internal testing."},
 }
 
+// named gives a few issues components and fix versions, so evidence can find
+// other projects sharing a name. DELTA shares a version with ALPHA but no
+// component; CHARLIE shares a component.
+var named = map[string]struct{ components, versions []string }{
+	"ALPHA-101":   {[]string{"Reset"}, []string{"2.4"}},
+	"BRAVO-201":   {[]string{"Reset"}, nil},
+	"CHARLIE-2":   {[]string{"Reset"}, nil},
+	"DELTA-2":     {nil, []string{"2.4"}},
+	"ECHO-3":      {[]string{"Session cache"}, nil},
+	"FOXTROT-601": {[]string{"Session cache"}, []string{"3.0"}},
+}
+
 // projectNames are invented, like the keys.
 var projectNames = map[string]string{
 	"ALPHA": "Card Platform", "BRAVO": "Reader Firmware", "CHARLIE": "Mobile Wallet",
@@ -192,6 +204,8 @@ func render(now time.Time) []corejira.RawIssue {
 			"resolutiondate": nil,
 			"issuelinks":     append([]any{}, issueLinks[r.key]...),
 			baseField:        map[string]any{"value": bases[projectOf(r.key)]},
+			"components":     names(named[r.key].components),
+			"fixVersions":    names(named[r.key].versions),
 			visibilityField:  nil,
 			impactField:      nil,
 		}
@@ -220,6 +234,14 @@ func summary(r row) map[string]any {
 
 func status(name string) map[string]any {
 	return map[string]any{"name": name, "statusCategory": map[string]any{"key": category[name]}}
+}
+
+func names(list []string) []any {
+	out := []any{}
+	for _, n := range list {
+		out = append(out, map[string]any{"name": n})
+	}
+	return out
 }
 
 func projectOf(key string) string {

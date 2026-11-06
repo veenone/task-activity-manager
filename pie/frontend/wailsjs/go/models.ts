@@ -105,6 +105,35 @@ export namespace cases {
 
 }
 
+export namespace evidence {
+	
+	export class Item {
+	    id: number;
+	    project: string;
+	    kind: string;
+	    ref: string;
+	    detail: string;
+	    state: string;
+	    weak: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Item(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project = source["project"];
+	        this.kind = source["kind"];
+	        this.ref = source["ref"];
+	        this.detail = source["detail"];
+	        this.state = source["state"];
+	        this.weak = source["weak"];
+	    }
+	}
+
+}
+
 export namespace jira {
 	
 	export class Project {

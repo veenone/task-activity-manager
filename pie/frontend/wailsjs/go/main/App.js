@@ -6,6 +6,14 @@ export function AddCaseProjects(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddCaseProjects'](arg1, arg2, arg3);
 }
 
+export function AddEvidenceIssue(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['AddEvidenceIssue'](arg1, arg2, arg3, arg4);
+}
+
+export function AddEvidenceNote(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['AddEvidenceNote'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateProfile(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3);
 }
@@ -22,8 +30,16 @@ export function DeleteQuery(arg1, arg2) {
   return window['go']['main']['App']['DeleteQuery'](arg1, arg2);
 }
 
+export function Evidence(arg1, arg2) {
+  return window['go']['main']['App']['Evidence'](arg1, arg2);
+}
+
 export function Fields(arg1) {
   return window['go']['main']['App']['Fields'](arg1);
+}
+
+export function FindEvidence(arg1, arg2, arg3) {
+  return window['go']['main']['App']['FindEvidence'](arg1, arg2, arg3);
 }
 
 export function GetCase(arg1, arg2) {
@@ -70,6 +86,10 @@ export function RemoveCaseProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['RemoveCaseProject'](arg1, arg2, arg3);
 }
 
+export function RemoveEvidence(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RemoveEvidence'](arg1, arg2, arg3);
+}
+
 export function RunQuery(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['RunQuery'](arg1, arg2, arg3, arg4);
 }
@@ -84,6 +104,10 @@ export function SaveQuery(arg1, arg2, arg3) {
 
 export function SetCaseNotes(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetCaseNotes'](arg1, arg2, arg3);
+}
+
+export function SetEvidenceState(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SetEvidenceState'](arg1, arg2, arg3, arg4);
 }
 
 export function SetFields(arg1, arg2) {

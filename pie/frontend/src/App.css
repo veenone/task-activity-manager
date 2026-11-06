@@ -100,6 +100,7 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .pie-out-of-step {
@@ -494,4 +495,35 @@ body,
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+}
+
+/* Evidence on a case */
+.pie-evidence {
+  margin-top: 14px;
+}
+
+.pie-evidence-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pie-evidence-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pie-evidence-kind {
+  min-width: 9em;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.pie-evidence-dismissed {
+  opacity: 0.6;
 }

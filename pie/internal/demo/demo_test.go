@@ -3,12 +3,18 @@ package demo_test
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	corejira "agile-suite/core/jira"
+	"agile-suite/core/store"
+	"agile-suite/pie/internal/cases"
 	"agile-suite/pie/internal/demo"
+	"agile-suite/pie/internal/evidence"
 	"agile-suite/pie/internal/query"
+	"agile-suite/pie/internal/saved"
 )
 
 func TestIsDemo(t *testing.T) {
@@ -294,5 +300,34 @@ func TestDemoListsProjectsBeyondTheSeed(t *testing.T) {
 	}
 	if names["ALPHA"] != "Card Platform" || len(got) <= 6 {
 		t.Fatalf("projects %+v", got)
+	}
+}
+
+// Demo answers the issue read and the name and phrase searches, so every kind
+// of evidence can be found without Jira.
+func TestDemoHasEveryKindOfEvidence(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "pie.db"), saved.Schema())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cs, ev := cases.New(db.DB()), evidence.New(db.DB())
+	_ = cs.Open("p1", []string{"ALPHA-101"}, time.Now())
+	list, _ := cs.List("p1")
+	if _, err := evidence.Find(context.Background(), demo.Client(), ev, "p1", list[0].ID, "ALPHA-101", []string{"PIN retry"}); err != nil {
+		t.Fatal(err)
+	}
+	items, _ := ev.List("p1", list[0].ID)
+	kinds := map[string]bool{}
+	for _, it := range items {
+		kinds[it.Kind] = true
+		if it.Project == "ALPHA" {
+			t.Errorf("suggested the case's own project: %+v", it)
+		}
+	}
+	for _, k := range []string{evidence.Link, evidence.Component, evidence.Version, evidence.Text} {
+		if !kinds[k] {
+			t.Errorf("no %s evidence in %+v", k, items)
+		}
 	}
 }

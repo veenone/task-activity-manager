@@ -143,3 +143,10 @@ func oneRow(r sql.Result, err, missing error) error {
 	}
 	return nil
 }
+
+// IsProjectKey and IsIssueKey check a key's shape before it is stored, for
+// the packages that take keys from the frontend.
+func IsProjectKey(k string) bool { return projectKey.MatchString(k) }
+
+// IsIssueKey reports whether k has the shape of a Jira issue key.
+func IsIssueKey(k string) bool { return issueKey.MatchString(k) }

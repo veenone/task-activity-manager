@@ -16,6 +16,12 @@ vi.mock("../wailsjs/go/main/App", () => ({
   ProjectGroups: vi.fn(),
   SaveProjectGroup: vi.fn(),
   DeleteProjectGroup: vi.fn(),
+  Evidence: vi.fn(),
+  FindEvidence: vi.fn(),
+  SetEvidenceState: vi.fn(),
+  AddEvidenceNote: vi.fn(),
+  AddEvidenceIssue: vi.fn(),
+  RemoveEvidence: vi.fn(),
 }));
 
 const list = [
@@ -49,6 +55,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(api.GetCase).mockResolvedValue(detail());
   vi.mocked(api.ProjectGroups).mockResolvedValue([]);
+  vi.mocked(api.Evidence).mockResolvedValue([]);
   vi.mocked(api.JiraProjects).mockResolvedValue([
     { key: "ALPHA", name: "Card Platform" },
     { key: "CHARLIE", name: "Mobile Wallet" },

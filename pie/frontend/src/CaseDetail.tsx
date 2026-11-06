@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useConfirm } from "@agile-suite/core";
-import { GetCase, RemoveCaseProject, SetCaseNotes, SetVerdict } from "../wailsjs/go/main/App";
+import { AddCaseProjects, GetCase, RemoveCaseProject, SetCaseNotes, SetVerdict } from "../wailsjs/go/main/App";
 import type { cases, query } from "../wailsjs/go/models";
 import { errorText } from "./AddProfileDialog";
 import { projectLabel, projectNames } from "./linked";
+import { EvidencePanel } from "./EvidencePanel";
 import { ProjectPicker } from "./ProjectPicker";
 
 // The verdicts Go accepts, in the order an assessment usually moves through.
@@ -167,6 +168,12 @@ export function CaseDetail({
           </tbody>
         </table>
       )}
+      <EvidencePanel
+        profileId={profileId}
+        caseId={id}
+        projects={detail.projects.map((p) => p.key)}
+        onAddProject={(key) => void change(() => AddCaseProjects(profileId, id, [key]))}
+      />
       {picking && (
         <ProjectPicker
           profileId={profileId}
