@@ -27,13 +27,15 @@ var fields = []string{"summary", "project", "issuetype", "status", "priority", "
 
 // Issue is one row of a query's result.
 type Issue struct {
-	Key      string `json:"key"`
-	Project  string `json:"project"`
-	Type     string `json:"type"`
-	Summary  string `json:"summary"`
-	Status   string `json:"status"`
-	Priority string `json:"priority"`
-	Updated  string `json:"updated"`
+	Key     string `json:"key"`
+	Project string `json:"project"`
+	// ProjectName is what analysts call the project; Project is its key.
+	ProjectName string `json:"projectName"`
+	Type        string `json:"type"`
+	Summary     string `json:"summary"`
+	Status      string `json:"status"`
+	Priority    string `json:"priority"`
+	Updated     string `json:"updated"`
 	// StatusCategory is Jira's own new, indeterminate or done, so PIE keeps no
 	// list of which statuses count as finished.
 	StatusCategory string `json:"statusCategory"`
@@ -125,13 +127,15 @@ func readable(err error) error {
 
 func toIssue(raw corejira.RawIssue) Issue {
 	return Issue{
-		Key:      raw.Key,
-		Project:  named(raw.Fields["project"], "key"),
-		Type:     named(raw.Fields["issuetype"], "name"),
-		Summary:  text(raw.Fields["summary"]),
-		Status:   named(raw.Fields["status"], "name"),
-		Priority: named(raw.Fields["priority"], "name"),
-		Updated:  text(raw.Fields["updated"]),
+		Key:     raw.Key,
+		Project: named(raw.Fields["project"], "key"),
+
+		ProjectName: named(raw.Fields["project"], "name"),
+		Type:        named(raw.Fields["issuetype"], "name"),
+		Summary:     text(raw.Fields["summary"]),
+		Status:      named(raw.Fields["status"], "name"),
+		Priority:    named(raw.Fields["priority"], "name"),
+		Updated:     text(raw.Fields["updated"]),
 
 		StatusCategory: text(object(object(raw.Fields["status"])["statusCategory"])["key"]),
 		Created:        text(raw.Fields["created"]),

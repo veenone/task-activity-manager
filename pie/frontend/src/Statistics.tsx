@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { BarChart } from "./BarChart";
+import { projectLabel, projectNames } from "./linked";
+import { Pager, usePaged } from "./Pager";
 import { statistics } from "./stats";
 
 const RANGES = [
@@ -29,6 +31,8 @@ export function Statistics({ result, productField }: { result: query.Result; pro
   // A filter on a project the new run does not hold would zero every number.
   const project = projects.includes(chosen) ? chosen : "";
   const s = statistics(result, { project, withinDays }, Date.now());
+  const names = projectNames(result);
+  const { rows, pager } = usePaged(s.projects);
   // The field is read when a query runs; a run from before it was set has none.
   const bases = productField !== "" && result.issues.some((i) => (i.bases ?? []).length > 0);
 
@@ -41,7 +45,7 @@ export function Statistics({ result, productField }: { result: query.Result; pro
             <option value="">All projects</option>
             {projects.map((p) => (
               <option key={p} value={p}>
-                {p}
+                {projectLabel(p, names.get(p))}
               </option>
             ))}
           </select>
@@ -95,9 +99,9 @@ export function Statistics({ result, productField }: { result: query.Result; pro
           </tr>
         </thead>
         <tbody>
-          {s.projects.map((p) => (
+          {rows.map((p) => (
             <tr key={p.project}>
-              <td>{p.project}</td>
+              <td>{projectLabel(p.project, names.get(p.project))}</td>
               {bases && <td>{p.bases.join(", ")}</td>}
               <td>{p.issues}</td>
               <td>{p.open}</td>
@@ -106,6 +110,7 @@ export function Statistics({ result, productField }: { result: query.Result; pro
           ))}
         </tbody>
       </table>
+      <Pager label="Per project" {...pager} />
 
       <table className="pie-table" aria-label="Finished, by status">
         <thead>

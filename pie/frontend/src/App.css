@@ -368,3 +368,29 @@ body,
 .pie-chart-value {
   fill: var(--text);
 }
+
+/* Pager */
+.pie-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.pie-pager label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.pie-pager .detail-input {
+  box-sizing: border-box;
+  width: auto;
+  margin-bottom: 0;
+}
+
+.pie-pager .pie-page-input {
+  width: 4em;
+  text-align: center;
+}

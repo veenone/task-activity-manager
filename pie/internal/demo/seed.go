@@ -78,6 +78,12 @@ var category = map[string]string{
 
 var projects = []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"}
 
+// projectNames are invented, like the keys.
+var projectNames = map[string]string{
+	"ALPHA": "Card Platform", "BRAVO": "Reader Firmware", "CHARLIE": "Mobile Wallet",
+	"DELTA": "Personalisation", "ECHO": "Test Tools", "FOXTROT": "Key Management",
+}
+
 // baseField is demo's invented product base field. Projects share bases, so
 // the ALPHA-102 and DELTA-401 set crosses projects but stays in one base.
 const baseField = "customfield_10500"
@@ -138,7 +144,7 @@ func render(now time.Time) []corejira.RawIssue {
 	for i, r := range rows {
 		f := map[string]any{
 			"summary":   r.summary,
-			"project":   map[string]any{"key": projectOf(r.key), "name": projectOf(r.key) + " product line"},
+			"project":   map[string]any{"key": projectOf(r.key), "name": projectNames[projectOf(r.key)]},
 			"issuetype": map[string]any{"name": r.typ},
 			"status":    status(r.status),
 			"priority":  map[string]any{"name": r.priority},

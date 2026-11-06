@@ -54,7 +54,7 @@ func TestRunFetchesEveryPageWhenTheServerCapsThem(t *testing.T) {
 func TestRunMapsTheFieldsAnAnalystReads(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"total":1,"issues":[{"key":"A-1","fields":{
-			"summary":"Fails","project":{"key":"A"},"issuetype":{"name":"Bug"},
+			"summary":"Fails","project":{"key":"A","name":"Alpha Platform"},"issuetype":{"name":"Bug"},
 			"status":{"name":"Open"},"priority":{"name":"High"},"updated":"2026-11-05T10:00:00.000+0700"}}]}`))
 	}))
 	defer srv.Close()
@@ -62,7 +62,7 @@ func TestRunMapsTheFieldsAnAnalystReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Issue{Key: "A-1", Project: "A", Type: "Bug", Summary: "Fails", Status: "Open", Priority: "High",
+	want := Issue{Key: "A-1", Project: "A", ProjectName: "Alpha Platform", Type: "Bug", Summary: "Fails", Status: "Open", Priority: "High",
 		Updated: "2026-11-05T10:00:00.000+0700", Matched: true}
 	if !reflect.DeepEqual(res.Issues[0], want) {
 		t.Fatalf("got %+v", res.Issues[0])

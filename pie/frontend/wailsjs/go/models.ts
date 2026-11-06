@@ -79,6 +79,7 @@ export namespace query {
 	export class Issue {
 	    key: string;
 	    project: string;
+	    projectName: string;
 	    type: string;
 	    summary: string;
 	    status: string;
@@ -99,6 +100,7 @@ export namespace query {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
 	        this.project = source["project"];
+	        this.projectName = source["projectName"];
 	        this.type = source["type"];
 	        this.summary = source["summary"];
 	        this.status = source["status"];

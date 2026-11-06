@@ -32,7 +32,7 @@ func TestAnyQueryListsTheSeedThroughRun(t *testing.T) {
 		byKey[is.Key] = is
 	}
 	got := byKey["ALPHA-101"]
-	if got.Project != "ALPHA" || got.Status != "Closed" || got.Type != "Bug" || got.Summary == "" || got.Updated == "" {
+	if got.Project != "ALPHA" || got.ProjectName != "Card Platform" || got.Status != "Closed" || got.Type != "Bug" || got.Summary == "" || got.Updated == "" {
 		t.Errorf("ALPHA-101 = %+v", got)
 	}
 	if _, listed := byKey["ECHO-502"]; listed {
