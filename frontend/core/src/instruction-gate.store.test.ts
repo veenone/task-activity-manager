@@ -73,4 +73,18 @@ describe('instruction gate: store schema and purge', () => {
     const missing = tables.filter((table) => !purgeList.includes(`"${table}"`));
     expect(missing, `${missing.join(', ')} in no PurgeProfile`).toEqual([]);
   });
+
+  // PIE's tables and its purge list share one file, so the list is read from
+  // the Go slice alone: a table name in the schema text must not satisfy it.
+  it('every profile-keyed PIE table is in its purge list', () => {
+    const source = read('pie/internal/saved/saved.go');
+    const tables = [...source.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\);/g)]
+      .filter(([, , body]) => /profile_id/.test(body))
+      .map(([, name]) => name);
+    expect(tables.length, 'found no profile-keyed PIE tables to check').toBeGreaterThan(0);
+
+    const purgeList = /var purged = \[\]string\{([^}]*)\}/.exec(source)?.[1] ?? '';
+    const missing = tables.filter((table) => !purgeList.includes(`"${table}"`));
+    expect(missing, `${missing.join(', ')} in no PurgeProfile`).toEqual([]);
+  });
 });

@@ -12,6 +12,10 @@ vi.mock("../wailsjs/go/main/App", () => ({
   CreateProfile: vi.fn(),
   DeleteProfile: vi.fn(),
   RunQuery: vi.fn(),
+  ListQueries: vi.fn(),
+  SaveQuery: vi.fn(),
+  DeleteQuery: vi.fn(),
+  LastRun: vi.fn(),
 }));
 
 function issue(key: string, status: string, statusCategory: string, links: [string, string][] = [], matched = true) {
@@ -51,7 +55,7 @@ const result = {
 };
 
 async function runAndOpen(view: "Trace" | "Project map", res: object = result) {
-  vi.mocked(api.RunQuery).mockResolvedValue(res as never);
+  vi.mocked(api.RunQuery).mockResolvedValue({ result: res } as never);
   render(
     <DialogProvider>
       <App />
@@ -67,6 +71,7 @@ async function runAndOpen(view: "Trace" | "Project map", res: object = result) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(api.StartupError).mockResolvedValue("");
+  vi.mocked(api.ListQueries).mockResolvedValue([]);
   vi.mocked(api.ListProfiles).mockResolvedValue([{ id: "p1", name: "Q", jiraUrl: "demo" }] as never);
 });
 

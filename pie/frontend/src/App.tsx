@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
-import { ViewTabs, useConfirm } from "@agile-suite/core";
-import { ListProfiles, DeleteProfile, RunQuery, StartupError } from "../wailsjs/go/main/App";
-import type { profile, query } from "../wailsjs/go/models";
+import { ViewTabs, useConfirm, usePrompt } from "@agile-suite/core";
+import {
+  DeleteProfile,
+  DeleteQuery,
+  LastRun,
+  ListProfiles,
+  ListQueries,
+  RunQuery,
+  SaveQuery,
+  StartupError,
+} from "../wailsjs/go/main/App";
+import type { profile, query, saved } from "../wailsjs/go/models";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
 import { ProjectMap } from "./ProjectMap";
 import { TracePage } from "./TracePage";
@@ -18,8 +27,16 @@ function countText(res: query.Result, matched: number): string {
   return res.total === 1 ? "1 issue" : `${res.total} issues`;
 }
 
+// runAtText gives a stored run's time in the analyst's own time zone.
+function runAtText(iso: string): string {
+  const d = new Date(iso);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `Last run ${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
 export default function App() {
   const { confirm } = useConfirm();
+  const { prompt } = usePrompt();
   const [startupError, setStartupError] = useState("");
   const [profiles, setProfiles] = useState<profile.Profile[] | null>(null);
   const [profileId, setProfileId] = useState("");
@@ -28,6 +45,11 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<query.Result | null>(null);
+  const [queries, setQueries] = useState<saved.Query[]>([]);
+  // 0 is JQL that has not been saved; its runs are not stored.
+  const [queryId, setQueryId] = useState(0);
+  const [runAt, setRunAt] = useState("");
+  const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
   // The key whose linked set Trace opens; the map sets it when a key is chosen.
   const [focus, setFocus] = useState<string | null>(null);
@@ -47,12 +69,88 @@ export default function App() {
       .catch((e) => setError(errorText(e)));
   }, []);
 
+  useEffect(() => {
+    setQueryId(0);
+    setRunAt("");
+    setChange(null);
+    if (profileId) ListQueries(profileId).then(setQueries, (e) => setError(errorText(e)));
+  }, [profileId]);
+
+  function showRun(r: saved.Run) {
+    setResult(r.result);
+    setRunAt(r.runAt);
+    setChange(r.added && r.dropped ? { added: r.added, dropped: r.dropped } : null);
+    setFocus(null);
+  }
+
+  async function openQuery(id: number) {
+    setQueryId(id);
+    setError("");
+    setChange(null);
+    if (id === 0) return;
+    setJql(queries.find((q) => q.id === id)?.jql ?? "");
+    try {
+      const r = await LastRun(profileId, id);
+      showRun(r);
+      if (!r.runAt) setResult(null);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
+
+  async function saveQuery() {
+    const name = await prompt({ title: "Save query as", placeholder: "Name", submitLabel: "Save" });
+    if (name === null) return;
+    try {
+      const q = await SaveQuery(profileId, name, jql);
+      setQueries(await ListQueries(profileId));
+      setQueryId(q.id);
+      setRunAt("");
+      setChange(null);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
+
+  async function deleteQuery() {
+    const target = queries.find((q) => q.id === queryId);
+    if (!target) return;
+    const yes = await confirm({
+      title: `Delete ${target.name}?`,
+      message: "This removes the saved query and its last run from this computer.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!yes) return;
+    try {
+      await DeleteQuery(profileId, target.id);
+      setQueries(await ListQueries(profileId));
+      setQueryId(0);
+      setRunAt("");
+      setChange(null);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
+
   async function run() {
     setRunning(true);
     setError("");
     try {
-      setResult(await RunQuery(profileId, jql));
-      setFocus(null);
+      let r = await RunQuery(profileId, queryId, jql, false);
+      if (r.result.needsConfirm) {
+        const yes = await confirm({
+          title: "Fetch a large result?",
+          message: `This query matches ${r.result.total} issues. PIE fetches at most 5000 of them.`,
+          confirmLabel: "Fetch",
+          danger: false,
+        });
+        if (!yes) return; // nothing was fetched, so the last rows stay
+        r = await RunQuery(profileId, queryId, jql, true);
+      }
+      showRun(r);
+      // A run stores the JQL it ran on the saved query.
+      if (queryId !== 0) setQueries(await ListQueries(profileId));
     } catch (e) {
       // The last good rows stay: a refused query says nothing about them.
       setError(errorText(e));
@@ -145,6 +243,38 @@ export default function App() {
               void run();
             }}
           >
+            <div className="pie-saved">
+              <label className="field-label" htmlFor="pie-saved-query">
+                Saved query
+              </label>
+              <select
+                id="pie-saved-query"
+                className="detail-input"
+                value={queryId}
+                disabled={running}
+                onChange={(e) => void openQuery(Number(e.target.value))}
+              >
+                <option value={0}>Unsaved query</option>
+                {queries.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={running || jql.trim() === ""}
+                onClick={() => void saveQuery()}
+              >
+                Save as...
+              </button>
+              {queryId !== 0 && (
+                <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteQuery()}>
+                  Delete query
+                </button>
+              )}
+            </div>
             <label className="field-label" htmlFor="pie-jql">
               JQL
             </label>
@@ -162,8 +292,19 @@ export default function App() {
               </button>
               {running && <span className="muted">Running...</span>}
               {!running && result && <span className="muted">{countText(result, matched.length)}</span>}
+              {!running && queryId !== 0 && runAt && <span className="muted">{runAtText(runAt)}</span>}
             </div>
           </form>
+        )}
+
+        {change && (
+          <details className="pie-change">
+            <summary>
+              Since the previous run: {change.added.length} added, {change.dropped.length} dropped
+            </summary>
+            {change.added.length > 0 && <p>Added: {change.added.join(", ")}</p>}
+            {change.dropped.length > 0 && <p>Dropped: {change.dropped.join(", ")}</p>}
+          </details>
         )}
 
         {error && (

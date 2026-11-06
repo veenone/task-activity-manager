@@ -10,12 +10,28 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
+export function DeleteQuery(arg1, arg2) {
+  return window['go']['main']['App']['DeleteQuery'](arg1, arg2);
+}
+
+export function LastRun(arg1, arg2) {
+  return window['go']['main']['App']['LastRun'](arg1, arg2);
+}
+
 export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
 }
 
-export function RunQuery(arg1, arg2) {
-  return window['go']['main']['App']['RunQuery'](arg1, arg2);
+export function ListQueries(arg1) {
+  return window['go']['main']['App']['ListQueries'](arg1);
+}
+
+export function RunQuery(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RunQuery'](arg1, arg2, arg3, arg4);
+}
+
+export function SaveQuery(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveQuery'](arg1, arg2, arg3);
 }
 
 export function StartupError() {

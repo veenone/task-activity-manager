@@ -192,7 +192,7 @@ func field(t *testing.T, f map[string]json.RawMessage, path ...string) string {
 }
 
 func TestExploreFindsTheSeedsSevenSets(t *testing.T) {
-	res, err := query.Explore(context.Background(), demo.Client(), "anything")
+	res, err := query.Explore(context.Background(), demo.Client(), "anything", true)
 	if err != nil {
 		t.Fatal(err)
 	}

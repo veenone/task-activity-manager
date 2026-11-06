@@ -14,10 +14,11 @@ import (
 
 // MaxRows is where a run stops fetching. Without a project clause nothing else
 // bounds a query, and a mistyped one can match the whole instance.
-//
-// ponytail: a fixed ceiling reported in the result. The plan's confirm-before-a-
-// large-fetch step replaces it once results are cached locally.
 const MaxRows = 5000
+
+// AskAbove is the match count past which Explore asks before fetching. The
+// team's normal query matches about 900.
+const AskAbove = 2000
 
 const pageSize = 100
 
@@ -59,6 +60,9 @@ type Result struct {
 	// LinkError is why following the links stopped. The rows stay.
 	LinkError      string `json:"linkError"`
 	LinksTruncated bool   `json:"linksTruncated"`
+	// NeedsConfirm means nothing was fetched: Total is above AskAbove and the
+	// analyst has not yet said to go ahead.
+	NeedsConfirm bool `json:"needsConfirm"`
 }
 
 // Run pages through every issue the JQL matches, up to MaxRows.

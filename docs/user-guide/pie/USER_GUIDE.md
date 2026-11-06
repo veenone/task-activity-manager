@@ -42,9 +42,28 @@ results on screen. A query that names a saved filter with `filter = 12345` fails
 as a whole if your account cannot see that filter, even when the filter is only
 one part of the query.
 
-PIE fetches at most 5,000 issues from one run. When a query matches more, the
-count above the table says how many of the total it fetched, so narrow the query
-to see the rest.
+When a query matches more than 2,000 issues, PIE asks before fetching them.
+If you decline, it fetches nothing and the previous rows stay on screen. PIE
+fetches at most 5,000 issues from one run. When a query matches more, the count
+above the table says how many of the total it fetched, so narrow the query to
+see the rest.
+
+## Save a query
+
+**Save as...** keeps the JQL in the box under a name, for the selected profile.
+Pick it from **Saved query** later to get its JQL back, along with the rows,
+Trace and Project map from its last run and the time of that run. Opening a
+saved query does not contact Jira, so it works offline.
+
+Running a saved query replaces its stored run. If you edited the JQL first, the
+saved query keeps the edited JQL. Below the form, PIE says how many issues the
+run added and dropped compared with the previous run; open the line to see
+their keys. Only issues the query matched count, not the ones reached through
+links.
+
+JQL run while **Unsaved query** is selected is not stored. **Delete query**
+removes a saved query and its last run, and deleting a profile removes all of
+its saved queries.
 
 ## Follow linked issues across projects
 
@@ -74,5 +93,5 @@ Following links stops when a run reaches 5,000 issues in all, and PIE says so.
 If Jira refuses one of the searches for linked issues, PIE shows Jira's
 message and keeps your results, but the sets may be incomplete.
 
-Results are not saved. They are gone when you close PIE or run another query, and
-PIE needs a connection to Jira to run one.
+Only a saved query's last run is kept. Other results are gone when you close
+PIE or run another query, and PIE needs a connection to Jira to run one.
