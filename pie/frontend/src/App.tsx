@@ -14,6 +14,7 @@ import {
 import type { profile, query, saved } from "../wailsjs/go/models";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
 import { CasesPage } from "./CasesPage";
+import { CyclesPage } from "./CyclesPage";
 import { FieldsDialog } from "./FieldsDialog";
 import { JiraFilterPicker } from "./JiraFilterPicker";
 import { LinkMap } from "./LinkMap";
@@ -25,7 +26,7 @@ import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
 import { useCases } from "./useCases";
 
-type View = "results" | "trace" | "map" | "links" | "stats" | "cases";
+type View = "results" | "trace" | "map" | "links" | "stats" | "cases" | "cycles";
 const VIEWS = [
   { id: "results", label: "Results" },
   { id: "trace", label: "Trace" },
@@ -33,6 +34,7 @@ const VIEWS = [
   { id: "links", label: "Link map" },
   { id: "stats", label: "Statistics" },
   { id: "cases", label: "Cases" },
+  { id: "cycles", label: "Cycles" },
 ] as const;
 
 function countText(res: query.Result, matched: number): string {
@@ -345,7 +347,8 @@ export default function App() {
         {hasProfile && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
         {/* Cases are PIE's own records; every other view needs a run. */}
         {view === "cases" && <CasesPage profileId={profileId} cases={cases.list} result={result} onChanged={cases.reload} />}
-        {!result && view !== "cases" && hasProfile && <p className="muted">Run a query to see this view.</p>}
+        {view === "cycles" && <CyclesPage profileId={profileId} result={result} />}
+        {!result && view !== "cases" && view !== "cycles" && hasProfile && <p className="muted">Run a query to see this view.</p>}
 
         {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
         {result && view === "map" && <ProjectMap profileId={profileId} result={result} onOpen={openInTrace} />}

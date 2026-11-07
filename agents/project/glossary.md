@@ -100,6 +100,12 @@ It is the Zephyr counterpart of a Test Execution, not of a Test Plan or Test
 Set, neither of which Zephyr Essential has.
 _Avoid_: test cycle, sprint, run group
 
+**Reporting cycle**:
+PIE's record of one reporting period: a copy of every case with its projects
+and verdicts, taken when the analyst names it, and compared with the last one
+published. PIE has no Zephyr cycles, so its screens say just "cycle".
+_Avoid_: snapshot, report run, cycle (outside PIE)
+
 **Step result**:
 One step's outcome within one execution. In Zephyr it is an entity with its
 own id, comment and defect links, addressable at `PUT /stepResult/{id}`. In
