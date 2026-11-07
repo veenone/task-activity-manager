@@ -34,6 +34,14 @@ export function CreateProfile(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3);
 }
 
+export function Cycles(arg1) {
+  return window['go']['main']['App']['Cycles'](arg1);
+}
+
+export function DeleteCycle(arg1, arg2) {
+  return window['go']['main']['App']['DeleteCycle'](arg1, arg2);
+}
+
 export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
@@ -60,6 +68,10 @@ export function FindEvidence(arg1, arg2, arg3) {
 
 export function GetCase(arg1, arg2) {
   return window['go']['main']['App']['GetCase'](arg1, arg2);
+}
+
+export function GetCycle(arg1, arg2) {
+  return window['go']['main']['App']['GetCycle'](arg1, arg2);
 }
 
 export function JiraFilter(arg1, arg2) {
@@ -114,6 +126,10 @@ export function RemoveEvidence(arg1, arg2, arg3) {
   return window['go']['main']['App']['RemoveEvidence'](arg1, arg2, arg3);
 }
 
+export function RetakeCycle(arg1, arg2) {
+  return window['go']['main']['App']['RetakeCycle'](arg1, arg2);
+}
+
 export function RunQuery(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['RunQuery'](arg1, arg2, arg3, arg4);
 }
@@ -144,4 +160,8 @@ export function SetVerdict(arg1, arg2, arg3, arg4, arg5) {
 
 export function StartupError() {
   return window['go']['main']['App']['StartupError']();
+}
+
+export function TakeCycle(arg1, arg2) {
+  return window['go']['main']['App']['TakeCycle'](arg1, arg2);
 }

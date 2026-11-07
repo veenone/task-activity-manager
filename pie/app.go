@@ -12,6 +12,7 @@ import (
 	"agile-suite/core/profile"
 	"agile-suite/core/store"
 	"agile-suite/pie/internal/cases"
+	"agile-suite/pie/internal/cycles"
 	"agile-suite/pie/internal/demo"
 	"agile-suite/pie/internal/evidence"
 	"agile-suite/pie/internal/pieprofile"
@@ -29,6 +30,7 @@ type App struct {
 	queries    *saved.Store
 	cases      *cases.Store
 	evidence   *evidence.Store
+	cycles     *cycles.Store
 	startupErr string
 }
 
@@ -51,6 +53,7 @@ func (a *App) startup(ctx context.Context) {
 	a.queries = saved.New(a.db.DB())
 	a.cases = cases.New(a.db.DB())
 	a.evidence = evidence.New(a.db.DB())
+	a.cycles = cycles.New(a.db.DB(), a.cases)
 }
 
 func (a *App) shutdown(context.Context) {

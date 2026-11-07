@@ -3,6 +3,7 @@
 import {cases} from '../models';
 import {evidence} from '../models';
 import {profile} from '../models';
+import {cycles} from '../models';
 import {saved} from '../models';
 import {jira} from '../models';
 
@@ -22,6 +23,10 @@ export function CaseGrid(arg1:string):Promise<Array<cases.Detail>>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string):Promise<profile.Profile>;
 
+export function Cycles(arg1:string):Promise<Array<cycles.Cycle>>;
+
+export function DeleteCycle(arg1:string,arg2:number):Promise<void>;
+
 export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteProjectGroup(arg1:string,arg2:number):Promise<void>;
@@ -35,6 +40,8 @@ export function Fields(arg1:string):Promise<saved.Fields>;
 export function FindEvidence(arg1:string,arg2:number,arg3:Array<string>):Promise<Array<evidence.Item>>;
 
 export function GetCase(arg1:string,arg2:number):Promise<cases.Detail>;
+
+export function GetCycle(arg1:string,arg2:number):Promise<cycles.Detail>;
 
 export function JiraFilter(arg1:string,arg2:string):Promise<jira.RawFilter>;
 
@@ -62,6 +69,8 @@ export function RemoveDescendant(arg1:string,arg2:string):Promise<Array<cases.Ba
 
 export function RemoveEvidence(arg1:string,arg2:number,arg3:number):Promise<Array<evidence.Item>>;
 
+export function RetakeCycle(arg1:string,arg2:number):Promise<cycles.Detail>;
+
 export function RunQuery(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<saved.Run>;
 
 export function SaveProjectGroup(arg1:string,arg2:string,arg3:Array<string>):Promise<cases.Group>;
@@ -77,3 +86,5 @@ export function SetFields(arg1:string,arg2:saved.Fields):Promise<void>;
 export function SetVerdict(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<cases.Detail>;
 
 export function StartupError():Promise<string>;
+
+export function TakeCycle(arg1:string,arg2:string):Promise<cycles.Cycle>;
