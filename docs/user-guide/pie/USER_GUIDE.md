@@ -37,6 +37,11 @@ same whenever you run it.
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
 project, type, summary, status, priority and last update.
 
+The **Project**, **Status** and **Priority** filters above the table narrow
+the rows without contacting Jira. Each lists only the values in the run, and
+they combine. While any filter hides rows, PIE says how many it shows of how
+many. A filter set to a value the next run no longer holds goes back to All.
+
 Wherever PIE names a project, it gives the project's name with its key in
 brackets, for example "Card Platform (ALPHA)". A saved query's run from before
 PIE read project names shows the key alone until the query runs again.

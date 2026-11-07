@@ -1,12 +1,53 @@
+import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { projectLabel } from "./linked";
 import { Pager, usePaged } from "./Pager";
 
-// ResultsTable lists the issues the query matched, one row each, a page at a time.
+type Field = "project" | "status" | "priority";
+const FILTERS: { field: Field; label: string }[] = [
+  { field: "project", label: "Project" },
+  { field: "status", label: "Status" },
+  { field: "priority", label: "Priority" },
+];
+
+// ResultsTable lists the issues the query matched, one row each, a page at a
+// time. Its filters narrow the run on screen and never ask Jira.
 export function ResultsTable({ issues }: { issues: query.Issue[] }) {
-  const { rows, pager } = usePaged(issues);
+  const [chosen, setChosen] = useState<Record<Field, string>>({ project: "", status: "", priority: "" });
+  const values = (f: Field) => [...new Set(issues.map((i) => i[f]))].filter(Boolean).sort();
+  // A value the run no longer holds would hide every row, so it reads as All.
+  const active = (f: Field) => (values(f).includes(chosen[f]) ? chosen[f] : "");
+  const shown = issues.filter((i) => FILTERS.every(({ field }) => active(field) === "" || i[field] === active(field)));
+  const names = new Map(issues.map((i) => [i.project, i.projectName]));
+  const { rows, pager } = usePaged(shown);
+
   return (
     <>
+      <div className="pie-filters">
+        {FILTERS.map(({ field, label }) => (
+          <label key={field}>
+            {label}
+            <select
+              className="detail-input pie-filter-select"
+              value={active(field)}
+              onChange={(e) => {
+                setChosen({ ...chosen, [field]: e.target.value });
+                pager.onPage(0);
+              }}
+            >
+              <option value="">All</option>
+              {values(field).map((v) => (
+                <option key={v} value={v}>
+                  {field === "project" ? projectLabel(v, names.get(v)) : v}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+        <span className="muted" role="status">
+          {shown.length < issues.length ? `Showing ${shown.length} of ${issues.length} issues` : ""}
+        </span>
+      </div>
       <div className="pie-results">
         <table className="pie-table" aria-label="Query results">
           <thead>
