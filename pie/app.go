@@ -11,7 +11,9 @@ import (
 	corejira "agile-suite/core/jira"
 	"agile-suite/core/profile"
 	"agile-suite/core/store"
+	"agile-suite/pie/internal/cases"
 	"agile-suite/pie/internal/demo"
+	"agile-suite/pie/internal/evidence"
 	"agile-suite/pie/internal/pieprofile"
 	"agile-suite/pie/internal/query"
 	"agile-suite/pie/internal/saved"
@@ -25,6 +27,8 @@ type App struct {
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
 	queries    *saved.Store
+	cases      *cases.Store
+	evidence   *evidence.Store
 	startupErr string
 }
 
@@ -45,6 +49,8 @@ func (a *App) startup(ctx context.Context) {
 	a.profiles = profile.NewManager(a.db.DB())
 	a.creds = profile.NewCredentialStore()
 	a.queries = saved.New(a.db.DB())
+	a.cases = cases.New(a.db.DB())
+	a.evidence = evidence.New(a.db.DB())
 }
 
 func (a *App) shutdown(context.Context) {
@@ -155,30 +161,74 @@ func (a *App) LastRun(profileID string, id int64) (saved.Run, error) {
 	return a.queries.Last(profileID, id)
 }
 
-// ProductField is the name of the profile's product base field, or "".
-func (a *App) ProductField(profileID string) (string, error) {
+// Fields returns the names of the profile's Jira custom fields.
+func (a *App) Fields(profileID string) (saved.Fields, error) {
 	if err := a.requireStore(); err != nil {
-		return "", err
+		return saved.Fields{}, err
 	}
-	return a.queries.ProductField(profileID)
+	return a.queries.Fields(profileID)
 }
 
-// SetProductField stores the profile's product base field after checking that
-// Jira has a custom field of that name. "" clears it without asking Jira.
-func (a *App) SetProductField(profileID, name string) error {
+// SetFields stores the profile's field names after checking each named one
+// against Jira's field list. If any is refused, none is stored. Clearing every
+// name needs no Jira.
+func (a *App) SetFields(profileID string, f saved.Fields) error {
 	if err := a.requireStore(); err != nil {
 		return err
 	}
-	if name = strings.TrimSpace(name); name != "" {
+	if f != (saved.Fields{}) {
 		client, err := a.client(profileID)
 		if err != nil {
 			return err
 		}
-		if _, err := fieldID(a.ctx, client, name); err != nil {
+		if _, err := fieldIDs(a.ctx, client, f); err != nil {
 			return err
 		}
 	}
-	return a.queries.SetProductField(profileID, name)
+	return a.queries.SetFields(profileID, f)
+}
+
+// ListCases returns the profile's cases.
+func (a *App) ListCases(profileID string) ([]cases.Case, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.cases.List(profileID)
+}
+
+// OpenCases opens a case for each issue key and returns the profile's cases.
+func (a *App) OpenCases(profileID string, keys []string) ([]cases.Case, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	if err := a.cases.Open(profileID, keys, time.Now()); err != nil {
+		return nil, err
+	}
+	return a.cases.List(profileID)
+}
+
+// JiraFilters lists the saved filters the profile's account has starred.
+func (a *App) JiraFilters(profileID string) ([]corejira.RawFilter, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	client, err := a.client(profileID)
+	if err != nil {
+		return nil, err
+	}
+	return query.Starred(a.ctx, client)
+}
+
+// JiraFilter reads one saved filter by id, which reaches a filter nobody starred.
+func (a *App) JiraFilter(profileID, id string) (corejira.RawFilter, error) {
+	if err := a.requireStore(); err != nil {
+		return corejira.RawFilter{}, err
+	}
+	client, err := a.client(profileID)
+	if err != nil {
+		return corejira.RawFilter{}, err
+	}
+	return query.Filter(a.ctx, client, id)
 }
 
 // client is the Jira connection for a profile: demo's, or the instance's with
@@ -198,18 +248,34 @@ func (a *App) client(profileID string) (*corejira.Client, error) {
 	return corejira.NewClient(p.JiraURL, token), nil
 }
 
-// fieldID resolves the product base field's name, in words an analyst can act on.
-func fieldID(ctx context.Context, client *corejira.Client, name string) (string, error) {
-	id, err := client.CustomFieldID(ctx, name)
-	switch {
-	case errors.Is(err, corejira.ErrFieldNotFound):
-		return "", fmt.Errorf("Jira has no custom field named %q. Check the product base field's name", name)
-	case errors.Is(err, corejira.ErrFieldAmbiguous):
-		return "", fmt.Errorf("Jira has more than one custom field named %q, so PIE cannot tell which is the product base", name)
-	case err != nil:
-		return "", fmt.Errorf("read Jira's field list: %w", err)
+// fieldIDs resolves each named field to its id, in words an analyst can act
+// on. An empty name stays an empty id.
+func fieldIDs(ctx context.Context, client *corejira.Client, f saved.Fields) (query.Fields, error) {
+	var ids query.Fields
+	for _, x := range []struct {
+		name, what string
+		id         *string
+	}{
+		{f.ProductBase, "product base", &ids.Base},
+		{f.ClientVisibility, "client visibility", &ids.Visibility},
+		{f.ClientImpact, "client impact", &ids.Impact},
+	} {
+		name := strings.TrimSpace(x.name)
+		if name == "" {
+			continue
+		}
+		id, err := client.CustomFieldID(ctx, name)
+		switch {
+		case errors.Is(err, corejira.ErrFieldNotFound):
+			return query.Fields{}, fmt.Errorf("Jira has no custom field named %q. Check the %s field's name", name, x.what)
+		case errors.Is(err, corejira.ErrFieldAmbiguous):
+			return query.Fields{}, fmt.Errorf("Jira has more than one custom field named %q, so PIE cannot tell which is the %s", name, x.what)
+		case err != nil:
+			return query.Fields{}, fmt.Errorf("read Jira's field list: %w", err)
+		}
+		*x.id = id
 	}
-	return id, nil
+	return ids, nil
 }
 
 // RunQuery runs JQL with a profile's connection and follows its links. With a
@@ -224,17 +290,15 @@ func (a *App) RunQuery(profileID string, queryID int64, jql string, confirmed bo
 	if err != nil {
 		return saved.Run{}, err
 	}
-	name, err := a.queries.ProductField(profileID)
+	names, err := a.queries.Fields(profileID)
 	if err != nil {
 		return saved.Run{}, err
 	}
-	var baseField string
-	if name != "" {
-		if baseField, err = fieldID(a.ctx, client, name); err != nil {
-			return saved.Run{}, err
-		}
+	ids, err := fieldIDs(a.ctx, client, names)
+	if err != nil {
+		return saved.Run{}, err
 	}
-	res, err := query.Explore(a.ctx, client, jql, confirmed, baseField)
+	res, err := query.Explore(a.ctx, client, jql, confirmed, ids)
 	if err != nil || queryID == 0 || res.NeedsConfirm {
 		return saved.Run{Result: res}, err
 	}

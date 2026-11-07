@@ -45,6 +45,10 @@ type Issue struct {
 	// Bases are the values of the profile's product base field. An option field
 	// with several options gives several.
 	Bases []string `json:"bases"`
+	// ClientVisibility and ClientImpact are the profile's client fields as
+	// text, "" when unset or not named.
+	ClientVisibility string `json:"clientVisibility"`
+	ClientImpact     string `json:"clientImpact"`
 	// Matched is false for an issue fetched only because another one links to it.
 	Matched bool `json:"matched"`
 }
@@ -54,6 +58,9 @@ type Link struct {
 	Key   string `json:"key"`
 	Type  string `json:"type"`
 	Words string `json:"words"`
+	// Outward is true when this issue is the link's outward end, so Words is
+	// the type's outward wording and the link points from here to Key.
+	Outward bool `json:"outward"`
 }
 
 // Result is what a run fetched. Truncated means Total is more than the query's
@@ -73,18 +80,25 @@ type Result struct {
 
 // Run pages through every issue the JQL matches, up to MaxRows.
 func Run(ctx context.Context, client *corejira.Client, jql string) (Result, error) {
-	return run(ctx, client, jql, "")
+	return run(ctx, client, jql, Fields{})
 }
 
-// run is Run that also reads baseField, a custom field id, or "" for none.
-func run(ctx context.Context, client *corejira.Client, jql, baseField string) (Result, error) {
+// Fields are the custom field ids a profile reads, "" for one it does not.
+type Fields struct {
+	Base, Visibility, Impact string
+}
+
+// run is Run that also reads the custom fields in extra.
+func run(ctx context.Context, client *corejira.Client, jql string, extra Fields) (Result, error) {
 	jql = strings.TrimSpace(jql)
 	if jql == "" {
 		return Result{}, errors.New("enter a JQL query to run")
 	}
-	want := fields
-	if baseField != "" {
-		want = append(slices.Clip(fields), baseField)
+	want := slices.Clip(fields)
+	for _, id := range []string{extra.Base, extra.Visibility, extra.Impact} {
+		if id != "" {
+			want = append(want, id)
+		}
 	}
 	res := Result{Issues: []Issue{}}
 	for {
@@ -96,8 +110,14 @@ func run(ctx context.Context, client *corejira.Client, jql, baseField string) (R
 		res.Total = page.Total
 		for _, raw := range page.Issues {
 			is := toIssue(raw)
-			if baseField != "" {
-				is.Bases = values(raw.Fields[baseField])
+			if extra.Base != "" {
+				is.Bases = values(raw.Fields[extra.Base])
+			}
+			if extra.Visibility != "" {
+				is.ClientVisibility = strings.Join(values(raw.Fields[extra.Visibility]), ", ")
+			}
+			if extra.Impact != "" {
+				is.ClientImpact = strings.Join(values(raw.Fields[extra.Impact]), ", ")
 			}
 			res.Issues = append(res.Issues, is)
 		}
@@ -162,7 +182,7 @@ func links(raw json.RawMessage) []Link {
 	for _, l := range ls {
 		switch {
 		case l.Outward != nil && l.Outward.Key != "":
-			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward})
+			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward, Outward: true})
 		case l.Inward != nil && l.Inward.Key != "":
 			out = append(out, Link{Key: l.Inward.Key, Type: l.Type.Name, Words: l.Type.Inward})
 		}

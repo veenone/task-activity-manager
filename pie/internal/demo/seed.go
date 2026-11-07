@@ -78,6 +78,56 @@ var category = map[string]string{
 
 var projects = []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"}
 
+// otherProjects hold no seed issues. They are there so the project picker
+// has more to search than the projects a run reaches.
+var otherProjects = map[string]string{
+	"GOLF": "Payment Terminals", "HOTEL": "Border Control", "INDIA": "Identity Wallet", "JULIET": "Factory Tooling",
+}
+
+// projectList is Jira's project list as demo answers it.
+func projectList() string {
+	var all []map[string]string
+	for _, k := range projects {
+		all = append(all, map[string]string{"key": k, "name": projectNames[k]})
+	}
+	for k, n := range otherProjects {
+		all = append(all, map[string]string{"key": k, "name": n})
+	}
+	b, err := json.Marshal(all)
+	if err != nil {
+		panic(err) // static strings always marshal
+	}
+	return string(b)
+}
+
+// visibilityField and impactField are demo's invented client fields: an option
+// and free text. Only some reports carry them, as on a real instance.
+const (
+	visibilityField = "customfield_10501"
+	impactField     = "customfield_10502"
+)
+
+var clientSeen = map[string][2]string{ // key: visibility, impact
+	"ALPHA-101": {"Visible", "A customer lost access after three PIN retries at two branches."},
+	"BRAVO-201": {"Visible", "Reported by the same customer on the newer reader model."},
+	"BRAVO-202": {"Possible", "One site saw the wrong code during a field update; not yet reproduced."},
+	"ALPHA-104": {"Visible", "Sessions slow down after a day of use; the customer restarts readers nightly."},
+	"DELTA-403": {"Possible", ""},
+	"BRAVO-204": {"Not visible", "Found in internal testing."},
+}
+
+// named gives a few issues components and fix versions, so evidence can find
+// other projects sharing a name. DELTA shares a version with ALPHA but no
+// component; CHARLIE shares a component.
+var named = map[string]struct{ components, versions []string }{
+	"ALPHA-101":   {[]string{"Reset"}, []string{"2.4"}},
+	"BRAVO-201":   {[]string{"Reset"}, nil},
+	"CHARLIE-2":   {[]string{"Reset"}, nil},
+	"DELTA-2":     {nil, []string{"2.4"}},
+	"ECHO-3":      {[]string{"Session cache"}, nil},
+	"FOXTROT-601": {[]string{"Session cache"}, []string{"3.0"}},
+}
+
 // projectNames are invented, like the keys.
 var projectNames = map[string]string{
 	"ALPHA": "Card Platform", "BRAVO": "Reader Firmware", "CHARLIE": "Mobile Wallet",
@@ -154,6 +204,16 @@ func render(now time.Time) []corejira.RawIssue {
 			"resolutiondate": nil,
 			"issuelinks":     append([]any{}, issueLinks[r.key]...),
 			baseField:        map[string]any{"value": bases[projectOf(r.key)]},
+			"components":     names(named[r.key].components),
+			"fixVersions":    names(named[r.key].versions),
+			visibilityField:  nil,
+			impactField:      nil,
+		}
+		if c, ok := clientSeen[r.key]; ok {
+			f[visibilityField] = map[string]any{"value": c[0]}
+			if c[1] != "" {
+				f[impactField] = c[1]
+			}
 		}
 		if r.resolved > 0 {
 			f["resolutiondate"] = day(r.resolved)
@@ -174,6 +234,14 @@ func summary(r row) map[string]any {
 
 func status(name string) map[string]any {
 	return map[string]any{"name": name, "statusCategory": map[string]any{"key": category[name]}}
+}
+
+func names(list []string) []any {
+	out := []any{}
+	for _, n := range list {
+		out = append(out, map[string]any{"name": n})
+	}
+	return out
 }
 
 func projectOf(key string) string {

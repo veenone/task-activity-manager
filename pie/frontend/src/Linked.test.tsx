@@ -16,8 +16,11 @@ vi.mock("../wailsjs/go/main/App", () => ({
   SaveQuery: vi.fn(),
   DeleteQuery: vi.fn(),
   LastRun: vi.fn(),
-  ProductField: vi.fn(),
-  SetProductField: vi.fn(),
+  Fields: vi.fn(),
+  SetFields: vi.fn(),
+  ListCases: vi.fn(),
+  OpenCases: vi.fn(),
+  Baselines: vi.fn(),
 }));
 
 function issue(key: string, status: string, statusCategory: string, links: [string, string][] = [], matched = true) {
@@ -67,12 +70,15 @@ async function runAndOpen(view: "Trace" | "Project map", res: object = result) {
   await user.type(await screen.findByLabelText("JQL"), "q");
   await user.click(screen.getByRole("button", { name: "Run" }));
   await user.click(await screen.findByRole("button", { name: view }));
+  if (view === "Project map") await user.click(screen.getByRole("button", { name: "Table" }));
   return user;
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(api.ProductField).mockResolvedValue("");
+  vi.mocked(api.Fields).mockResolvedValue({ productBase: "", clientVisibility: "", clientImpact: "" } as never);
+  vi.mocked(api.ListCases).mockResolvedValue([]);
+  vi.mocked(api.Baselines).mockResolvedValue([]);
   vi.mocked(api.StartupError).mockResolvedValue("");
   vi.mocked(api.ListQueries).mockResolvedValue([]);
   vi.mocked(api.ListProfiles).mockResolvedValue([{ id: "p1", name: "Q", jiraUrl: "demo" }] as never);
@@ -98,6 +104,20 @@ describe("project map", () => {
     expect(cells).toEqual(["A-1 Closed", "B-1 Open", "-", "Out of step"]);
     const second = within(map).getByRole("rowheader", { name: "A-2" }).closest("tr")!;
     expect(within(second).getAllByRole("cell").at(-1)).toHaveTextContent("In step");
+  });
+
+  it("groups the project columns by baseline, with projects under none last", async () => {
+    vi.mocked(api.Baselines).mockResolvedValue([{ key: "B", descendants: ["C"] }]);
+    await runAndOpen("Project map");
+    const map = screen.getByRole("table", { name: "Project map" });
+    expect(await within(map).findByRole("columnheader", { name: "Baseline B" })).toHaveAttribute("colspan", "2");
+    const [top, keys] = within(map).getAllByRole("row");
+    const text = (r: HTMLElement) => within(r).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(text(top)).toEqual(["Linked set", "Baseline B", "No baseline", "State"]);
+    expect(text(keys)).toEqual(["B", "C", "A"]);
+
+    const first = within(map).getByRole("rowheader", { name: "A-1" }).closest("tr")!;
+    expect(within(first).getAllByRole("cell").map((c) => c.textContent)).toEqual(["B-1 Open", "-", "A-1 Closed", "Out of step"]);
   });
 
   it("narrows to sets out of step", async () => {

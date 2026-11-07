@@ -23,9 +23,9 @@ type Set struct {
 // Explore runs the JQL, then fetches the issues its rows link to in other
 // projects, and theirs, until no new key appears or MaxRows is reached. Unless
 // confirmed, a query matching more than AskAbove issues fetches nothing and
-// comes back with NeedsConfirm. baseField is the product base field's id, or ""
-// when the profile names none; linked issues read it too, for reach.
-func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed bool, baseField string) (Result, error) {
+// comes back with NeedsConfirm. extra names the profile's custom fields;
+// linked issues read them too, because reach counts product bases.
+func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed bool, extra Fields) (Result, error) {
 	if !confirmed && strings.TrimSpace(jql) != "" {
 		page, err := client.SearchIssues(ctx, jql, []string{"key"}, nil, 0, 1)
 		if err != nil {
@@ -35,7 +35,7 @@ func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed
 			return Result{Total: page.Total, Issues: []Issue{}, NeedsConfirm: true}, nil
 		}
 	}
-	res, err := run(ctx, client, jql, baseField)
+	res, err := run(ctx, client, jql, extra)
 	if err != nil {
 		return Result{}, err
 	}
@@ -61,7 +61,7 @@ func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed
 			pending, res.LinksTruncated = pending[:room], true
 		}
 		for batch := range slices.Chunk(pending, keysPerSearch) {
-			got, err := run(ctx, client, "key in ("+strings.Join(batch, ", ")+")", baseField)
+			got, err := run(ctx, client, "key in ("+strings.Join(batch, ", ")+")", extra)
 			if err != nil {
 				res.LinkError = err.Error()
 				res.Sets = Sets(res.Issues)

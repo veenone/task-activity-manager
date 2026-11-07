@@ -6,25 +6,33 @@ import {
   LastRun,
   ListProfiles,
   ListQueries,
-  ProductField,
+  Fields,
   RunQuery,
   SaveQuery,
-  SetProductField,
   StartupError,
 } from "../wailsjs/go/main/App";
 import type { profile, query, saved } from "../wailsjs/go/models";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
+import { CasesPage } from "./CasesPage";
+import { FieldsDialog } from "./FieldsDialog";
+import { JiraFilterPicker } from "./JiraFilterPicker";
+import { LinkMap } from "./LinkMap";
 import { ProjectMap } from "./ProjectMap";
 import { ResultsTable } from "./ResultsTable";
+import { JqlField } from "./JqlField";
+import { RunNotes } from "./RunNotes";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
+import { useCases } from "./useCases";
 
-type View = "results" | "trace" | "map" | "stats";
+type View = "results" | "trace" | "map" | "links" | "stats" | "cases";
 const VIEWS = [
   { id: "results", label: "Results" },
   { id: "trace", label: "Trace" },
   { id: "map", label: "Project map" },
+  { id: "links", label: "Link map" },
   { id: "stats", label: "Statistics" },
+  { id: "cases", label: "Cases" },
 ] as const;
 
 function countText(res: query.Result, matched: number): string {
@@ -47,6 +55,7 @@ export default function App() {
   const [profileId, setProfileId] = useState("");
   const [adding, setAdding] = useState(false);
   const [jql, setJql] = useState("");
+  const [jqlOpen, setJqlOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<query.Result | null>(null);
@@ -56,9 +65,16 @@ export default function App() {
   const [runAt, setRunAt] = useState("");
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
-  const [productField, setProductField] = useState("");
+  const cases = useCases(profileId, setError);
+  // null until the stored names arrive, so the dialog cannot save blanks over them.
+  const [fields, setFields] = useState<saved.Fields | null>(null);
+  const [editingFields, setEditingFields] = useState(false);
   // The key whose linked set Trace opens; the map sets it when a key is chosen.
   const [focus, setFocus] = useState<string | null>(null);
+  const openInTrace = (key: string) => {
+    setFocus(key);
+    setView("trace");
+  };
 
   async function loadProfiles(select?: string) {
     const list = await ListProfiles();
@@ -80,7 +96,7 @@ export default function App() {
     setRunAt("");
     setChange(null);
     setQueries([]);
-    setProductField("");
+    setFields(null);
     if (!profileId) return;
     // A slow answer for a profile no longer selected must not land.
     let current = true;
@@ -88,8 +104,8 @@ export default function App() {
       (list) => current && setQueries(list),
       (e) => current && setError(errorText(e)),
     );
-    ProductField(profileId).then(
-      (name) => current && setProductField(name),
+    Fields(profileId).then(
+      (f) => current && setFields(f),
       (e) => current && setError(errorText(e)),
     );
     return () => {
@@ -110,6 +126,7 @@ export default function App() {
     setChange(null);
     if (id === 0) return;
     setJql(queries.find((q) => q.id === id)?.jql ?? "");
+    setJqlOpen(false);
     // The rows on screen belong to whatever was open before.
     setResult(null);
     setRunAt("");
@@ -182,17 +199,6 @@ export default function App() {
     }
   }
 
-  async function chooseProductField() {
-    const name = await prompt({ title: "Product base field", defaultValue: productField, placeholder: "Custom field name", submitLabel: "Save" });
-    if (name === null) return;
-    setError("");
-    try {
-      await SetProductField(profileId, name);
-      setProductField(name.trim());
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }
 
   async function deleteProfile() {
     const target = profiles?.find((p) => p.id === profileId);
@@ -257,8 +263,8 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void chooseProductField()}>
-                Product base field
+              <button type="button" className="btn btn-ghost" disabled={running || fields === null} onClick={() => setEditingFields(true)}>
+                Jira fields
               </button>
               <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteProfile()}>
                 Delete profile
@@ -312,18 +318,17 @@ export default function App() {
                   Delete query
                 </button>
               )}
+              <JiraFilterPicker
+                profileId={profileId}
+                disabled={running}
+                onPick={(id) => {
+                  // A filter reference follows the filter as its owner edits it.
+                  setJql(`filter = ${id}`);
+                  void openQuery(0);
+                }}
+              />
             </div>
-            <label className="field-label" htmlFor="pie-jql">
-              JQL
-            </label>
-            <textarea
-              id="pie-jql"
-              className="detail-input mono"
-              rows={4}
-              spellCheck={false}
-              value={jql}
-              onChange={(e) => setJql(e.target.value)}
-            />
+            <JqlField jql={jql} onChange={setJql} open={jqlOpen} onOpenChange={setJqlOpen} />
             <div className="form-actions">
               <button type="submit" className="btn btn-primary" disabled={running || jql.trim() === ""}>
                 Run
@@ -335,48 +340,34 @@ export default function App() {
           </form>
         )}
 
-        {change && (
-          <details className="pie-change">
-            <summary>
-              Since the previous run: {change.added.length} added, {change.dropped.length} dropped
-            </summary>
-            {change.added.length > 0 && <p>Added: {change.added.join(", ")}</p>}
-            {change.dropped.length > 0 && <p>Dropped: {change.dropped.join(", ")}</p>}
-          </details>
-        )}
+        <RunNotes change={change} error={error} result={result} caseKeys={cases.keys} />
 
-        {error && (
-          <p role="alert" className="error-text">
-            {error}
-          </p>
-        )}
-
-        {result?.linkError && (
-          <p role="alert" className="error-text">
-            Linked issues could not all be fetched: {result.linkError}
-          </p>
-        )}
-        {result?.linksTruncated && (
-          <p className="muted">Links were followed only until 5000 issues were fetched, so some linked sets may be incomplete.</p>
-        )}
-
-        {result && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
+        {hasProfile && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
+        {/* Cases are PIE's own records; every other view needs a run. */}
+        {view === "cases" && <CasesPage profileId={profileId} cases={cases.list} result={result} onChanged={cases.reload} />}
+        {!result && view !== "cases" && hasProfile && <p className="muted">Run a query to see this view.</p>}
 
         {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
-        {result && view === "map" && (
-          <ProjectMap
-            result={result}
-            onOpen={(key) => {
-              setFocus(key);
-              setView("trace");
-            }}
-          />
-        )}
+        {result && view === "map" && <ProjectMap profileId={profileId} result={result} onOpen={openInTrace} />}
+        {result && view === "links" && <LinkMap result={result} onOpen={openInTrace} />}
 
-        {result && view === "stats" && <Statistics result={result} productField={productField} />}
-        {result && view === "results" && matched.length > 0 && <ResultsTable issues={matched} />}
+        {result && view === "stats" && <Statistics result={result} productField={fields?.productBase ?? ""} />}
+        {result && view === "results" && matched.length > 0 && (
+          <ResultsTable issues={matched} caseKeys={cases.keys} onOpenCases={cases.open} />
+        )}
       </main>
 
+      {editingFields && fields && (
+        <FieldsDialog
+          profileId={profileId}
+          fields={fields}
+          onClose={() => setEditingFields(false)}
+          onSaved={(f) => {
+            setEditingFields(false);
+            setFields(f);
+          }}
+        />
+      )}
       {adding && (
         <AddProfileDialog
           onClose={() => setAdding(false)}

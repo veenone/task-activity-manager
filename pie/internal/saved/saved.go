@@ -1,6 +1,7 @@
 // Package saved keeps an analyst's named queries and the last run of each, so
 // PIE opens with the rows it showed last time without asking Jira. It also
-// keeps each profile's settings, which share its schema and purge list.
+// keeps each profile's settings, and holds PIE's whole schema and purge list,
+// case_item included: one file is what the purge gate reads.
 package saved
 
 import (
@@ -32,11 +33,72 @@ CREATE TABLE IF NOT EXISTS profile_setting (
 	profile_id    TEXT PRIMARY KEY,
 	product_field TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS profile_field (
+	profile_id TEXT NOT NULL,
+	role       TEXT NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, role)
+);
+INSERT OR IGNORE INTO profile_field (profile_id, role, name)
+	SELECT profile_id, 'product', product_field FROM profile_setting WHERE product_field != '';
+CREATE TABLE IF NOT EXISTS case_item (
+	id         INTEGER PRIMARY KEY,
+	profile_id TEXT NOT NULL,
+	source_key TEXT NOT NULL,
+	state      TEXT NOT NULL DEFAULT 'open',
+	notes      TEXT NOT NULL DEFAULT '',
+	opened_at  TEXT NOT NULL,
+	UNIQUE (profile_id, source_key)
+);
+CREATE TABLE IF NOT EXISTS case_project (
+	profile_id  TEXT NOT NULL,
+	case_id     INTEGER NOT NULL,
+	project_key TEXT NOT NULL,
+	verdict     TEXT NOT NULL DEFAULT 'not assessed',
+	reason      TEXT NOT NULL DEFAULT '',
+	assessed_at TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, case_id, project_key)
+);
+CREATE TABLE IF NOT EXISTS project_group (
+	id         INTEGER PRIMARY KEY,
+	profile_id TEXT NOT NULL,
+	name       TEXT NOT NULL,
+	UNIQUE (profile_id, name)
+);
+CREATE TABLE IF NOT EXISTS evidence (
+	id          INTEGER PRIMARY KEY,
+	profile_id  TEXT NOT NULL,
+	case_id     INTEGER NOT NULL,
+	project_key TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	ref         TEXT NOT NULL,
+	detail      TEXT NOT NULL DEFAULT '',
+	state       TEXT NOT NULL,
+	UNIQUE (profile_id, case_id, project_key, kind, ref)
+);
+CREATE TABLE IF NOT EXISTS project_group_member (
+	profile_id  TEXT NOT NULL,
+	group_id    INTEGER NOT NULL,
+	project_key TEXT NOT NULL,
+	PRIMARY KEY (profile_id, group_id, project_key)
+);
+CREATE TABLE IF NOT EXISTS product_baseline (
+	profile_id   TEXT NOT NULL,
+	project_key  TEXT NOT NULL,
+	baseline_key TEXT NOT NULL,
+	PRIMARY KEY (profile_id, project_key)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
-// checks that each profile-keyed table above is named here.
-var purged = []string{"saved_query", "profile_setting"}
+// checks that each profile-keyed table above is named here. profile_setting
+// held the product base name before profile_field; the copy above reads it
+// on every open, so it stays until a migration can drop it.
+var purged = []string{
+	"saved_query", "profile_setting", "profile_field",
+	"case_item", "case_project", "project_group", "project_group_member", "evidence",
+	"product_baseline",
+}
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
 // are created if missing, so a pie.db from before this opens unchanged.
@@ -160,24 +222,57 @@ func (s *Store) Record(profileID string, id int64, jql string, res query.Result,
 	return run, nil
 }
 
-// ProductField is the name of the profile's product base field, or "" if it
-// has none.
-func (s *Store) ProductField(profileID string) (string, error) {
-	var name string
-	err := s.db.QueryRow(`SELECT product_field FROM profile_setting WHERE profile_id = ?`, profileID).Scan(&name)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	return name, err
+// Fields are the names of the Jira custom fields a profile reads. "" is a
+// field the profile does not use.
+type Fields struct {
+	ProductBase      string `json:"productBase"`
+	ClientVisibility string `json:"clientVisibility"`
+	ClientImpact     string `json:"clientImpact"`
 }
 
-// SetProductField stores the name of the profile's product base field. ""
-// clears it. Checking the name against Jira is the caller's job.
-func (s *Store) SetProductField(profileID, name string) error {
-	_, err := s.db.Exec(`INSERT INTO profile_setting (profile_id, product_field) VALUES (?, ?)
-		ON CONFLICT (profile_id) DO UPDATE SET product_field = excluded.product_field`,
-		profileID, strings.TrimSpace(name))
-	return err
+// roles names each field as profile_field stores it.
+func (f *Fields) roles() map[string]*string {
+	return map[string]*string{"product": &f.ProductBase, "visibility": &f.ClientVisibility, "impact": &f.ClientImpact}
+}
+
+// Fields returns the profile's field names.
+func (s *Store) Fields(profileID string) (Fields, error) {
+	var f Fields
+	rows, err := s.db.Query(`SELECT role, name FROM profile_field WHERE profile_id = ?`, profileID)
+	if err != nil {
+		return f, err
+	}
+	defer rows.Close()
+	into := f.roles()
+	for rows.Next() {
+		var role, name string
+		if err := rows.Scan(&role, &name); err != nil {
+			return Fields{}, err
+		}
+		if p := into[role]; p != nil {
+			*p = name
+		}
+	}
+	return f, rows.Err()
+}
+
+// SetFields stores all three names at once. A cleared name is stored as "",
+// not deleted, so the carry-over in tables never brings an old one back.
+// Checking the names against Jira is the caller's job.
+func (s *Store) SetFields(profileID string, f Fields) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for role, name := range f.roles() {
+		if _, err := tx.Exec(`INSERT INTO profile_field (profile_id, role, name) VALUES (?, ?, ?)
+			ON CONFLICT (profile_id, role) DO UPDATE SET name = excluded.name`,
+			profileID, role, strings.TrimSpace(*name)); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // Purge removes everything the profile owns in PIE's tables.

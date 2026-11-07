@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -37,16 +38,57 @@ var (
 	keyIn       = regexp.MustCompile(`(?i)\bkey\s+in\s*\(([^)]*)\)`)
 	refusedJQL  = regexp.MustCompile(`(?i)\bfilter\s*=\s*` + refusedFilter + `\b`)
 	refusedBody = `{"errorMessages":["A value with ID '` + refusedFilter + `' does not exist for the field 'filter'."],"errors":{}}`
+
+	// The name and phrase searches evidence sends, which demo answers from
+	// the seed's components, fix versions and summaries.
+	componentIs = regexp.MustCompile(`component = "([^"]*)"`)
+	versionIs   = regexp.MustCompile(`fixVersion = "([^"]*)"`)
+	textHas     = regexp.MustCompile(`text ~ "\\"([^"\\]*)\\""`)
+	keyIsNot    = regexp.MustCompile(`key != ([A-Z][A-Z0-9_]*-[0-9]+)`)
 )
 
 type transport struct{}
 
-// RoundTrip answers /rest/api/2/search and the field list, and nothing else.
-// The JQL is ignored apart from key in (...) and the refused filter: demo has
-// no query engine.
+// filters are demo's saved filters by id: two starred, one only reachable by
+// its id. Demo ignores JQL, so running any of them lists the whole seed.
+var filters = map[string]string{
+	"4200": `{"id":"4200","name":"Client reports, open","jql":"issuetype = Bug AND statusCategory != Done","owner":{"name":"demo"}}`,
+	"4201": `{"id":"4201","name":"Clones out of step","jql":"issueLinkType = Cloners","owner":{"name":"quality"}}`,
+	"4300": `{"id":"4300","name":"Unstarred team filter","jql":"project in (ALPHA, BRAVO)","owner":{"name":"lead"}}`,
+}
+
+// RoundTrip answers /rest/api/2/search, the field list and saved filters,
+// and nothing else. The JQL is ignored apart from key in (...) and the
+// refused filter: demo has no query engine.
 func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Path == "/rest/api/2/field" {
-		return reply(req, http.StatusOK, `[{"id":"`+baseField+`","name":"Product base","custom":true}]`), nil
+		return reply(req, http.StatusOK, `[{"id":"`+baseField+`","name":"Product base","custom":true},`+
+			`{"id":"`+visibilityField+`","name":"Client visibility","custom":true},`+
+			`{"id":"`+impactField+`","name":"Client impact","custom":true}]`), nil
+	}
+	if req.URL.Path == "/rest/api/2/project" {
+		return reply(req, http.StatusOK, projectList()), nil
+	}
+	if req.URL.Path == "/rest/api/2/filter/favourite" {
+		return reply(req, http.StatusOK, "["+filters["4200"]+","+filters["4201"]+"]"), nil
+	}
+	if id, ok := strings.CutPrefix(req.URL.Path, "/rest/api/2/filter/"); ok {
+		if f, found := filters[id]; found {
+			return reply(req, http.StatusOK, f), nil
+		}
+		return reply(req, http.StatusNotFound, `{"errorMessages":["The selected filter is not available to you."]}`), nil
+	}
+	if key, ok := strings.CutPrefix(req.URL.Path, "/rest/api/2/issue/"); ok {
+		for _, is := range render(time.Now()) {
+			if is.Key == key {
+				b, err := json.Marshal(is)
+				if err != nil {
+					return nil, err
+				}
+				return reply(req, http.StatusOK, string(b)), nil
+			}
+		}
+		return reply(req, http.StatusNotFound, `{"errorMessages":["Issue Does Not Exist"]}`), nil
 	}
 	if req.URL.Path != "/rest/api/2/search" {
 		return reply(req, http.StatusNotFound, `{"errorMessages":["demo answers searches only"]}`), nil
@@ -77,6 +119,15 @@ func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
 // order, or every issue the seed lists to a plain query.
 func search(jql string, now time.Time) []corejira.RawIssue {
 	all := render(now)
+	if match, ok := evidenceSearch(jql); ok {
+		var out []corejira.RawIssue
+		for _, is := range all {
+			if match(is) {
+				out = append(out, is)
+			}
+		}
+		return out
+	}
 	m := keyIn.FindStringSubmatch(jql)
 	var out []corejira.RawIssue
 	if m == nil {
@@ -107,4 +158,30 @@ func reply(req *http.Request, code int, body string) *http.Response {
 		Body:       io.NopCloser(bytes.NewBufferString(body)),
 		Request:    req,
 	}
+}
+
+// evidenceSearch reads the one clause an evidence search is built around, if
+// jql is one: an issue with that component, fix version or phrase in its
+// summary, other than the case's own issue.
+func evidenceSearch(jql string) (func(corejira.RawIssue) bool, bool) {
+	not := ""
+	if m := keyIsNot.FindStringSubmatch(jql); m != nil {
+		not = m[1]
+	}
+	other := func(is corejira.RawIssue) bool { return is.Key != not }
+	if m := componentIs.FindStringSubmatch(jql); m != nil {
+		return func(is corejira.RawIssue) bool { return other(is) && slices.Contains(named[is.Key].components, m[1]) }, true
+	}
+	if m := versionIs.FindStringSubmatch(jql); m != nil {
+		return func(is corejira.RawIssue) bool { return other(is) && slices.Contains(named[is.Key].versions, m[1]) }, true
+	}
+	if m := textHas.FindStringSubmatch(jql); m != nil {
+		phrase := strings.ToLower(m[1])
+		return func(is corejira.RawIssue) bool {
+			var summary string
+			_ = json.Unmarshal(is.Fields["summary"], &summary)
+			return other(is) && strings.Contains(strings.ToLower(summary), phrase)
+		}, true
+	}
+	return nil, false
 }

@@ -66,7 +66,7 @@ body,
   white-space: nowrap;
 }
 
-.pie-table td:not(:nth-child(4)) {
+.pie-table td:not(.pie-summary) {
   white-space: nowrap;
 }
 
@@ -81,6 +81,43 @@ body,
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+}
+
+/* Baselines dialog */
+.pie-baseline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.pie-baseline legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pie-baseline ul {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pie-baseline li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pie-baseline-add {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .pie-check {
@@ -100,6 +137,7 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .pie-out-of-step {
@@ -250,6 +288,278 @@ body,
   color: var(--text);
 }
 
+/* Project map views: Flow and Tree */
+.pie-map-views {
+  margin-left: auto;
+}
+
+.pie-flow,
+.pie-tree-view {
+  display: flex;
+  flex: 1;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pie-flow-svg {
+  flex: 1;
+  min-width: 480px;
+  height: auto;
+  max-height: 100%;
+}
+
+.pie-flow-band {
+  opacity: 0.35;
+}
+
+.pie-flow-band:hover {
+  opacity: 0.7;
+}
+
+.pie-flow-plain {
+  fill: var(--border-strong);
+}
+
+.pie-flow-missing {
+  fill: var(--warn-solid);
+}
+
+.pie-flow-behind {
+  fill: var(--accent);
+}
+
+.pie-flow-everywhere {
+  fill: var(--ok-solid);
+}
+
+.pie-flow-open {
+  fill: var(--text-muted);
+}
+
+.pie-flow-node.pie-flow-plain {
+  fill: var(--text-muted);
+}
+
+.pie-flow-label {
+  fill: var(--text);
+  font-size: var(--fs-sm);
+  dominant-baseline: middle;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+
+.pie-flow-side {
+  flex: none;
+  width: 260px;
+  overflow: auto;
+}
+
+.pie-flow-side h3 {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.pie-flow-side ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pie-flow-side li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pie-tree-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+/* A horizontal tree: each list hangs off its parent node by a line. */
+.pie-tree,
+.pie-tree ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pie-tree li {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pie-tree ul {
+  position: relative;
+  padding-left: 28px;
+}
+
+.pie-tree ul::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 14px;
+  border-top: 1px solid var(--border-strong);
+  content: "";
+}
+
+.pie-tree ul > li::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14px;
+  border-left: 1px solid var(--border-strong);
+  content: "";
+}
+
+.pie-tree ul > li:first-child::before {
+  top: 50%;
+}
+
+.pie-tree ul > li:last-child::before {
+  bottom: 50%;
+}
+
+.pie-tree ul > li:only-child::before {
+  display: none;
+}
+
+.pie-tree ul > li::after {
+  position: absolute;
+  top: 50%;
+  left: -14px;
+  width: 14px;
+  border-top: 1px solid var(--border-strong);
+  content: "";
+}
+
+.pie-tree-node {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+.pie-tree-node .muted {
+  font-size: var(--fs-sm);
+}
+
+.pie-tree-node progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--ok-solid);
+}
+
+.pie-tree-issue {
+  padding: 2px 6px;
+  border-radius: var(--r-2);
+}
+
+.pie-tree-issue[aria-current="true"] {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent);
+}
+
+/* Link map */
+.pie-linkmap {
+  display: flex;
+  flex: 1;
+  gap: 14px;
+  min-height: 0;
+}
+
+.pie-linkmap-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 250px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.pie-linkmap-rail legend {
+  font-weight: 600;
+}
+
+.pie-linkmap-all {
+  display: flex;
+  gap: 6px;
+}
+
+.pie-linkmap-type ul {
+  margin: 2px 0 0 24px;
+  padding: 0;
+  font-size: var(--fs-sm);
+  list-style: none;
+}
+
+.pie-linkmap-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pie-linkmap-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pie-linkmap-cell:hover,
+.pie-linkmap-cell[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pie-linkmap-cell:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.pie-linkmap-chip {
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-1);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.pie-linkmap-links {
+  max-height: 45%;
+  overflow: auto;
+}
+
+.pie-linkmap-links h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+
 /* Saved queries */
 .pie-saved {
   display: flex;
@@ -262,6 +572,34 @@ body,
   width: auto;
   min-width: 220px;
   margin-bottom: 0;
+}
+
+.pie-jql summary {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+
+/* A flex summary loses its marker, so it draws its own. */
+.pie-jql summary::before {
+  content: "\25B8";
+  color: var(--text-muted);
+}
+
+.pie-jql[open] summary::before {
+  content: "\25BE";
+}
+
+.pie-jql-line {
+  overflow: hidden;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pie-jql[open] .pie-jql-line {
+  display: none;
 }
 
 .pie-change summary {
@@ -393,4 +731,136 @@ body,
 .pie-pager .pie-page-input {
   width: 4em;
   text-align: center;
+}
+
+/* Issue details beside Results */
+.pie-results-split {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+
+.pie-results-split .pie-results {
+  min-width: 0;
+}
+
+.pie-row-open {
+  background: var(--accent-soft);
+}
+
+.pie-detail {
+  flex: none;
+  width: 340px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.pie-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pie-detail h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.pie-detail h3 {
+  margin: 12px 0 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.pie-detail-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.pie-detail-facts dt {
+  color: var(--text-muted);
+}
+
+.pie-detail-facts dd {
+  margin: 0;
+}
+
+.pie-detail-impact {
+  white-space: pre-wrap;
+}
+
+/* Jira filter picker */
+.pie-filter-list {
+  max-height: 16em;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.pie-filter-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pie-filter-list .muted {
+  font-size: var(--fs-sm);
+}
+
+.pie-filter-id {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.pie-case {
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.pie-filter-list .pie-group {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Evidence on a case */
+.pie-evidence {
+  margin-top: 14px;
+}
+
+.pie-evidence-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pie-evidence-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pie-evidence-kind {
+  min-width: 9em;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.pie-evidence-dismissed {
+  opacity: 0.6;
 }

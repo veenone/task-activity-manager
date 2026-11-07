@@ -3,12 +3,18 @@ package demo_test
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	corejira "agile-suite/core/jira"
+	"agile-suite/core/store"
+	"agile-suite/pie/internal/cases"
 	"agile-suite/pie/internal/demo"
+	"agile-suite/pie/internal/evidence"
 	"agile-suite/pie/internal/query"
+	"agile-suite/pie/internal/saved"
 )
 
 func TestIsDemo(t *testing.T) {
@@ -192,7 +198,7 @@ func field(t *testing.T, f map[string]json.RawMessage, path ...string) string {
 }
 
 func TestExploreFindsTheSeedsSevenSets(t *testing.T) {
-	res, err := query.Explore(context.Background(), demo.Client(), "anything", true, "")
+	res, err := query.Explore(context.Background(), demo.Client(), "anything", true, query.Fields{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +227,7 @@ func TestDemoHasAProductBaseField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := query.Explore(ctx, client, "anything", true, id)
+	res, err := query.Explore(ctx, client, "anything", true, query.Fields{Base: id})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,5 +240,94 @@ func TestDemoHasAProductBaseField(t *testing.T) {
 	}
 	if bases["ALPHA-101"] != bases["BRAVO-201"] || bases["ALPHA-101"] == bases["CHARLIE-301"] || bases["ECHO-502"] == "" {
 		t.Fatalf("bases %v", bases)
+	}
+}
+
+func TestDemoHasClientFields(t *testing.T) {
+	ctx := context.Background()
+	client := demo.Client()
+	var ids query.Fields
+	var err error
+	if ids.Visibility, err = client.CustomFieldID(ctx, "client visibility"); err != nil {
+		t.Fatal(err)
+	}
+	if ids.Impact, err = client.CustomFieldID(ctx, "client impact"); err != nil {
+		t.Fatal(err)
+	}
+	res, err := query.Explore(ctx, client, "anything", true, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, is := range res.Issues {
+		if is.ClientVisibility != "" {
+			seen++
+		}
+		if is.Key == "ALPHA-101" && (is.ClientVisibility == "" || is.ClientImpact == "") {
+			t.Errorf("ALPHA-101 = %+v", is)
+		}
+	}
+	if seen == 0 || seen == len(res.Issues) {
+		t.Fatalf("%d of %d issues have a client visibility; demo needs some with and some without", seen, len(res.Issues))
+	}
+}
+
+func TestDemoHasJiraFilters(t *testing.T) {
+	ctx := context.Background()
+	starred, err := query.Starred(ctx, demo.Client())
+	if err != nil || len(starred) < 2 {
+		t.Fatalf("starred %+v, %v", starred, err)
+	}
+	if _, err := query.Filter(ctx, demo.Client(), starred[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := query.Filter(ctx, demo.Client(), "4300"); err != nil {
+		t.Fatalf("the unstarred demo filter: %v", err)
+	}
+	if _, err := query.Filter(ctx, demo.Client(), "99999"); err == nil {
+		t.Fatal("demo answered a filter it does not hold")
+	}
+}
+
+func TestDemoListsProjectsBeyondTheSeed(t *testing.T) {
+	got, err := query.Projects(context.Background(), demo.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]string{}
+	for _, p := range got {
+		names[p.Key] = p.Name
+	}
+	if names["ALPHA"] != "Card Platform" || len(got) <= 6 {
+		t.Fatalf("projects %+v", got)
+	}
+}
+
+// Demo answers the issue read and the name and phrase searches, so every kind
+// of evidence can be found without Jira.
+func TestDemoHasEveryKindOfEvidence(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "pie.db"), saved.Schema())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cs, ev := cases.New(db.DB()), evidence.New(db.DB())
+	_ = cs.Open("p1", []string{"ALPHA-101"}, time.Now())
+	list, _ := cs.List("p1")
+	if _, err := evidence.Find(context.Background(), demo.Client(), ev, "p1", list[0].ID, "ALPHA-101", []string{"PIN retry"}); err != nil {
+		t.Fatal(err)
+	}
+	items, _ := ev.List("p1", list[0].ID)
+	kinds := map[string]bool{}
+	for _, it := range items {
+		kinds[it.Kind] = true
+		if it.Project == "ALPHA" {
+			t.Errorf("suggested the case's own project: %+v", it)
+		}
+	}
+	for _, k := range []string{evidence.Link, evidence.Component, evidence.Version, evidence.Text} {
+		if !kinds[k] {
+			t.Errorf("no %s evidence in %+v", k, items)
+		}
 	}
 }

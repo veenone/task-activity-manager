@@ -14,7 +14,7 @@ const RANGES = [
 
 const dayText = (n: number | null) => (n === null ? "-" : `${n} days`);
 
-function Card({ value, label }: { value: number | string; label: string }) {
+export function Card({ value, label }: { value: number | string; label: string }) {
   return (
     <li className="pie-stat">
       <strong>{value}</strong> <span>{label}</span>
@@ -77,7 +77,7 @@ export function Statistics({ result, productField }: { result: query.Result; pro
       {!bases && (
         <p className="muted">
           {productField === ""
-            ? "Name the product base field with Product base field, then run the query again, to count product bases."
+            ? "Name the product base field under Jira fields, then run the query again, to count product bases."
             : "Run the query again to read the product base field."}
         </p>
       )}
