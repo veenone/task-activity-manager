@@ -188,3 +188,19 @@ func TestListIsNewestFirstAndPurgeTakesOnlyItsProfile(t *testing.T) {
 		t.Fatalf("purge took another profile's cycles: %+v", list)
 	}
 }
+
+func TestAProjectTakenOffACaseShowsAsRemoved(t *testing.T) {
+	s, cs, _, db := open(t)
+	id := caseWith(t, cs, "p1", "ACME-1", map[string]string{"ALPHA": cases.Affected})
+	first, _ := s.Take("p1", "Week 44", at)
+	publish(t, db, first.ID)
+	if err := cs.RemoveProject("p1", id, "ALPHA"); err != nil {
+		t.Fatal(err)
+	}
+	now, _ := s.Take("p1", "Week 45", at)
+	d, _ := s.Get("p1", now.ID)
+	want := []Change{{Case: "ACME-1", Project: "ALPHA", From: cases.Affected, To: Removed}}
+	if !reflect.DeepEqual(d.Changes.Verdicts, want) {
+		t.Fatalf("verdicts = %+v", d.Changes.Verdicts)
+	}
+}

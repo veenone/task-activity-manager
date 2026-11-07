@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,6 +22,9 @@ type Cycle struct {
 	TakenAt     string `json:"takenAt"`
 	PublishedAt string `json:"publishedAt"`
 }
+
+// Removed is the To of a Change for a project taken off its case.
+const Removed = "removed"
 
 // Change is one project whose verdict on a case differs from the last
 // published cycle.
@@ -137,8 +141,9 @@ func (s *Store) Get(profileID string, id int64) (Detail, error) {
 		return Detail{}, err
 	}
 	var before []cases.Detail
+	var since string
 	err = s.db.QueryRow(`SELECT name, cases FROM report_cycle WHERE profile_id = ? AND id < ? AND published_at != ''
-		ORDER BY id DESC LIMIT 1`, profileID, id).Scan(&d.Changes.Since, &copied)
+		ORDER BY id DESC LIMIT 1`, profileID, id).Scan(&since, &copied)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 	case err != nil:
@@ -148,7 +153,6 @@ func (s *Store) Get(profileID string, id int64) (Detail, error) {
 			return Detail{}, err
 		}
 	}
-	since := d.Changes.Since
 	d.Changes = diff(before, d.Cases)
 	d.Changes.Since = since
 	return d, nil
@@ -181,7 +185,8 @@ func (s *Store) draftRow(profileID string, id int64, r sql.Result, err error) er
 
 // diff lists the cases new in now, the cases gone from before, and every
 // project whose verdict moved. A project new on a case counts as moved from
-// not assessed, so one that is still not assessed is no change.
+// not assessed, so one that is still not assessed is no change, and one taken
+// off its case moves to Removed.
 func diff(before, now []cases.Detail) Changes {
 	was := map[string]map[string]string{}
 	for _, c := range before {
@@ -199,13 +204,20 @@ func diff(before, now []cases.Detail) Changes {
 			ch.New = append(ch.New, c.Key)
 			continue
 		}
+		kept := map[string]bool{}
 		for _, p := range c.Projects {
+			kept[p.Key] = true
 			from := old[p.Key]
 			if from == "" {
 				from = cases.NotAssessed
 			}
 			if from != p.Verdict {
 				ch.Verdicts = append(ch.Verdicts, Change{Case: c.Key, Project: p.Key, From: from, To: p.Verdict})
+			}
+		}
+		for _, p := range sortedKeys(old) {
+			if !kept[p] {
+				ch.Verdicts = append(ch.Verdicts, Change{Case: c.Key, Project: p, From: old[p], To: Removed})
 			}
 		}
 	}
@@ -215,4 +227,13 @@ func diff(before, now []cases.Detail) Changes {
 		}
 	}
 	return ch
+}
+
+func sortedKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	slices.Sort(out)
+	return out
 }

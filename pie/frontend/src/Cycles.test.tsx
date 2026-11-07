@@ -122,3 +122,11 @@ it("offers neither Take again nor Delete on a published cycle", async () => {
   expect(screen.queryByRole("button", { name: "Take again" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
 });
+
+it("keeps the cycle on screen when Take again fails", async () => {
+  const user = show();
+  vi.mocked(api.RetakeCycle).mockRejectedValue("that cycle is published, so it stays as it was");
+  await user.click(await screen.findByRole("button", { name: "Take again" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("that cycle is published");
+  expect(screen.getByRole("table", { name: "Cases by project" })).toBeVisible();
+});

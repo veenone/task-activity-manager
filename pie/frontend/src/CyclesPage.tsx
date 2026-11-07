@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, usePrompt } from "@agile-suite/core";
 import { Cycles, DeleteCycle, GetCycle, RetakeCycle, TakeCycle } from "../wailsjs/go/main/App";
 import type { cycles, query } from "../wailsjs/go/models";
@@ -16,19 +16,27 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
   const { prompt } = usePrompt();
   const { confirm } = useConfirm();
 
+  // asked counts reloads, so a slow answer for an earlier profile or reload
+  // cannot overwrite a later one.
+  const asked = useRef(0);
   const reload = useCallback(
     async (select?: number) => {
+      const mine = ++asked.current;
       try {
         const next = await Cycles(profileId);
+        if (mine !== asked.current) return;
+        setError("");
         setList(next);
         setOpenId(select ?? next[0]?.id ?? null);
       } catch (e) {
-        setError(errorText(e));
+        if (mine === asked.current) setError(errorText(e));
       }
     },
     [profileId],
   );
   useEffect(() => {
+    setList(null);
+    setOpenId(null);
     void reload();
   }, [reload]);
 
@@ -36,7 +44,6 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
     const name = await prompt({ title: "New cycle", placeholder: "Name, such as Week 45", submitLabel: "Take" });
     if (name === null) return;
     try {
-      setError("");
       const c = await TakeCycle(profileId, name);
       await reload(c.id);
     } catch (e) {
@@ -131,20 +138,19 @@ function CycleDetail({
 
   const retake = async () => {
     try {
+      setError("");
       setD(await RetakeCycle(profileId, id));
     } catch (e) {
       setError(errorText(e));
     }
   };
 
-  if (error) {
-    return (
-      <p role="alert" className="error-text">
-        {error}
-      </p>
-    );
-  }
-  if (!d) return <p className="muted">Reading the cycle...</p>;
+  const alert = error && (
+    <p role="alert" className="error-text">
+      {error}
+    </p>
+  );
+  if (!d) return alert || <p className="muted">Reading the cycle...</p>;
   const ch = d.changes;
   return (
     <section className="pie-trace-detail" aria-labelledby="pie-cycle-heading">
@@ -161,6 +167,7 @@ function CycleDetail({
           </>
         )}
       </div>
+      {alert}
       <p className="muted">
         {ch.since
           ? `Compared with ${ch.since}, the last cycle published before this one.`

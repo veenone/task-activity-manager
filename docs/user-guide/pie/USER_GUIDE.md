@@ -306,7 +306,8 @@ the cycle, so it still says what was true when you took it.
 
 Choose a cycle in the list to see what changed since the last cycle published
 before it: the cases that are new, the cases that are gone, and each project
-whose verdict moved, with what it was and what it is now. A cycle with no
+whose verdict moved, with what it was and what it is now. A project taken off
+a case shows as removed. A cycle with no
 published cycle before it counts every case as new. Below the changes is the
 cycle's own grid of cases against projects.
 
