@@ -116,28 +116,30 @@ your query matched. The two other pages show the sets:
   a dash when it has none. Choose a key to open its set in Trace, where the set list opens on the page
   that holds it.
 
-The Project map counts the sets out of step, the issues that still need the
-fix and the issues in linked sets, and shows the sets three ways. Switch with
-**Flow**, **Tree** and **Table**:
-
-- **Flow** runs each issue from its baseline to its project to its fix state.
-  *Fix missing* is an unfinished issue in a set out of step, and *Fixed,
-  others behind* a finished one. *Fixed everywhere* and *Open everywhere* are
-  issues in sets that are in step. A band is as wide as its issue count; hover
-  over it to see its count and keys. The sets out of step are listed beside
-  the chart.
-- **Tree** branches each baseline into its projects and each project into its
-  issues, with how many of a project's issues are finished. Choose a set in
-  the list beside it to mark its issues across the tree.
-- **Table** is the grid described above.
-
-In every view, choosing a key opens its set in Trace.
-
 A set is **out of step** when at least one of its issues is finished in Jira
 (its status is in Jira's done category) and at least one is not. That is the
 case PIE is for: a fix made in one project but not in another. A Rejected
 issue counts as finished, so a Rejected clone beside an open one is out of
-step. Both pages can show only the sets that are out of step.
+step. A set is **in step** when its issues agree: all finished, or all still
+open. Both pages can show only the sets that are out of step.
+
+Above the map, PIE counts the sets out of step, the issues in them that are
+still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
+show the same sets three ways:
+
+- **Flow** draws each issue as a line from its baseline to its project to
+  one of four states. *Fix missing* is an open issue in a set out of step: the
+  fix was made elsewhere and still has to be made here. *Fixed, others behind*
+  is a finished issue in such a set. *Fixed everywhere* and *Open
+  everywhere* are issues in sets that are in step. A band is as wide as the
+  number of issues in it; hover over it to see the keys. The sets out of step
+  are listed beside the chart.
+- **Tree** branches each baseline into its projects and each project into its
+  issues, and says how many of a project's issues are finished. Choose a set
+  in the list beside it to mark its issues in the tree.
+- **Table** is the grid described above.
+
+In every view, choosing a key opens its set in Trace.
 
 Following links stops when a run reaches 5,000 issues in all, and PIE says so.
 If Jira refuses one of the searches for linked issues, PIE shows Jira's
