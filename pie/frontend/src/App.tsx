@@ -16,6 +16,7 @@ import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
 import { CasesPage } from "./CasesPage";
 import { FieldsDialog } from "./FieldsDialog";
 import { JiraFilterPicker } from "./JiraFilterPicker";
+import { LinkMap } from "./LinkMap";
 import { ProjectMap } from "./ProjectMap";
 import { ResultsTable } from "./ResultsTable";
 import { JqlField } from "./JqlField";
@@ -24,11 +25,12 @@ import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
 import { useCases } from "./useCases";
 
-type View = "results" | "trace" | "map" | "stats" | "cases";
+type View = "results" | "trace" | "map" | "links" | "stats" | "cases";
 const VIEWS = [
   { id: "results", label: "Results" },
   { id: "trace", label: "Trace" },
   { id: "map", label: "Project map" },
+  { id: "links", label: "Link map" },
   { id: "stats", label: "Statistics" },
   { id: "cases", label: "Cases" },
 ] as const;
@@ -69,6 +71,10 @@ export default function App() {
   const [editingFields, setEditingFields] = useState(false);
   // The key whose linked set Trace opens; the map sets it when a key is chosen.
   const [focus, setFocus] = useState<string | null>(null);
+  const openInTrace = (key: string) => {
+    setFocus(key);
+    setView("trace");
+  };
 
   async function loadProfiles(select?: string) {
     const list = await ListProfiles();
@@ -342,16 +348,8 @@ export default function App() {
         {!result && view !== "cases" && hasProfile && <p className="muted">Run a query to see this view.</p>}
 
         {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
-        {result && view === "map" && (
-          <ProjectMap
-            profileId={profileId}
-            result={result}
-            onOpen={(key) => {
-              setFocus(key);
-              setView("trace");
-            }}
-          />
-        )}
+        {result && view === "map" && <ProjectMap profileId={profileId} result={result} onOpen={openInTrace} />}
+        {result && view === "links" && <LinkMap result={result} onOpen={openInTrace} />}
 
         {result && view === "stats" && <Statistics result={result} productField={fields?.productBase ?? ""} />}
         {result && view === "results" && matched.length > 0 && (

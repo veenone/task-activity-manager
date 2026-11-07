@@ -141,6 +141,10 @@ show the same sets three ways:
 
 In every view, choosing a key opens its set in Trace.
 
+Following links stops when a run reaches 5,000 issues in all, and PIE says so.
+If Jira refuses one of the searches for linked issues, PIE shows Jira's
+message and keeps your results, but the sets may be incomplete.
+
 ### Baselines
 
 **Baselines** on the Project map keeps your own mapping of Jira projects for
@@ -158,9 +162,27 @@ Projects under no baseline come last, under **No baseline**. The mapping is
 separate from the Product base field, which Statistics still reads from each
 issue.
 
-Following links stops when a run reaches 5,000 issues in all, and PIE says so.
-If Jira refuses one of the searches for linked issues, PIE shows Jira's
-message and keeps your results, but the sets may be incomplete.
+### Link map
+
+The **Link map** tab counts the links between projects by type. Each row is
+the project a link starts from and each column the project it points to, read
+in Jira's outward wording: a row of Reader Firmware with "Cloners 2" under
+Card Platform means two Reader Firmware issues clone Card Platform issues. A
+type worded the same both ways, such as "relates to", has no direction, so
+its link shows under whichever end Jira calls outward.
+
+The list on the left names every link type in the run with its outward and
+inward wording and its count. Untick a type to hide it, or use **All** and
+**None**. Links between issues of one project are hidden until you tick
+**Show links inside one project**. Links to issues PIE did not fetch are
+hidden while **Only links where both ends are in the run** is ticked; untick
+it to count them under the project in their key.
+
+Choose a cell to list its links below the grid, with each end's status and
+the summary of the issue the link starts from. The button beside the title
+switches to the other direction and says how many links it has. Choose a key
+to open it in Trace. A run saved before PIE kept link direction asks you to
+run the query again.
 
 ## Statistics
 

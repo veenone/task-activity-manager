@@ -270,6 +270,7 @@ export namespace query {
 	    key: string;
 	    type: string;
 	    words: string;
+	    outward: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Link(source);
@@ -280,6 +281,7 @@ export namespace query {
 	        this.key = source["key"];
 	        this.type = source["type"];
 	        this.words = source["words"];
+	        this.outward = source["outward"];
 	    }
 	}
 	export class Issue {
