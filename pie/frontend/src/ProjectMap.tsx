@@ -74,9 +74,12 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
       </div>
       <ul className="pie-stat-cards" aria-label="Map counts">
         <Card value={`${result.sets.filter((s) => s.outOfStep).length} of ${result.sets.length}`} label="linked sets out of step" />
-        <Card value={needFix.length} label="issues still need the fix" />
+        <Card value={needFix.length} label="issues still to fix" />
         <Card value={inSets.size} label={`issues across ${projects.length} projects`} />
-        <Card value={`${groups.length - (unplaced > 0 ? 1 : 0)} + ${unplaced}`} label="baselines + projects under none" />
+        <Card
+          value={groups.length - (unplaced > 0 ? 1 : 0)}
+          label={`baselines, and ${unplaced === 1 ? "1 project" : `${unplaced} projects`} under none`}
+        />
       </ul>
       {error && (
         <p role="alert" className="error-text">

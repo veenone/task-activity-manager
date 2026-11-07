@@ -37,17 +37,12 @@ beforeEach(() => {
 it("counts what the map shows above the views", async () => {
   show();
   const counts = screen.getByRole("list", { name: "Map counts" });
-  expect(await within(counts).findByText("1 + 1")).toBeVisible();
+  expect(await within(counts).findByText("baselines, and 1 project under none")).toBeVisible();
   expect(
     within(counts)
       .getAllByRole("listitem")
       .map((l) => l.textContent),
-  ).toEqual([
-    "1 of 2 linked sets out of step",
-    "1 issues still need the fix",
-    "4 issues across 3 projects",
-    "1 + 1 baselines + projects under none",
-  ]);
+  ).toEqual(["1 of 2 linked sets out of step", "1 issues still to fix", "4 issues across 3 projects", "1 baselines, and 1 project under none"]);
 });
 
 it("flows issues from baseline to project to fix state, and lists the sets out of step", async () => {
