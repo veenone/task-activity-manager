@@ -1,0 +1,204 @@
+import { useCallback, useEffect, useState } from "react";
+import { useConfirm, usePrompt } from "@agile-suite/core";
+import { Cycles, DeleteCycle, GetCycle, RetakeCycle, TakeCycle } from "../wailsjs/go/main/App";
+import type { cycles, query } from "../wailsjs/go/models";
+import { errorText } from "./AddProfileDialog";
+import { VerdictGrid } from "./CaseGrid";
+import { projectNames } from "./linked";
+import { Card } from "./Statistics";
+
+// CyclesPage lists the profile's reporting cycles and shows one: what changed
+// since the last published cycle, then its own copy of the cases.
+export function CyclesPage({ profileId, result }: { profileId: string; result: query.Result | null }) {
+  const [list, setList] = useState<cycles.Cycle[] | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const { prompt } = usePrompt();
+  const { confirm } = useConfirm();
+
+  const reload = useCallback(
+    async (select?: number) => {
+      try {
+        const next = await Cycles(profileId);
+        setList(next);
+        setOpenId(select ?? next[0]?.id ?? null);
+      } catch (e) {
+        setError(errorText(e));
+      }
+    },
+    [profileId],
+  );
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const take = async () => {
+    const name = await prompt({ title: "New cycle", placeholder: "Name, such as Week 45", submitLabel: "Take" });
+    if (name === null) return;
+    try {
+      setError("");
+      const c = await TakeCycle(profileId, name);
+      await reload(c.id);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
+  const remove = async (c: cycles.Cycle) => {
+    const yes = await confirm({
+      title: `Delete ${c.name}?`,
+      message: "This removes the cycle and its copy of the cases from this computer.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!yes) return;
+    try {
+      await DeleteCycle(profileId, c.id);
+      await reload();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
+  return (
+    <div className="pie-linked pie-trace">
+      <div className="pie-trace-side">
+        <button type="button" className="btn btn-primary" onClick={() => void take()}>
+          New cycle
+        </button>
+        {error && (
+          <p role="alert" className="error-text">
+            {error}
+          </p>
+        )}
+        {list?.length === 0 && <p className="muted">No cycles yet. A new cycle keeps a copy of every case and its verdicts.</p>}
+        <ul className="pie-set-list" aria-label="Cycles">
+          {(list ?? []).map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                className={`pie-set pie-cycle${c.id === openId ? " pie-set-open" : ""}`}
+                aria-pressed={c.id === openId}
+                onClick={() => setOpenId(c.id)}
+              >
+                <span>{c.name}</span>
+                <span className="muted">
+                  {`Taken ${c.takenAt.slice(0, 10)}, `}
+                  {c.publishedAt ? `published ${c.publishedAt.slice(0, 10)}` : "not published"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {openId !== null && (
+        <CycleDetail
+          key={openId}
+          profileId={profileId}
+          id={openId}
+          names={result ? projectNames(result) : new Map()}
+          onDelete={(c) => void remove(c)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CycleDetail({
+  profileId,
+  id,
+  names,
+  onDelete,
+}: {
+  profileId: string;
+  id: number;
+  names: Map<string, string>;
+  onDelete: (c: cycles.Cycle) => void;
+}) {
+  const [d, setD] = useState<cycles.Detail | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let current = true;
+    GetCycle(profileId, id).then(
+      (got) => current && setD(got),
+      (e) => current && setError(errorText(e)),
+    );
+    return () => {
+      current = false;
+    };
+  }, [profileId, id]);
+
+  const retake = async () => {
+    try {
+      setD(await RetakeCycle(profileId, id));
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
+  if (error) {
+    return (
+      <p role="alert" className="error-text">
+        {error}
+      </p>
+    );
+  }
+  if (!d) return <p className="muted">Reading the cycle...</p>;
+  const ch = d.changes;
+  return (
+    <section className="pie-trace-detail" aria-labelledby="pie-cycle-heading">
+      <div className="pie-filters">
+        <h2 id="pie-cycle-heading">{d.name}</h2>
+        {!d.publishedAt && (
+          <>
+            <button type="button" className="btn" onClick={() => void retake()}>
+              Take again
+            </button>
+            <button type="button" className="btn btn-danger" onClick={() => onDelete(d)}>
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+      <p className="muted">
+        {ch.since
+          ? `Compared with ${ch.since}, the last cycle published before this one.`
+          : "No cycle was published before this one, so every case counts as new."}
+      </p>
+      <ul className="pie-stat-cards" aria-label="Changes">
+        <Card value={ch.new.length} label="new cases" />
+        <Card value={ch.gone.length} label="cases gone" />
+        <Card value={ch.verdicts.length} label="verdicts changed" />
+      </ul>
+      {ch.new.length > 0 && <p className="mono">{`New: ${ch.new.join(", ")}`}</p>}
+      {ch.gone.length > 0 && <p className="mono">{`Gone: ${ch.gone.join(", ")}`}</p>}
+      {ch.verdicts.length > 0 && (
+        <div className="pie-results">
+          <table className="pie-table" aria-label="Verdicts that changed">
+            <thead>
+              <tr>
+                <th scope="col">Case</th>
+                <th scope="col">Project</th>
+                <th scope="col">Was</th>
+                <th scope="col">Now</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ch.verdicts.map((v) => (
+                <tr key={`${v.case}>${v.project}`}>
+                  <td className="mono">{v.case}</td>
+                  <td>{v.project}</td>
+                  <td>{v.from}</td>
+                  <td>{v.to}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <h3>Cases in this cycle</h3>
+      <VerdictGrid rows={d.cases} names={names} />
+    </section>
+  );
+}

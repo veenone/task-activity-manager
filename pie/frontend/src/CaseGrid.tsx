@@ -32,11 +32,6 @@ export function CaseGrid({
     };
   }, [profileId]);
 
-  const all = rows ?? [];
-  const projects = [...new Set(all.flatMap((c) => c.projects.map((p) => p.key)))].sort();
-  const verdict = (c: cases.Detail, key: string) => c.projects.find((p) => p.key === key)?.verdict ?? "-";
-  const paged = usePaged(all);
-
   if (error) {
     return (
       <p role="alert" className="error-text">
@@ -45,6 +40,16 @@ export function CaseGrid({
     );
   }
   if (rows === null) return <p className="muted">Reading the cases...</p>;
+  return <VerdictGrid rows={rows} names={names} onOpen={onOpen} />;
+}
+
+// VerdictGrid draws cases against projects. Without onOpen a case key is
+// plain text, as in a cycle, whose cases may since have changed or gone.
+export function VerdictGrid({ rows, names, onOpen }: { rows: cases.Detail[]; names: Map<string, string>; onOpen?: (id: number) => void }) {
+  const projects = [...new Set(rows.flatMap((c) => c.projects.map((p) => p.key)))].sort();
+  const verdict = (c: cases.Detail, key: string) => c.projects.find((p) => p.key === key)?.verdict ?? "-";
+  const paged = usePaged(rows);
+
   if (projects.length === 0) return <p className="muted">No case has projects to assess yet.</p>;
   return (
     <>
@@ -64,9 +69,13 @@ export function CaseGrid({
             {paged.rows.map((c) => (
               <tr key={c.id}>
                 <th scope="row">
-                  <button type="button" className="pie-map-key mono" onClick={() => onOpen(c.id)}>
-                    {c.key}
-                  </button>
+                  {onOpen ? (
+                    <button type="button" className="pie-map-key mono" onClick={() => onOpen(c.id)}>
+                      {c.key}
+                    </button>
+                  ) : (
+                    <span className="mono">{c.key}</span>
+                  )}
                 </th>
                 {projects.map((p) => (
                   <td key={p} className={verdict(c, p) === "affected" ? "pie-out-of-step" : undefined}>
@@ -80,7 +89,7 @@ export function CaseGrid({
             <tr>
               <th scope="row">Affected</th>
               {projects.map((p) => (
-                <td key={p}>{all.filter((c) => verdict(c, p) === "affected").length}</td>
+                <td key={p}>{rows.filter((c) => verdict(c, p) === "affected").length}</td>
               ))}
             </tr>
           </tfoot>

@@ -864,3 +864,9 @@ body,
 .pie-evidence-dismissed {
   opacity: 0.6;
 }
+
+/* A cycle's date line sits under its name, not beside it. */
+.pie-cycle .muted:last-child {
+  grid-row: auto;
+  grid-column: 1 / -1;
+}

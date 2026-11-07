@@ -297,6 +297,22 @@ Each cell gives that case's verdict for the project, or a dash when the
 project is not on the case. The last row counts how many cases have affected
 each project. Choose a case's key to open it in the list. **List** goes back.
 
+## Cycles
+
+A cycle is one reporting period, such as a week or a release. **New cycle**
+on the Cycles tab asks for a name and keeps a copy of every case with its
+projects, verdicts and reasons. Verdicts you change afterwards do not change
+the cycle, so it still says what was true when you took it.
+
+Choose a cycle in the list to see what changed since the last cycle published
+before it: the cases that are new, the cases that are gone, and each project
+whose verdict moved, with what it was and what it is now. A cycle with no
+published cycle before it counts every case as new. Below the changes is the
+cycle's own grid of cases against projects.
+
+Until a cycle is published, **Take again** replaces its copy with the cases as
+they are now, and **Delete** removes it.
+
 ## Issue details
 
 Choose an issue's key in Results to open its details beside the table: its
