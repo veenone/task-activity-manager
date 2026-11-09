@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LinkMap } from "./LinkMap";
 import * as api from "../wailsjs/go/main/App";
@@ -184,4 +184,31 @@ it("keeps only the links between the projects chosen", async () => {
   expect(cell("A", "B")).toHaveTextContent("Cloners 1");
   await user.click(screen.getByRole("button", { name: "Remove A" }));
   expect(screen.getByText("No links between projects to show.")).toBeVisible();
+});
+
+it("draws a hovered project's name last, on top of the others", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
+  const node = chart.querySelector('[data-project="B"]')!;
+  fireEvent.mouseEnter(node);
+  const texts = [...chart.querySelectorAll("text")];
+  expect(texts.at(-1)).toHaveTextContent("B");
+  expect(texts.at(-1)).toHaveClass("pie-network-label-hover");
+  fireEvent.mouseLeave(node);
+  expect(chart.querySelector(".pie-network-label-hover")).toBeNull();
+});
+
+it("moves a dragged project without recentring, and lays out afresh for a new centre", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
+  const node = chart.querySelector('[data-project="B"]')!;
+  const before = node.querySelector("circle")!.getAttribute("cx");
+  fireEvent.pointerDown(node, { clientX: 0, clientY: 0, pointerId: 1 });
+  fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
+  fireEvent.pointerUp(node, { clientX: 40, clientY: 30, pointerId: 1 });
+  fireEvent.click(node);
+  expect(node.querySelector("circle")!.getAttribute("cx")).not.toBe(before);
+  expect(screen.getByLabelText("Centre project")).toHaveValue("A");
 });

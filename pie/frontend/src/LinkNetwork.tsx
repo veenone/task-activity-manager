@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { ProjectInput } from "./ProjectInput";
 import { busiest, type Edge, neighbours, projectOf, type Spoke } from "./linkData";
@@ -9,6 +9,11 @@ const DRAWN = 24;
 const SPREAD = 10;
 // HUB is the centre circle's radius; spokes start just outside it.
 const HUB = 24;
+// A pointer that moves further than this, in screen pixels, is a drag and
+// not a click, so letting go does not recentre.
+const DRAG = 3;
+
+type Point = { x: number; y: number };
 
 const words = (s: Spoke) => [s.out && `${s.out} out`, s.in && `${s.in} in`].filter(Boolean).join(", ");
 
@@ -26,16 +31,46 @@ export function LinkNetwork({
 }) {
   const projects = [...new Set(edges.flatMap((e) => [projectOf(e.from, issues), projectOf(e.to, issues)]))].sort();
   const [picked, setPicked] = useState("");
+  const [hovered, setHovered] = useState<string | null>(null);
+  // Positions the analyst dragged projects to, for one centre. Another centre
+  // starts from the even ring again.
+  const [placed, setPlaced] = useState<{ centre: string; at: Record<string, Point> }>({ centre: "", at: {} });
+  const svg = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ project: string; from: Point; origin: Point; far: boolean } | null>(null);
+  const dragged = useRef(false);
   const centre = projects.includes(picked) ? picked : busiest(edges, issues);
   if (!centre) return <p className="muted">No links between projects to show.</p>;
   const around = neighbours(centre, edges, issues);
   const drawn = around.slice(0, DRAWN);
   const radius = Math.max(140, drawn.length * 16);
-  const at = (i: number) => {
+  const moved = placed.centre === centre ? placed.at : {};
+  const at = (i: number): Point => {
+    const project = drawn[i].project;
+    if (moved[project]) return moved[project];
     const a = (2 * Math.PI * i) / drawn.length - Math.PI / 2;
     return { x: radius * Math.cos(a), y: radius * Math.sin(a) };
   };
   const box = radius + 90;
+  // unit is screen pixels per chart unit, read from the drawn SVG; a test DOM
+  // has no layout, so one to one.
+  const unit = () => svg.current?.getScreenCTM?.()?.a || 1;
+  const startDrag = (project: string, e: React.PointerEvent, origin: Point) => {
+    drag.current = { project, from: { x: e.clientX, y: e.clientY }, origin, far: false };
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const [dx, dy] = [e.clientX - d.from.x, e.clientY - d.from.y];
+    d.far ||= Math.hypot(dx, dy) > DRAG;
+    if (!d.far) return;
+    const u = unit();
+    setPlaced({ centre, at: { ...moved, [d.project]: { x: d.origin.x + dx / u, y: d.origin.y + dy / u } } });
+  };
+  const endDrag = () => {
+    dragged.current = drag.current?.far ?? false;
+    drag.current = null;
+  };
 
   return (
     <div className="pie-network">
@@ -51,6 +86,7 @@ export function LinkNetwork({
           />
         </div>
         <svg
+          ref={svg}
           className="pie-network-svg"
           viewBox={`${-box} ${-box} ${box * 2} ${box * 2}`}
           role="img"
@@ -72,7 +108,7 @@ export function LinkNetwork({
           </defs>
           {drawn.map((n, i) => {
             const p = at(i);
-            const len = Math.hypot(p.x, p.y);
+            const len = Math.max(1, Math.hypot(p.x, p.y));
             const [nx, ny] = [-p.y / len, p.x / len];
             return n.types.map((s, j) => {
               const off = (j - (n.types.length - 1) / 2) * SPREAD;
@@ -107,12 +143,43 @@ export function LinkNetwork({
           {drawn.map((n, i) => {
             const p = at(i);
             return (
-              <g key={n.project} className="pie-network-node" onClick={() => setPicked(n.project)}>
+              <g
+                key={n.project}
+                data-project={n.project}
+                className="pie-network-node"
+                onMouseEnter={() => setHovered(n.project)}
+                onMouseLeave={() => setHovered(null)}
+                onPointerDown={(e) => startDrag(n.project, e, p)}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onClick={() => {
+                  if (dragged.current) dragged.current = false;
+                  else setPicked(n.project);
+                }}
+              >
                 <circle cx={p.x} cy={p.y} r={7} />
-                <text className="pie-network-label" x={p.x} y={p.y + (p.y < 0 ? -12 : 20)} textAnchor="middle">
-                  {label(n.project)}
-                </text>
+                {hovered !== n.project && (
+                  <text className="pie-network-label" x={p.x} y={p.y + (p.y < 0 ? -12 : 20)} textAnchor="middle">
+                    {label(n.project)}
+                  </text>
+                )}
               </g>
+            );
+          })}
+          {/* Drawn last, so it sits on top of every other label. */}
+          {drawn.map((n, i) => {
+            if (n.project !== hovered) return null;
+            const p = at(i);
+            return (
+              <text
+                key="hovered"
+                className="pie-network-label pie-network-label-hover"
+                x={p.x}
+                y={p.y + (p.y < 0 ? -12 : 20)}
+                textAnchor="middle"
+              >
+                {label(n.project)}
+              </text>
             );
           })}
         </svg>
