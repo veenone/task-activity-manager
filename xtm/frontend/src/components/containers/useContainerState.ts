@@ -342,6 +342,10 @@ export function useContainerState() {
     });
   }, [board, kind, memberRuns, memberFvFilter, memberRunFilter, memberLabel, memberJqlKeys, rowSortField, rowSortDesc]);
   const memberLabelOptions = useMemo(() => memberLabels(board?.rows ?? []), [board]);
+  // A JQL answer names the tests the execution had when it was asked. A sync
+  // that changes the tests makes it stale, so the filter clears (#446).
+  const memberKeys = (board?.rows ?? []).map((r) => r.testKey).join(",");
+  useEffect(() => setMemberJqlKeys(null), [memberKeys]);
 
   // Toggle the run-status filter from a colorbar segment / badge and reset to
   // the first page so the (possibly shorter) filtered list starts at the top.

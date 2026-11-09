@@ -21,14 +21,14 @@ func (c *Client) KeysMatching(ctx context.Context, keys []string, jql string) ([
 	if isDemoURL(c.baseURL) {
 		return nil, errNoDemoJQL
 	}
-	jql = strings.TrimSpace(jql)
+	jql = withoutOrderBy(jql)
 	out := []string{}
 	for _, chunk := range chunkKeys(keys, bugSearchKeyChunk) {
 		quoted := make([]string, len(chunk))
 		for i, k := range chunk {
 			quoted[i] = `"` + strings.TrimSpace(k) + `"`
 		}
-		q := "key in (" + strings.Join(quoted, ", ") + ") AND (" + jql + ") ORDER BY key ASC"
+		q := "key in (" + strings.Join(quoted, ", ") + ") AND (" + jql + ")"
 		for startAt := 0; ; {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -57,4 +57,29 @@ func (c *Client) KeysMatching(ctx context.Context, keys []string, jql string) ([
 		}
 	}
 	return out, nil
+}
+
+// withoutOrderBy drops an ORDER BY clause outside quotes. Jira refuses one
+// inside the parentheses KeysMatching wraps the query in, a saved filter's JQL
+// often ends with one, and the order means nothing to a set of keys.
+func withoutOrderBy(jql string) string {
+	lower := strings.ToLower(jql)
+	cut := -1
+	var quote byte
+	for i := 0; i < len(jql); i++ {
+		switch c := jql[i]; {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '"' || c == '\'':
+			quote = c
+		case strings.HasPrefix(lower[i:], "order by"):
+			cut = i
+		}
+	}
+	if cut >= 0 {
+		jql = jql[:cut]
+	}
+	return strings.TrimSpace(jql)
 }

@@ -34,7 +34,7 @@ func TestKeysMatchingAsksForTheKeysAndTheJQLTogether(t *testing.T) {
 	if !reflect.DeepEqual(got, []string{"QA-2"}) {
 		t.Fatalf("keys = %v", got)
 	}
-	if len(sent) != 1 || sent[0] != `key in ("QA-1", "QA-2") AND (labels = smoke) ORDER BY key ASC` {
+	if len(sent) != 1 || sent[0] != `key in ("QA-1", "QA-2") AND (labels = smoke)` {
 		t.Fatalf("jql sent = %q", sent)
 	}
 
@@ -46,5 +46,20 @@ func TestKeysMatchingAsksForTheKeysAndTheJQLTogether(t *testing.T) {
 func TestKeysMatchingRefusesTheDemoProfile(t *testing.T) {
 	if _, err := NewClient("demo", "t").KeysMatching(context.Background(), []string{"DEMO-1"}, "labels = x"); err == nil {
 		t.Fatal("the demo profile answered a JQL it cannot run")
+	}
+}
+
+// Jira refuses ORDER BY inside the parentheses, and a saved filter's JQL
+// often ends with one. The order is irrelevant to a set of keys.
+func TestWithoutOrderByDropsATrailingOrderClause(t *testing.T) {
+	for in, want := range map[string]string{
+		"priority = High ORDER BY created DESC": "priority = High",
+		"priority = High order by rank":         "priority = High",
+		`summary ~ "order by me"`:               `summary ~ "order by me"`,
+		"labels = smoke":                        "labels = smoke",
+	} {
+		if got := withoutOrderBy(in); got != want {
+			t.Errorf("withoutOrderBy(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

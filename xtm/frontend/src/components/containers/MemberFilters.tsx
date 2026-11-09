@@ -10,8 +10,16 @@ export function memberLabels(rows: Labelled[]): string[] {
 
 // keepMembers applies the label filter (from the local cache) and the JQL
 // match (the keys Jira answered with, or null for no JQL filter).
-export function keepMembers<R extends Labelled>(rows: R[], label: string, jqlKeys: Set<string> | null): R[] {
-  return rows.filter((r) => (!label || (r.labels ?? []).includes(label)) && (!jqlKeys || jqlKeys.has(r.testKey)));
+export function keepMembers<R extends Labelled>(
+  rows: R[],
+  label: string,
+  jqlKeys: Set<string> | null,
+): R[] {
+  return rows.filter(
+    (r) =>
+      (!label || (r.labels ?? []).includes(label)) &&
+      (!jqlKeys || jqlKeys.has(r.testKey)),
+  );
 }
 
 // MemberFilters narrows an open Test Execution's tests the way Jira's own Test
@@ -24,6 +32,7 @@ export function MemberFilters({
   label,
   onLabel,
   jqlOn,
+  jqlAvailable = true,
   onJqlKeys,
 }: {
   profileId: string;
@@ -32,6 +41,9 @@ export function MemberFilters({
   label: string;
   onLabel: (label: string) => void;
   jqlOn: boolean;
+  // jqlAvailable is false for a backend with no JQL and for the demo profile,
+  // which has no Jira; the form is left out rather than shown to fail.
+  jqlAvailable?: boolean;
   onJqlKeys: (keys: Set<string> | null) => void;
 }) {
   const [jql, setJql] = useState("");
@@ -42,7 +54,11 @@ export function MemberFilters({
     setBusy(true);
     setError("");
     try {
-      onJqlKeys(new Set(await ContainerTestsMatching(profileId, containerKey, jql.trim())));
+      onJqlKeys(
+        new Set(
+          await ContainerTestsMatching(profileId, containerKey, jql.trim()),
+        ),
+      );
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -54,7 +70,11 @@ export function MemberFilters({
       {labels.length > 0 && (
         <label className="member-filter">
           Label
-          <select className="container-status-filter app-select" value={label} onChange={(e) => onLabel(e.target.value)}>
+          <select
+            className="container-status-filter app-select"
+            value={label}
+            onChange={(e) => onLabel(e.target.value)}
+          >
             <option value="">All labels</option>
             {labels.map((l) => (
               <option key={l} value={l}>
@@ -64,39 +84,41 @@ export function MemberFilters({
           </select>
         </label>
       )}
-      <form
-        className="member-filter"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void apply();
-        }}
-      >
-        <label className="member-filter">
-          JQL
-          <input
-            className="detail-input member-jql"
-            value={jql}
-            placeholder="e.g. priority = High AND labels = smoke"
-            onChange={(e) => setJql(e.target.value)}
-          />
-        </label>
-        <button type="submit" className="btn" disabled={busy || !jql.trim()}>
-          Apply JQL
-        </button>
-        {jqlOn && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              setJql("");
-              setError("");
-              onJqlKeys(null);
-            }}
-          >
-            Clear JQL
+      {jqlAvailable && (
+        <form
+          className="member-filter"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void apply();
+          }}
+        >
+          <label>
+            JQL
+            <input
+              className="detail-input member-jql"
+              value={jql}
+              placeholder="e.g. priority = High AND labels = smoke"
+              onChange={(e) => setJql(e.target.value)}
+            />
+          </label>
+          <button type="submit" className="btn" disabled={busy || !jql.trim()}>
+            Apply JQL
           </button>
-        )}
-      </form>
+          {jqlOn && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setJql("");
+                setError("");
+                onJqlKeys(null);
+              }}
+            >
+              Clear JQL
+            </button>
+          )}
+        </form>
+      )}
       {error && (
         <span role="alert" className="error-text">
           {error}

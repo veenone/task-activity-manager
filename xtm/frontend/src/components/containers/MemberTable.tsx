@@ -61,6 +61,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
             setBoardPage(0);
           }}
           jqlOn={memberJqlKeys !== null}
+          jqlAvailable={caps.supportsJqlScope && !isDemo}
           onJqlKeys={(k) => {
             setMemberJqlKeys(k);
             setBoardPage(0);
