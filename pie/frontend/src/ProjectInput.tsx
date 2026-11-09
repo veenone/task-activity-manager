@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 // listId is a datalist id safe for a CSS selector; useId's colons are not.
 const useListId = () => `pie-projects-${useId().replace(/:/g, "")}`;
@@ -43,10 +43,16 @@ export function ProjectInput({
 }) {
   const id = useListId();
   const [text, setText] = useState(value);
-  // A value set from outside, such as Clear filters, replaces the text.
+  // emitted is the last value this box sent. A value that differs from it was
+  // set from outside, and replaces the text; any other change of render, such
+  // as a new projects array, leaves what the analyst is typing alone.
+  const emitted = useRef(value);
   useEffect(() => {
-    setText((t) => (resolve(t, projects, projectLabel) === value ? t : value));
-  }, [value, projects, projectLabel]);
+    if (value !== emitted.current) {
+      emitted.current = value;
+      setText(value);
+    }
+  }, [value]);
   const unknown = text.trim() !== "" && resolve(text, projects, projectLabel) === "";
   return (
     <>
@@ -59,13 +65,17 @@ export function ProjectInput({
           value={text}
           placeholder={allText}
           onChange={(e) => {
+            const p = resolve(e.target.value, projects, projectLabel);
             setText(e.target.value);
-            onChange(resolve(e.target.value, projects, projectLabel));
+            emitted.current = p;
+            onChange(p);
           }}
         />
       </label>
       <Suggestions id={id} projects={projects} label={projectLabel} />
-      {unknown && <span className="muted">No project matches</span>}
+      <span role="status" className="muted">
+        {unknown ? "No project matches" : ""}
+      </span>
     </>
   );
 }

@@ -52,7 +52,7 @@ it("starts again at the first page when a filter changes", async () => {
   await user.click(screen.getByRole("button", { name: "Next page" }));
   await user.selectOptions(screen.getByLabelText("Status"), "Open");
   expect(screen.getByText("1-25 of 40")).toBeVisible();
-  expect(screen.getByRole("status")).toHaveTextContent("Showing 40 of 60 issues");
+  expect(screen.getByText("Showing 40 of 60 issues")).toBeVisible();
 });
 
 it("drops a filter value the next run does not hold", async () => {

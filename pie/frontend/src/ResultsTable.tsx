@@ -63,21 +63,20 @@ export function ResultsTable({
   return (
     <>
       <div className="pie-filters">
-        {FILTERS.filter(({ field }) => values(field).length > 0).map(({ field, label }) =>
-          field === "project" ? (
-            <ProjectInput
-              key={field}
-              label={label}
-              allText="All"
-              projects={values(field)}
-              projectLabel={(p) => projectLabel(p, names.get(p))}
-              value={active(field)}
-              onChange={(p) => {
-                setChosen({ ...chosen, [field]: p });
-                pager.onPage(0);
-              }}
-            />
-          ) : (
+        {values("project").length > 0 && (
+          <ProjectInput
+            label="Project"
+            allText="All"
+            projects={values("project")}
+            projectLabel={(p) => projectLabel(p, names.get(p))}
+            value={active("project")}
+            onChange={(p) => {
+              setChosen({ ...chosen, project: p });
+              pager.onPage(0);
+            }}
+          />
+        )}
+        {FILTERS.filter(({ field }) => field !== "project" && values(field).length > 0).map(({ field, label }) => (
           <label key={field}>
             {label}
             <select
@@ -96,8 +95,7 @@ export function ResultsTable({
               ))}
             </select>
           </label>
-          ),
-        )}
+        ))}
         {hasCases && (
           <label>
             Case

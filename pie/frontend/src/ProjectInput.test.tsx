@@ -69,3 +69,43 @@ it("adds projects as chips by typing and removes them", async () => {
   expect(screen.getByRole("list", { name: "Chosen projects" })).not.toHaveTextContent("ALPHA");
   expect(screen.getByRole("list", { name: "Chosen projects" })).toHaveTextContent("CHARLIE");
 });
+
+it("keeps the text being typed while the value it names stays the same", async () => {
+  function Busiest() {
+    const [picked, setPicked] = useState("");
+    const centre = picked || "ALPHA";
+    return (
+      <>
+        <ProjectInput label="Centre" projects={[...projects]} projectLabel={label} value={picked} onChange={setPicked} allText="Busiest project" />
+        <output>{centre}</output>
+      </>
+    );
+  }
+  render(<Busiest />);
+  const user = userEvent.setup();
+  const box = screen.getByLabelText("Centre");
+  await user.type(box, "CHARL");
+  expect(box).toHaveValue("CHARL");
+  await user.type(box, "IE");
+  expect(screen.queryByText("No project matches")).not.toBeInTheDocument();
+  expect(document.querySelector("output")).toHaveTextContent("CHARLIE");
+  await user.clear(box);
+  expect(document.querySelector("output")).toHaveTextContent("ALPHA");
+});
+
+it("takes a value set from outside", async () => {
+  function Outside() {
+    const [value, setValue] = useState("");
+    return (
+      <>
+        <ProjectInput label="Project" projects={projects} projectLabel={label} value={value} onChange={setValue} />
+        <button type="button" onClick={() => setValue("BRAVO")}>
+          Pick bravo
+        </button>
+      </>
+    );
+  }
+  render(<Outside />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Pick bravo" }));
+  expect(screen.getByLabelText("Project")).toHaveValue("BRAVO");
+});

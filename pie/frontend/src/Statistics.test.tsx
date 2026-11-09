@@ -79,7 +79,7 @@ describe("Statistics", () => {
     await userEvent.type(screen.getByLabelText("Project"), "B");
     const onlyA = { ...result, issues: result.issues.filter((i) => i.project === "A"), sets: [] } as unknown as query.Result;
     rerender(<Statistics result={onlyA} productField="" />);
-    expect(screen.getByText("No project matches")).toBeVisible();
+    expect(screen.getByLabelText("Project")).toHaveValue("");
     expect(headline("not finished")).toHaveTextContent("2 not finished");
   });
 

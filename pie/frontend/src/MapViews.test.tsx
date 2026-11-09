@@ -173,6 +173,16 @@ it("forgets a chosen project the next run no longer reaches, instead of showing 
   await user.type(screen.getByLabelText("Project"), "C");
   const next = { ...result, sets: [result.sets[0]] };
   view.rerender(<ProjectMap profileId="p1" result={next as never} onOpen={vi.fn()} />);
-  expect(screen.getByText("No project matches")).toBeVisible();
+  expect(screen.getByLabelText("Project")).toHaveValue("");
   expect(screen.queryByText("No linked sets to show.")).not.toBeInTheDocument();
+});
+
+it("empties project text that named nothing when filters are cleared", async () => {
+  const { user } = show();
+  await screen.findByRole("option", { name: "Baseline A" });
+  await user.type(screen.getByLabelText("Project"), "zzz");
+  await user.click(screen.getByLabelText("Out of step only"));
+  await user.click(screen.getByRole("button", { name: "Clear filters" }));
+  expect(screen.getByLabelText("Project")).toHaveValue("");
+  expect(screen.queryByText("No project matches")).not.toBeInTheDocument();
 });

@@ -61,7 +61,10 @@ export function TracePage({
               type="search"
               value={keyText}
               placeholder="Part of a key"
-              onChange={(e) => setKeyText(e.target.value)}
+              onChange={(e) => {
+                setKeyText(e.target.value);
+                pager.onPage(0);
+              }}
             />
           </label>
           <label className="pie-check">
