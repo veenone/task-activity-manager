@@ -67,7 +67,7 @@ export function ProjectGroups(arg1:string):Promise<Array<cases.Group>>;
 
 export function PublishCycle(arg1:string,arg2:number,arg3:boolean):Promise<report.Outcome>;
 
-export function RefreshLinks(arg1:string,arg2:number,arg3:query.Result):Promise<query.Result>;
+export function RefreshLinks(arg1:string,arg2:number,arg3:string,arg4:query.Result):Promise<query.Result>;
 
 export function RemoveBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
 

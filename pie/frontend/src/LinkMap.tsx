@@ -1,4 +1,4 @@
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshLinks } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
 import { errorText } from "./AddProfileDialog";
@@ -11,18 +11,26 @@ import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
 export function LinkMap({
   result,
   onOpen,
-  profileId,
-  queryId,
-  onResult,
+  refresh: { profileId, queryId, runAt, onResult },
 }: {
   result: query.Result;
   onOpen: (key: string) => void;
-  profileId: string;
-  queryId: number;
-  onResult: (r: query.Result) => void;
+  // refresh names the run on screen, for Refresh links: the saved query it
+  // belongs to (0 for none) and when it ran.
+  refresh: { profileId: string; queryId: number; runAt: string; onResult: (r: query.Result) => void };
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
+  // onScreen is the run on screen, or null once the map is gone. A refresh whose
+  // run is no longer shown answers for a run the analyst has left (#436).
+  const onScreen = useRef<query.Result | null>(result);
+  onScreen.current = result;
+  useEffect(
+    () => () => {
+      onScreen.current = null;
+    },
+    [],
+  );
   const [off, setOff] = useState<Set<string>>(new Set());
   const [inside, setInside] = useState(false);
   const [bothEnds, setBothEnds] = useState(true);
@@ -56,11 +64,12 @@ export function LinkMap({
 
   // Refresh links fetches the linked issues again and keeps the query's own
   // rows, so it costs a fraction of a run (#435).
-  const refresh = async () => {
+  const refreshLinks = async () => {
     setRefreshing(true);
     setRefreshError("");
     try {
-      onResult(await RefreshLinks(profileId, queryId, result));
+      const fresh = await RefreshLinks(profileId, queryId, runAt, result);
+      if (onScreen.current === result) onResult(fresh);
     } catch (e) {
       setRefreshError(errorText(e));
     } finally {
@@ -85,7 +94,7 @@ export function LinkMap({
     <div className="pie-linkmap">
       <fieldset className="pie-linkmap-rail" aria-label="Link types">
         <legend>Link types</legend>
-        <button type="button" className="btn" disabled={refreshing} aria-busy={refreshing} onClick={() => void refresh()}>
+        <button type="button" className="btn" disabled={refreshing} aria-busy={refreshing} onClick={() => void refreshLinks()}>
           Refresh links
         </button>
         {refreshError && (

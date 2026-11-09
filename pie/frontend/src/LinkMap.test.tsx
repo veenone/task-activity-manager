@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LinkMap } from "./LinkMap";
 import * as api from "../wailsjs/go/main/App";
@@ -32,8 +32,10 @@ const result = {
 function show(res: object = result) {
   const onOpen = vi.fn();
   const onResult = vi.fn();
-  render(<LinkMap result={res as never} onOpen={onOpen} profileId="p1" queryId={7} onResult={onResult} />);
-  return { user: userEvent.setup(), onOpen, onResult };
+  const view = render(
+    <LinkMap result={res as never} onOpen={onOpen} refresh={{ profileId: "p1", queryId: 7, runAt: "2026-11-06T10:00:00Z", onResult }} />,
+  );
+  return { user: userEvent.setup(), onOpen, onResult, view };
 }
 
 const cell = (from: string, to: string) => {
@@ -118,7 +120,7 @@ it("refreshes the links without running the query", async () => {
   vi.mocked(api.RefreshLinks).mockResolvedValue(fresh as never);
   const { user, onResult } = show();
   await user.click(screen.getByRole("button", { name: "Refresh links" }));
-  expect(api.RefreshLinks).toHaveBeenCalledWith("p1", 7, result);
+  expect(api.RefreshLinks).toHaveBeenCalledWith("p1", 7, "2026-11-06T10:00:00Z", result);
   expect(onResult).toHaveBeenCalledWith(fresh);
 });
 
@@ -127,5 +129,16 @@ it("keeps the run and says why when a refresh fails", async () => {
   const { user, onResult } = show();
   await user.click(screen.getByRole("button", { name: "Refresh links" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Jira is down");
+  expect(onResult).not.toHaveBeenCalled();
+});
+
+it("drops a refresh that answers after the run on screen changed", async () => {
+  let answer: (r: unknown) => void = () => undefined;
+  vi.mocked(api.RefreshLinks).mockReturnValue(new Promise((r) => (answer = r)) as never);
+  const { user, onResult, view } = show();
+  await user.click(screen.getByRole("button", { name: "Refresh links" }));
+  const other = { ...result, issues: result.issues.slice(3) };
+  view.rerender(<LinkMap result={other as never} onOpen={vi.fn()} refresh={{ profileId: "p1", queryId: 8, runAt: "", onResult }} />);
+  await act(async () => answer(result));
   expect(onResult).not.toHaveBeenCalled();
 });
