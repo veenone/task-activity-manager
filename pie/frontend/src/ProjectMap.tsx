@@ -29,9 +29,13 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
   const projects = groups.flatMap((g) => g.projects);
   const grouped = groups.some((g) => g.baseline !== null);
   // The filters narrow every view; the count cards stay on the whole run.
-  const sets = filterSets(result.sets, groups, filter).filter((s) => !onlyOutOfStep || s.outOfStep);
-  const filtered = onlyOutOfStep || filter !== NO_FILTER;
-  const pickable = filter.baseline === "" ? projects : (groups.find((g) => (g.baseline ?? "-") === filter.baseline)?.projects ?? []);
+  // A baseline or project that a new run or a baselines edit took away counts
+  // as no choice, so the map never empties under a select that shows none.
+  const baseline = groups.some((g) => (g.baseline ?? "-") === filter.baseline) ? filter.baseline : "";
+  const pickable = baseline === "" ? projects : (groups.find((g) => (g.baseline ?? "-") === baseline)?.projects ?? []);
+  const live: MapFilter = { baseline, project: pickable.includes(filter.project) ? filter.project : "", key: filter.key };
+  const sets = filterSets(result.sets, groups, live).filter((s) => !onlyOutOfStep || s.outOfStep);
+  const filtered = onlyOutOfStep || live.baseline !== "" || live.project !== "" || live.key.trim() !== "";
   const { rows, pager } = usePaged(sets);
   // Flow and Tree draw only the projects the shown sets reach.
   const shown = baselineGroups(allProjects(sets), baselines);
@@ -65,8 +69,8 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
           Baseline
           <select
             className="detail-input pie-filter-select"
-            value={filter.baseline}
-            onChange={(e) => setFilter({ ...filter, baseline: e.target.value, project: "" })}
+            value={live.baseline}
+            onChange={(e) => setFilter({ ...live, baseline: e.target.value, project: "" })}
           >
             <option value="">All baselines</option>
             {groups.map((g) => (
@@ -80,8 +84,8 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
           Project
           <select
             className="detail-input pie-filter-select"
-            value={filter.project}
-            onChange={(e) => setFilter({ ...filter, project: e.target.value })}
+            value={live.project}
+            onChange={(e) => setFilter({ ...live, project: e.target.value })}
           >
             <option value="">All projects</option>
             {pickable.map((p) => (
