@@ -1,12 +1,28 @@
-import { useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
+import { RefreshLinks } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
+import { errorText } from "./AddProfileDialog";
 import { byKey, projectLabel, projectNames } from "./linked";
 import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
 
 // LinkMap counts Jira links between projects by type, each read from its
 // outward end, so a row's project points at a column's project in the
 // outward wording. A cell lists its links below the grid.
-export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key: string) => void }) {
+export function LinkMap({
+  result,
+  onOpen,
+  profileId,
+  queryId,
+  onResult,
+}: {
+  result: query.Result;
+  onOpen: (key: string) => void;
+  profileId: string;
+  queryId: number;
+  onResult: (r: query.Result) => void;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
   const [off, setOff] = useState<Set<string>>(new Set());
   const [inside, setInside] = useState(false);
   const [bothEnds, setBothEnds] = useState(true);
@@ -36,6 +52,21 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
     [shown, off, issues],
   );
   const between = (from: string, to: string) => cells.get(`${from}>${to}`) ?? [];
+  const most = Math.max(1, ...[...cells.values()].map((c) => c.length));
+
+  // Refresh links fetches the linked issues again and keeps the query's own
+  // rows, so it costs a fraction of a run (#435).
+  const refresh = async () => {
+    setRefreshing(true);
+    setRefreshError("");
+    try {
+      onResult(await RefreshLinks(profileId, queryId, result));
+    } catch (e) {
+      setRefreshError(errorText(e));
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const words = (type: string) => {
     const t = types.find((x) => x.name === type);
     return t?.outward || t?.inward || type;
@@ -54,6 +85,14 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
     <div className="pie-linkmap">
       <fieldset className="pie-linkmap-rail" aria-label="Link types">
         <legend>Link types</legend>
+        <button type="button" className="btn" disabled={refreshing} aria-busy={refreshing} onClick={() => void refresh()}>
+          Refresh links
+        </button>
+        {refreshError && (
+          <p role="alert" className="error-text">
+            {refreshError}
+          </p>
+        )}
         <div className="pie-linkmap-all">
           <button type="button" className="btn btn-ghost" onClick={() => setOff(new Set())}>
             All
@@ -109,15 +148,16 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
       </fieldset>
       <div className="pie-linkmap-main">
         <div className="pie-results">
-          <table className="pie-table pie-map" aria-label="Projects connected by links">
+          <table className="pie-table pie-map pie-linkmap-grid" aria-label="Projects connected by links">
             <thead>
               <tr>
                 <th scope="col">From \ to</th>
                 {projects.map((p) => (
-                  <th key={p} scope="col">
-                    {label(p)}
+                  <th key={p} scope="col" title={label(p)}>
+                    {p}
                   </th>
                 ))}
+                <th scope="col">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -126,12 +166,21 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
                   <th scope="row">{label(from)}</th>
                   {projects.map((to) => {
                     const here = between(from, to);
-                    if (here.length === 0) return <td key={to}>-</td>;
+                    if (here.length === 0)
+                      return (
+                        <td key={to} className="pie-linkmap-empty">
+                          -
+                        </td>
+                      );
                     const counts = new Map<string, number>();
                     here.forEach((e) => counts.set(e.type, (counts.get(e.type) ?? 0) + 1));
                     const open = chosen?.from === from && chosen.to === to;
                     return (
-                      <td key={to}>
+                      <td
+                        key={to}
+                        className="pie-linkmap-full"
+                        style={{ "--shade": `${Math.round(8 + (32 * here.length) / most)}%` } as CSSProperties}
+                      >
                         <button
                           type="button"
                           className="pie-linkmap-cell"
@@ -146,6 +195,7 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
                       </td>
                     );
                   })}
+                  <td className="pie-linkmap-total">{projects.reduce((n, to) => n + between(from, to).length, 0)}</td>
                 </tr>
               ))}
             </tbody>

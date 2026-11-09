@@ -2,6 +2,9 @@ import { expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LinkMap } from "./LinkMap";
+import * as api from "../wailsjs/go/main/App";
+
+vi.mock("../wailsjs/go/main/App", () => ({ RefreshLinks: vi.fn() }));
 
 const link = (key: string, type: string, words: string, outward: boolean) => ({ key, type, words, outward });
 const issue = (key: string, status: string, links: object[]) => ({
@@ -28,8 +31,9 @@ const result = {
 
 function show(res: object = result) {
   const onOpen = vi.fn();
-  render(<LinkMap result={res as never} onOpen={onOpen} />);
-  return { user: userEvent.setup(), onOpen };
+  const onResult = vi.fn();
+  render(<LinkMap result={res as never} onOpen={onOpen} profileId="p1" queryId={7} onResult={onResult} />);
+  return { user: userEvent.setup(), onOpen, onResult };
 }
 
 const cell = (from: string, to: string) => {
@@ -99,4 +103,29 @@ it("asks for a new run when the stored one has no link direction", () => {
 it("does not take a run whose links all point to unfetched outward ends for an old one", () => {
   show({ issues: [issue("B-1", "Open", [link("A-1", "Cloners", "is cloned by", false)])], sets: [] });
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("ends each row with its total", () => {
+  show();
+  const grid = screen.getByRole("table", { name: "Projects connected by links" });
+  expect(within(grid).getAllByRole("columnheader").at(-1)).toHaveTextContent("Total");
+  expect(cell("A", "Total")).toHaveTextContent("2");
+  expect(cell("C", "Total")).toHaveTextContent("0");
+});
+
+it("refreshes the links without running the query", async () => {
+  const fresh = { ...result, issues: result.issues.slice(0, 2) };
+  vi.mocked(api.RefreshLinks).mockResolvedValue(fresh as never);
+  const { user, onResult } = show();
+  await user.click(screen.getByRole("button", { name: "Refresh links" }));
+  expect(api.RefreshLinks).toHaveBeenCalledWith("p1", 7, result);
+  expect(onResult).toHaveBeenCalledWith(fresh);
+});
+
+it("keeps the run and says why when a refresh fails", async () => {
+  vi.mocked(api.RefreshLinks).mockRejectedValue("the links could not be refreshed: Jira is down");
+  const { user, onResult } = show();
+  await user.click(screen.getByRole("button", { name: "Refresh links" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Jira is down");
+  expect(onResult).not.toHaveBeenCalled();
 });

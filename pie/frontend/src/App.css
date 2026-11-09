@@ -550,6 +550,40 @@ body,
   white-space: nowrap;
 }
 
+/* The Link map's grid: on a large run it scrolls both ways, so the column
+   headers and the project column stay pinned, and a cell's shade grows with
+   its link count (#435). */
+.pie-linkmap-grid tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface-2);
+}
+
+.pie-linkmap-grid thead th:first-child {
+  left: 0;
+  z-index: 2;
+}
+
+.pie-linkmap-grid tbody tr:nth-child(even) td {
+  background: var(--row-hover);
+}
+
+.pie-linkmap-full,
+.pie-linkmap-grid tbody tr:nth-child(even) td.pie-linkmap-full {
+  background: color-mix(in srgb, var(--accent) var(--shade), transparent);
+}
+
+.pie-linkmap-empty {
+  color: var(--border-strong);
+  text-align: center;
+}
+
+.pie-linkmap-total {
+  font-weight: 600;
+  text-align: right;
+}
+
 .pie-linkmap-links {
   max-height: 45%;
   overflow: auto;

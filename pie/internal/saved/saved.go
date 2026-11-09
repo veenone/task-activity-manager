@@ -238,6 +238,18 @@ func (s *Store) Record(profileID string, id int64, jql string, res query.Result,
 	return run, nil
 }
 
+// ReplaceResult stores res as the query's run without moving its run time or
+// comparing it: Refresh links fetches only linked issues, so the query's own
+// rows, and when they were fetched, have not changed.
+func (s *Store) ReplaceResult(profileID string, id int64, res query.Result) error {
+	raw, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+	r, err := s.db.Exec(`UPDATE saved_query SET result = ? WHERE profile_id = ? AND id = ?`, string(raw), profileID, id)
+	return oneRow(r, err)
+}
+
 // Fields are the names of the Jira custom fields a profile reads. "" is a
 // field the profile does not use.
 type Fields struct {

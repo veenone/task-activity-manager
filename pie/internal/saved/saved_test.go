@@ -245,3 +245,21 @@ func TestAnEarlierProductFieldCarriesOver(t *testing.T) {
 		t.Fatalf("fields = %+v", got)
 	}
 }
+
+func TestReplaceResultKeepsTheRunTimeAndTheJQL(t *testing.T) {
+	s := open(t)
+	q, _ := s.Save("p1", "Weekly", "category = X")
+	if _, err := s.Record("p1", q.ID, "category = X", result("A-1"), at); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceResult("p1", q.ID, result("A-1", "B-1")); err != nil {
+		t.Fatal(err)
+	}
+	run, _ := s.Last("p1", q.ID)
+	if len(run.Result.Issues) != 2 || run.RunAt != "2026-11-06T10:00:00Z" {
+		t.Fatalf("run = %+v", run)
+	}
+	if err := s.ReplaceResult("p2", q.ID, result()); err == nil {
+		t.Fatal("another profile's query was replaced")
+	}
+}

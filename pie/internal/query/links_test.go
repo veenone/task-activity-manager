@@ -264,3 +264,25 @@ func TestExploreFetchesLinkBatchesInParallel(t *testing.T) {
 		t.Fatalf("at most %d requests at once, want 2 to %d", m, workers)
 	}
 }
+
+func TestFollowFetchesOnlyTheLinkedIssues(t *testing.T) {
+	graph := map[string]node{"A-1": {"new", []string{"B-1"}}, "B-1": {"done", []string{"C-1"}}, "C-1": {"new", nil}}
+	var seen []string
+	client := linkedJira(t, graph, []string{"A-1"}, &seen, "")
+	first, err := Explore(context.Background(), client, "q", true, Fields{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen = nil
+	mine := Result{Total: first.Total, Issues: first.Issues[:1]}
+	res := Follow(context.Background(), client, mine, Fields{})
+	if got := keysOf(res.Issues); !slices.Equal(got, []string{"A-1", "B-1", "C-1"}) {
+		t.Fatalf("issues %v", got)
+	}
+	if slices.Contains(seen, "q") || len(seen) != 2 {
+		t.Fatalf("searches %q", seen)
+	}
+	if len(res.Sets) != 1 || res.Total != 1 {
+		t.Fatalf("sets %+v, total %d", res.Sets, res.Total)
+	}
+}

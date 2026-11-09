@@ -7,6 +7,7 @@ import {cycles} from '../models';
 import {saved} from '../models';
 import {jira} from '../models';
 import {report} from '../models';
+import {query} from '../models';
 
 export function AddBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
 
@@ -65,6 +66,8 @@ export function OpenCases(arg1:string,arg2:Array<string>):Promise<Array<cases.Ca
 export function ProjectGroups(arg1:string):Promise<Array<cases.Group>>;
 
 export function PublishCycle(arg1:string,arg2:number,arg3:boolean):Promise<report.Outcome>;
+
+export function RefreshLinks(arg1:string,arg2:number,arg3:query.Result):Promise<query.Result>;
 
 export function RemoveBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
 
