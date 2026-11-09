@@ -187,6 +187,7 @@ describe('instruction gate', () => {
   it.each([
     ['tam/main.go', 'tam/frontend/src/nav.ts'],
     ['xtm/main.go', 'xtm/frontend/src/views.ts'],
+    ['pie/menu.go', 'pie/frontend/src/views.ts'],
   ])('the View menu in %s and the view tabs in %s name the same views, in the same order', (goFile, viewsFile) => {
     const go = read(goFile).split('var menuViews')[1] ?? '';
     const menu = [...go.matchAll(/\{"(\w+)", "([^"]+)", "(\w*)"\}/g)].map(([, id, label]) => `${id}:${label}`);

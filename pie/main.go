@@ -24,6 +24,7 @@ func main() {
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind:             []interface{}{app},
+		Menu:             appMenu(app),
 	})
 	if err != nil {
 		println("Error:", err.Error())

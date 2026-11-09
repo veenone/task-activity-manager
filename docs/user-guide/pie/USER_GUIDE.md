@@ -10,6 +10,19 @@ matches, whichever projects those issues are in. PIE only reads from Jira. It
 does not change anything there. The one place it writes is Confluence, when
 you publish a cycle.
 
+## The menu bar and the theme
+
+The menu bar has three menus:
+- **File** has Add profile, Jira fields, Run query (Ctrl+R) and Quit (Ctrl+Q).
+- **View** switches tabs, from Ctrl+1 for Results to Ctrl+7 for Cycles. Its
+  **Theme** submenu picks Light, Dark, or System to follow your operating
+  system.
+- **Help** has About, which shows PIE's version.
+
+The moon or sun button at the right of the top bar switches between light and
+dark. PIE remembers the theme you pick, from either place, for the next time
+it starts.
+
 ## Add a profile
 
 A profile is how PIE reaches Jira. Choose **Add profile** and enter a name, your

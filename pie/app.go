@@ -10,6 +10,7 @@ import (
 
 	corejira "agile-suite/core/jira"
 	"agile-suite/core/profile"
+	"agile-suite/core/settings"
 	"agile-suite/core/store"
 	"agile-suite/pie/internal/cases"
 	"agile-suite/pie/internal/cycles"
@@ -18,6 +19,8 @@ import (
 	"agile-suite/pie/internal/pieprofile"
 	"agile-suite/pie/internal/query"
 	"agile-suite/pie/internal/saved"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App is the backend bound to the React frontend. Every exported method here
@@ -27,6 +30,7 @@ type App struct {
 	db         *store.DB
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
+	settings   *settings.Manager
 	queries    *saved.Store
 	cases      *cases.Store
 	evidence   *evidence.Store
@@ -50,10 +54,15 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.profiles = profile.NewManager(a.db.DB())
 	a.creds = profile.NewCredentialStore()
+	a.settings = settings.NewManager(a.db.DB())
 	a.queries = saved.New(a.db.DB())
 	a.cases = cases.New(a.db.DB())
 	a.evidence = evidence.New(a.db.DB())
 	a.cycles = cycles.New(a.db.DB(), a.cases)
+	// The menu was built before the database opened, so its Theme radio
+	// showed the default. Redraw it with the stored choice.
+	runtime.MenuSetApplicationMenu(ctx, appMenu(a))
+	runtime.MenuUpdateApplicationMenu(ctx)
 }
 
 func (a *App) shutdown(context.Context) {

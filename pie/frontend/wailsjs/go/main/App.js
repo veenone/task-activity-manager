@@ -166,6 +166,10 @@ export function SetFields(arg1, arg2) {
   return window['go']['main']['App']['SetFields'](arg1, arg2);
 }
 
+export function SetTheme(arg1) {
+  return window['go']['main']['App']['SetTheme'](arg1);
+}
+
 export function SetVerdict(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SetVerdict'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -176,4 +180,12 @@ export function StartupError() {
 
 export function TakeCycle(arg1, arg2) {
   return window['go']['main']['App']['TakeCycle'](arg1, arg2);
+}
+
+export function Theme() {
+  return window['go']['main']['App']['Theme']();
+}
+
+export function Version() {
+  return window['go']['main']['App']['Version']();
 }

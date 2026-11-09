@@ -90,8 +90,14 @@ export function SetEvidenceState(arg1:string,arg2:number,arg3:number,arg4:string
 
 export function SetFields(arg1:string,arg2:saved.Fields):Promise<void>;
 
+export function SetTheme(arg1:string):Promise<void>;
+
 export function SetVerdict(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<cases.Detail>;
 
 export function StartupError():Promise<string>;
 
 export function TakeCycle(arg1:string,arg2:string):Promise<cycles.Cycle>;
+
+export function Theme():Promise<string>;
+
+export function Version():Promise<string>;
