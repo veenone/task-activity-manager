@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	corejira "agile-suite/core/jira"
@@ -27,6 +28,13 @@ var keyIn = regexp.MustCompile(`key in \(([^)]*)\)`)
 // key in (...). Every JQL it is sent is recorded in seen.
 func linkedJira(t *testing.T, graph map[string]node, matched []string, seen *[]string, refuseKeyIn string) *corejira.Client {
 	t.Helper()
+	return linkedJiraCounting(t, graph, matched, seen, refuseKeyIn, &inFlight{})
+}
+
+// linkedJiraCounting is linkedJira that counts its requests in flight.
+func linkedJiraCounting(t *testing.T, graph map[string]node, matched []string, seen *[]string, refuseKeyIn string, f *inFlight) *corejira.Client {
+	t.Helper()
+	var mu sync.Mutex
 	both := map[string][]string{}
 	for k, n := range graph {
 		for _, o := range n.links {
@@ -48,9 +56,11 @@ func linkedJira(t *testing.T, graph map[string]node, matched []string, seen *[]s
 			"issuelinks": links,
 		}}
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(f.wrap(func(w http.ResponseWriter, r *http.Request) {
 		jql := r.URL.Query().Get("jql")
+		mu.Lock()
 		*seen = append(*seen, jql)
+		mu.Unlock()
 		keys := matched
 		if m := keyIn.FindStringSubmatch(jql); m != nil {
 			if refuseKeyIn != "" {
@@ -141,8 +151,10 @@ func TestExploreAsksForAHundredKeysAtATime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(seen) != 3 || strings.Count(seen[1], ",") != 99 || strings.Count(seen[2], ",") != 49 {
-		t.Fatalf("searched %d times", len(seen))
+	commas := []int{strings.Count(seen[1], ","), strings.Count(seen[2], ",")}
+	slices.Sort(commas)
+	if len(seen) != 3 || !slices.Equal(commas, []int{49, 99}) {
+		t.Fatalf("searched %d times, %v", len(seen), commas)
 	}
 	if len(res.Issues) != 151 || len(res.Sets) != 1 || len(res.Sets[0].Keys) != 151 {
 		t.Fatalf("issues %d, sets %d", len(res.Issues), len(res.Sets))
@@ -227,5 +239,28 @@ func TestRunReadsDatesCategoryAndLinkWording(t *testing.T) {
 	want := []Link{{Key: "A-1", Type: "Cloners", Words: "clones", Outward: true}, {Key: "C-1", Type: "Cloners", Words: "is cloned by"}}
 	if got.StatusCategory != "done" || got.Created != "2026-01-02T10:00:00.000+0700" || got.Resolved != "" || !slices.Equal(got.Links, want) {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestExploreFetchesLinkBatchesInParallel(t *testing.T) {
+	graph := map[string]node{"A-1": {"new", nil}}
+	for i := range 350 {
+		k := fmt.Sprintf("B-%d", i)
+		graph[k] = node{"done", nil}
+		n := graph["A-1"]
+		n.links = append(n.links, k)
+		graph["A-1"] = n
+	}
+	var seen []string
+	var f inFlight
+	res, err := Explore(context.Background(), linkedJiraCounting(t, graph, []string{"A-1"}, &seen, "", &f), "q", true, Fields{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Issues) != 351 || res.Issues[0].Key != "A-1" {
+		t.Fatalf("issues %d, first %s", len(res.Issues), res.Issues[0].Key)
+	}
+	if m := f.most.Load(); m < 2 || m > workers {
+		t.Fatalf("at most %d requests at once, want 2 to %d", m, workers)
 	}
 }
