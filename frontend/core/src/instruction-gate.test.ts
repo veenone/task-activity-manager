@@ -208,6 +208,21 @@ describe('instruction gate', () => {
     expect(triggers, 'release.yml tag filters and the buildable apps have drifted').toEqual(apps.sort());
   });
 
+  // The Windows release job compiles each app's own Inno Setup script. PIE
+  // shipped a tag without one, so pie/v0.1.0 built the exe and then failed
+  // with no Windows assets (#429). Each script carries an AppId, and two apps
+  // sharing one would install over each other.
+  it('every app with a wails.json has its own installer script and AppId', () => {
+    const apps = GO_DIRS.filter((d) => fs.existsSync(path.join(repoRoot, d, 'wails.json')));
+    const ids = apps.map((app) => {
+      const iss = path.join(app, 'build', 'windows', 'installer', 'installer.iss');
+      expect(fs.existsSync(path.join(repoRoot, iss)), `${app} has no ${iss}`).toBe(true);
+      return read(iss).match(/^AppId=\{\{([0-9A-F-]{36})\}/m)?.[1];
+    });
+    expect(ids.every(Boolean), 'an installer script has no AppId line').toBe(true);
+    expect(new Set(ids).size, 'two apps share an installer AppId').toBe(apps.length);
+  });
+
   // core.autocrlf rewrites every tracked text file on a Windows checkout,
   // the gate scripts and the ratchet's own two data files among them. Git for
   // Windows runs a CRLF script anyway, so the damage hides until the repo is
