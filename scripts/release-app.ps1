@@ -187,8 +187,12 @@ if ($guideDirs.ContainsKey($App)) {
   $guideInner = Join-Path $guideStage $guideFolder
   New-Item -ItemType Directory -Force -Path $guideInner | Out-Null
   Copy-Item (Join-Path $guideSrc "USER_GUIDE.md") $guideInner -Force
-  Copy-Item (Join-Path $guideSrc "images") (Join-Path $guideInner "images") -Recurse -Force
-  Remove-Item (Join-Path $guideInner "images\.gitkeep") -Force -ErrorAction SilentlyContinue
+  # A guide written as one file, as PIE's is, has no images folder to copy.
+  $guideImages = Join-Path $guideSrc "images"
+  if (Test-Path $guideImages) {
+    Copy-Item $guideImages (Join-Path $guideInner "images") -Recurse -Force
+    Remove-Item (Join-Path $guideInner "images\.gitkeep") -Force -ErrorAction SilentlyContinue
+  }
   $guideZip = Join-Path $dist "$binary-$Version-user-guide.zip"
   if (Test-Path $guideZip) { Remove-Item $guideZip -Force }
   # Compress the folder itself so the archive root is the folder, not its files.
