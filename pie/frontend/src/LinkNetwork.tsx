@@ -55,6 +55,10 @@ export function LinkNetwork({
   // has no layout, so one to one.
   const unit = () => svg.current?.getScreenCTM?.()?.a || 1;
   const startDrag = (project: string, e: React.PointerEvent, origin: Point) => {
+    // Only the main button drags; a new press also forgets a drag whose click
+    // never came, so it cannot swallow this one.
+    dragged.current = false;
+    if (e.button !== 0) return;
     drag.current = { project, from: { x: e.clientX, y: e.clientY }, origin, far: false };
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
@@ -152,6 +156,7 @@ export function LinkNetwork({
                 onPointerDown={(e) => startDrag(n.project, e, p)}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
+                onPointerCancel={endDrag}
                 onClick={() => {
                   if (dragged.current) dragged.current = false;
                   else setPicked(n.project);

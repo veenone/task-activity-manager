@@ -24,7 +24,7 @@ export function LinkFlow({
   const name = (id: string) => (id.startsWith("t:") ? id.slice(2) : label(id.slice(2)));
   const { nodes, bands, height } = sankey(columns, links, { width: WIDTH - LEFT - RIGHT, height: HEIGHT, gap: 10 });
   return (
-    <div className="pie-results">
+    <div className="pie-flow">
       <Zoom label="Link flow">
         <svg
           className="pie-flow-svg"

@@ -36,3 +36,9 @@ it("zooms with Ctrl and the wheel, and stops at its limits", async () => {
   expect(screen.getByText("25%")).toBeVisible();
   expect(screen.getByRole("button", { name: "Zoom out" })).toBeDisabled();
 });
+
+it("zooms a trackpad pinch by as much as it moved, not a whole step each event", () => {
+  const { area } = show();
+  for (let i = 0; i < 6; i += 1) fireEvent.wheel(area, { deltaY: -2, ctrlKey: true });
+  expect(screen.getByText("103%")).toBeVisible();
+});

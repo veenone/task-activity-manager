@@ -212,3 +212,27 @@ it("moves a dragged project without recentring, and lays out afresh for a new ce
   expect(node.querySelector("circle")!.getAttribute("cx")).not.toBe(before);
   expect(screen.getByLabelText("Centre project")).toHaveValue("A");
 });
+
+it("stops dragging when the browser cancels the pointer", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
+  const node = chart.querySelector('[data-project="B"]')!;
+  fireEvent.pointerDown(node, { clientX: 0, clientY: 0, pointerId: 1, button: 0 });
+  fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
+  fireEvent.pointerCancel(node, { pointerId: 1 });
+  const after = node.querySelector("circle")!.getAttribute("cx");
+  fireEvent.pointerMove(node, { clientX: 90, clientY: 90, pointerId: 1 });
+  expect(node.querySelector("circle")!.getAttribute("cx")).toBe(after);
+});
+
+it("starts no drag from a button other than the main one", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
+  const node = chart.querySelector('[data-project="B"]')!;
+  const before = node.querySelector("circle")!.getAttribute("cx");
+  fireEvent.pointerDown(node, { clientX: 0, clientY: 0, pointerId: 1, button: 2 });
+  fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
+  expect(node.querySelector("circle")!.getAttribute("cx")).toBe(before);
+});

@@ -20,7 +20,9 @@ export function Zoom({ label, children }: { label: string; children: ReactNode }
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      by(e.deltaY < 0 ? STEP : 1 / STEP);
+      // Follow the wheel's distance, so a trackpad pinch, many tiny steps,
+      // zooms smoothly while one mouse notch (about 100) is one STEP.
+      by(Math.exp((-e.deltaY * Math.log(STEP)) / 100));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
