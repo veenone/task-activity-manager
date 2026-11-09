@@ -141,6 +141,18 @@ issue counts as finished, so a Rejected clone beside an open one is out of
 step. A set is **in step** when its issues agree: all finished, or all still
 open. Both pages can show only the sets that are out of step.
 
+On a large run the Project map can also be narrowed to the sets you care
+about:
+- **Baseline** keeps the sets that reach a project under that baseline, or
+  under none.
+- **Project** keeps the sets that reach that project. Its list shows only the
+  chosen baseline's projects.
+- **Key** keeps the sets with a key that contains what you type.
+
+The filters apply to Flow, Tree and Table together. A line says how many sets
+are showing out of the whole run, and **Clear filters** brings them all back.
+The counts above the map always describe the whole run.
+
 Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
 show the same sets three ways:
