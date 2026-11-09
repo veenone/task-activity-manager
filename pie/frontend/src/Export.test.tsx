@@ -7,6 +7,7 @@ import { CasesPage } from "./CasesPage";
 import { CyclesPage } from "./CyclesPage";
 import { LinkMap } from "./LinkMap";
 import { ProjectMap } from "./ProjectMap";
+import { ResultsTable } from "./ResultsTable";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
 
@@ -26,6 +27,7 @@ const issue = (key: string, statusCategory: string, links: object[] = []) => ({
   summary: `About ${key}`,
   matched: key !== "B-1",
   created: "2026-10-01T00:00:00Z",
+  updated: "2026-10-02T00:00:00Z",
   links,
 });
 const result = {
@@ -99,4 +101,11 @@ it("exports the open cycle's changes and cases", async () => {
   );
   await screen.findByRole("heading", { name: "Week 45" });
   expect(await exported()).toMatchObject({ name: "pie-cycle-Week 45", sheets: ["Changes", "Cases"] });
+});
+
+it("exports the Results rows the filters leave", async () => {
+  render(<ResultsTable issues={(result as { issues: never[] }).issues} caseKeys={new Set()} onOpenCases={async () => true} />);
+  const got = await exported();
+  expect(got).toMatchObject({ name: "pie-results", sheets: ["Results"] });
+  expect(got.first.rows.map((r: string[]) => r[0])).toEqual(["A-1", "B-1"]);
 });

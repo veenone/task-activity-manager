@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { query } from "../wailsjs/go/models";
-import { caseSheet, cycleSheets, linkSheets, mapSheet, setSheet, statisticsSheets } from "./exportSheets";
+import { caseSheet, cycleSheets, linkSheets, mapSheet, resultsSheet, setSheet, statisticsSheets } from "./exportSheets";
 
 const issue = (key: string, status: string, statusCategory: string, matched = true) =>
   ({ key, project: key.split("-")[0], status, statusCategory, summary: `About ${key}`, matched }) as query.Issue;
@@ -90,4 +90,16 @@ it("lists each case's projects with verdict and reason, and a cycle's changes", 
     ["Case gone", "ACME-0", "", "", ""],
     ["Verdict changed", "ACME-1", "Alpha (A)", "investigating", "affected"],
   ]);
+});
+
+it("writes the Results rows in the table's columns", () => {
+  const rows = [
+    { key: "A-1", project: "A", type: "Bug", summary: "Crash", status: "Open", priority: "High", clientVisibility: "Yes", updated: "2026-10-02T00:00:00.000+0000" },
+  ] as query.Issue[];
+  expect(resultsSheet(rows, label, { visibility: true, caseKeys: new Set(["A-1"]) })).toEqual({
+    name: "Results",
+    header: ["Key", "Project", "Type", "Summary", "Status", "Priority", "Client visibility", "Case", "Updated"],
+    rows: [["A-1", "Alpha (A)", "Bug", "Crash", "Open", "High", "Yes", "yes", "2026-10-02"]],
+  });
+  expect(resultsSheet(rows, label, { visibility: false, caseKeys: null }).header).toEqual(["Key", "Project", "Type", "Summary", "Status", "Priority", "Updated"]);
 });

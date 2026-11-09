@@ -17,7 +17,9 @@ The menu bar has three menus:
 - **View** switches tabs, from Ctrl+1 for Results to Ctrl+7 for Cycles. Its
   **Theme** submenu picks Light, Dark, or System to follow your operating
   system.
-- **Help** has About, which shows PIE's version.
+- **Help** has About. It shows PIE's version, the database it uses, the
+  runtime and the number of profiles, in the same box TAM and XTM use. Paste
+  it into a bug report.
 
 The moon or sun button at the right of the top bar switches between light and
 dark. PIE remembers the theme you pick, from either place, for the next time
@@ -365,9 +367,11 @@ each project. Choose a case's key to open it in the list. **List** goes back.
 
 ## Export to Excel
 
-Trace, the Project map, the Link map, Statistics, Cases and a cycle on the
-Cycles tab each have **Export to Excel**. It asks where to save, then writes
+Results, Trace, the Project map, the Link map, Statistics, Cases and a cycle
+on the Cycles tab each have **Export to Excel**. It asks where to save, then writes
 an .xlsx of what the view is showing, with its filters applied:
+- **Results** writes every row its filters leave, across all pages, in the
+  table's columns.
 - **Trace** writes the linked sets it lists, one issue per row.
 - **Project map** writes its table, and the same sets one issue per row.
 - **Link map** writes its grid and every link the grid counts.

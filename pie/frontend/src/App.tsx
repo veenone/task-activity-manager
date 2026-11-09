@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ViewTabs, applyTheme, useConfirm, useNotice, usePrompt } from "@agile-suite/core";
+import { ViewTabs, applyTheme, useConfirm, usePrompt } from "@agile-suite/core";
 import {
   DeleteProfile,
   DeleteQuery,
@@ -10,9 +10,9 @@ import {
   RunQuery,
   SaveQuery,
   StartupError,
-  Version,
 } from "../wailsjs/go/main/App";
 import type { profile, query, saved } from "../wailsjs/go/models";
+import { AboutModal } from "./AboutModal";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
 import { CasesPage } from "./CasesPage";
 import { CyclesPage } from "./CyclesPage";
@@ -61,7 +61,7 @@ export default function App() {
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
   const [shownTheme, setShownTheme] = useState(() => document.documentElement.dataset.theme ?? "light");
-  const { notice } = useNotice();
+  const [about, setAbout] = useState(false);
   const cases = useCases(profileId, setError);
   // null until the stored names arrive, so the dialog cannot save blanks over them.
   const [fields, setFields] = useState<saved.Fields | null>(null);
@@ -225,10 +225,7 @@ export default function App() {
       applyTheme(t);
       setShownTheme(document.documentElement.dataset.theme ?? "light");
     },
-    about: () =>
-      void Version().then((v) =>
-        notice({ title: `Project Issue Explorer ${v}`, message: "Cross-project issue analysis for Jira Data Center." }),
-      ),
+    about: () => setAbout(true),
   });
 
   if (startupError) {
@@ -384,6 +381,7 @@ export default function App() {
           }}
         />
       )}
+      {about && <AboutModal onClose={() => setAbout(false)} />}
       {adding && (
         <AddProfileDialog
           onClose={() => setAdding(false)}

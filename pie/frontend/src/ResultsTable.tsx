@@ -3,6 +3,8 @@ import type { query } from "../wailsjs/go/models";
 import { IssueDetail } from "./IssueDetail";
 import { projectLabel } from "./linked";
 import { ProjectInput } from "./ProjectInput";
+import { ExportButton } from "./ExportButton";
+import { resultsSheet } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
 
 type Field = "project" | "status" | "priority" | "clientVisibility";
@@ -96,6 +98,12 @@ export function ResultsTable({
             </select>
           </label>
         ))}
+        <ExportButton
+          name="pie-results"
+          sheets={() => [
+            resultsSheet(shown, (p) => projectLabel(p, names.get(p)), { visibility, caseKeys: hasCases ? caseKeys : null }),
+          ]}
+        />
         {hasCases && (
           <label>
             Case
