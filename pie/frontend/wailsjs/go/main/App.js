@@ -82,6 +82,10 @@ export function GetCycle(arg1, arg2) {
   return window['go']['main']['App']['GetCycle'](arg1, arg2);
 }
 
+export function GetDiagnostics() {
+  return window['go']['main']['App']['GetDiagnostics']();
+}
+
 export function JiraFilter(arg1, arg2) {
   return window['go']['main']['App']['JiraFilter'](arg1, arg2);
 }

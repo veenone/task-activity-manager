@@ -28,6 +28,7 @@ import (
 type App struct {
 	ctx        context.Context
 	db         *store.DB
+	dbPath     string
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
 	settings   *settings.Manager
@@ -43,6 +44,7 @@ type App struct {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	path, err := pieprofile.DefaultPath()
+	a.dbPath = path
 	if err == nil {
 		// Core's profile tables and PIE's own, in PIE's file. See pieprofile.
 		a.db, err = store.Open(path, saved.Schema())
