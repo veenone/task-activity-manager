@@ -10,6 +10,7 @@ import { mapSheet, setSheet } from "./exportSheets";
 import { MapFlow } from "./MapFlow";
 import { MapTree } from "./MapTree";
 import { Pager, usePaged } from "./Pager";
+import { ProjectInput } from "./ProjectInput";
 import { Card } from "./Statistics";
 
 const VIEWS = ["Flow", "Tree", "Table"] as const;
@@ -82,21 +83,13 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
             ))}
           </select>
         </label>
-        <label>
-          Project
-          <select
-            className="detail-input pie-filter-select"
-            value={live.project}
-            onChange={(e) => setFilter({ ...live, project: e.target.value })}
-          >
-            <option value="">All projects</option>
-            {pickable.map((p) => (
-              <option key={p} value={p}>
-                {projectLabel(p, names.get(p))}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ProjectInput
+          label="Project"
+          projects={pickable}
+          projectLabel={(p) => projectLabel(p, names.get(p))}
+          value={live.project}
+          onChange={(p) => setFilter({ ...live, project: p })}
+        />
         <label>
           Key
           <input

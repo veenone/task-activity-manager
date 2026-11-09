@@ -4,6 +4,7 @@ import type { query } from "../wailsjs/go/models";
 import { OutOfStep, ageText, allProjects, byKey, projectLabel, projectNames, tone } from "./linked";
 import { ExportButton } from "./ExportButton";
 import { setSheet } from "./exportSheets";
+import { ProjectInput } from "./ProjectInput";
 import { Pager, usePaged } from "./Pager";
 
 // A set rarely spans many projects, so its groups page in smaller steps.
@@ -22,10 +23,12 @@ export function TracePage({
 }) {
   const [project, setProject] = useState("");
   const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
+  const [keyText, setKeyText] = useState("");
+  const keyHit = (s: query.Set) => s.keys.some((k) => k.toLowerCase().includes(keyText.trim().toLowerCase()));
   const issues = byKey(result);
   const names = projectNames(result);
   const shownBy = (p: string, only: boolean) =>
-    result.sets.filter((s) => (p === "" || s.projects.includes(p)) && (!only || s.outOfStep));
+    result.sets.filter((s) => (p === "" || s.projects.includes(p)) && (!only || s.outOfStep) && keyHit(s));
   // The open set is the focused one if it is shown, else the first shown.
   const openIndex = (list: query.Set[]) => Math.max(0, list.findIndex((s) => focus !== null && s.keys.includes(focus)));
   const sets = shownBy(project, onlyOutOfStep);
@@ -44,16 +47,22 @@ export function TracePage({
     <div className="pie-linked pie-trace">
       <div className="pie-trace-side">
         <div className="pie-filters">
+          <ProjectInput
+            label="Project"
+            projects={allProjects(result.sets)}
+            projectLabel={(p) => projectLabel(p, names.get(p))}
+            value={project}
+            onChange={(p) => refilter(p, onlyOutOfStep)}
+          />
           <label>
-            Project
-            <select value={project} onChange={(e) => refilter(e.target.value, onlyOutOfStep)}>
-              <option value="">All projects</option>
-              {allProjects(result.sets).map((p) => (
-                <option key={p} value={p}>
-                  {projectLabel(p, names.get(p))}
-                </option>
-              ))}
-            </select>
+            Key
+            <input
+              className="detail-input pie-filter-select"
+              type="search"
+              value={keyText}
+              placeholder="Part of a key"
+              onChange={(e) => setKeyText(e.target.value)}
+            />
           </label>
           <label className="pie-check">
             <input type="checkbox" checked={onlyOutOfStep} onChange={(e) => refilter(project, e.target.checked)} />

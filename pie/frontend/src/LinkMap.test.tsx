@@ -165,3 +165,23 @@ it("centres the network on the busiest project and recentres on a neighbour", as
   expect(screen.getByLabelText("Centre project")).toHaveValue("B");
   expect(screen.getByRole("img", { name: "Projects linked to B by link type" })).toBeInTheDocument();
 });
+
+it("keeps the links with an end whose key contains the text", async () => {
+  const { user } = show();
+  await user.type(screen.getByLabelText("Key"), "c-1");
+  expect(cell("A", "C")).toHaveTextContent("Relates 1");
+  const grid = screen.getByRole("table", { name: "Projects connected by links" });
+  expect(within(grid).queryByRole("rowheader", { name: "B" })).not.toBeInTheDocument();
+});
+
+it("keeps only the links between the projects chosen", async () => {
+  const { user } = show();
+  const box = screen.getByLabelText("Add a project");
+  await user.type(box, "A{Enter}");
+  await user.type(box, "B{Enter}");
+  const grid = screen.getByRole("table", { name: "Projects connected by links" });
+  expect(within(grid).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["A", "B"]);
+  expect(cell("A", "B")).toHaveTextContent("Cloners 1");
+  await user.click(screen.getByRole("button", { name: "Remove A" }));
+  expect(screen.getByText("No links between projects to show.")).toBeVisible();
+});

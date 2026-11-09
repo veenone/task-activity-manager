@@ -137,7 +137,7 @@ it("keeps the sets that pass every filter", () => {
 it("filters every view by project and key, says how many show, and clears", async () => {
   const { user } = show();
   await screen.findByRole("option", { name: "Baseline A" });
-  await user.selectOptions(screen.getByLabelText("Project"), "C");
+  await user.type(screen.getByLabelText("Project"), "C");
   expect(screen.getByText("Showing 1 of 2 linked sets")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Table" }));
   const table = screen.getByRole("table", { name: "Project map" });
@@ -153,7 +153,7 @@ it("filters every view by project and key, says how many show, and clears", asyn
 it("offers only the chosen baseline's projects", async () => {
   const { user } = show();
   await user.selectOptions(await screen.findByLabelText("Baseline"), "A");
-  expect(within(screen.getByLabelText("Project")).getAllByRole("option").map((o) => o.textContent)).toEqual(["All projects", "A", "B"]);
+  expect([...document.querySelectorAll(`#${screen.getByLabelText("Project").getAttribute("list")} option`)].map((o) => o.textContent)).toEqual(["A", "B"]);
 });
 
 it("drops the Showing line once every filter is back to its default", async () => {
@@ -170,9 +170,9 @@ it("forgets a chosen project the next run no longer reaches, instead of showing 
   const user = userEvent.setup();
   const view = render(<ProjectMap profileId="p1" result={result as never} onOpen={vi.fn()} />);
   await screen.findByRole("option", { name: "Baseline A" });
-  await user.selectOptions(screen.getByLabelText("Project"), "C");
+  await user.type(screen.getByLabelText("Project"), "C");
   const next = { ...result, sets: [result.sets[0]] };
   view.rerender(<ProjectMap profileId="p1" result={next as never} onOpen={vi.fn()} />);
-  expect(screen.getByLabelText("Project")).toHaveValue("");
+  expect(screen.getByText("No project matches")).toBeVisible();
   expect(screen.queryByText("No linked sets to show.")).not.toBeInTheDocument();
 });

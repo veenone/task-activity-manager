@@ -123,7 +123,7 @@ describe("pages and project names in the views", () => {
     const list = screen.getByRole("list", { name: "Linked sets" });
     expect(within(list).getByRole("button", { current: true })).toHaveTextContent("A-28");
     expect(screen.getByText("26-30 of 30")).toBeVisible();
-    expect(screen.getByRole("option", { name: "A name (A)" })).toBeInTheDocument();
+    expect(document.querySelector('datalist option[value="A"]')).toHaveTextContent("A name (A)");
     expect(screen.getByRole("group", { name: "Project A name (A)" })).toBeVisible();
   });
 
@@ -132,7 +132,7 @@ describe("pages and project names in the views", () => {
     render(<TracePage result={many} focus={null} onFocus={() => {}} />);
     await user.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("26-30 of 30")).toBeVisible();
-    await user.selectOptions(screen.getByLabelText("Project"), "B");
+    await user.type(screen.getByLabelText("Project"), "B");
     expect(screen.getByText("1-25 of 30")).toBeVisible();
     const list = screen.getByRole("list", { name: "Linked sets" });
     expect(within(list).getByRole("button", { current: true })).toHaveTextContent("A-1");
@@ -169,7 +169,7 @@ describe("pages and project names in the views", () => {
 
   it("names projects in the Statistics filter and table", () => {
     render(<Statistics result={many} productField="" />);
-    expect(screen.getByRole("option", { name: "A name (A)" })).toBeInTheDocument();
+    expect(document.querySelector('datalist option[value="A"]')).toHaveTextContent("A name (A)");
     expect(within(screen.getByRole("table", { name: "Per project" })).getByRole("cell", { name: "B name (B)" })).toBeVisible();
   });
 });
