@@ -1000,3 +1000,28 @@ body,
   gap: 8px;
   align-items: center;
 }
+
+/* Projects chooser: a typeable box, then the chosen projects as chips (#444). */
+.pie-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pie-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pie-chips li {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-1);
+  font-size: var(--fs-sm);
+}

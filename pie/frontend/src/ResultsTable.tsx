@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { IssueDetail } from "./IssueDetail";
 import { projectLabel } from "./linked";
+import { ProjectInput } from "./ProjectInput";
 import { Pager, usePaged } from "./Pager";
 
 type Field = "project" | "status" | "priority" | "clientVisibility";
@@ -62,7 +63,20 @@ export function ResultsTable({
   return (
     <>
       <div className="pie-filters">
-        {FILTERS.filter(({ field }) => values(field).length > 0).map(({ field, label }) => (
+        {values("project").length > 0 && (
+          <ProjectInput
+            label="Project"
+            allText="All"
+            projects={values("project")}
+            projectLabel={(p) => projectLabel(p, names.get(p))}
+            value={active("project")}
+            onChange={(p) => {
+              setChosen({ ...chosen, project: p });
+              pager.onPage(0);
+            }}
+          />
+        )}
+        {FILTERS.filter(({ field }) => field !== "project" && values(field).length > 0).map(({ field, label }) => (
           <label key={field}>
             {label}
             <select
@@ -76,7 +90,7 @@ export function ResultsTable({
               <option value="">All</option>
               {values(field).map((v) => (
                 <option key={v} value={v}>
-                  {field === "project" ? projectLabel(v, names.get(v)) : v}
+                  {v}
                 </option>
               ))}
             </select>

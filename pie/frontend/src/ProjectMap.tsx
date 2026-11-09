@@ -10,6 +10,7 @@ import { mapSheet, setSheet } from "./exportSheets";
 import { MapFlow } from "./MapFlow";
 import { MapTree } from "./MapTree";
 import { Pager, usePaged } from "./Pager";
+import { ProjectInput } from "./ProjectInput";
 import { Card } from "./Statistics";
 
 const VIEWS = ["Flow", "Tree", "Table"] as const;
@@ -21,6 +22,8 @@ const NO_FILTER: MapFilter = { baseline: "", project: "", key: "" };
 export function ProjectMap({ profileId, result, onOpen }: { profileId: string; result: query.Result; onOpen: (key: string) => void }) {
   const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
   const [filter, setFilter] = useState<MapFilter>(NO_FILTER);
+  // clears remounts the project box, so Clear filters also empties text that named no project.
+  const [clears, setClears] = useState(0);
   const [view, setView] = useState<(typeof VIEWS)[number]>("Flow");
   const [baselines, setBaselines] = useState<cases.Baseline[]>([]);
   const [editing, setEditing] = useState(false);
@@ -82,21 +85,14 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
             ))}
           </select>
         </label>
-        <label>
-          Project
-          <select
-            className="detail-input pie-filter-select"
-            value={live.project}
-            onChange={(e) => setFilter({ ...live, project: e.target.value })}
-          >
-            <option value="">All projects</option>
-            {pickable.map((p) => (
-              <option key={p} value={p}>
-                {projectLabel(p, names.get(p))}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ProjectInput
+          key={clears}
+          label="Project"
+          projects={pickable}
+          projectLabel={(p) => projectLabel(p, names.get(p))}
+          value={live.project}
+          onChange={(p) => setFilter({ ...live, project: p })}
+        />
         <label>
           Key
           <input
@@ -115,6 +111,7 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
               className="btn btn-ghost"
               onClick={() => {
                 setFilter(NO_FILTER);
+                setClears((n) => n + 1);
                 setOnlyOutOfStep(false);
               }}
             >

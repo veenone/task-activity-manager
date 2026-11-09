@@ -46,7 +46,7 @@ describe("Statistics", () => {
     expect(headline("reach more than one product base")).toHaveTextContent("2 reach");
     expect(headline("linked sets out of step")).toHaveTextContent("1 linked");
 
-    await userEvent.selectOptions(screen.getByLabelText("Project"), "B");
+    await userEvent.type(screen.getByLabelText("Project"), "B");
     expect(headline("not finished")).toHaveTextContent("0 not finished");
     const rows = within(screen.getByRole("table", { name: "Per project" })).getAllByRole("row");
     expect(rows.map((r) => r.textContent)).toEqual(["ProjectProduct baseIssuesNot finishedMedian age, not finished", "BTwo10-"]);
@@ -76,7 +76,7 @@ describe("Statistics", () => {
 
   it("drops a project filter the next run does not contain", async () => {
     const { rerender } = render(<Statistics result={result} productField="" />);
-    await userEvent.selectOptions(screen.getByLabelText("Project"), "B");
+    await userEvent.type(screen.getByLabelText("Project"), "B");
     const onlyA = { ...result, issues: result.issues.filter((i) => i.project === "A"), sets: [] } as unknown as query.Result;
     rerender(<Statistics result={onlyA} productField="" />);
     expect(screen.getByLabelText("Project")).toHaveValue("");

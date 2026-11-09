@@ -5,6 +5,7 @@ import { errorText } from "./AddProfileDialog";
 import { ExportButton } from "./ExportButton";
 import { linkSheets } from "./exportSheets";
 import { LinkFlow } from "./LinkFlow";
+import { ProjectsChooser } from "./ProjectInput";
 import { LinkNetwork } from "./LinkNetwork";
 import { byKey, projectLabel, projectNames } from "./linked";
 import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
@@ -40,6 +41,8 @@ export function LinkMap({
   );
   const [off, setOff] = useState<Set<string>>(new Set());
   const [inside, setInside] = useState(false);
+  const [keyText, setKeyText] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
   const [bothEnds, setBothEnds] = useState(true);
   const [chosen, setChosen] = useState<{ from: string; to: string } | null>(null);
   // Everything below reads the run once per change of run or filter. A large
@@ -52,12 +55,22 @@ export function LinkMap({
   const label = (p: string) => projectLabel(p, names.get(p));
   const { shown, projects } = useMemo(() => {
     const ends = (e: Edge) => [projectOf(e.from, issues), projectOf(e.to, issues)] as const;
+    const text = keyText.trim().toLowerCase();
     const kept = edges.filter((e) => {
       const [pf, pt] = ends(e);
-      return (inside || pf !== pt) && (!bothEnds || (issues.has(e.from) && issues.has(e.to)));
+      return (
+        (inside || pf !== pt) &&
+        (!bothEnds || (issues.has(e.from) && issues.has(e.to))) &&
+        (picked.length === 0 || (picked.includes(pf) && picked.includes(pt))) &&
+        (!text || e.from.toLowerCase().includes(text) || e.to.toLowerCase().includes(text))
+      );
     });
     return { shown: kept, projects: [...new Set(kept.flatMap((e) => ends(e)))].sort() };
-  }, [edges, issues, inside, bothEnds]);
+  }, [edges, issues, inside, bothEnds, picked, keyText]);
+  const everyProject = useMemo(
+    () => [...new Set(edges.flatMap((e) => [projectOf(e.from, issues), projectOf(e.to, issues)]))].sort(),
+    [edges, issues],
+  );
   const ticked = useMemo(() => shown.filter((e) => !off.has(e.type)), [shown, off]);
   const cells = useMemo(() => byCell(ticked, issues), [ticked, issues]);
   const between = (from: string, to: string) => cells.get(`${from}>${to}`) ?? [];
@@ -98,6 +111,17 @@ export function LinkMap({
         <button type="button" className="btn" disabled={refreshing} aria-busy={refreshing} onClick={() => void refreshLinks()}>
           Refresh links
         </button>
+        <ProjectsChooser projects={everyProject} projectLabel={label} chosen={picked} onChange={setPicked} />
+        <label>
+          Key
+          <input
+            className="detail-input"
+            type="search"
+            value={keyText}
+            placeholder="Part of a key"
+            onChange={(e) => setKeyText(e.target.value)}
+          />
+        </label>
         {refreshError && (
           <p role="alert" className="error-text">
             {refreshError}

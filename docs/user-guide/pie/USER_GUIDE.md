@@ -52,6 +52,12 @@ same whenever you run it.
 
 ## Run a query
 
+Every project filter in PIE is a box you can type into: Trace, Project map,
+Statistics, Results, and the Network centre on the Link map. As you type, the
+suggestions narrow to the projects whose key or name contains it, and picking
+one applies it. Clear the box to see every project again. Text that names no
+project applies no filter, and the box says "No project matches".
+
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
 project, type, summary, status, priority and last update.
 
@@ -125,7 +131,8 @@ the same project are not followed.
 Issues joined this way form a linked set. **Results** lists only the issues
 your query matched. The two other pages show the sets:
 
-- **Trace** lists the linked sets on the left. Pick one to see its issues
+- **Trace** lists the linked sets on the left. **Key** above the list keeps
+  the sets with an issue key that contains what you type. Pick one to see its issues
   project by project, with status, age and how each issue links to the others
   (for example "clones ALPHA-101"). An issue your query did not match is
   marked "Not in the query".
@@ -213,6 +220,12 @@ the summary of the issue the link starts from. The button beside the title
 switches to the other direction and says how many links it has. Choose a key
 to open it in Trace. A run saved before PIE kept link direction asks you to
 run the query again.
+
+To narrow the Link map, type into **Add a project** above the link types and
+press Enter, or pick from the suggestions. Once you have chosen some projects,
+the grid, Flow and Network keep only the links between them. Remove a project
+with the × on its chip. **Key** keeps the links with an end whose issue key
+contains what you type.
 
 On a large run the grid scrolls both ways. The column headers and the project
 column stay in view. A column shows the project key, and hovering over it

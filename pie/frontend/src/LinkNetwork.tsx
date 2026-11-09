@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
+import { ProjectInput } from "./ProjectInput";
 import { busiest, type Edge, neighbours, projectOf, type Spoke } from "./linkData";
 
 // DRAWN is how many neighbours the diagram places around the centre. The list
@@ -39,16 +40,16 @@ export function LinkNetwork({
   return (
     <div className="pie-network">
       <div className="pie-network-chart">
-        <label className="pie-network-pick">
-          Centre project
-          <select className="detail-input pie-filter-select" value={centre} onChange={(e) => setPicked(e.target.value)}>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {label(p)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="pie-network-pick">
+          <ProjectInput
+            label="Centre project"
+            allText="Busiest project"
+            projects={projects}
+            projectLabel={label}
+            value={centre}
+            onChange={setPicked}
+          />
+        </div>
         <svg
           className="pie-network-svg"
           viewBox={`${-box} ${-box} ${box * 2} ${box * 2}`}

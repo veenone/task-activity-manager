@@ -35,16 +35,12 @@ const keys = () =>
 it("narrows the rows by project, status and priority together", async () => {
   const user = userEvent.setup();
   render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
-  expect(within(screen.getByLabelText("Project")).getAllByRole("option").map((o) => o.textContent)).toEqual([
-    "All",
-    "A name (A)",
-    "B name (B)",
-  ]);
+  expect([...document.querySelectorAll(`#${screen.getByLabelText("Project").getAttribute("list")} option`)].map((o) => o.textContent)).toEqual(["A name (A)", "B name (B)"]);
   await user.selectOptions(screen.getByLabelText("Status"), "Open");
   expect(keys()).toEqual(["A-1", "B-1", "B-2"]);
   await user.selectOptions(screen.getByLabelText("Priority"), "High");
   expect(keys()).toEqual(["A-1", "B-2"]);
-  await user.selectOptions(screen.getByLabelText("Project"), "B");
+  await user.type(screen.getByLabelText("Project"), "B");
   expect(keys()).toEqual(["B-2"]);
   expect(screen.getByText("Showing 1 of 4 issues")).toBeVisible();
 });
@@ -56,7 +52,7 @@ it("starts again at the first page when a filter changes", async () => {
   await user.click(screen.getByRole("button", { name: "Next page" }));
   await user.selectOptions(screen.getByLabelText("Status"), "Open");
   expect(screen.getByText("1-25 of 40")).toBeVisible();
-  expect(screen.getByRole("status")).toHaveTextContent("Showing 40 of 60 issues");
+  expect(screen.getByText("Showing 40 of 60 issues")).toBeVisible();
 });
 
 it("drops a filter value the next run does not hold", async () => {

@@ -5,6 +5,7 @@ import { projectLabel, projectNames } from "./linked";
 import { ExportButton } from "./ExportButton";
 import { statisticsSheets } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
+import { ProjectInput } from "./ProjectInput";
 import { statistics } from "./stats";
 
 const RANGES = [
@@ -41,17 +42,13 @@ export function Statistics({ result, productField }: { result: query.Result; pro
   return (
     <section className="pie-stats" aria-label="Statistics">
       <div className="pie-filters">
-        <label>
-          Project
-          <select className="detail-input pie-filter-select" value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value="">All projects</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {projectLabel(p, names.get(p))}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ProjectInput
+          label="Project"
+          projects={projects}
+          projectLabel={(p) => projectLabel(p, names.get(p))}
+          value={project}
+          onChange={setProject}
+        />
         <label>
           Created
           <select

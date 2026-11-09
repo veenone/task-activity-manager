@@ -155,14 +155,22 @@ describe("trace", () => {
   it("filters the sets by project and by out of step", async () => {
     const user = await runAndOpen("Trace");
     const list = screen.getByRole("list", { name: "Linked sets" });
-    await user.selectOptions(screen.getByLabelText("Project"), "C");
+    await user.type(screen.getByLabelText("Project"), "C");
     expect(within(list).queryByRole("button", { name: /^A-1/ })).not.toBeInTheDocument();
     expect(within(list).getByRole("button", { name: /^A-2/ })).toBeVisible();
 
-    await user.selectOptions(screen.getByLabelText("Project"), "");
+    await user.clear(screen.getByLabelText("Project"));
     await user.click(screen.getByLabelText("Out of step only"));
     expect(within(list).getByRole("button", { name: /^A-1/ })).toBeVisible();
     expect(within(list).queryByRole("button", { name: /^A-2/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the sets with a key containing the text", async () => {
+    const user = await runAndOpen("Trace");
+    const list = screen.getByRole("list", { name: "Linked sets" });
+    await user.type(screen.getByLabelText("Key"), "c-2");
+    expect(within(list).queryByRole("button", { name: /^A-1/ })).not.toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /^A-2/ })).toBeVisible();
   });
 });
 
