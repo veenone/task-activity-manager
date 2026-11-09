@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -90,14 +91,26 @@ func write(f *excelize.File, name string, s Sheet, bold int) error {
 	return f.SetColWidth(name, "A", last, 18)
 }
 
-// cell stores a whole number as a number. "0042" stays text, since its
-// leading zero is part of what it says.
+// cell stores a whole number as a number, but only one that reads back as
+// the same text: "0042", "-007" and "+5" stay text, and so does a long key
+// that Excel's doubles could not hold exactly.
 func cell(v string) any {
 	n, err := strconv.Atoi(v)
-	if err != nil || (len(v) > 1 && v[0] == '0') || v[0] == '+' {
+	if err != nil || strconv.Itoa(n) != v || n > 1e15 || n < -1e15 {
 		return v
 	}
 	return n
+}
+
+// FileName makes name safe to suggest as a file name on Windows, which
+// refuses these characters; a cycle's name is the analyst's own text.
+func FileName(name string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 32 || strings.ContainsRune(`\/:*?"<>|`, r) {
+			return '-'
+		}
+		return r
+	}, name)
 }
 
 // sheetName fits a name to Excel's 31 characters, or names an unnamed sheet

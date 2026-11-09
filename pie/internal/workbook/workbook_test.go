@@ -52,6 +52,20 @@ func TestWorkbookKeepsLeadingZerosAndTrimsSheetNames(t *testing.T) {
 	}
 }
 
+func TestOnlyANumberThatReadsBackTheSameIsStoredAsOne(t *testing.T) {
+	for v, number := range map[string]bool{"12": true, "-5": true, "0": true, "-007": false, "0042": false, "+5": false, "123456789012345678": false, "": false} {
+		if _, got := cell(v).(int); got != number {
+			t.Errorf("cell(%q) stored as a number: %v, want %v", v, got, number)
+		}
+	}
+}
+
+func TestFileNameDropsWhatWindowsRefuses(t *testing.T) {
+	if got := FileName(`pie-cycle-Week 45/46: "Q1" <draft>|?*\`); got != "pie-cycle-Week 45-46- -Q1- -draft-----" {
+		t.Fatalf("file name = %q", got)
+	}
+}
+
 func TestWorkbookRefusesNoSheets(t *testing.T) {
 	if _, err := Workbook(nil); err == nil {
 		t.Fatal("an empty workbook was written")

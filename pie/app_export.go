@@ -19,7 +19,7 @@ func (a *App) ExportWorkbook(name string, sheets []workbook.Sheet) (string, erro
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export to Excel",
-		DefaultFilename: name + ".xlsx",
+		DefaultFilename: workbook.FileName(name) + ".xlsx",
 		Filters:         []runtime.FileFilter{{DisplayName: "Excel workbook", Pattern: "*.xlsx"}},
 	})
 	if err != nil {

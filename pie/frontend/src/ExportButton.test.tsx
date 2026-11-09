@@ -25,7 +25,7 @@ it("says nothing when the dialog is cancelled, and why when the write fails", as
   const user = userEvent.setup();
   render(<ExportButton name="pie-links" sheets={() => [sheet]} />);
   await user.click(screen.getByRole("button", { name: "Export to Excel" }));
-  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toBeEmptyDOMElement();
   await user.click(screen.getByRole("button", { name: "Export to Excel" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("access denied");
 });

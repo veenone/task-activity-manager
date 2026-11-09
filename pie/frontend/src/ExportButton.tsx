@@ -28,11 +28,10 @@ export function ExportButton({ name, sheets }: { name: string; sheets: () => She
       <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void save()}>
         Export to Excel
       </button>
-      {saved && (
-        <span role="status" className="muted">
-          {`Saved to ${saved}`}
-        </span>
-      )}
+      {/* Mounted from the start, so a screen reader announces the text when it arrives. */}
+      <span role="status" className="muted">
+        {saved && `Saved to ${saved}`}
+      </span>
       {error && (
         <span role="alert" className="error-text">
           {error}

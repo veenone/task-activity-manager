@@ -154,7 +154,7 @@ it("publishes a cycle, asking first when Confluence already has a page with its 
 
   expect(api.PublishCycle).toHaveBeenNthCalledWith(1, "p1", 2, false);
   expect(api.PublishCycle).toHaveBeenNthCalledWith(2, "p1", 2, true);
-  expect(await screen.findByRole("status")).toHaveTextContent("Published as Impact report: Week 45.");
+  expect(await screen.findByText("Published as Impact report: Week 45.")).toHaveAttribute("role", "status");
   expect(await screen.findByRole("button", { name: /^Week 45Taken 2026-11-07, published 2026-11-09/ })).toBeVisible();
   expect(screen.getByRole("button", { name: "Publish again" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Take again" })).not.toBeInTheDocument();
@@ -166,7 +166,7 @@ it("writes nothing when the analyst says no to the question", async () => {
   await user.click(await screen.findByRole("button", { name: "Publish" }));
   await user.click(within(await screen.findByRole("alertdialog")).getByText("Cancel"));
   expect(api.PublishCycle).toHaveBeenCalledTimes(1);
-  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Published as/)).not.toBeInTheDocument();
 });
 
 it("says why a publish failed", async () => {
