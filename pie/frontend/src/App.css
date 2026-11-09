@@ -556,13 +556,13 @@ body,
 .pie-linkmap-grid tbody th {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: var(--z-sticky);
   background: var(--surface-2);
 }
 
 .pie-linkmap-grid thead th:first-child {
   left: 0;
-  z-index: 2;
+  z-index: calc(var(--z-sticky) + 1);
 }
 
 .pie-linkmap-grid tbody tr:nth-child(even) td {
