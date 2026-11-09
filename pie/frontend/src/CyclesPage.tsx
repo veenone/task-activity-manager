@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, usePrompt } from "@agile-suite/core";
-import { Cycles, DeleteCycle, GetCycle, RetakeCycle, TakeCycle } from "../wailsjs/go/main/App";
+import { Cycles, DeleteCycle, GetCycle, PublishCycle, RetakeCycle, TakeCycle } from "../wailsjs/go/main/App";
 import type { cycles, query } from "../wailsjs/go/models";
 import { errorText } from "./AddProfileDialog";
 import { VerdictGrid } from "./CaseGrid";
+import { ConfluenceDialog } from "./ConfluenceDialog";
 import { projectNames } from "./linked";
 import { Card } from "./Statistics";
 
@@ -13,6 +14,7 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
   const [list, setList] = useState<cycles.Cycle[] | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [settings, setSettings] = useState(false);
   const { prompt } = usePrompt();
   const { confirm } = useConfirm();
 
@@ -73,6 +75,9 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
         <button type="button" className="btn btn-primary" onClick={() => void take()}>
           New cycle
         </button>
+        <button type="button" className="btn" onClick={() => setSettings(true)}>
+          Confluence settings
+        </button>
         {error && (
           <p role="alert" className="error-text">
             {error}
@@ -105,8 +110,10 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
           id={openId}
           names={result ? projectNames(result) : new Map()}
           onDelete={(c) => void remove(c)}
+          onPublished={() => void reload(openId)}
         />
       )}
+      {settings && <ConfluenceDialog profileId={profileId} onClose={() => setSettings(false)} />}
     </div>
   );
 }
@@ -116,14 +123,18 @@ function CycleDetail({
   id,
   names,
   onDelete,
+  onPublished,
 }: {
   profileId: string;
   id: number;
   names: Map<string, string>;
   onDelete: (c: cycles.Cycle) => void;
+  onPublished: () => void;
 }) {
   const [d, setD] = useState<cycles.Detail | null>(null);
   const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     let current = true;
@@ -145,6 +156,25 @@ function CycleDetail({
     }
   };
 
+  // publish asks Go first without confirming; Go answers with a question when
+  // the page has the cycle's title already or was edited in Confluence.
+  const publish = async () => {
+    setError("");
+    setDone("");
+    try {
+      let out = await PublishCycle(profileId, id, false);
+      if (out.ask) {
+        if (!(await confirm({ title: "Publish this cycle?", message: out.ask, confirmLabel: "Publish" }))) return;
+        out = await PublishCycle(profileId, id, true);
+      }
+      setD(await GetCycle(profileId, id));
+      setDone(`Published as ${out.title}.`);
+      onPublished();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
   const alert = error && (
     <p role="alert" className="error-text">
       {error}
@@ -156,6 +186,9 @@ function CycleDetail({
     <section className="pie-trace-detail" aria-labelledby="pie-cycle-heading">
       <div className="pie-filters">
         <h2 id="pie-cycle-heading">{d.name}</h2>
+        <button type="button" className="btn btn-primary" onClick={() => void publish()}>
+          {d.publishedAt ? "Publish again" : "Publish"}
+        </button>
         {!d.publishedAt && (
           <>
             <button type="button" className="btn" onClick={() => void retake()}>
@@ -168,6 +201,11 @@ function CycleDetail({
         )}
       </div>
       {alert}
+      {done && (
+        <p role="status" className="muted">
+          {done}
+        </p>
+      )}
       <p className="muted">
         {ch.since
           ? `Compared with ${ch.since}, the last cycle published before this one.`

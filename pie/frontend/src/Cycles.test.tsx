@@ -11,6 +11,9 @@ vi.mock("../wailsjs/go/main/App", () => ({
   GetCycle: vi.fn(),
   RetakeCycle: vi.fn(),
   DeleteCycle: vi.fn(),
+  PublishCycle: vi.fn(),
+  ConfluenceSettings: vi.fn(),
+  SetConfluenceSettings: vi.fn(),
 }));
 
 const draft = { id: 2, name: "Week 45", takenAt: "2026-11-07T10:00:00Z", publishedAt: "" };
@@ -18,7 +21,9 @@ const published = { id: 1, name: "Week 44", takenAt: "2026-10-31T10:00:00Z", pub
 const project = (key: string, verdict: string) => ({ key, verdict, reason: "", assessedAt: "" });
 const detail = {
   ...draft,
-  cases: [{ id: 1, key: "ACME-1", state: "open", notes: "", openedAt: "", assessed: 1, affected: 1, projects: [project("ALPHA", "affected")] }],
+  cases: [
+    { id: 1, key: "ACME-1", state: "open", notes: "", openedAt: "", assessed: 1, affected: 1, projects: [project("ALPHA", "affected")] },
+  ],
   changes: {
     since: "Week 44",
     new: ["ACME-3"],
@@ -129,4 +134,70 @@ it("keeps the cycle on screen when Take again fails", async () => {
   await user.click(await screen.findByRole("button", { name: "Take again" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("that cycle is published");
   expect(screen.getByRole("table", { name: "Cases by project" })).toBeVisible();
+});
+
+it("publishes a cycle, asking first when Confluence already has a page with its title", async () => {
+  const user = show();
+  vi.mocked(api.PublishCycle)
+    .mockResolvedValueOnce({
+      title: "Impact report: Week 45",
+      pageId: "",
+      ask: "A page named that already exists in SEC. Publish over it?",
+    })
+    .mockResolvedValueOnce({ title: "Impact report: Week 45", pageId: "50", ask: "" });
+  await user.click(await screen.findByRole("button", { name: "Publish" }));
+  vi.mocked(api.Cycles).mockResolvedValue([{ ...draft, publishedAt: "2026-11-09T10:00:00Z" }, published]);
+  vi.mocked(api.GetCycle).mockResolvedValue({ ...detail, publishedAt: "2026-11-09T10:00:00Z" } as never);
+  const ask = await screen.findByRole("alertdialog");
+  expect(ask).toHaveTextContent("A page named that already exists in SEC. Publish over it?");
+  await user.click(within(ask).getByRole("button", { name: "Publish" }));
+
+  expect(api.PublishCycle).toHaveBeenNthCalledWith(1, "p1", 2, false);
+  expect(api.PublishCycle).toHaveBeenNthCalledWith(2, "p1", 2, true);
+  expect(await screen.findByRole("status")).toHaveTextContent("Published as Impact report: Week 45.");
+  expect(await screen.findByRole("button", { name: /^Week 45Taken 2026-11-07, published 2026-11-09/ })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Publish again" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Take again" })).not.toBeInTheDocument();
+});
+
+it("writes nothing when the analyst says no to the question", async () => {
+  const user = show();
+  vi.mocked(api.PublishCycle).mockResolvedValue({ title: "Impact report: Week 45", pageId: "", ask: "Someone edited it. Publish anyway?" });
+  await user.click(await screen.findByRole("button", { name: "Publish" }));
+  await user.click(within(await screen.findByRole("alertdialog")).getByText("Cancel"));
+  expect(api.PublishCycle).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+it("says why a publish failed", async () => {
+  const user = show();
+  vi.mocked(api.PublishCycle).mockRejectedValue("this profile has no Confluence token yet. Add one in Confluence settings");
+  await user.click(await screen.findByRole("button", { name: "Publish" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("no Confluence token yet");
+  expect(screen.getByRole("button", { name: "Take again" })).toBeVisible();
+});
+
+it("stores the Confluence settings with a new token", async () => {
+  const user = show();
+  vi.mocked(api.ConfluenceSettings).mockResolvedValue({
+    baseURL: "https://wiki.example.com",
+    spaceKey: "SEC",
+    rootPageID: "",
+    reportsSpaceKey: "",
+    reportsRootPageID: "",
+  } as never);
+  vi.mocked(api.SetConfluenceSettings).mockResolvedValue();
+  await user.click(await screen.findByRole("button", { name: "Confluence settings" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(await within(dialog).findByLabelText("Confluence URL")).toHaveValue("https://wiki.example.com");
+  expect(within(dialog).getByLabelText("Space key")).toHaveValue("SEC");
+  await user.type(within(dialog).getByLabelText("Parent page id"), "7");
+  await user.type(within(dialog).getByLabelText("Token"), "secret");
+  await user.click(within(dialog).getByRole("button", { name: "Save" }));
+  expect(api.SetConfluenceSettings).toHaveBeenCalledWith(
+    "p1",
+    { baseURL: "https://wiki.example.com", spaceKey: "SEC", rootPageID: "7", reportsSpaceKey: "", reportsRootPageID: "" },
+    "secret",
+  );
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
