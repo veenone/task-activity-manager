@@ -265,6 +265,27 @@ export namespace evidence {
 
 }
 
+export namespace export {
+	
+	export class Sheet {
+	    name: string;
+	    header: string[];
+	    rows: string[][];
+	
+	    static createFrom(source: any = {}) {
+	        return new Sheet(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.header = source["header"];
+	        this.rows = source["rows"];
+	    }
+	}
+
+}
+
 export namespace jira {
 	
 	export class Project {
