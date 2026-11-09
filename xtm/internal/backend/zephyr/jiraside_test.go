@@ -50,6 +50,7 @@ func TestTheDelegatedMethodsOnlyTalkToJira(t *testing.T) {
 	// against a stub body is not what is under test.
 	_, _, _ = a.SearchTestsPage(ctx, "PROJ", "", "", 0, 1)
 	_, _ = a.ListTestsBasic(ctx, []string{"PROJ-101"})
+	_, _ = a.KeysMatching(ctx, []string{"PROJ-101"}, "labels = smoke")
 	_, _ = a.GetTestFields(ctx, "PROJ-101")
 	_, _, _ = a.SearchTestsAcrossProjects(ctx, []string{"PROJ"}, "login", 0, 1)
 	_, _ = a.GetTestMeta(ctx, "PROJ-101")

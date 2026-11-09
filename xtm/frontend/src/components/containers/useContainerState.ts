@@ -8,6 +8,7 @@ import type { ExecMemberRun, RollupMember } from "../../api";
 import { keyCompare, cmpStr, applyDir } from "../../sort";
 import { useContainers, useContainerBoard, useContainerBugs, useContainerMembers, useContainerRollup } from "../../queries/containers";
 import { useCapabilities } from "../../features";
+import { keepMembers, memberLabels } from "./MemberFilters";
 import { KINDS, offeredKinds, offeredRunStatuses } from "./constants";
 
 // useContainerState holds what the Containers view knows: the chosen kind and
@@ -97,6 +98,10 @@ export function useContainerState() {
   const [memberRunFilter, setMemberRunFilter] = useState("");
   // Clickable roll-up breakdown: which bucket's modal is open, and the member
   // detail (lazily fetched on first badge click, cached per selected container).
+  // Label and JQL filters over an open execution's tests (#446). jqlKeys is
+  // the set Jira answered with, or null when no JQL filter is on.
+  const [memberLabel, setMemberLabel] = useState("");
+  const [memberJqlKeys, setMemberJqlKeys] = useState<Set<string> | null>(null);
   const [breakdownStatus, setBreakdownStatus] = useState<string | null>(null);
   const [breakdown, setBreakdown] = useState<RollupMember[] | null>(null);
   const [breakdownFor, setBreakdownFor] = useState("");
@@ -290,6 +295,8 @@ export function useContainerState() {
     setBreakdown(null);
     setBreakdownFor("");
     setBreakdownStatus(null);
+    setMemberLabel("");
+    setMemberJqlKeys(null);
   }, [selected]);
 
   // Client-side paging of the member table.
@@ -298,6 +305,7 @@ export function useContainerState() {
     // Apply the fix-version filter for Test Executions: keep only members whose
     // own fixVersions array (from the memberRuns enrichment) contains the chosen
     // value. When no filter is active every row is shown.
+    if (kind === "testexec") rows = keepMembers(rows, memberLabel, memberJqlKeys);
     if (kind === "testexec" && memberFvFilter) {
       rows = rows.filter((r) =>
         (memberRuns.get(r.testKey)?.fixVersions ?? []).includes(memberFvFilter),
@@ -332,7 +340,12 @@ export function useContainerState() {
       }
       return applyDir(cmp, rowSortDesc);
     });
-  }, [board, kind, memberRuns, memberFvFilter, memberRunFilter, rowSortField, rowSortDesc]);
+  }, [board, kind, memberRuns, memberFvFilter, memberRunFilter, memberLabel, memberJqlKeys, rowSortField, rowSortDesc]);
+  const memberLabelOptions = useMemo(() => memberLabels(board?.rows ?? []), [board]);
+  // A JQL answer names the tests the execution had when it was asked. A sync
+  // that changes the tests makes it stale, so the filter clears (#446).
+  const memberKeys = (board?.rows ?? []).map((r) => r.testKey).join(",");
+  useEffect(() => setMemberJqlKeys(null), [memberKeys]);
 
   // Toggle the run-status filter from a colorbar segment / badge and reset to
   // the first page so the (possibly shorter) filtered list starts at the top.
@@ -350,7 +363,7 @@ export function useContainerState() {
     (safePage + 1) * pageSize,
   );
 
-  return { kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, runStatuses, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
+  return { memberLabel, setMemberLabel, memberJqlKeys, setMemberJqlKeys, memberLabelOptions, kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, runStatuses, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
 }
 
 export type ContainerState = ReturnType<typeof useContainerState>;

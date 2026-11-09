@@ -41,6 +41,12 @@ func (a *Adapter) SearchTestsPage(ctx context.Context, projectKey, scopeJQL, sin
 	return a.jiraSide().SearchTestsPage(ctx, projectKey, scopeJQL, since, startAt, maxResults)
 }
 
+// KeysMatching keeps the keys that also match jql (backend.KeyMatcher). A
+// Zephyr test is an ordinary Jira issue, so Jira's search answers it.
+func (a *Adapter) KeysMatching(ctx context.Context, keys []string, jql string) ([]string, error) {
+	return a.jiraSide().KeysMatching(ctx, keys, jql)
+}
+
 func (a *Adapter) ListTestsBasic(ctx context.Context, keys []string) ([]backend.TestBasic, error) {
 	return a.jiraSide().ListTestsBasic(ctx, keys)
 }

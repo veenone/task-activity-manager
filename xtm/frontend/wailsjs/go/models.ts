@@ -4281,6 +4281,7 @@ export namespace testrepo {
 	    status: string;
 	    runStatus: string;
 	    isExternal: boolean;
+	    labels: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TestPlanBoardRow(source);
@@ -4293,6 +4294,7 @@ export namespace testrepo {
 	        this.status = source["status"];
 	        this.runStatus = source["runStatus"];
 	        this.isExternal = source["isExternal"];
+	        this.labels = source["labels"];
 	    }
 	}
 	export class TestPlanBoard {

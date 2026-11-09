@@ -92,6 +92,7 @@ export {
   SeedSampleContainers,
   CleanSampleData,
   GetContainerBoard,
+  ContainerTestsMatching,
   ExportPytest,
   MoveTestToFolder,
   BulkMoveToFolder,

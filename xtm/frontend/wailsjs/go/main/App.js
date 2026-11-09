@@ -154,6 +154,10 @@ export function ComputeBridgeGap(arg1, arg2) {
   return window['go']['main']['App']['ComputeBridgeGap'](arg1, arg2);
 }
 
+export function ContainerTestsMatching(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ContainerTestsMatching'](arg1, arg2, arg3);
+}
+
 export function CreateBugForTest(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['CreateBugForTest'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
