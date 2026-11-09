@@ -166,6 +166,10 @@ Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
 show the same sets three ways:
 
+Both Flow charts, on the Project map and on the Link map, can be zoomed. Use
+**+** and **−** above the chart, or hold Ctrl and turn the mouse wheel. The
+chart then scrolls inside its own area, and **Reset** returns it to fit.
+
 - **Flow** draws each issue as a line from its baseline to its project to
   one of four states. *Fix missing* is an open issue in a set out of step: the
   fix was made elsewhere and still has to be made here. *Fixed, others behind*
@@ -245,7 +249,9 @@ all three views.
   count, and the arrows show which way the links point. Pick the centre from
   **Centre project**, or choose a project in the diagram or in the list beside
   it to move the centre there. On a busy project the diagram draws the 24 with
-  the most links, and the list names them all.
+  the most links, and the list names them all. Hover over a project to bring its
+  name to the front, and drag a project to move it when names crowd. Choosing
+  another centre lays the projects out again.
 
 **Refresh links** at the top of the list fetches the linked issues again
 without running the query. Your query's own rows stay as they were. For a

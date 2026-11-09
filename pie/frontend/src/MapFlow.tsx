@@ -1,6 +1,7 @@
 import type { query } from "../wailsjs/go/models";
 import { FIX_STATES, FLOW_NODE, type FixState, fixState, sankey } from "./mapData";
 import { projectLabel } from "./linked";
+import { Zoom } from "./Zoom";
 
 type Group = { baseline: string | null; projects: string[] };
 
@@ -65,31 +66,33 @@ export function MapFlow({
 
   return (
     <div className="pie-flow">
-      <svg
-        className="pie-flow-svg"
-        viewBox={`${-LEFT} -10 ${WIDTH} ${height + 20}`}
-        role="img"
-        aria-label="Issues by baseline, project and fix state. The table view lists the same sets."
-      >
-        {bands.map((b) => (
-          <path key={`${b.from}|${b.to}`} className={`pie-flow-band ${tone(b.to)}`} d={b.path}>
-            <title>{`${name.get(b.from)} to ${name.get(b.to)}: ${b.keys.length} (${b.keys.join(", ")})`}</title>
-          </path>
-        ))}
-        {nodes.map((n) => (
-          <g key={n.id}>
-            <rect className={`pie-flow-node ${tone(n.id)}`} x={n.x} y={n.y} width={FLOW_NODE} height={Math.max(n.h, 2)} rx={2} />
-            <text
-              className="pie-flow-label"
-              x={n.id.startsWith("b:") ? n.x - 6 : n.x + FLOW_NODE + 6}
-              y={n.y + n.h / 2}
-              textAnchor={n.id.startsWith("b:") ? "end" : "start"}
-            >
-              {n.id.startsWith("s:") ? `${n.label} ${n.value}` : n.label}
-            </text>
-          </g>
-        ))}
-      </svg>
+      <Zoom label="Project flow">
+        <svg
+          className="pie-flow-svg"
+          viewBox={`${-LEFT} -10 ${WIDTH} ${height + 20}`}
+          role="img"
+          aria-label="Issues by baseline, project and fix state. The table view lists the same sets."
+        >
+          {bands.map((b) => (
+            <path key={`${b.from}|${b.to}`} className={`pie-flow-band ${tone(b.to)}`} d={b.path}>
+              <title>{`${name.get(b.from)} to ${name.get(b.to)}: ${b.keys.length} (${b.keys.join(", ")})`}</title>
+            </path>
+          ))}
+          {nodes.map((n) => (
+            <g key={n.id}>
+              <rect className={`pie-flow-node ${tone(n.id)}`} x={n.x} y={n.y} width={FLOW_NODE} height={Math.max(n.h, 2)} rx={2} />
+              <text
+                className="pie-flow-label"
+                x={n.id.startsWith("b:") ? n.x - 6 : n.x + FLOW_NODE + 6}
+                y={n.y + n.h / 2}
+                textAnchor={n.id.startsWith("b:") ? "end" : "start"}
+              >
+                {n.id.startsWith("s:") ? `${n.label} ${n.value}` : n.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </Zoom>
       <section className="pie-flow-side">
         <h3>Sets out of step</h3>
         <ul aria-label="Sets out of step">

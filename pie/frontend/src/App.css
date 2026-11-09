@@ -407,7 +407,12 @@ body,
 }
 
 .pie-network-node {
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pie-network-node:active {
+  cursor: grabbing;
 }
 
 .pie-network-node circle {
@@ -1024,4 +1029,38 @@ body,
   border: 1px solid var(--border-strong);
   border-radius: var(--r-1);
   font-size: var(--fs-sm);
+}
+
+/* A zoomable chart: the area is drawn wider than its box, and the box
+   scrolls (#448). */
+.pie-zoom {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pie-zoom-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pie-zoom-box {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pie-zoom-area .pie-flow-svg {
+  width: 100%;
+  min-width: 0;
+  max-height: none;
+}
+
+.pie-network-label-hover {
+  font-weight: 600;
+  pointer-events: none;
 }
