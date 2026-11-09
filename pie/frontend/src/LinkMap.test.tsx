@@ -142,3 +142,26 @@ it("drops a refresh that answers after the run on screen changed", async () => {
   await act(async () => answer(result));
   expect(onResult).not.toHaveBeenCalled();
 });
+
+it("draws the links as a flow from project through type to project", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Flow" }));
+  const chart = screen.getByRole("img", { name: /Links from each project, by type, to the project they point to/ });
+  expect(within(chart).getByText("A to Cloners: 1")).toBeInTheDocument();
+  expect(screen.queryByRole("table", { name: "Projects connected by links" })).not.toBeInTheDocument();
+});
+
+it("centres the network on the busiest project and recentres on a neighbour", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  expect(screen.getByLabelText("Centre project")).toHaveValue("A");
+  const around = screen.getByRole("list", { name: "Projects linked to A" });
+  expect(
+    within(around)
+      .getAllByRole("button")
+      .map((b) => b.textContent),
+  ).toEqual(["B: Cloners 1 out", "C: Relates 1 out"]);
+  await user.click(within(around).getByRole("button", { name: /^B/ }));
+  expect(screen.getByLabelText("Centre project")).toHaveValue("B");
+  expect(screen.getByRole("img", { name: "Projects linked to B by link type" })).toBeInTheDocument();
+});

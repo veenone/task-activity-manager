@@ -207,6 +207,19 @@ column stay in view. A column shows the project key, and hovering over it
 shows the name. A cell gets darker the more links it holds, and the last
 column totals each row.
 
+**Grid**, **Flow** and **Network** at the top right switch how the links
+are drawn. The link type filters and the two tick boxes on the left apply to
+all three views.
+- **Flow** runs each link from the project it starts in, through its link type,
+  to the project it points to. Bands are sized by link count. Hover over a band
+  to see its count.
+- **Network** puts one project in the middle, the busiest at first, with the
+  projects it links to around it. Each link type has its own spoke, with its
+  count, and the arrows show which way the links point. Pick the centre from
+  **Centre project**, or choose a project in the diagram or in the list beside
+  it to move the centre there. On a busy project the diagram draws the 24 with
+  the most links, and the list names them all.
+
 **Refresh links** at the top of the list fetches the linked issues again
 without running the query. Your query's own rows stay as they were. For a
 saved query the refreshed run is stored, so it is what PIE shows next time.

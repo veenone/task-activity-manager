@@ -350,6 +350,95 @@ body,
   stroke-width: 3px;
 }
 
+/* Link map: the type column of its flow, and the project-centred network
+   (#437). Spokes are neutral; the type is in the label, not a colour. */
+.pie-flow-type {
+  fill: var(--accent);
+}
+
+.pie-network {
+  display: flex;
+  flex: 1;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pie-network-chart {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 480px;
+}
+
+.pie-network-pick {
+  display: flex;
+  white-space: nowrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.pie-network-pick select {
+  width: auto;
+}
+
+.pie-network-svg {
+  width: 100%;
+  max-height: 70vh;
+}
+
+.pie-network-spoke {
+  stroke: var(--border-strong);
+}
+
+.pie-network-spoke:hover {
+  stroke: var(--accent);
+}
+
+.pie-network-arrow {
+  fill: var(--text-muted);
+}
+
+.pie-network-centre {
+  fill: var(--accent);
+}
+
+.pie-network-node {
+  cursor: pointer;
+}
+
+.pie-network-node circle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2px;
+}
+
+.pie-network-node:hover circle {
+  fill: var(--accent-soft);
+}
+
+.pie-network-label,
+.pie-network-type {
+  fill: var(--text);
+  font-size: var(--fs-sm);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+
+.pie-network-type {
+  fill: var(--text-muted);
+}
+
+.pie-network-hub {
+  fill: var(--on-accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
 .pie-flow-side {
   flex: none;
   width: 260px;
