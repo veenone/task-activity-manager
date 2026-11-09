@@ -1,7 +1,7 @@
-// Package export writes what a PIE view shows to an Excel workbook. The
+// Package workbook writes what a PIE view shows to an Excel workbook. The
 // frontend decides the rows, since it holds the filters; this package only
 // lays them out.
-package export
+package workbook
 
 import (
 	"errors"

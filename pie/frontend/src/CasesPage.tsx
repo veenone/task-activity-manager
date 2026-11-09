@@ -1,7 +1,11 @@
 import { useState } from "react";
 import type { cases, query } from "../wailsjs/go/models";
 import { CaseDetail } from "./CaseDetail";
+import { CaseGrid as ReadGrid } from "../wailsjs/go/main/App";
 import { CaseGrid } from "./CaseGrid";
+import { ExportButton } from "./ExportButton";
+import { caseSheet } from "./exportSheets";
+import { projectLabel, projectNames } from "./linked";
 
 // CasesPage lists the profile's cases and opens one. It works with no run on
 // screen; a run, when there is one, supplies each case's summary.
@@ -44,6 +48,13 @@ export function CasesPage({
           {m.label}
         </button>
       ))}
+      <ExportButton
+        name="pie-cases"
+        sheets={async () => {
+          const names = result ? projectNames(result) : new Map<string, string>();
+          return [caseSheet(await ReadGrid(profileId), (p) => projectLabel(p, names.get(p)))];
+        }}
+      />
     </div>
   );
   if (grid) {

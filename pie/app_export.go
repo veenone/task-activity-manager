@@ -5,15 +5,15 @@ import (
 	"os"
 	"strings"
 
-	"agile-suite/pie/internal/export"
+	"agile-suite/pie/internal/workbook"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // ExportWorkbook asks where to save the sheets and writes them there as an
 // .xlsx. It answers with the path written, or "" when the analyst cancelled.
-func (a *App) ExportWorkbook(name string, sheets []export.Sheet) (string, error) {
-	raw, err := export.Workbook(sheets)
+func (a *App) ExportWorkbook(name string, sheets []workbook.Sheet) (string, error) {
+	raw, err := workbook.Workbook(sheets)
 	if err != nil {
 		return "", err
 	}

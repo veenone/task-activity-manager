@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { BarChart } from "./BarChart";
 import { projectLabel, projectNames } from "./linked";
+import { ExportButton } from "./ExportButton";
+import { statisticsSheets } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
 import { statistics } from "./stats";
 
@@ -65,6 +67,7 @@ export function Statistics({ result, productField }: { result: query.Result; pro
           </select>
         </label>
         <span className="muted">{s.issues === 1 ? "1 issue" : `${s.issues} issues`} the query matched</span>
+        <ExportButton name="pie-statistics" sheets={() => statisticsSheets(s, (p) => projectLabel(p, names.get(p)))} />
       </div>
 
       <ul className="pie-stat-cards" aria-label="Headline numbers">
