@@ -30,6 +30,10 @@ export function CaseGrid(arg1) {
   return window['go']['main']['App']['CaseGrid'](arg1);
 }
 
+export function ConfluenceSettings(arg1) {
+  return window['go']['main']['App']['ConfluenceSettings'](arg1);
+}
+
 export function CreateProfile(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3);
 }
@@ -110,6 +114,10 @@ export function ProjectGroups(arg1) {
   return window['go']['main']['App']['ProjectGroups'](arg1);
 }
 
+export function PublishCycle(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PublishCycle'](arg1, arg2, arg3);
+}
+
 export function RemoveBaseline(arg1, arg2) {
   return window['go']['main']['App']['RemoveBaseline'](arg1, arg2);
 }
@@ -144,6 +152,10 @@ export function SaveQuery(arg1, arg2, arg3) {
 
 export function SetCaseNotes(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetCaseNotes'](arg1, arg2, arg3);
+}
+
+export function SetConfluenceSettings(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetConfluenceSettings'](arg1, arg2, arg3);
 }
 
 export function SetEvidenceState(arg1, arg2, arg3, arg4) {

@@ -6,6 +6,7 @@ import {profile} from '../models';
 import {cycles} from '../models';
 import {saved} from '../models';
 import {jira} from '../models';
+import {report} from '../models';
 
 export function AddBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
 
@@ -20,6 +21,8 @@ export function AddEvidenceNote(arg1:string,arg2:number,arg3:string,arg4:string)
 export function Baselines(arg1:string):Promise<Array<cases.Baseline>>;
 
 export function CaseGrid(arg1:string):Promise<Array<cases.Detail>>;
+
+export function ConfluenceSettings(arg1:string):Promise<profile.ConfluenceConfig>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string):Promise<profile.Profile>;
 
@@ -61,6 +64,8 @@ export function OpenCases(arg1:string,arg2:Array<string>):Promise<Array<cases.Ca
 
 export function ProjectGroups(arg1:string):Promise<Array<cases.Group>>;
 
+export function PublishCycle(arg1:string,arg2:number,arg3:boolean):Promise<report.Outcome>;
+
 export function RemoveBaseline(arg1:string,arg2:string):Promise<Array<cases.Baseline>>;
 
 export function RemoveCaseProject(arg1:string,arg2:number,arg3:string):Promise<cases.Detail>;
@@ -78,6 +83,8 @@ export function SaveProjectGroup(arg1:string,arg2:string,arg3:Array<string>):Pro
 export function SaveQuery(arg1:string,arg2:string,arg3:string):Promise<saved.Query>;
 
 export function SetCaseNotes(arg1:string,arg2:number,arg3:string):Promise<void>;
+
+export function SetConfluenceSettings(arg1:string,arg2:profile.ConfluenceConfig,arg3:string):Promise<void>;
 
 export function SetEvidenceState(arg1:string,arg2:number,arg3:number,arg4:string):Promise<Array<evidence.Item>>;
 

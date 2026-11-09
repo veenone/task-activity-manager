@@ -314,6 +314,26 @@ cycle's own grid of cases against projects.
 Until a cycle is published, **Take again** replaces its copy with the cases as
 they are now, and **Delete** removes it.
 
+### Publishing to Confluence
+
+**Confluence settings** on the Cycles tab takes the Confluence URL, the space
+key and the id of the page the reports go under. Leave the page id empty to put
+them at the top of the space. The token goes to the operating system's
+credential store, never to PIE's database. Leave the token field empty to keep
+the token you saved before. A new URL needs its own token, and PIE
+forgets the pages it wrote on the old one.
+
+**Publish** writes the cycle to a page called "Impact report:" followed by the
+cycle's name. The page has the change counts, the cases by project grid, and
+each case's verdicts with their reasons. After that the cycle is published:
+**Take again** and **Delete** go away, and the next cycle is compared with
+this one.
+
+PIE asks before it writes in two cases. The first is a page with that title
+that PIE did not write. The second is a page someone edited in Confluence
+after PIE published it. Say no and nothing changes. **Publish again** updates
+the same page. If the page was deleted in Confluence, PIE writes a new one.
+
 ## Issue details
 
 Choose an issue's key in Results to open its details beside the table: its
