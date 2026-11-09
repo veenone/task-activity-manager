@@ -137,3 +137,34 @@ export function cycleSheets(d: cycles.Detail, label: Label): [Sheet, Sheet] {
     caseSheet(d.cases, label),
   ];
 }
+
+// resultsSheet is the Results table: every row its filters leave, across all
+// pages, in its columns. Client visibility and Case appear when the table
+// shows them.
+export function resultsSheet(rows: query.Issue[], label: Label, show: { visibility: boolean; caseKeys: Set<string> | null }): Sheet {
+  return {
+    name: "Results",
+    header: [
+      "Key",
+      "Project",
+      "Type",
+      "Summary",
+      "Status",
+      "Priority",
+      ...(show.visibility ? ["Client visibility"] : []),
+      ...(show.caseKeys ? ["Case"] : []),
+      "Updated",
+    ],
+    rows: rows.map((i) => [
+      i.key,
+      label(i.project),
+      i.type,
+      i.summary,
+      i.status,
+      i.priority,
+      ...(show.visibility ? [i.clientVisibility ?? ""] : []),
+      ...(show.caseKeys ? [yes(show.caseKeys.has(i.key))] : []),
+      day(i.updated ?? ""),
+    ]),
+  };
+}

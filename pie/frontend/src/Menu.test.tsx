@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogProvider } from "@agile-suite/core";
 import App from "./App";
@@ -11,6 +11,7 @@ vi.mock("../wailsjs/runtime/runtime", () => ({
     handlers.set(name, fn);
     return () => handlers.delete(name);
   },
+  BrowserOpenURL: vi.fn(),
 }));
 
 vi.mock("../wailsjs/go/main/App", () => ({
@@ -21,7 +22,7 @@ vi.mock("../wailsjs/go/main/App", () => ({
   ListCases: vi.fn(),
   LastRun: vi.fn(),
   SetTheme: vi.fn(),
-  Version: vi.fn(),
+  GetDiagnostics: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -55,6 +56,8 @@ it("switches tabs from the View menu", async () => {
 it("opens Add profile and Jira fields from the File menu", async () => {
   show();
   await screen.findByRole("navigation", { name: "Views" });
+  // The menu item does nothing until the profile's fields have loaded.
+  await waitFor(() => expect(screen.getByRole("button", { name: "Jira fields" })).toBeEnabled());
   emit("menu:fields");
   expect(await screen.findByRole("heading", { name: "Jira fields" })).toBeVisible();
   await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
@@ -79,11 +82,22 @@ it("applies a theme chosen in the View menu", async () => {
   expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeVisible();
 });
 
-it("names the app and its version in About", async () => {
-  vi.mocked(api.Version).mockResolvedValue("0.1.0");
+it("opens the shared About box with PIE's version and runtime", async () => {
+  vi.mocked(api.GetDiagnostics).mockResolvedValue({
+    version: "0.1.0",
+    dbPath: "/home/analyst/pie.db",
+    logPath: "",
+    os: "windows",
+    arch: "amd64",
+    goVersion: "go1.25.0",
+    schemaVersion: 4,
+    profileCount: 1,
+    startupError: "",
+  } as never);
   show();
   await screen.findByRole("navigation", { name: "Views" });
   emit("menu:about");
-  const about = await screen.findByRole("alertdialog");
-  expect(within(about).getByText("Project Issue Explorer 0.1.0")).toBeVisible();
+  const about = await screen.findByRole("dialog", { name: "About Project Issue Explorer" });
+  expect(await within(about).findByText("v0.1.0")).toBeVisible();
+  expect(within(about).getByText("/home/analyst/pie.db")).toBeInTheDocument();
 });

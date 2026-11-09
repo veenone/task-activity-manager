@@ -13,4 +13,4 @@ afterEach(cleanup);
 
 // The Wails runtime is not there in jsdom. Tests that drive the menu mock it
 // with their own listeners.
-vi.mock("../../wailsjs/runtime/runtime", () => ({ EventsOn: () => () => undefined }));
+vi.mock("../../wailsjs/runtime/runtime", () => ({ EventsOn: () => () => undefined, BrowserOpenURL: () => undefined }));

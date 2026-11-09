@@ -6,6 +6,7 @@ import {profile} from '../models';
 import {cycles} from '../models';
 import {workbook} from '../models';
 import {saved} from '../models';
+import {main} from '../models';
 import {jira} from '../models';
 import {report} from '../models';
 import {query} from '../models';
@@ -49,6 +50,8 @@ export function FindEvidence(arg1:string,arg2:number,arg3:Array<string>):Promise
 export function GetCase(arg1:string,arg2:number):Promise<cases.Detail>;
 
 export function GetCycle(arg1:string,arg2:number):Promise<cycles.Detail>;
+
+export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function JiraFilter(arg1:string,arg2:string):Promise<jira.RawFilter>;
 
