@@ -97,6 +97,13 @@ CREATE TABLE IF NOT EXISTS report_cycle (
 	published_at TEXT NOT NULL DEFAULT '',
 	UNIQUE (profile_id, name)
 );
+CREATE TABLE IF NOT EXISTS report_page (
+	profile_id TEXT NOT NULL,
+	cycle_id   INTEGER NOT NULL,
+	page_id    TEXT NOT NULL,
+	version    INTEGER NOT NULL,
+	PRIMARY KEY (profile_id, cycle_id)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
@@ -106,7 +113,7 @@ CREATE TABLE IF NOT EXISTS report_cycle (
 var purged = []string{
 	"saved_query", "profile_setting", "profile_field",
 	"case_item", "case_project", "project_group", "project_group_member", "evidence",
-	"product_baseline", "report_cycle",
+	"product_baseline", "report_cycle", "report_page",
 }
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables

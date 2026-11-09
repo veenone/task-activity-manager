@@ -323,6 +323,26 @@ export namespace jira {
 
 export namespace profile {
 	
+	export class ConfluenceConfig {
+	    baseURL: string;
+	    spaceKey: string;
+	    rootPageID: string;
+	    reportsSpaceKey: string;
+	    reportsRootPageID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConfluenceConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.baseURL = source["baseURL"];
+	        this.spaceKey = source["spaceKey"];
+	        this.rootPageID = source["rootPageID"];
+	        this.reportsSpaceKey = source["reportsSpaceKey"];
+	        this.reportsRootPageID = source["reportsRootPageID"];
+	    }
+	}
 	export class Profile {
 	    id: string;
 	    name: string;
@@ -519,6 +539,27 @@ export namespace query {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace report {
+	
+	export class Outcome {
+	    title: string;
+	    pageId: string;
+	    ask: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Outcome(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.pageId = source["pageId"];
+	        this.ask = source["ask"];
+	    }
 	}
 
 }

@@ -123,6 +123,9 @@ func (a *App) DeleteProfile(id string) error {
 	if err := a.profiles.Delete(id); err != nil {
 		return err
 	}
+	if err := a.creds.Delete(profile.ConfluenceCredentialID(id)); err != nil {
+		log.Printf("pie: delete Confluence credentials for %s: %v", id, err)
+	}
 	if demo.Is(p.JiraURL) {
 		return nil
 	}
