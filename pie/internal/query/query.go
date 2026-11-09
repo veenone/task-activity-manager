@@ -3,13 +3,13 @@
 package query
 
 import (
-	"sync"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 
 	corejira "agile-suite/core/jira"
 )
