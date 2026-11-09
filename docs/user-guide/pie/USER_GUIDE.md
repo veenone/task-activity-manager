@@ -350,6 +350,24 @@ Each cell gives that case's verdict for the project, or a dash when the
 project is not on the case. The last row counts how many cases have affected
 each project. Choose a case's key to open it in the list. **List** goes back.
 
+## Export to Excel
+
+Trace, the Project map, the Link map, Statistics, Cases and a cycle on the
+Cycles tab each have **Export to Excel**. It asks where to save, then writes
+an .xlsx of what the view is showing, with its filters applied:
+- **Trace** writes the linked sets it lists, one issue per row.
+- **Project map** writes its table, and the same sets one issue per row.
+- **Link map** writes its grid and every link the grid counts.
+- **Statistics** writes the headline numbers and both tables, for the project
+  and time range you chose.
+- **Cases** writes every case with each project's verdict and reason.
+- **A cycle** writes what changed since the last published cycle, and its
+  cases.
+
+Each sheet has a bold header row that stays in view and a filter on every
+column. Counts are stored as numbers, so Excel can sum and sort them. If you
+cancel the Save dialog, nothing is written.
+
 ## Cycles
 
 A cycle is one reporting period, such as a week or a release. **New cycle**

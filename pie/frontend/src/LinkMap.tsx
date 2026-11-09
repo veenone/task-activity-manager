@@ -2,6 +2,8 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { RefreshLinks } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
 import { errorText } from "./AddProfileDialog";
+import { ExportButton } from "./ExportButton";
+import { linkSheets } from "./exportSheets";
 import { LinkFlow } from "./LinkFlow";
 import { LinkNetwork } from "./LinkNetwork";
 import { byKey, projectLabel, projectNames } from "./linked";
@@ -155,18 +157,21 @@ export function LinkMap({
         <p className="muted">The wording is Jira&apos;s own. A type worded the same both ways has no direction.</p>
       </fieldset>
       <div className="pie-linkmap-main">
-        <div className="view-tabs pie-map-views" role="group" aria-label="Link view">
-          {LINK_VIEWS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              className={`view-tab${v === view ? " view-tab-active" : ""}`}
-              aria-pressed={v === view}
-              onClick={() => setView(v)}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="pie-filters">
+          <ExportButton name="pie-link-map" sheets={() => linkSheets(projects, between, ticked, issues, label)} />
+          <div className="view-tabs pie-map-views" role="group" aria-label="Link view">
+            {LINK_VIEWS.map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={`view-tab${v === view ? " view-tab-active" : ""}`}
+                aria-pressed={v === view}
+                onClick={() => setView(v)}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
         {view === "Flow" && <LinkFlow edges={ticked} issues={issues} label={label} />}
         {view === "Network" && <LinkNetwork edges={ticked} issues={issues} label={label} />}

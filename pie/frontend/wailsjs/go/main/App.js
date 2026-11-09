@@ -62,6 +62,10 @@ export function Evidence(arg1, arg2) {
   return window['go']['main']['App']['Evidence'](arg1, arg2);
 }
 
+export function ExportWorkbook(arg1, arg2) {
+  return window['go']['main']['App']['ExportWorkbook'](arg1, arg2);
+}
+
 export function Fields(arg1) {
   return window['go']['main']['App']['Fields'](arg1);
 }

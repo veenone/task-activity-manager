@@ -5,6 +5,8 @@ import { errorText } from "./AddProfileDialog";
 import { BaselinesDialog } from "./BaselinesDialog";
 import { OutOfStep, allProjects, baselineGroups, byKey, projectLabel, projectNames } from "./linked";
 import { filterSets, type MapFilter } from "./mapData";
+import { ExportButton } from "./ExportButton";
+import { mapSheet, setSheet } from "./exportSheets";
 import { MapFlow } from "./MapFlow";
 import { MapTree } from "./MapTree";
 import { Pager, usePaged } from "./Pager";
@@ -123,6 +125,13 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
         <button type="button" className="btn btn-ghost" onClick={() => setEditing(true)}>
           Baselines
         </button>
+        <ExportButton
+          name="pie-project-map"
+          sheets={() => {
+            const label = (p: string) => projectLabel(p, names.get(p));
+            return [mapSheet(sets, projects, issues, label), setSheet(sets, issues, label)];
+          }}
+        />
         <div className="view-tabs pie-map-views" role="group" aria-label="Map view">
           {VIEWS.map((v) => (
             <button

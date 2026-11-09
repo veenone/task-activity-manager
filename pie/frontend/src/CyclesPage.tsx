@@ -4,8 +4,10 @@ import { Cycles, DeleteCycle, GetCycle, PublishCycle, RetakeCycle, TakeCycle } f
 import type { cycles, query } from "../wailsjs/go/models";
 import { errorText } from "./AddProfileDialog";
 import { VerdictGrid } from "./CaseGrid";
+import { ExportButton } from "./ExportButton";
+import { cycleSheets } from "./exportSheets";
 import { ConfluenceDialog } from "./ConfluenceDialog";
-import { projectNames } from "./linked";
+import { projectLabel, projectNames } from "./linked";
 import { Card } from "./Statistics";
 
 // CyclesPage lists the profile's reporting cycles and shows one: what changed
@@ -186,6 +188,7 @@ function CycleDetail({
     <section className="pie-trace-detail" aria-labelledby="pie-cycle-heading">
       <div className="pie-filters">
         <h2 id="pie-cycle-heading">{d.name}</h2>
+        <ExportButton name={`pie-cycle-${d.name}`} sheets={() => cycleSheets(d, (p) => projectLabel(p, names.get(p)))} />
         <button type="button" className="btn btn-primary" onClick={() => void publish()}>
           {d.publishedAt ? "Publish again" : "Publish"}
         </button>

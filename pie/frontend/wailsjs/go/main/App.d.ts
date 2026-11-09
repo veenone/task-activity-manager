@@ -4,6 +4,7 @@ import {cases} from '../models';
 import {evidence} from '../models';
 import {profile} from '../models';
 import {cycles} from '../models';
+import {workbook} from '../models';
 import {saved} from '../models';
 import {jira} from '../models';
 import {report} from '../models';
@@ -38,6 +39,8 @@ export function DeleteProjectGroup(arg1:string,arg2:number):Promise<void>;
 export function DeleteQuery(arg1:string,arg2:number):Promise<void>;
 
 export function Evidence(arg1:string,arg2:number):Promise<Array<evidence.Item>>;
+
+export function ExportWorkbook(arg1:string,arg2:Array<workbook.Sheet>):Promise<string>;
 
 export function Fields(arg1:string):Promise<saved.Fields>;
 

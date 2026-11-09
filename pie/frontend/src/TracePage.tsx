@@ -2,6 +2,8 @@ import { useState } from "react";
 import { StatusBadge } from "@agile-suite/core";
 import type { query } from "../wailsjs/go/models";
 import { OutOfStep, ageText, allProjects, byKey, projectLabel, projectNames, tone } from "./linked";
+import { ExportButton } from "./ExportButton";
+import { setSheet } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
 
 // A set rarely spans many projects, so its groups page in smaller steps.
@@ -57,6 +59,7 @@ export function TracePage({
             <input type="checkbox" checked={onlyOutOfStep} onChange={(e) => refilter(project, e.target.checked)} />
             Out of step only
           </label>
+          <ExportButton name="pie-trace" sheets={() => [setSheet(sets, issues, (p) => projectLabel(p, names.get(p)))]} />
         </div>
         <ul className="pie-set-list" aria-label="Linked sets">
           {rows.map((s) => (
