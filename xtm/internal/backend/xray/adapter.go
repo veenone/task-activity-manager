@@ -52,6 +52,11 @@ func (a *Adapter) SearchTestsPage(ctx context.Context, projectKey, scopeJQL, sin
 	return toTests(tests), total, nil
 }
 
+// KeysMatching keeps the keys that also match jql (backend.KeyMatcher).
+func (a *Adapter) KeysMatching(ctx context.Context, keys []string, jql string) ([]string, error) {
+	return a.c.KeysMatching(ctx, keys, jql)
+}
+
 func (a *Adapter) ListTestsBasic(ctx context.Context, keys []string) ([]backend.TestBasic, error) {
 	tb, err := a.c.ListTestsBasic(ctx, keys)
 	if err != nil {

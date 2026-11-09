@@ -153,6 +153,10 @@ type TestPlanBoardRow struct {
 	// lives in a different Jira project than the profile's) and its summary /
 	// status come from the external_test cache instead.
 	IsExternal bool `json:"isExternal"`
+	// Labels are the Test's labels from the local cache, empty for a member
+	// that is only in the external cache. The member table filters on them
+	// offline (#446).
+	Labels []string `json:"labels"`
 }
 
 // TestPlanBoard is the read-only board for one Test Plan (FR-13.7) — its member
@@ -1645,7 +1649,8 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 		        COALESCE(t.summary, x.summary, '') AS summary,
 		        COALESCE(t.status,  x.status,  '') AS status,
 		        (t.jira_key IS NULL)               AS is_external,
-		        l.run_status
+		        l.run_status,
+		        COALESCE(t.labels, '')             AS labels
 		 FROM test_container_test l
 		 LEFT JOIN test_case     t ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
 		 LEFT JOIN external_test x ON x.profile_id = l.profile_id AND x.jira_key = l.test_key
@@ -1660,16 +1665,17 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 	type member struct {
 		summary, status, directRun string
 		isExternal                 bool
+		labels                     []string
 	}
 	members := map[string]member{}
 	memberOrder := []string{}
 	for memberRows.Next() {
-		var key, summary, status, directRun string
+		var key, summary, status, directRun, labels string
 		var isExternal bool
-		if err := memberRows.Scan(&key, &summary, &status, &isExternal, &directRun); err != nil {
+		if err := memberRows.Scan(&key, &summary, &status, &isExternal, &directRun, &labels); err != nil {
 			return board, err
 		}
-		members[key] = member{summary: summary, status: status, directRun: directRun, isExternal: isExternal}
+		members[key] = member{summary: summary, status: status, directRun: directRun, isExternal: isExternal, labels: append([]string{}, strings.Fields(labels)...)}
 		memberOrder = append(memberOrder, key)
 	}
 	if err := memberRows.Err(); err != nil {
@@ -1722,6 +1728,7 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 			Status:     m.status,
 			RunStatus:  runStatus,
 			IsExternal: m.isExternal,
+			Labels:     m.labels,
 		})
 		runCounts[blankAs(runStatus, "(not run)")]++
 	}
