@@ -252,6 +252,8 @@ export interface TestPlanBoardRow {
   // (no local test_case row) and its summary/status come from the external_test
   // cache.
   isExternal: boolean;
+  // labels are the Test's labels from the local cache, for the member filter.
+  labels?: string[];
 }
 
 // TestPlanBoard mirrors testrepo.TestPlanBoard — a Test Plan's member Tests

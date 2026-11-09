@@ -7429,3 +7429,21 @@ tr.row-checked:hover {
     transition: none;
   }
 }
+
+/* Label and JQL filters over an open Test Execution's tests (#446). */
+.member-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.member-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.member-jql {
+  width: 320px;
+  margin-bottom: 0;
+}

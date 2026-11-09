@@ -927,6 +927,12 @@ You can:
 - For a **Test Execution**, set each member's **run result** inline (e.g. PASS /
   FAIL / TODO), or apply one result to many selected members at once. A compact
   bar summarizes the run-status mix.
+- For a **Test Execution**, narrow its tests the way Jira's Test Execution page
+  does. **Label** keeps the tests that carry a label, read from the local cache,
+  so it works offline. **JQL** asks Jira which of the execution's tests also
+  match your query and keeps those; it needs a connection, and Jira's own
+  message shows if the query is refused. **Clear JQL** shows every test again.
+  The demo profile and Kiwi profiles have no JQL and say so.
 
 ![Figure 23: Run results per test](images/23-execution-runstatus.png)
 *Figure 23 — Each member's run result shows in the Execution column (PASS /

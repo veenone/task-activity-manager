@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { PAGE_SIZE_OPTIONS } from "./constants";
+import { MemberFilters } from "./MemberFilters";
 import { ExecRunCells, DefectsCell, RemarksCell } from "./RunCells";
 import { ParameterizedRunIndicator, ParameterizedRunRows } from "./ParameterizedRunRows";
 import { RunStepIndicator, RunStepRows } from "./RunStepRows";
@@ -39,11 +40,33 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
     boardTotalPages,
     safePage,
     pageRows,
+    memberLabel,
+    setMemberLabel,
+    memberJqlKeys,
+    setMemberJqlKeys,
+    memberLabelOptions,
   } = s;
   const { removeTest, setRunStatus, unlinkBug, setRunComment, toggleRun, toggleRowSort, rowSortIndicator, applyBulkRunStatus, openBug } = a;
   const { isDemo } = p;
   return (
     <>
+      {kind === "testexec" && board && selected && (
+        <MemberFilters
+          profileId={profileId}
+          containerKey={selected}
+          labels={memberLabelOptions}
+          label={memberLabel}
+          onLabel={(l) => {
+            setMemberLabel(l);
+            setBoardPage(0);
+          }}
+          jqlOn={memberJqlKeys !== null}
+          onJqlKeys={(k) => {
+            setMemberJqlKeys(k);
+            setBoardPage(0);
+          }}
+        />
+      )}
       {kind === "testexec" && selectedRuns.size > 0 && (
         <div className="board-bulk">
           <span className="bulk-count">{selectedRuns.size} selected</span>

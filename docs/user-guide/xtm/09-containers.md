@@ -20,6 +20,8 @@ The card under the filters shows the container's key, status and test count. For
 
 The table lists the member tests. For a Test Execution it adds the run columns: Execution, Date, By, Environment, Fix Version, Defects and Remarks.
 
+Above the table of a Test Execution, **Label** and **JQL** narrow its tests the way Jira's Test Execution page does. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. JQL asks Jira which of the execution's tests also match your query, and keeps those. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL and say so.
+
 **Sync** at the right of the filters refreshes only the containers from Jira.
 
 ## Record run results

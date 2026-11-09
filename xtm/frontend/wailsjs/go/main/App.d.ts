@@ -91,6 +91,8 @@ export function ComponentIssueCount(arg1:string,arg2:string):Promise<number>;
 
 export function ComputeBridgeGap(arg1:string,arg2:string):Promise<Array<bridge.Gap>>;
 
+export function ContainerTestsMatching(arg1:string,arg2:string,arg3:string):Promise<Array<string>>;
+
 export function CreateBugForTest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<string>,arg8:Record<string, any>):Promise<string>;
 
 export function CreateCanonicalRequirement(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
