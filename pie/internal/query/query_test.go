@@ -9,7 +9,10 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	corejira "agile-suite/core/jira"
 )
@@ -18,10 +21,13 @@ import (
 // page however many were asked for, because Jira imposes its own limit.
 func jiraWith(t *testing.T, total, serverCap int, seen *[]string) *corejira.Client {
 	t.Helper()
+	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		if seen != nil {
+			mu.Lock()
 			*seen = append(*seen, q.Get("jql"))
+			mu.Unlock()
 		}
 		start, _ := strconv.Atoi(q.Get("startAt"))
 		var issues []map[string]any
@@ -48,6 +54,51 @@ func TestRunFetchesEveryPageWhenTheServerCapsThem(t *testing.T) {
 	}
 	if seen[0] != "category = X" {
 		t.Fatalf("sent %q", seen[0])
+	}
+}
+
+// inFlight counts the requests a server is answering at once and keeps the
+// highest count it saw. Each request waits a little, so overlapping ones do.
+type inFlight struct {
+	now, most atomic.Int32
+}
+
+func (f *inFlight) wrap(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		n := f.now.Add(1)
+		for m := f.most.Load(); n > m && !f.most.CompareAndSwap(m, n); m = f.most.Load() {
+		}
+		time.Sleep(20 * time.Millisecond)
+		h(w, r)
+		f.now.Add(-1)
+	}
+}
+
+func TestRunFetchesTheRemainingPagesInParallelAndInOrder(t *testing.T) {
+	var f inFlight
+	srv := httptest.NewServer(f.wrap(func(w http.ResponseWriter, r *http.Request) {
+		start, _ := strconv.Atoi(r.URL.Query().Get("startAt"))
+		var issues []map[string]any
+		for i := start; i < 950 && i < start+100; i++ {
+			issues = append(issues, map[string]any{"key": fmt.Sprintf("A-%d", i), "fields": map[string]any{}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"total": 950, "issues": issues})
+	}))
+	t.Cleanup(srv.Close)
+	res, err := Run(context.Background(), corejira.NewClient(srv.URL, "token"), "category = X")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Issues) != 950 || res.Truncated {
+		t.Fatalf("rows %d, truncated %v", len(res.Issues), res.Truncated)
+	}
+	for i, is := range res.Issues {
+		if is.Key != fmt.Sprintf("A-%d", i) {
+			t.Fatalf("row %d is %s", i, is.Key)
+		}
+	}
+	if m := f.most.Load(); m < 2 || m > workers {
+		t.Fatalf("at most %d requests at once, want 2 to %d", m, workers)
 	}
 }
 

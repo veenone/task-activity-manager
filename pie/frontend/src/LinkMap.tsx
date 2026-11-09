@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { byKey, projectLabel, projectNames } from "./linked";
-import { type Edge, edges as edgesOf, projectOf } from "./linkData";
+import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
 
 // LinkMap counts Jira links between projects by type, each read from its
 // outward end, so a row's project points at a column's project in the
@@ -11,18 +11,31 @@ export function LinkMap({ result, onOpen }: { result: query.Result; onOpen: (key
   const [inside, setInside] = useState(false);
   const [bothEnds, setBothEnds] = useState(true);
   const [chosen, setChosen] = useState<{ from: string; to: string } | null>(null);
-  const issues = byKey(result);
-  const names = projectNames(result);
+  // Everything below reads the run once per change of run or filter. A large
+  // run has thousands of links, and scanning them for every cell on every
+  // render is what made the map slow (#431).
+  const { issues, names, edges, types, stale } = useMemo(
+    () => ({ issues: byKey(result), names: projectNames(result), ...edgesOf(result.issues) }),
+    [result],
+  );
   const label = (p: string) => projectLabel(p, names.get(p));
-  const { edges, types, stale } = edgesOf(result.issues);
-  const ends = (e: Edge) => [projectOf(e.from, issues), projectOf(e.to, issues)] as const;
-  const shown = edges.filter((e) => {
-    const [pf, pt] = ends(e);
-    return (inside || pf !== pt) && (!bothEnds || (issues.has(e.from) && issues.has(e.to)));
-  });
-  const ticked = shown.filter((e) => !off.has(e.type));
-  const projects = [...new Set(shown.flatMap((e) => ends(e)))].sort();
-  const between = (from: string, to: string) => ticked.filter((e) => ends(e)[0] === from && ends(e)[1] === to);
+  const { shown, projects } = useMemo(() => {
+    const ends = (e: Edge) => [projectOf(e.from, issues), projectOf(e.to, issues)] as const;
+    const kept = edges.filter((e) => {
+      const [pf, pt] = ends(e);
+      return (inside || pf !== pt) && (!bothEnds || (issues.has(e.from) && issues.has(e.to)));
+    });
+    return { shown: kept, projects: [...new Set(kept.flatMap((e) => ends(e)))].sort() };
+  }, [edges, issues, inside, bothEnds]);
+  const cells = useMemo(
+    () =>
+      byCell(
+        shown.filter((e) => !off.has(e.type)),
+        issues,
+      ),
+    [shown, off, issues],
+  );
+  const between = (from: string, to: string) => cells.get(`${from}>${to}`) ?? [];
   const words = (type: string) => {
     const t = types.find((x) => x.name === type);
     return t?.outward || t?.inward || type;

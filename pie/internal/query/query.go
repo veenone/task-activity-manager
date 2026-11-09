@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 
 	corejira "agile-suite/core/jira"
 )
@@ -22,6 +23,10 @@ const MaxRows = 5000
 const AskAbove = 2000
 
 const pageSize = 100
+
+// workers is how many searches PIE sends Jira at once. The client's rate
+// limiter still paces them, so this bounds waiting, not load.
+const workers = 4
 
 var fields = []string{"summary", "project", "issuetype", "status", "priority", "updated", "created", "resolutiondate", "issuelinks"}
 
@@ -100,15 +105,13 @@ func run(ctx context.Context, client *corejira.Client, jql string, extra Fields)
 			want = append(want, id)
 		}
 	}
-	res := Result{Issues: []Issue{}}
-	for {
-		size := min(pageSize, MaxRows-len(res.Issues))
-		page, err := client.SearchIssues(ctx, jql, want, nil, len(res.Issues), size)
+	page := func(start, size int) ([]Issue, int, error) {
+		got, err := client.SearchIssues(ctx, jql, want, nil, start, size)
 		if err != nil {
-			return Result{}, readable(err)
+			return nil, 0, readable(err)
 		}
-		res.Total = page.Total
-		for _, raw := range page.Issues {
+		out := make([]Issue, 0, len(got.Issues))
+		for _, raw := range got.Issues {
 			is := toIssue(raw)
 			if extra.Base != "" {
 				is.Bases = values(raw.Fields[extra.Base])
@@ -119,16 +122,64 @@ func run(ctx context.Context, client *corejira.Client, jql string, extra Fields)
 			if extra.Impact != "" {
 				is.ClientImpact = strings.Join(values(raw.Fields[extra.Impact]), ", ")
 			}
-			res.Issues = append(res.Issues, is)
+			out = append(out, is)
 		}
-		// An empty page ends the walk even if Total claims more: advancing by
-		// what the page held is what makes a server's own page limit harmless.
-		if len(page.Issues) == 0 || len(res.Issues) >= page.Total || len(res.Issues) >= MaxRows {
-			break
+		return out, got.Total, nil
+	}
+
+	// The first page says how many match and how many a page holds, which can
+	// be fewer than asked: Jira imposes its own limit. The rest are fetched
+	// at that size, several at once, and put back in order.
+	first, total, err := page(0, min(pageSize, MaxRows))
+	if err != nil {
+		return Result{}, err
+	}
+	res := Result{Total: total, Issues: first}
+	step := len(first)
+	end := min(total, MaxRows)
+	if step > 0 && step < end {
+		starts := []int{}
+		for s := step; s < end; s += step {
+			starts = append(starts, s)
+		}
+		pages := make([][]Issue, len(starts))
+		err := parallel(len(starts), func(i int) error {
+			got, _, err := page(starts[i], min(step, end-starts[i]))
+			pages[i] = got
+			return err
+		})
+		if err != nil {
+			return Result{}, err
+		}
+		for _, p := range pages {
+			res.Issues = append(res.Issues, p...)
 		}
 	}
 	res.Truncated = res.Total > len(res.Issues)
 	return res, nil
+}
+
+// parallel calls fn for 0 to n-1, at most workers at a time, and returns the
+// error of the lowest i that failed, so a failure reads the same on every run.
+func parallel(n int, fn func(i int) error) error {
+	errs := make([]error, n)
+	slots := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	for i := range n {
+		slots <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer func() { <-slots; wg.Done() }()
+			errs[i] = fn(i)
+		}()
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // readable keeps Jira's own sentence for a refused query, because it is the

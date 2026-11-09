@@ -31,3 +31,16 @@ export function edges(issues: query.Issue[]): { edges: Edge[]; types: LinkType[]
   }
   return { edges: [...seen.values()], types: [...types.values()].sort((a, b) => a.name.localeCompare(b.name)), stale: paired && !directed };
 }
+
+// byCell groups edges by "fromProject>toProject" in one pass, so a grid of
+// projects reads each cell from the map instead of scanning every edge.
+export function byCell(edges: Edge[], issues: Map<string, query.Issue>): Map<string, Edge[]> {
+  const out = new Map<string, Edge[]>();
+  for (const e of edges) {
+    const key = `${projectOf(e.from, issues)}>${projectOf(e.to, issues)}`;
+    const list = out.get(key);
+    if (list) list.push(e);
+    else out.set(key, [e]);
+  }
+  return out;
+}

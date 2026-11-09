@@ -60,14 +60,23 @@ func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed
 		if room := MaxRows - len(res.Issues); len(pending) > room {
 			pending, res.LinksTruncated = pending[:room], true
 		}
-		for batch := range slices.Chunk(pending, keysPerSearch) {
-			got, err := run(ctx, client, "key in ("+strings.Join(batch, ", ")+")", extra)
-			if err != nil {
-				res.LinkError = err.Error()
+		batches := slices.Collect(slices.Chunk(pending, keysPerSearch))
+		got := make([][]Issue, len(batches))
+		errs := make([]error, len(batches))
+		_ = parallel(len(batches), func(i int) error {
+			r, err := run(ctx, client, "key in ("+strings.Join(batches[i], ", ")+")", extra)
+			got[i], errs[i] = r.Issues, err
+			return err
+		})
+		// Batches before the first failure are kept, as a sequential walk
+		// would have kept them, so a failure costs only what came after it.
+		for i := range batches {
+			if errs[i] != nil {
+				res.LinkError = errs[i].Error()
 				res.Sets = Sets(res.Issues)
 				return res, nil
 			}
-			for _, is := range got.Issues {
+			for _, is := range got[i] {
 				if !have[is.Key] {
 					have[is.Key] = true
 					is.Matched = false
