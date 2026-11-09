@@ -61,5 +61,6 @@ Releases are tagged per app: `xtm/vX.Y.Z` for XTM (see `xtm/README.md`) and
 `scripts/release-app.ps1 -App <app> -Version X.Y.Z` is the same build run
 locally. Each app's user guide is a folder of its own, one file for each View menu
 entry plus a printable `USER_GUIDE.md` and the screenshots they share:
-[`docs/user-guide/xtm`](docs/user-guide/xtm/README.md) and
-[`docs/user-guide/tam`](docs/user-guide/tam/README.md).
+[`docs/user-guide/xtm`](docs/user-guide/xtm/README.md),
+[`docs/user-guide/tam`](docs/user-guide/tam/README.md) and
+[`docs/user-guide/pie`](docs/user-guide/pie/USER_GUIDE.md), which is a single file for now.

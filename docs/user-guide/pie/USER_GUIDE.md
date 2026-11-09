@@ -1,9 +1,14 @@
 # Project Issue Explorer: User Guide
 
+**Version:** 0.1.0 · **Platform:** Windows 10/11 (64-bit) and macOS ·
+**Audience:** analysts who follow an issue across many Jira Data Center
+projects.
+
 Project Issue Explorer (PIE) is a desktop app for people who look across Jira
 projects rather than inside one. You give it a JQL filter and it lists what
-matches, whichever projects those issues are in. This first version only reads
-from Jira. It does not change anything there.
+matches, whichever projects those issues are in. PIE only reads from Jira. It
+does not change anything there. The one place it writes is Confluence, when
+you publish a cycle.
 
 ## Add a profile
 
