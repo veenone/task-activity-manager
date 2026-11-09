@@ -238,6 +238,27 @@ func (s *Store) Record(profileID string, id int64, jql string, res query.Result,
 	return run, nil
 }
 
+// ReplaceResult stores res as the query's run without moving its run time or
+// comparing it: Refresh links fetches only linked issues, so the query's own
+// rows, and when they were fetched, have not changed. runAt is the run the
+// refresh started from. If the query ran again meanwhile, that newer run
+// stays and the refresh is refused.
+func (s *Store) ReplaceResult(profileID string, id int64, runAt string, res query.Result) error {
+	raw, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+	r, err := s.db.Exec(`UPDATE saved_query SET result = ? WHERE profile_id = ? AND id = ? AND run_at = ?`,
+		string(raw), profileID, id, runAt)
+	if err != nil {
+		return err
+	}
+	if n, _ := r.RowsAffected(); n == 0 {
+		return errors.New("the query ran again while its links were refreshing, so the newer run stays")
+	}
+	return nil
+}
+
 // Fields are the names of the Jira custom fields a profile reads. "" is a
 // field the profile does not use.
 type Fields struct {

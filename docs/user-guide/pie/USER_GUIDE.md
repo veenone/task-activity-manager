@@ -202,6 +202,16 @@ switches to the other direction and says how many links it has. Choose a key
 to open it in Trace. A run saved before PIE kept link direction asks you to
 run the query again.
 
+On a large run the grid scrolls both ways. The column headers and the project
+column stay in view. A column shows the project key, and hovering over it
+shows the name. A cell gets darker the more links it holds, and the last
+column totals each row.
+
+**Refresh links** at the top of the list fetches the linked issues again
+without running the query. Your query's own rows stay as they were. For a
+saved query the refreshed run is stored, so it is what PIE shows next time.
+If Jira fails partway, PIE keeps the run it had and says why.
+
 ## Statistics
 
 The **Statistics** page counts the run on screen without contacting Jira. Only

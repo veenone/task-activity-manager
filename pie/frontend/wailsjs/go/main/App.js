@@ -118,6 +118,10 @@ export function PublishCycle(arg1, arg2, arg3) {
   return window['go']['main']['App']['PublishCycle'](arg1, arg2, arg3);
 }
 
+export function RefreshLinks(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RefreshLinks'](arg1, arg2, arg3, arg4);
+}
+
 export function RemoveBaseline(arg1, arg2) {
   return window['go']['main']['App']['RemoveBaseline'](arg1, arg2);
 }

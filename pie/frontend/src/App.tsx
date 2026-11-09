@@ -363,7 +363,9 @@ export default function App() {
 
         {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
         {result && view === "map" && <ProjectMap profileId={profileId} result={result} onOpen={openInTrace} />}
-        {result && view === "links" && <LinkMap result={result} onOpen={openInTrace} />}
+        {result && view === "links" && (
+          <LinkMap result={result} onOpen={openInTrace} refresh={{ profileId, queryId, runAt, onResult: setResult }} />
+        )}
 
         {result && view === "stats" && <Statistics result={result} productField={fields?.productBase ?? ""} />}
         {result && view === "results" && matched.length > 0 && (

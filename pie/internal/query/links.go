@@ -39,6 +39,16 @@ func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed
 	if err != nil {
 		return Result{}, err
 	}
+	return Follow(ctx, client, res, extra), nil
+}
+
+// Follow fetches the issues res links to in other projects, and theirs,
+// until no new key appears or MaxRows is reached, and groups the result into
+// sets. res holds the rows to start from; Refresh links passes a stored run's
+// own rows, so only the linked issues are fetched again. A failed search
+// stops the walk and is reported in LinkError, with the rows kept.
+func Follow(ctx context.Context, client *corejira.Client, res Result, extra Fields) Result {
+	res.LinkError, res.LinksTruncated = "", false
 	have := map[string]bool{}
 	for _, is := range res.Issues {
 		have[is.Key] = true
@@ -74,7 +84,7 @@ func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed
 			if errs[i] != nil {
 				res.LinkError = errs[i].Error()
 				res.Sets = Sets(res.Issues)
-				return res, nil
+				return res
 			}
 			for _, is := range got[i] {
 				if !have[is.Key] {
@@ -89,7 +99,7 @@ func Explore(ctx context.Context, client *corejira.Client, jql string, confirmed
 		}
 	}
 	res.Sets = Sets(res.Issues)
-	return res, nil
+	return res
 }
 
 // Sets groups issues into linked sets, in the order their first issue appears.
