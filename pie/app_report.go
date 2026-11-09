@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -37,8 +38,29 @@ func (a *App) SetConfluenceSettings(profileID string, c profile.ConfluenceConfig
 	if token != "" && c.BaseURL == "" {
 		return errors.New("enter the Confluence URL the token is for")
 	}
+	// A token and page ids belong to one Confluence. A new URL needs its own
+	// token, so the old one is never sent there, and forgets the old pages.
+	was, err := a.profiles.ConfluenceConfig(profileID)
+	if err != nil {
+		return err
+	}
+	moved := was.BaseURL != "" && strings.TrimRight(c.BaseURL, "/") != was.BaseURL
+	if moved && c.BaseURL != "" && token == "" {
+		return errors.New("enter the token for the new Confluence URL")
+	}
 	if err := a.profiles.SetConfluenceConfig(profileID, c); err != nil {
 		return err
+	}
+	if moved {
+		if err := a.cycles.ForgetPages(profileID); err != nil {
+			return err
+		}
+		if token == "" {
+			// The URL was cleared, so the token has nowhere to go.
+			if err := a.creds.Delete(profile.ConfluenceCredentialID(profileID)); err != nil {
+				log.Printf("pie: delete Confluence credentials for %s: %v", profileID, err)
+			}
+		}
 	}
 	if token == "" {
 		return nil

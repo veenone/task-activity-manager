@@ -195,3 +195,16 @@ func TestPurgeRemovesThePageRecord(t *testing.T) {
 		t.Fatalf("purge left the page record: %v, %v", ok, err)
 	}
 }
+
+func TestForgettingPagesSendsTheNextPublishThroughTheTitleCheck(t *testing.T) {
+	cy, _, id := setup(t)
+	sp := newSpace()
+	first, _ := publish(cy, sp, id, false)
+	if err := cy.ForgetPages("p1"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := publish(cy, sp, id, false)
+	if err != nil || !strings.Contains(got.Ask, "already exists") || sp.pages[first.PageID].Version != 1 {
+		t.Fatalf("after forgetting, publish = %+v, %v", got, err)
+	}
+}

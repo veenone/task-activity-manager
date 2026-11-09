@@ -45,3 +45,13 @@ func TestStorageHoldsTheCountsTheGridAndEachReason(t *testing.T) {
 		t.Error("the projects of a case are not in key order")
 	}
 }
+
+func TestStorageDropsCharactersXMLCannotHold(t *testing.T) {
+	d := cycles.Detail{Cases: []cases.Detail{{Case: cases.Case{Key: "ACME-1"}, Projects: []cases.Project{
+		{Key: "ALPHA", Verdict: cases.Affected, Reason: "line\x00one\x0bpasted\ttab\nnext"},
+	}}}}
+	got := Storage(d)
+	if !strings.Contains(got, "<td>lineonepasted\ttab\nnext</td>") {
+		t.Fatalf("storage = %s", got)
+	}
+}

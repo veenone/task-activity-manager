@@ -320,7 +320,8 @@ they are now, and **Delete** removes it.
 key and the id of the page the reports go under. Leave the page id empty to put
 them at the top of the space. The token goes to the operating system's
 credential store, never to PIE's database. Leave the token field empty to keep
-the token you saved before.
+the token you saved before. A new URL needs its own token, and PIE
+forgets the pages it wrote on the old one.
 
 **Publish** writes the cycle to a page called "Impact report:" followed by the
 cycle's name. The page has the change counts, the cases by project grid, and

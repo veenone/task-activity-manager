@@ -54,7 +54,7 @@ func Storage(d cycles.Detail) string {
 
 	b.WriteString("<h2>Verdicts and reasons</h2>")
 	for _, c := range d.Cases {
-		b.WriteString("<h3>" + html.EscapeString(c.Key) + "</h3>")
+		b.WriteString("<h3>" + esc(c.Key) + "</h3>")
 		if len(c.Projects) == 0 {
 			para(&b, "No projects on this case.")
 			continue
@@ -71,12 +71,12 @@ func Storage(d cycles.Detail) string {
 	return b.String()
 }
 
-func para(b *strings.Builder, text string) { b.WriteString("<p>" + html.EscapeString(text) + "</p>") }
+func para(b *strings.Builder, text string) { b.WriteString("<p>" + esc(text) + "</p>") }
 
 func row(b *strings.Builder, cell string, values ...string) {
 	b.WriteString("<tr>")
 	for _, v := range values {
-		b.WriteString("<" + cell + ">" + html.EscapeString(v) + "</" + cell + ">")
+		b.WriteString("<" + cell + ">" + esc(v) + "</" + cell + ">")
 	}
 	b.WriteString("</tr>")
 }
@@ -86,7 +86,7 @@ func counted(n int, what string, keys []string) string {
 	if len(keys) > 0 {
 		s += ": " + strings.Join(keys, ", ")
 	}
-	return html.EscapeString(s)
+	return esc(s)
 }
 
 func projectKeys(cs []cases.Detail) []string {
@@ -107,4 +107,16 @@ func day(stamp string) string {
 		return stamp[:10]
 	}
 	return stamp
+}
+
+// esc escapes text for the storage format and drops the control characters
+// XML 1.0 cannot hold, which reasons pasted from elsewhere sometimes carry.
+// Confluence refuses a body containing one.
+func esc(s string) string {
+	return html.EscapeString(strings.Map(func(r rune) rune {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' {
+			return -1
+		}
+		return r
+	}, s))
 }

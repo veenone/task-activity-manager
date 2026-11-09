@@ -48,3 +48,11 @@ func (s *Store) MarkPublished(profileID string, id int64, p Page, at time.Time) 
 	}
 	return tx.Commit()
 }
+
+// ForgetPages drops the profile's page records. The settings call it when the
+// Confluence URL changes, because page ids from one instance mean nothing on
+// another. The cycles stay published.
+func (s *Store) ForgetPages(profileID string) error {
+	_, err := s.db.Exec(`DELETE FROM report_page WHERE profile_id = ?`, profileID)
+	return err
+}
