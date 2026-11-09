@@ -4,18 +4,21 @@ import type { cases, query } from "../wailsjs/go/models";
 import { errorText } from "./AddProfileDialog";
 import { BaselinesDialog } from "./BaselinesDialog";
 import { OutOfStep, allProjects, baselineGroups, byKey, projectLabel, projectNames } from "./linked";
+import { filterSets, type MapFilter } from "./mapData";
 import { MapFlow } from "./MapFlow";
 import { MapTree } from "./MapTree";
 import { Pager, usePaged } from "./Pager";
 import { Card } from "./Statistics";
 
 const VIEWS = ["Flow", "Tree", "Table"] as const;
+const NO_FILTER: MapFilter = { baseline: "", project: "", key: "" };
 
 // ProjectMap puts every linked set against every project it touches, so a
 // status that moved in one project and not in another shows in one row. The
 // project columns follow the analyst's baselines when there are any.
 export function ProjectMap({ profileId, result, onOpen }: { profileId: string; result: query.Result; onOpen: (key: string) => void }) {
   const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
+  const [filter, setFilter] = useState<MapFilter>(NO_FILTER);
   const [view, setView] = useState<(typeof VIEWS)[number]>("Flow");
   const [baselines, setBaselines] = useState<cases.Baseline[]>([]);
   const [editing, setEditing] = useState(false);
@@ -25,7 +28,14 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
   const groups = baselineGroups(allProjects(result.sets), baselines);
   const projects = groups.flatMap((g) => g.projects);
   const grouped = groups.some((g) => g.baseline !== null);
-  const sets = result.sets.filter((s) => !onlyOutOfStep || s.outOfStep);
+  // The filters narrow every view; the count cards stay on the whole run.
+  // A baseline or project that a new run or a baselines edit took away counts
+  // as no choice, so the map never empties under a select that shows none.
+  const baseline = groups.some((g) => (g.baseline ?? "-") === filter.baseline) ? filter.baseline : "";
+  const pickable = baseline === "" ? projects : (groups.find((g) => (g.baseline ?? "-") === baseline)?.projects ?? []);
+  const live: MapFilter = { baseline, project: pickable.includes(filter.project) ? filter.project : "", key: filter.key };
+  const sets = filterSets(result.sets, groups, live).filter((s) => !onlyOutOfStep || s.outOfStep);
+  const filtered = onlyOutOfStep || live.baseline !== "" || live.project !== "" || live.key.trim() !== "";
   const { rows, pager } = usePaged(sets);
   // Flow and Tree draw only the projects the shown sets reach.
   const shown = baselineGroups(allProjects(sets), baselines);
@@ -55,6 +65,61 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
           <input type="checkbox" checked={onlyOutOfStep} onChange={(e) => setOnlyOutOfStep(e.target.checked)} />
           Out of step only
         </label>
+        <label>
+          Baseline
+          <select
+            className="detail-input pie-filter-select"
+            value={live.baseline}
+            onChange={(e) => setFilter({ ...live, baseline: e.target.value, project: "" })}
+          >
+            <option value="">All baselines</option>
+            {groups.map((g) => (
+              <option key={g.baseline ?? "-"} value={g.baseline ?? "-"}>
+                {g.baseline === null ? "No baseline" : `Baseline ${projectLabel(g.baseline, names.get(g.baseline))}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Project
+          <select
+            className="detail-input pie-filter-select"
+            value={live.project}
+            onChange={(e) => setFilter({ ...live, project: e.target.value })}
+          >
+            <option value="">All projects</option>
+            {pickable.map((p) => (
+              <option key={p} value={p}>
+                {projectLabel(p, names.get(p))}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Key
+          <input
+            className="detail-input pie-filter-select"
+            type="search"
+            value={filter.key}
+            placeholder="Part of a key"
+            onChange={(e) => setFilter({ ...filter, key: e.target.value })}
+          />
+        </label>
+        {filtered && (
+          <>
+            <span className="muted">{`Showing ${sets.length} of ${result.sets.length} linked sets`}</span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setFilter(NO_FILTER);
+                setOnlyOutOfStep(false);
+              }}
+            >
+              Clear filters
+            </button>
+          </>
+        )}
         <button type="button" className="btn btn-ghost" onClick={() => setEditing(true)}>
           Baselines
         </button>
