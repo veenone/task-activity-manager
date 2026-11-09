@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ViewTabs, useConfirm, usePrompt } from "@agile-suite/core";
+import { ViewTabs, applyTheme, useConfirm, useNotice, usePrompt } from "@agile-suite/core";
 import {
   DeleteProfile,
   DeleteQuery,
@@ -10,6 +10,7 @@ import {
   RunQuery,
   SaveQuery,
   StartupError,
+  Version,
 } from "../wailsjs/go/main/App";
 import type { profile, query, saved } from "../wailsjs/go/models";
 import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
@@ -24,18 +25,10 @@ import { JqlField } from "./JqlField";
 import { RunNotes } from "./RunNotes";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
+import { ThemeToggle } from "./ThemeToggle";
 import { useCases } from "./useCases";
-
-type View = "results" | "trace" | "map" | "links" | "stats" | "cases" | "cycles";
-const VIEWS = [
-  { id: "results", label: "Results" },
-  { id: "trace", label: "Trace" },
-  { id: "map", label: "Project map" },
-  { id: "links", label: "Link map" },
-  { id: "stats", label: "Statistics" },
-  { id: "cases", label: "Cases" },
-  { id: "cycles", label: "Cycles" },
-] as const;
+import { useMenu } from "./useMenu";
+import { type View, VIEWS } from "./views";
 
 function countText(res: query.Result, matched: number): string {
   if (res.truncated) return `Showing the first ${matched} of ${res.total} issues`;
@@ -67,6 +60,8 @@ export default function App() {
   const [runAt, setRunAt] = useState("");
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
+  const [shownTheme, setShownTheme] = useState(() => document.documentElement.dataset.theme ?? "light");
+  const { notice } = useNotice();
   const cases = useCases(profileId, setError);
   // null until the stored names arrive, so the dialog cannot save blanks over them.
   const [fields, setFields] = useState<saved.Fields | null>(null);
@@ -221,6 +216,21 @@ export default function App() {
     }
   }
 
+  useMenu({
+    view: (id: View) => setView(id),
+    "add-profile": () => setAdding(true),
+    fields: () => fields !== null && !running && setEditingFields(true),
+    run: () => profileId !== "" && !running && void run(),
+    theme: (t: string) => {
+      applyTheme(t);
+      setShownTheme(document.documentElement.dataset.theme ?? "light");
+    },
+    about: () =>
+      void Version().then((v) =>
+        notice({ title: `Project Issue Explorer ${v}`, message: "Cross-project issue analysis for Jira Data Center." }),
+      ),
+  });
+
   if (startupError) {
     return (
       <div className="pie-main">
@@ -276,6 +286,7 @@ export default function App() {
           <button type="button" className="btn btn-ghost" onClick={() => setAdding(true)}>
             Add profile
           </button>
+          <ThemeToggle shown={shownTheme} onChange={setShownTheme} />
         </div>
       </header>
 
