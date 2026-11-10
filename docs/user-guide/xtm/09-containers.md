@@ -14,15 +14,21 @@ The toggle at the top left switches between **Containers** and [Bugs](#work-with
 
 ![Picking a Test Execution](images/containers-02-pick-execution.png)
 
-The card under the filters shows the container's key, status and test count. For an execution it also shows the parent issue, the **Environments** and **Fix version(s)**, and a bar with the result counts. **Related bugs** expands to list the defects linked to its runs.
+The card under the filters is one line: the container's type, key, name, status, test count and a small bar of its results, then **Related bugs**, **+ Add tests** and, for an execution, **Import results**. A long name is cut short; hover over it to read it whole. **Related bugs** shows how many defects are linked through its tests, and opens their list under the card. Click **▸** at the start of the card to show the details: the parent issue, the **Environments** and **Fix version(s)** of an execution, the result counts, and a plan's or set's consolidated results. The view remembers whether you left the details open.
 
 ![A Test Execution and its runs](images/containers-03-execution-card.png)
 
 The table lists the member tests. For a Test Execution it adds the run columns: Execution, Date, By, Environment, Fix Version, Defects and Remarks.
 
-Above the table of a Test Execution, **Label** and **JQL** narrow its tests the way Jira's Test Execution page does. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. JQL asks Jira which of the execution's tests also match your query, and keeps those. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL and say so.
+Above the table, **Filters** opens every filter for the view, in one panel:
 
-**Sync** at the right of the filters refreshes only the containers from Jira.
+- the filters for the container list: **All executions**, **All environments**, the sort, and **Set env on shown**
+- **Fix version** and **Result**, for the tests of the container you opened
+- **Label** and **JQL**, which narrow the tests the way Jira's Test Execution page does, for any container type. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. JQL asks Jira which of the container's tests also match your query, and keeps those. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL and say so.
+
+With the panel closed, the button says how many filters are in force, for example **Filters (2)**, and each one shows beside it as a chip. Click **✕** on a chip to remove that filter.
+
+**Actions** at the right of the header holds **Sync**, which refreshes only the containers from Jira, and for executions **Import JUnit**, beside rename, pytest and delete.
 
 ## Record run results
 
@@ -103,7 +109,7 @@ local pending data.
 
 ### Set environments
 
-Type in **Add environment…** on the card to add an environment to the execution, and click **✕** on an environment to remove it. To change many executions at once, filter them with **All executions** and **All environments**, then use **Set env on shown**.
+Type in **Add environment…** on the card to add an environment to the execution, and click **✕** on an environment to remove it. To change many executions at once, filter them with **All executions** and **All environments**, then use **Set env on shown**. All three are under **Filters**.
 
 ## See results across a Test Plan or Set
 
@@ -137,13 +143,13 @@ On a demo profile, **Regenerate sample data** and **Clean sample data…** reset
 ### Into an existing execution
 
 1. Pick the Test Execution.
-2. Click **Import results (JUnit XML)** on its card and choose the report.
+2. Click **Import results** on its card and choose the report.
 3. Check the preview. It lists the results it will apply and the testcases it skipped, with the reason.
 4. Click **Apply N results**.
 
 ### Into a new execution
 
-1. Set **Type** to Test Execution and click **Import JUnit**.
+1. Set **Type** to Test Execution and choose **Actions** > **Import JUnit**.
 2. Enter the **Execution summary**, for example `Nightly run 2026-10-15`.
 3. Tick **Create missing tests** if testcases with no matching test should become new tests.
 4. Click **Choose JUnit XML file…** and pick the report.

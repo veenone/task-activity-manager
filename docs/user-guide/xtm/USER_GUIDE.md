@@ -1072,7 +1072,7 @@ the result maps as: no failure/error → **PASS**, a `<failure>`/`<error>` →
 **FAIL**, a `<skipped>` is left unchanged. Two entry points on the Test Execution
 view:
 
-- **Import results (JUnit XML)** updates the **selected** execution. Matched
+- **Import results** updates the **selected** execution. Matched
   member tests get the imported result; unmatched or ambiguous testcases are
   reported and skipped.
 - **New exec from JUnit XML** **creates a new Test Execution** from the report:
