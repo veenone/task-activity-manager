@@ -176,6 +176,7 @@ export default function App() {
   async function run() {
     setRunning(true);
     setError("");
+    setNotice(null);
     try {
       let r = await RunQuery(profileId, queryId, jql, false);
       if (r.result.needsConfirm) {

@@ -50,15 +50,17 @@ export function StatusBar({
   onDismiss: () => void;
   theme: string;
 }) {
+  // A run's progress wins over a notice nobody dismissed (#452 review).
+  const shown = progress ? null : notice;
   return (
     <footer
       className={
-        notice?.error ? "app-statusbar statusbar-failed" : "app-statusbar"
+        shown?.error ? "app-statusbar statusbar-failed" : "app-statusbar"
       }
     >
-      {notice ? (
-        <div className="pie-ribbon" role={notice.error ? "alert" : "status"}>
-          <span>{notice.text}</span>
+      {shown ? (
+        <div className="pie-ribbon" role={shown.error ? "alert" : "status"}>
+          <span>{shown.text}</span>
           <button
             type="button"
             className="btn btn-ghost pie-ribbon-close"

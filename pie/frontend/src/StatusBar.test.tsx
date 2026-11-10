@@ -34,3 +34,16 @@ it("shows the profile, the last run and the theme when nothing runs", () => {
     "Old Jira12 issuesLast run 2026-11-10 09:30Theme: dark",
   );
 });
+
+it("shows a run's progress over an export notice left on screen", () => {
+  render(
+    <StatusBar
+      progress={{ stage: "Following links", done: 3, total: 9 }}
+      notice={{ text: "Saved to /tmp/x.xlsx" }}
+      onDismiss={() => {}}
+      theme="light"
+    />,
+  );
+  expect(screen.getByRole("progressbar", { name: "Run progress" })).toBeVisible();
+  expect(screen.queryByText("Saved to /tmp/x.xlsx")).toBeNull();
+});
