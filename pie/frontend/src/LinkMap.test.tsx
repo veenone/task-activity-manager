@@ -259,3 +259,49 @@ it("sorts the grid's rows and columns by project key or by project name", async 
   await user.click(within(grid()).getByRole("button", { name: "Sort by project key" }));
   expect(cols()).toEqual(["A", "B", "C"]);
 });
+
+it("keeps only the chosen projects on the flow's left side", async () => {
+  // C-1 also blocks B-1, so A and C both start links.
+  const res = {
+    ...result,
+    issues: result.issues.map((i) =>
+      i.key === "C-1" ? { ...i, links: [...i.links, link("B-1", "Blocks", "blocks", true)] } : i,
+    ),
+  };
+  const { user } = show(res);
+  await user.click(screen.getByRole("button", { name: "Flow" }));
+  const chart = () => screen.getByRole("img", { name: /Links from each project/ });
+  expect(within(chart()).getByText("C to Blocks: 1")).toBeInTheDocument();
+  await user.type(screen.getByRole("combobox", { name: "Left side" }), "A{Enter}");
+  expect(within(chart()).getByText("A to Cloners: 1")).toBeInTheDocument();
+  expect(within(chart()).queryByText("C to Blocks: 1")).not.toBeInTheDocument();
+});
+
+it("widens the flow's margins for long project names, and scrolls rather than squeezing them", async () => {
+  const long = "A very long project name that would be clipped";
+  const { user } = show({ ...result, issues: result.issues.map((i) => ({ ...i, projectName: i.project === "A" ? long : "" })) });
+  await user.click(screen.getByRole("button", { name: "Flow" }));
+  const chart = screen.getByRole("img", { name: /Links from each project/ });
+  const left = -Number(chart.getAttribute("viewBox")!.split(" ")[0]);
+  expect(left).toBeGreaterThan(200);
+  expect(chart.style.minWidth).toBe(`${chart.getAttribute("viewBox")!.split(" ")[2]}px`);
+});
+
+it("zooms the network, explains it in a legend, and fits the centre's key in its circle", async () => {
+  const res = {
+    issues: [
+      issue("ALPHABETA-1", "Open", [link("B-1", "Cloners", "clones", true)]),
+      issue("B-1", "Open", [link("ALPHABETA-1", "Cloners", "is cloned by", false)]),
+    ],
+    sets: [],
+  };
+  const { user } = show(res);
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  expect(screen.getByRole("group", { name: "Link network zoom" })).toBeVisible();
+  const legend = screen.getByRole("list", { name: "Legend" });
+  expect(legend).toHaveTextContent("Centre: the project chosen");
+  expect(legend).toHaveTextContent("Arrow away from the centre: its issues link out");
+  const hub = document.querySelector(".pie-network-centre")!;
+  // Nine letters do not fit the 24-unit circle a short key gets.
+  expect(Number(hub.getAttribute("r"))).toBeGreaterThan(24);
+});

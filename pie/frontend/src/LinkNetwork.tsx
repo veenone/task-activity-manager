@@ -2,13 +2,16 @@ import { useRef, useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { ProjectInput } from "./ProjectInput";
 import { busiest, type Edge, neighbours, projectOf, type Spoke } from "./linkData";
+import { Zoom } from "./Zoom";
 
 // DRAWN is how many neighbours the diagram places around the centre. The list
 // beside it names every one, so a busy project stays readable.
 const DRAWN = 24;
 const SPREAD = 10;
-// HUB is the centre circle's radius; spokes start just outside it.
+// HUB is the centre circle's smallest radius; a longer key widens it to fit
+// (#455). Spokes start just outside it.
 const HUB = 24;
+const HUB_CHAR = 4.5;
 // A pointer that moves further than this, in screen pixels, is a drag and
 // not a click, so letting go does not recentre.
 const DRAG = 3;
@@ -41,6 +44,7 @@ export function LinkNetwork({
   const centre = projects.includes(picked) ? picked : busiest(edges, issues);
   if (!centre) return <p className="muted">No links between projects to show.</p>;
   const around = neighbours(centre, edges, issues);
+  const hub = Math.max(HUB, centre.length * HUB_CHAR + 10);
   const drawn = around.slice(0, DRAWN);
   const radius = Math.max(140, drawn.length * 16);
   const moved = placed.centre === centre ? placed.at : {};
@@ -89,6 +93,7 @@ export function LinkNetwork({
             onChange={setPicked}
           />
         </div>
+        <Zoom label="Link network">
         <svg
           ref={svg}
           className="pie-network-svg"
@@ -121,8 +126,8 @@ export function LinkNetwork({
                 <g key={`${n.project}|${s.type}`}>
                   <line
                     className="pie-network-spoke"
-                    x1={x0 + (p.x * (HUB + 4)) / len}
-                    y1={y0 + (p.y * (HUB + 4)) / len}
+                    x1={x0 + (p.x * (hub + 4)) / len}
+                    y1={y0 + (p.y * (hub + 4)) / len}
                     x2={x1}
                     y2={y1}
                     strokeWidth={1 + Math.log2(1 + s.out + s.in)}
@@ -140,7 +145,7 @@ export function LinkNetwork({
               );
             });
           })}
-          <circle className="pie-network-centre" r={HUB} />
+          <circle className="pie-network-centre" r={hub} />
           <text className="pie-network-hub" textAnchor="middle" dominantBaseline="central">
             {centre}
           </text>
@@ -188,6 +193,29 @@ export function LinkNetwork({
             );
           })}
         </svg>
+        </Zoom>
+        <ul className="pie-network-legend" aria-label="Legend">
+          <li>
+            <span className="pie-legend-hub" aria-hidden="true" />
+            Centre: the project chosen, or the busiest
+          </li>
+          <li>
+            <span className="pie-legend-node" aria-hidden="true" />
+            Around it: the projects its issues link to, one spoke per link type
+          </li>
+          <li>
+            <span aria-hidden="true">→</span>
+            Arrow away from the centre: its issues link out to that project
+          </li>
+          <li>
+            <span aria-hidden="true">←</span>
+            Arrow towards the centre: that project&apos;s issues link in
+          </li>
+          <li>
+            <span className="pie-legend-thick" aria-hidden="true" />
+            A thicker spoke has more links
+          </li>
+        </ul>
         {around.length > DRAWN && (
           <p className="muted">{`The ${DRAWN} projects with the most links are drawn. The list names all ${around.length}.`}</p>
         )}
