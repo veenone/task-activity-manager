@@ -292,6 +292,35 @@ all three views.
   towards it means that project's issues link in, and a thicker spoke has more
   links.
 
+  **Projects** and **Issues** above the diagram switch between projects and
+  the issues themselves. **Issues** draws each issue as a box with its key, a
+  short summary and a border coloured by status. Each relationship is one
+  line, coloured by link type, with an arrow from the issue that does it to
+  the one it is done to ("blocks", "clones", "parent of"). "relates to" is
+  dashed and has no arrow. A dashed box is an issue outside the run, and
+  **+3** on a box says three of its links are not drawn yet.
+  - Click an issue to move to it. The panel on the right shows its fields, its
+    links by type and, for an issue fetched from Jira, when it was fetched.
+    **Expand links** draws its linked issues, 50 at a time. **Open in Trace**
+    and **Open in Jira** open it there.
+  - **‹ Back** and **Forward ›** step through the issues you visited, and the
+    line beside them shows the path.
+  - **Find an issue** looks among the issues drawn by key or summary. Type a
+    full key, such as ABC-120, and press Enter to fetch one that is not drawn.
+  - The **Relationships** list hides a link type, and **Show** hides issues
+    outside the run or finished issues.
+  - Drag to pan, hold Ctrl and turn the wheel or use **+** and **−** to zoom,
+    and use **Fit** to see everything. **Re-layout** arranges the boxes again.
+  - The graph holds at most 300 issues and says so when it is full.
+
+  Issues outside the run are fetched from Jira and kept on this computer.
+  When Jira cannot be reached, the graph opens and expands from what is kept,
+  each issue says when it was fetched, and the status bar says PIE is offline
+  until Jira answers again. To have a saved query's linked issues ready before
+  you go offline, open it and tick **Keep links for offline**: each run then
+  also fetches the issues one link away. It is off by default, because on a
+  large run it costs more Jira searches.
+
 **Refresh links** at the top of the list fetches the linked issues again
 without running the query. Your query's own rows stay as they were. For a
 saved query the refreshed run is stored, so it is what PIE shows next time.
