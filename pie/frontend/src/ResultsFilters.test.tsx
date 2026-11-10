@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { query } from "../wailsjs/go/models";
 import { ResultsTable } from "./ResultsTable";
@@ -35,7 +35,8 @@ const keys = () =>
 it("narrows the rows by project, status and priority together", async () => {
   const user = userEvent.setup();
   render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
-  expect([...document.querySelectorAll(`#${screen.getByLabelText("Project").getAttribute("list")} option`)].map((o) => o.textContent)).toEqual(["A name (A)", "B name (B)"]);
+  fireEvent.focus(screen.getByLabelText("Project"));
+  expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["A name (A)", "B name (B)"]);
   await user.selectOptions(screen.getByLabelText("Status"), "Open");
   expect(keys()).toEqual(["A-1", "B-1", "B-2"]);
   await user.selectOptions(screen.getByLabelText("Priority"), "High");

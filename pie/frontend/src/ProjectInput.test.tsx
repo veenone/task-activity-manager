@@ -26,22 +26,48 @@ function One({ onChange }: { onChange: (p: string) => void }) {
 it("suggests every project by key and name, and applies a project once its key or name is typed", async () => {
   const onChange = vi.fn();
   render(<One onChange={onChange} />);
-  const box = screen.getByLabelText("Project");
-  const options = [...document.querySelectorAll(`#${box.getAttribute("list")} option`)].map((o) => [
-    o.getAttribute("value"),
-    o.textContent,
-  ]);
-  expect(options).toEqual([
-    ["ALPHA", "Card Platform (ALPHA)"],
-    ["BRAVO", "Reader (BRAVO)"],
-    ["CHARLIE", "CHARLIE"],
-  ]);
+  const box = screen.getByRole("combobox", { name: "Project" });
   const user = userEvent.setup();
+  // PIE's own list, not the browser's: it opens on focus and follows the theme.
+  await user.click(box);
+  expect(box).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+    "Card Platform (ALPHA)",
+    "Reader (BRAVO)",
+    "CHARLIE",
+  ]);
   await user.type(box, "bravo");
   expect(onChange).toHaveBeenLastCalledWith("BRAVO");
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Reader (BRAVO)"]);
   await user.clear(box);
   await user.type(box, "card platform (alpha)");
   expect(onChange).toHaveBeenLastCalledWith("ALPHA");
+});
+
+it("narrows the list by key or name as you type, and picks with the keyboard or a click", async () => {
+  const onChange = vi.fn();
+  render(<One onChange={onChange} />);
+  const box = screen.getByRole("combobox", { name: "Project" });
+  const user = userEvent.setup();
+  await user.type(box, "r");
+  // "r" is in Card Platform, Reader and CHARLIE.
+  expect(screen.getAllByRole("option")).toHaveLength(3);
+  await user.type(box, "ea");
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Reader (BRAVO)"]);
+  await user.keyboard("{ArrowDown}");
+  expect(screen.getByRole("option", { name: "Reader (BRAVO)" })).toHaveAttribute("aria-selected", "true");
+  await user.keyboard("{Enter}");
+  expect(onChange).toHaveBeenLastCalledWith("BRAVO");
+  expect(box).toHaveValue("BRAVO");
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+  await user.clear(box);
+  await user.click(screen.getByRole("option", { name: "CHARLIE" }));
+  expect(onChange).toHaveBeenLastCalledWith("CHARLIE");
+  await user.keyboard("{ArrowDown}");
+  expect(screen.getByRole("listbox")).toBeVisible();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
 });
 
 it("applies no project, and says so, for text that names none", async () => {
@@ -65,6 +91,10 @@ it("adds projects as chips by typing and removes them", async () => {
   await user.type(box, "charlie{Enter}");
   expect(screen.getByRole("list", { name: "Chosen projects" })).toHaveTextContent("Card Platform (ALPHA)");
   expect(box).toHaveValue("");
+  // A click on a suggestion adds it too.
+  await user.type(box, "rea");
+  await user.click(screen.getByRole("option", { name: "Reader (BRAVO)" }));
+  expect(screen.getByRole("list", { name: "Chosen projects" })).toHaveTextContent("Reader (BRAVO)");
   await user.click(screen.getByRole("button", { name: "Remove Card Platform (ALPHA)" }));
   expect(screen.getByRole("list", { name: "Chosen projects" })).not.toHaveTextContent("ALPHA");
   expect(screen.getByRole("list", { name: "Chosen projects" })).toHaveTextContent("CHARLIE");

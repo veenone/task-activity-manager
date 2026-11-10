@@ -3,6 +3,7 @@ import { Modal, useConfirm } from "@agile-suite/core";
 import { AddBaseline, AddDescendants, JiraProjects, RemoveBaseline, RemoveDescendant } from "../wailsjs/go/main/App";
 import type { cases, jira } from "../wailsjs/go/models";
 import { errorText } from "./ProfileForm";
+import { Combo } from "./ProjectInput";
 import { projectLabel } from "./linked";
 
 // BaselinesDialog keeps the analyst's mapping of Jira projects: which are
@@ -40,6 +41,9 @@ export function BaselinesDialog({
   const names = new Map(projects.map((p) => [p.key, p.name]));
   const label = (key: string) => projectLabel(key, names.get(key));
   const keyOf = (text: string) => text.trim().toUpperCase();
+  // Every Jira project, offered in the boxes' suggestion lists (#454).
+  const keys = projects.map((p) => p.key);
+  const jiraLabel = (key: string) => projectLabel(key, projects.find((p) => p.key === key)?.name);
 
   async function change(action: () => Promise<cases.Baseline[]>): Promise<boolean> {
     setError("");
@@ -72,13 +76,6 @@ export function BaselinesDialog({
           Mark the Jira projects that are product baselines and put the projects derived from each under it. A project sits under one
           baseline at most. The Project map groups its columns this way.
         </p>
-        <datalist id="pie-jira-projects">
-          {projects.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.name}
-            </option>
-          ))}
-        </datalist>
         <form
           className="pie-baseline-add"
           onSubmit={(e) => {
@@ -88,7 +85,16 @@ export function BaselinesDialog({
         >
           <label>
             New baseline
-            <input list="pie-jira-projects" value={newBase} onChange={(e) => setNewBase(e.target.value)} />
+            <Combo
+              name="New baseline"
+              className="detail-input"
+              text={newBase}
+              onText={setNewBase}
+              projects={keys}
+              label={jiraLabel}
+              onPick={setNewBase}
+              placeholder=""
+            />
           </label>
           <button type="submit" className="btn btn-ghost" disabled={newBase.trim() === ""}>
             Add baseline
@@ -125,11 +131,15 @@ export function BaselinesDialog({
                 void change(() => AddDescendants(profileId, b.key, [key])).then((ok) => ok && setDrafts({ ...drafts, [b.key]: "" }));
               }}
             >
-              <input
-                list="pie-jira-projects"
-                aria-label={`Add a descendant of ${label(b.key)}`}
-                value={drafts[b.key] ?? ""}
-                onChange={(e) => setDrafts({ ...drafts, [b.key]: e.target.value })}
+              <Combo
+                name={`Add a descendant of ${label(b.key)}`}
+                className="detail-input"
+                text={drafts[b.key] ?? ""}
+                onText={(t) => setDrafts({ ...drafts, [b.key]: t })}
+                projects={keys}
+                label={jiraLabel}
+                onPick={(k) => setDrafts({ ...drafts, [b.key]: k })}
+                placeholder=""
               />
               <button type="submit" className="btn btn-ghost" disabled={(drafts[b.key] ?? "").trim() === ""}>
                 Add

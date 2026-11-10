@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProjectMap } from "./ProjectMap";
 import { filterSets, sankey } from "./mapData";
@@ -153,7 +153,8 @@ it("filters every view by project and key, says how many show, and clears", asyn
 it("offers only the chosen baseline's projects", async () => {
   const { user } = show();
   await user.selectOptions(await screen.findByLabelText("Baseline"), "A");
-  expect([...document.querySelectorAll(`#${screen.getByLabelText("Project").getAttribute("list")} option`)].map((o) => o.textContent)).toEqual(["A", "B"]);
+  fireEvent.focus(screen.getByLabelText("Project"));
+  expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["A", "B"]);
 });
 
 it("drops the Showing line once every filter is back to its default", async () => {
