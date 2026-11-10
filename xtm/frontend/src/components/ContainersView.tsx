@@ -12,7 +12,7 @@ import { useContainerState } from "./containers/useContainerState";
 import { useContainerActions } from "./containers/useContainerActions";
 import type { ContainerViewProps } from "./containers/useContainerActions";
 import { ContainerPickerBar } from "./containers/ContainerPickerBar";
-import { ContainerFilterBar } from "./containers/ContainerFilterBar";
+import { FiltersRow } from "./containers/FiltersRow";
 import { ContainerCard } from "./containers/ContainerCard";
 import { MemberTable } from "./containers/MemberTable";
 
@@ -67,8 +67,6 @@ export function ContainersView(p: ContainerViewProps) {
         <>
       <ContainerPickerBar s={s} a={a} p={p} />
 
-      <ContainerFilterBar s={s} a={a} p={p} />
-
       {(listError || error || boardQuery.error) && (
         <div className="error-text">
           {listError || error || errMsg(boardQuery.error)}
@@ -83,6 +81,8 @@ export function ContainersView(p: ContainerViewProps) {
       )}
 
       <ContainerCard s={s} a={a} p={p} />
+
+      <FiltersRow s={s} a={a} p={p} />
 
       <MemberTable s={s} a={a} p={p} />
         </>

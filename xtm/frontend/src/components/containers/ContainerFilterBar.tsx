@@ -1,18 +1,18 @@
 import { SortControl } from "../SortControl";
 import { Modal } from "../Modal";
-import { RunBadge } from "./RunCells";
 import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
-// ContainerFilterBar narrows the list (execution type, environment), shows a
-// plan or set's consolidated results, and holds sort and the Set env dialog.
+// ContainerFilterBar narrows the list (execution type, environment) and holds
+// sort and the Set env dialog. It sits in the Filters row's panel (#456); a
+// plan's or set's consolidated results moved to the card's details.
 export function ContainerFilterBar({ s, a }: { s: ContainerState; a: ContainerActions; p: ContainerViewProps }) {
   const {
     kind, cExecType, setCExecType, cEnv, setCEnv, batchEnvOp, setBatchEnvOp, batchEnvName,
     setBatchEnvName, batchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField,
-    cSortDesc, setCSortDesc, caps, containers, rollup, kindLabel, viewContainers, envOptions,
+    cSortDesc, setCSortDesc, caps, containers, viewContainers, envOptions,
   } = s;
-  const { applyBatchEnv, openBreakdown } = a;
+  const { applyBatchEnv } = a;
   return (
       <div className="container-filter-bar">
         {kind === "testexec" && (
@@ -41,76 +41,6 @@ export function ContainerFilterBar({ s, a }: { s: ContainerState; a: ContainerAc
               </option>
             ))}
           </select>
-        )}
-        {/* Consolidated-results summary for the selected Test Plan / Set, shown
-            inline on the filter row (moved here from the detail card; the label
-            filter it replaced now sits beside the Status filter above). */}
-        {kind !== "testexec" && rollup && rollup.total > 0 && (
-          <div className="container-rollup">
-            <span
-              className="container-rollup-label"
-              title={
-                `Each test in this ${kindLabel} gets one combined result across the ` +
-                `${rollup.execCount} Test Execution${rollup.execCount === 1 ? "" : "s"} that ran it. ` +
-                `The worst result wins, so any FAIL makes the test FAIL overall. These badges count ` +
-                `tests by that combined result; "(not run)" means no execution has recorded a result yet. ` +
-                `Click a badge to see which tests are behind it.`
-              }
-            >
-              Consolidated results across {rollup.execCount} execution{rollup.execCount === 1 ? "" : "s"}
-              <span className="rollup-info" aria-hidden="true">ⓘ</span>
-            </span>
-            <div className="board-counts">
-              {rollup.passed > 0 && (
-                <RunBadge
-                  status="PASS"
-                  count={rollup.passed}
-                  onPick={() => openBreakdown("PASS")}
-                  pickHint="See the tests behind this result"
-                />
-              )}
-              {rollup.failed > 0 && (
-                <RunBadge
-                  status="FAIL"
-                  count={rollup.failed}
-                  onPick={() => openBreakdown("FAIL")}
-                  pickHint="See the tests behind this result"
-                />
-              )}
-              {rollup.executing > 0 && (
-                <RunBadge
-                  status="EXECUTING"
-                  count={rollup.executing}
-                  onPick={() => openBreakdown("EXECUTING")}
-                  pickHint="See the tests behind this result"
-                />
-              )}
-              {rollup.aborted > 0 && (
-                <RunBadge
-                  status="ABORTED"
-                  count={rollup.aborted}
-                  onPick={() => openBreakdown("ABORTED")}
-                  pickHint="See the tests behind this result"
-                />
-              )}
-              {rollup.blocked > 0 && (
-                <RunBadge
-                  status="BLOCKED"
-                  count={rollup.blocked}
-                  onPick={() => openBreakdown("BLOCKED")}
-                  pickHint="See the tests behind this result"
-                />
-              )}
-              {rollup.notRun > 0 && (
-                <RunBadge
-                  status="(not run)"
-                  count={rollup.notRun}
-                  onPick={() => openBreakdown("(not run)")}
-                  pickHint="See the tests behind this result"
-                />
-              )}
-            </div>
-          </div>
         )}
         <span className="muted container-filter-count">
           {viewContainers.length} of {containers.length}

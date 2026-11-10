@@ -989,9 +989,9 @@ steps and fields without leaving Containers.
 
 **Per-test Fix Version filter.** Each member of a Test Execution shows its **own**
 Jira Fix Version(s) in a **Fix Version** column (members can differ from one
-another). The execution's Fix Version chips are clickable: select one to filter
-the member list to the tests carrying it, and click it again (or **All**) to
-clear.
+another). Pick one under **Filters** > **Fix version** to keep the tests
+carrying it, and remove its chip beside **Filters** to clear it. The execution's
+Fix Version chips in the card's details mark the one chosen.
 
 ![Figure 52: Per-test Fix Version on an execution](images/52-exec-fixversion-filter.png)
 *Figure 52 — A Test Execution's member table with the per-test **Fix Version**
@@ -1072,7 +1072,7 @@ the result maps as: no failure/error → **PASS**, a `<failure>`/`<error>` →
 **FAIL**, a `<skipped>` is left unchanged. Two entry points on the Test Execution
 view:
 
-- **Import results (JUnit XML)** updates the **selected** execution. Matched
+- **Import results** updates the **selected** execution. Matched
   member tests get the imported result; unmatched or ambiguous testcases are
   reported and skipped.
 - **New exec from JUnit XML** **creates a new Test Execution** from the report:

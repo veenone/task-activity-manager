@@ -107,14 +107,18 @@ export function useContainerState() {
   const [breakdownFor, setBreakdownFor] = useState("");
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   // Collapse the selected container's detail (parent, environments, fix
-  // versions, name, run bar) to a single header line to give the member table
-  // more room. Persisted per profile so the choice sticks across selections.
+  // versions, result badges) to its single summary line to give the member
+  // table more room. Folded by default since #456; persisted per profile so
+  // the choice sticks across selections.
   const [cardCollapsed, setCardCollapsed] = useViewState(
     profileId,
     "containers",
     "cardCollapsed",
-    false,
+    true,
   );
+  // Whether the Filters row is open; closed, it shows only the active
+  // filters as chips (#456).
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // In-view read-only test detail sidebar for Test Execution member rows:
   // detailKey is session-persisted so the panel restores on returning to this
@@ -305,7 +309,8 @@ export function useContainerState() {
     // Apply the fix-version filter for Test Executions: keep only members whose
     // own fixVersions array (from the memberRuns enrichment) contains the chosen
     // value. When no filter is active every row is shown.
-    if (kind === "testexec") rows = keepMembers(rows, memberLabel, memberJqlKeys);
+    // Label and JQL narrow any container's tests (#456).
+    rows = keepMembers(rows, memberLabel, memberJqlKeys);
     if (kind === "testexec" && memberFvFilter) {
       rows = rows.filter((r) =>
         (memberRuns.get(r.testKey)?.fixVersions ?? []).includes(memberFvFilter),
@@ -347,12 +352,6 @@ export function useContainerState() {
   const memberKeys = (board?.rows ?? []).map((r) => r.testKey).join(",");
   useEffect(() => setMemberJqlKeys(null), [memberKeys]);
 
-  // Toggle the run-status filter from a colorbar segment / badge and reset to
-  // the first page so the (possibly shorter) filtered list starts at the top.
-  const pickRunFilter = (label: string) => {
-    setMemberRunFilter((cur) => (cur === label ? "" : label));
-    setBoardPage(0);
-  };
   const boardTotalPages = Math.max(
     1,
     Math.ceil(allRows.length / pageSize),
@@ -363,7 +362,7 @@ export function useContainerState() {
     (safePage + 1) * pageSize,
   );
 
-  return { memberLabel, setMemberLabel, memberJqlKeys, setMemberJqlKeys, memberLabelOptions, kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, runStatuses, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, pickRunFilter, boardTotalPages, safePage, pageRows };
+  return { filtersOpen, setFiltersOpen, memberLabel, setMemberLabel, memberJqlKeys, setMemberJqlKeys, memberLabelOptions, kind, setKind, cStatus, setCStatus, cExecType, setCExecType, cEnv, setCEnv, cLabel, setCLabel, envDraft, setEnvDraft, batchEnvOp, setBatchEnvOp, batchEnvName, setBatchEnvName, batchEnvBusy, setBatchEnvBusy, envToolsOpen, setEnvToolsOpen, cSortField, setCSortField, cSortDesc, setCSortDesc, rowSortField, setRowSortField, rowSortDesc, setRowSortDesc, selected, setSelected, bugFor, setBugFor, linkBugFor, setLinkBugFor, mode, setMode, bugsExpanded, setBugsExpanded, error, setError, seeding, setSeeding, syncing, setSyncing, selectedRuns, setSelectedRuns, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests, bulkStatus, setBulkStatus, editingName, setEditingName, nameDraft, setNameDraft, showAdd, setShowAdd, showJUnitImport, setShowJUnitImport, showJUnitNewExec, setShowJUnitNewExec, boardPage, setBoardPage, memberFvFilter, setMemberFvFilter, memberRunFilter, setMemberRunFilter, breakdownStatus, setBreakdownStatus, breakdown, setBreakdown, breakdownFor, setBreakdownFor, breakdownLoading, setBreakdownLoading, cardCollapsed, setCardCollapsed, detailKey, setDetailKey, detailVersion, setDetailVersion, pageSize, setPageSize, profileId, caps, kinds, runStatuses, containersQuery, containers, listError, boardQuery, board, relatedBugs, membersQuery, memberRuns, rollup, loading, focusRef, kindLabel, selectedContainer, statusOptions, statusCounts, viewContainers, envOptions, labelOptions, allRows, boardTotalPages, safePage, pageRows };
 }
 
 export type ContainerState = ReturnType<typeof useContainerState>;

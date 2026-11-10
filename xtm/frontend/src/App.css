@@ -865,12 +865,15 @@
   min-height: 0;
   overflow: auto;
 }
+/* One line, always (#456): the item picker gives way first, so New and
+   Actions keep their place instead of wrapping onto a second row. */
 .board-head {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .board-picker select {
   min-width: 280px;
@@ -1368,8 +1371,8 @@ i.sankey-node-l2 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   /* Cap the card so a data-heavy execution (many environments, sub-executions,
      related bugs) cannot grow tall enough to push the member table off-screen
@@ -1383,7 +1386,7 @@ i.sankey-node-l2 {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  min-width: 0;
 }
 /* Caret that collapses a detail block (container card, requirement detail) to
    just its header line, giving the list/table below more room. */
@@ -1475,9 +1478,6 @@ i.sankey-node-l2 {
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
-.container-bugs-count {
-  color: var(--text-strong);
-}
 .container-bugs-list {
   list-style: none;
   margin: 0;
@@ -1544,15 +1544,6 @@ i.sankey-node-l2 {
 }
 .fix-version-chip--active:hover {
   background: var(--info-fg-strong);
-}
-/* "All" chip shown when a filter is active — slightly muted to indicate it
-   clears the current selection rather than being a data value. */
-.fix-version-chip--all {
-  background: var(--slate-muted);
-  font-weight: 400;
-}
-.fix-version-chip--all:hover {
-  background: var(--slate-solid);
 }
 /* Highlight the Fix Version cell of a row whose fix version matches the active
    filter, so it is easy to confirm which row qualified. */
@@ -1879,11 +1870,15 @@ button.defect-chip-key:hover {
   cursor: default;
   opacity: 0.65;
 }
+/* The name sits in the card's one line and gives way to the rest, cut short
+   with an ellipsis; its title holds the whole name (#456). */
 .container-card-name {
-  font-size: var(--fs-xl);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text);
-  margin: 0 0 12px;
+  margin: 0;
   cursor: text;
   border-radius: 5px;
 }
@@ -1891,8 +1886,13 @@ button.defect-chip-key:hover {
   color: var(--accent);
 }
 .container-card-name > button {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
   font: inherit;
   color: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   background: none;
   border: 0;
   padding: 0;
@@ -1900,7 +1900,8 @@ button.defect-chip-key:hover {
   cursor: text;
 }
 .container-card-name-edit {
-  font-size: var(--fs-xl);
+  /* The same size as the name it replaces in the card's line (#456). */
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text);
   width: 100%;
@@ -1951,14 +1952,9 @@ button.defect-chip-key:hover {
 .run-bar .run-aborted {
   background: var(--text-muted);
 }
-/* The colorbar doubles as a filter control: segments show a pointer, and while
-   a status is active the other segments dim so the filtered slice reads at a
-   glance. Opacity (not an outline) keeps the active state inside the bar's
-   overflow:hidden clip. */
-.run-bar--clickable .run-seg {
-  cursor: pointer;
-  transition: opacity var(--dur-1) ease;
-}
+/* While a result filter is on, the bar's other segments dim so the filtered
+   slice reads at a glance. Opacity (not an outline) keeps the active state
+   inside the bar's overflow:hidden clip. */
 .run-bar--filtering .run-seg {
   opacity: 0.3;
 }
@@ -6495,34 +6491,9 @@ tr.row-checked:hover {
   max-width: 460px;
 }
 
-/* -274: collapsible related-bugs section inside the container detail card.
-   The header acts as a toggle; the body is scrollable and height-capped so
-   even an enormous bug list cannot push the member table below off-screen. */
-.tp-bugs-collapsible {
-  margin: 6px 0 2px;
-}
-.tp-bugs-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-.tp-bugs-header:hover {
-  color: var(--text);
-}
-.tp-bugs-chevron {
-  font-size: var(--fs-2xs);
-  display: inline-block;
-  transition: transform var(--dur-2) ease;
-}
+/* -274: the related-bugs list under the container card's line (#456). It
+   scrolls within a capped height, so even an enormous bug list cannot push
+   the member table below off-screen. */
 .tp-bugs-body {
   max-height: 160px;
   overflow-y: auto;
@@ -7419,11 +7390,9 @@ tr.row-checked:hover {
   .syncbar-fill,
   .sankey-link,
   .fix-version-chip,
-  .run-bar--clickable .run-seg,
   .sidebar-resizer,
   .detail-collapse-chevron,
   .about-close,
-  .tp-bugs-chevron,
   .cov-cr-item,
   .cov-dist-bar {
     transition: none;
@@ -7446,4 +7415,61 @@ tr.row-checked:hover {
 .member-jql {
   width: 320px;
   margin-bottom: 0;
+}
+
+/* The compact containers layout (#456). The item picker shrinks first; the
+   head's buttons keep their size and place. */
+.board-picker--primary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.board-picker--primary .container-exec-filter {
+  width: 100%;
+  min-width: 200px;
+  flex-shrink: 1;
+}
+.board-head-actions {
+  flex: none;
+  margin-left: auto;
+}
+/* The card's one line: a slim run bar, then its buttons at the right. */
+.container-card-runbar {
+  flex: none;
+  width: 120px;
+}
+.container-card-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-left: auto;
+}
+.container-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+/* One filter row: Filters, then a chip for each filter in force; open, the
+   panel below holds every filter. */
+.filters-row {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+.filters-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.filters-row-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+.filter-chip {
+  gap: 4px;
 }
