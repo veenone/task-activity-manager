@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "@agile-suite/core";
 import { JiraFilter, JiraFilters } from "../wailsjs/go/main/App";
 import type { jira } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 
 // JiraFilterPicker starts a query from a saved Jira filter: one the account
 // starred, or any it can see by the id in the filter's Jira address, because

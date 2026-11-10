@@ -21,13 +21,36 @@ export function MapTree({
   onOpen: (key: string) => void;
 }) {
   const [chosen, setChosen] = useState("");
+  // grouped folds a project's issues under one node per status, so a project
+  // with hundreds of issues is a few lines until one is opened (#455).
+  const [grouped, setGrouped] = useState(false);
   const label = (p: string) => projectLabel(p, names.get(p));
   const lit = new Set(sets.find((s) => s.keys[0] === chosen)?.keys ?? []);
   const keysIn = (p: string) => [...new Set(sets.flatMap((s) => s.keys))].filter((k) => issues.get(k)?.project === p).sort();
 
+  const byStatus = (keys: string[]) => {
+    const out = new Map<string, string[]>();
+    for (const k of keys) {
+      const status = issues.get(k)?.status ?? "";
+      out.set(status, [...(out.get(status) ?? []), k]);
+    }
+    return [...out].sort(([a], [b]) => a.localeCompare(b));
+  };
+  const leaf = (k: string) => (
+    <li key={k} className="pie-tree-issue" aria-current={lit.has(k) ? "true" : undefined}>
+      <button type="button" className="pie-map-key" onClick={() => onOpen(k)}>
+        <span className="mono">{k}</span> {issues.get(k)?.status}
+      </button>
+    </li>
+  );
+
   return (
     <div className="pie-tree-view">
       <div className="pie-tree-scroll">
+        <label className="pie-check">
+          <input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} />
+          Group by status
+        </label>
         <ul className="pie-tree" aria-label="Project tree">
           {groups.map((g) => (
             <li key={g.baseline ?? ""}>
@@ -43,15 +66,23 @@ export function MapTree({
                         <span className="muted">{`${fixed} of ${keys.length} fixed`}</span>
                         <progress value={fixed} max={Math.max(1, keys.length)} aria-hidden="true" />
                       </span>
-                      <ul>
-                        {keys.map((k) => (
-                          <li key={k} className="pie-tree-issue" aria-current={lit.has(k) ? "true" : undefined}>
-                            <button type="button" className="pie-map-key" onClick={() => onOpen(k)}>
-                              <span className="mono">{k}</span> {issues.get(k)?.status}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                      {grouped ? (
+                        <ul>
+                          {byStatus(keys).map(([status, inStatus]) => (
+                            <li key={status}>
+                              <details className="pie-tree-group">
+                                <summary className="pie-tree-node">
+                                  <span>{status}</span>
+                                  <span className="muted">{inStatus.length}</span>
+                                </summary>
+                                <ul>{inStatus.map(leaf)}</ul>
+                              </details>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <ul>{keys.map(leaf)}</ul>
+                      )}
                     </li>
                   );
                 })}

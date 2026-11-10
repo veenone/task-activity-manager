@@ -49,7 +49,7 @@ describe("Statistics", () => {
     await userEvent.type(screen.getByLabelText("Project"), "B");
     expect(headline("not finished")).toHaveTextContent("0 not finished");
     const rows = within(screen.getByRole("table", { name: "Per project" })).getAllByRole("row");
-    expect(rows.map((r) => r.textContent)).toEqual(["ProjectProduct baseIssuesNot finishedMedian age, not finished", "BTwo10-"]);
+    expect(rows.map((r) => r.textContent)).toEqual(["Project▸Product base▸Issues▸Not finished▸Median age, not finished▸", "BTwo10-"]);
   });
 
   it("times each finished status", () => {
@@ -90,4 +90,18 @@ describe("Statistics", () => {
     const reach = within(screen.getByRole("table", { name: "Projects each issue reaches" })).getAllByRole("row");
     expect(reach.slice(1).map((r) => r.textContent)).toEqual(["11", "22"]);
   });
+});
+
+it("sorts the per-project table by a clicked header", async () => {
+  render(<Statistics result={result} productField="" />);
+  const table = () => screen.getByRole("table", { name: "Per project" });
+  const first = () => within(table()).getAllByRole("row")[1].textContent;
+  expect(first()).toMatch(/^A/);
+  await userEvent.setup().click(within(table()).getByRole("button", { name: "Sort by Median age, not finished" }));
+  await userEvent.setup().click(within(table()).getByRole("button", { name: "Sort by Median age, not finished" }));
+  // B has no unfinished issue, so no age: a blank sorts last both ways.
+  expect(first()).toMatch(/^A/);
+  await userEvent.setup().click(within(table()).getByRole("button", { name: "Sort by Project" }));
+  await userEvent.setup().click(within(table()).getByRole("button", { name: "Sort by Project" }));
+  expect(first()).toMatch(/^B/);
 });

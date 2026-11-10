@@ -42,6 +42,10 @@ export function Cycles(arg1) {
   return window['go']['main']['App']['Cycles'](arg1);
 }
 
+export function DefaultProfile() {
+  return window['go']['main']['App']['DefaultProfile']();
+}
+
 export function DeleteCycle(arg1, arg2) {
   return window['go']['main']['App']['DeleteCycle'](arg1, arg2);
 }
@@ -60,6 +64,10 @@ export function DeleteQuery(arg1, arg2) {
 
 export function Evidence(arg1, arg2) {
   return window['go']['main']['App']['Evidence'](arg1, arg2);
+}
+
+export function ExportProfile(arg1) {
+  return window['go']['main']['App']['ExportProfile'](arg1);
 }
 
 export function ExportWorkbook(arg1, arg2) {
@@ -84,6 +92,10 @@ export function GetCycle(arg1, arg2) {
 
 export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
+}
+
+export function ImportProfile() {
+  return window['go']['main']['App']['ImportProfile']();
 }
 
 export function JiraFilter(arg1, arg2) {
@@ -170,6 +182,10 @@ export function SetConfluenceSettings(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetConfluenceSettings'](arg1, arg2, arg3);
 }
 
+export function SetDefaultProfile(arg1) {
+  return window['go']['main']['App']['SetDefaultProfile'](arg1);
+}
+
 export function SetEvidenceState(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SetEvidenceState'](arg1, arg2, arg3, arg4);
 }
@@ -196,6 +212,10 @@ export function TakeCycle(arg1, arg2) {
 
 export function Theme() {
   return window['go']['main']['App']['Theme']();
+}
+
+export function UpdateProfile(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateProfile'](arg1, arg2, arg3, arg4);
 }
 
 export function Version() {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { query } from "../wailsjs/go/models";
 import { Pager, usePaged } from "./Pager";
@@ -123,7 +123,8 @@ describe("pages and project names in the views", () => {
     const list = screen.getByRole("list", { name: "Linked sets" });
     expect(within(list).getByRole("button", { current: true })).toHaveTextContent("A-28");
     expect(screen.getByText("26-30 of 30")).toBeVisible();
-    expect(document.querySelector('datalist option[value="A"]')).toHaveTextContent("A name (A)");
+    fireEvent.focus(screen.getAllByRole("combobox")[0]);
+    expect(screen.getByRole("option", { name: "A name (A)" })).toBeVisible();
     expect(screen.getByRole("group", { name: "Project A name (A)" })).toBeVisible();
   });
 
@@ -169,7 +170,8 @@ describe("pages and project names in the views", () => {
 
   it("names projects in the Statistics filter and table", () => {
     render(<Statistics result={many} productField="" />);
-    expect(document.querySelector('datalist option[value="A"]')).toHaveTextContent("A name (A)");
+    fireEvent.focus(screen.getAllByRole("combobox")[0]);
+    expect(screen.getByRole("option", { name: "A name (A)" })).toBeVisible();
     expect(within(screen.getByRole("table", { name: "Per project" })).getByRole("cell", { name: "B name (B)" })).toBeVisible();
   });
 });

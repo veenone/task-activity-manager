@@ -154,7 +154,8 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
                   onClick={() => open(p.id)}
                 >
                   <span className="profiles-row-name">{p.name}</span>
-                  <span className="profiles-row-key muted">({p.projectKey})</span>
+                  {/* PIE's profiles have no project key. */}
+                  {p.projectKey && <span className="profiles-row-key muted">({p.projectKey})</span>}
                 </button>
                 {p.id === activeId && <span className="profiles-badge-active">Active</span>}
               </li>

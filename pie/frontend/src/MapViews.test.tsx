@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProjectMap } from "./ProjectMap";
 import { filterSets, sankey } from "./mapData";
@@ -153,7 +153,8 @@ it("filters every view by project and key, says how many show, and clears", asyn
 it("offers only the chosen baseline's projects", async () => {
   const { user } = show();
   await user.selectOptions(await screen.findByLabelText("Baseline"), "A");
-  expect([...document.querySelectorAll(`#${screen.getByLabelText("Project").getAttribute("list")} option`)].map((o) => o.textContent)).toEqual(["A", "B"]);
+  fireEvent.focus(screen.getByLabelText("Project"));
+  expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["A", "B"]);
 });
 
 it("drops the Showing line once every filter is back to its default", async () => {
@@ -185,4 +186,25 @@ it("empties project text that named nothing when filters are cleared", async () 
   await user.click(screen.getByRole("button", { name: "Clear filters" }));
   expect(screen.getByLabelText("Project")).toHaveValue("");
   expect(screen.queryByText("No project matches")).not.toBeInTheDocument();
+});
+
+it("groups each project's issues under their status when asked, and back", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Tree" }));
+  const tree = screen.getByRole("list", { name: "Project tree" });
+  await within(tree).findByText("Baseline A");
+  expect(within(tree).getByRole("button", { name: "A-2 Closed" })).toBeVisible();
+
+  await user.click(screen.getByRole("checkbox", { name: "Group by status" }));
+  // A's two Closed issues fold under one Closed node with their count.
+  const closed = within(tree).getAllByText("Closed", { selector: "summary > span" });
+  expect(closed.map((s) => s.closest("summary")!.textContent)).toEqual(["Closed2"]);
+  const group = closed[0].closest("details")!;
+  expect(group).not.toHaveAttribute("open");
+  await user.click(within(group).getByText("Closed", { selector: "summary > span" }));
+  expect(within(group).getByRole("button", { name: "A-1 Closed" })).toBeVisible();
+  expect(within(group).getByRole("button", { name: "A-2 Closed" })).toBeVisible();
+
+  await user.click(screen.getByRole("checkbox", { name: "Group by status" }));
+  expect(within(tree).queryByText("Closed", { selector: "summary > span" })).not.toBeInTheDocument();
 });

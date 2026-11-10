@@ -83,11 +83,11 @@ func (a *App) PublishCycle(profileID string, id int64, confirmed bool) (report.O
 		return report.Outcome{}, err
 	}
 	if c.BaseURL == "" {
-		return report.Outcome{}, errors.New("set up Confluence for this profile first, in Confluence settings")
+		return report.Outcome{}, errors.New("set up Confluence for this profile first, in Manage profiles")
 	}
 	token, err := a.creds.Load(profile.ConfluenceCredentialID(profileID))
 	if err != nil {
-		return report.Outcome{}, errors.New("this profile has no Confluence token yet. Add one in Confluence settings")
+		return report.Outcome{}, errors.New("this profile has no Confluence token yet. Add one in Manage profiles")
 	}
 	pages := confluence.NewClient(c.BaseURL, token, p.CACert, p.AllowUntrustedTLS)
 	to := report.Target{Profile: profileID, Space: c.SpaceKey, Parent: c.RootPageID}

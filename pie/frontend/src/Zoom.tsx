@@ -7,7 +7,10 @@ const MAX = 4;
 // Zoom lets a chart grow past its box: the chart is drawn at a width of its own
 // and the box scrolls. A sankey of hundreds of projects can then be read a
 // part at a time (#448). Ctrl and the wheel zoom too, as in a browser.
-export function Zoom({ label, children }: { label: string; children: ReactNode }) {
+// minWidth, in pixels at 100%, keeps a chart from being squeezed below the
+// width its labels need; it scales with the zoom, so zooming out still
+// shrinks the chart (#455).
+export function Zoom({ label, minWidth = 0, children }: { label: string; minWidth?: number; children: ReactNode }) {
   const [scale, setScale] = useState(1);
   const box = useRef<HTMLDivElement>(null);
   const by = (f: number) => setScale((s) => Math.min(MAX, Math.max(MIN, s * f)));
@@ -43,7 +46,7 @@ export function Zoom({ label, children }: { label: string; children: ReactNode }
         </button>
       </div>
       <div className="pie-zoom-box" ref={box}>
-        <div className="pie-zoom-area" style={{ width: `${scale * 100}%` }}>
+        <div className="pie-zoom-area" style={{ width: `${scale * 100}%`, minWidth: `${minWidth * scale}px` }}>
           {children}
         </div>
       </div>

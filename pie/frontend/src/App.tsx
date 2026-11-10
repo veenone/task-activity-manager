@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ViewTabs, applyTheme, useConfirm, usePrompt } from "@agile-suite/core";
 import {
-  DeleteProfile,
+  DefaultProfile,
   DeleteQuery,
   LastRun,
   ListProfiles,
@@ -13,7 +13,8 @@ import {
 } from "../wailsjs/go/main/App";
 import type { profile, query, saved } from "../wailsjs/go/models";
 import { AboutModal } from "./AboutModal";
-import { AddProfileDialog, errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
+import { ProfilesModal } from "./ProfilesModal";
 import { CasesPage } from "./CasesPage";
 import { CyclesPage } from "./CyclesPage";
 import { FieldsDialog } from "./FieldsDialog";
@@ -49,7 +50,8 @@ export default function App() {
   const [startupError, setStartupError] = useState("");
   const [profiles, setProfiles] = useState<profile.Profile[] | null>(null);
   const [profileId, setProfileId] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [defaultId, setDefaultId] = useState("");
   const [jql, setJql] = useState("");
   const [jqlOpen, setJqlOpen] = useState(false);
   const [running, setRunning] = useState(false);
@@ -76,17 +78,26 @@ export default function App() {
     setView("trace");
   };
 
+  // loadProfiles rereads the list after Manage Profiles changed it. A deleted
+  // active profile takes its rows with it.
   async function loadProfiles(select?: string) {
     const list = await ListProfiles();
     setProfiles(list);
-    setProfileId((current) => select ?? (list.some((p) => p.id === current) ? current : (list[0]?.id ?? "")));
+    const next = [select, profileId].find((id) => id && list.some((p) => p.id === id)) ?? list[0]?.id ?? "";
+    if (next !== profileId) setResult(null);
+    setProfileId(next);
   }
 
   useEffect(() => {
     StartupError()
       .then((problem) => {
         setStartupError(problem);
-        return problem ? undefined : loadProfiles();
+        if (problem) return;
+        // The default profile opens at launch (#453).
+        return DefaultProfile().then((id) => {
+          setDefaultId(id);
+          return loadProfiles(id);
+        });
       })
       .catch((e) => setError(errorText(e)));
   }, []);
@@ -201,28 +212,9 @@ export default function App() {
   }
 
 
-  async function deleteProfile() {
-    const target = profiles?.find((p) => p.id === profileId);
-    if (!target) return;
-    const yes = await confirm({
-      title: `Delete ${target.name}?`,
-      message: "This removes the profile and its saved token from this computer.",
-      confirmLabel: "Delete",
-      danger: true,
-    });
-    if (!yes) return;
-    try {
-      await DeleteProfile(target.id);
-      await loadProfiles();
-      setResult(null);
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }
-
   useMenu({
     view: (id: View) => setView(id),
-    "add-profile": () => setAdding(true),
+    profiles: () => setManaging(true),
     fields: () => fields !== null && !running && setEditingFields(true),
     run: () => profileId !== "" && !running && void run(),
     theme: (t: string) => {
@@ -262,8 +254,7 @@ export default function App() {
           setError("");
         }}
         onFields={() => setEditingFields(true)}
-        onDeleteProfile={() => void deleteProfile()}
-        onAddProfile={() => setAdding(true)}
+        onManageProfiles={() => setManaging(true)}
         onTheme={setShownTheme}
       />
 
@@ -359,13 +350,14 @@ export default function App() {
         />
       )}
       {about && <AboutModal onClose={() => setAbout(false)} />}
-      {adding && (
-        <AddProfileDialog
-          onClose={() => setAdding(false)}
-          onSaved={(saved) => {
-            setAdding(false);
-            void loadProfiles(saved.id);
-          }}
+      {managing && profiles && (
+        <ProfilesModal
+          profiles={profiles}
+          activeId={profileId}
+          defaultId={defaultId}
+          onDefault={setDefaultId}
+          reload={() => loadProfiles()}
+          onClose={() => setManaging(false)}
         />
       )}
       <StatusBar

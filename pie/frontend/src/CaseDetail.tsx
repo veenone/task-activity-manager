@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useConfirm } from "@agile-suite/core";
 import { AddCaseProjects, GetCase, RemoveCaseProject, SetCaseNotes, SetVerdict } from "../wailsjs/go/main/App";
 import type { cases, query } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { projectLabel, projectNames } from "./linked";
 import { EvidencePanel } from "./EvidencePanel";
 import { ProjectPicker } from "./ProjectPicker";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Modal } from "@agile-suite/core";
 import { SetFields } from "../wailsjs/go/main/App";
 import type { saved } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 
 const NAMES: { key: keyof saved.Fields; label: string }[] = [
   { key: "productBase", label: "Product base" },

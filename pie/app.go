@@ -134,6 +134,11 @@ func (a *App) DeleteProfile(id string) error {
 	if err := a.profiles.Delete(id); err != nil {
 		return err
 	}
+	if a.DefaultProfile() == id {
+		if err := a.settings.SetDefaultProfileID(""); err != nil {
+			log.Printf("pie: clear the default profile %s: %v", id, err)
+		}
+	}
 	if err := a.creds.Delete(profile.ConfluenceCredentialID(id)); err != nil {
 		log.Printf("pie: delete Confluence credentials for %s: %v", id, err)
 	}

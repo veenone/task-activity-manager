@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal, useConfirm, usePrompt } from "@agile-suite/core";
 import { AddCaseProjects, DeleteProjectGroup, JiraProjects, ProjectGroups, SaveProjectGroup } from "../wailsjs/go/main/App";
 import type { cases, jira } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { projectLabel } from "./linked";
 
 // An account can see hundreds of projects; past this many matches the list

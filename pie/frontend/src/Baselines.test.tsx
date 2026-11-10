@@ -75,3 +75,19 @@ it("asks before removing a baseline, then takes a descendant out on its own", as
   expect(api.RemoveBaseline).toHaveBeenCalledWith("p1", "BASE");
   expect(onChange).toHaveBeenLastCalledWith([]);
 });
+
+it("closes only the suggestion list on Escape, not the dialog", async () => {
+  const onClose = vi.fn();
+  render(
+    <DialogProvider>
+      <BaselinesDialog profileId="p1" baselines={[]} onChange={vi.fn()} onClose={onClose} />
+    </DialogProvider>,
+  );
+  const user = userEvent.setup();
+  const box = screen.getByRole("combobox", { name: "New baseline" });
+  await user.click(box);
+  await screen.findByRole("option", { name: "Card OS (BASE)" });
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  expect(onClose).not.toHaveBeenCalled();
+});

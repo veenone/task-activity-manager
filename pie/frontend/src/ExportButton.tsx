@@ -1,6 +1,6 @@
 import { useContext, useState } from "react";
 import { ExportWorkbook } from "../wailsjs/go/main/App";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import type { Sheet } from "./exportSheets";
 import { NoticeContext } from "./StatusBar";
 

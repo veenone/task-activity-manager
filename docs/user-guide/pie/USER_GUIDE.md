@@ -13,7 +13,7 @@ you publish a cycle.
 ## The menu bar and the theme
 
 The menu bar has three menus:
-- **File** has Add profile, Jira fields, Run query (Ctrl+R) and Quit (Ctrl+Q).
+- **File** has Manage profiles, Jira fields, Run query (Ctrl+R) and Quit (Ctrl+Q).
 - **View** switches tabs, from Ctrl+1 for Results to Ctrl+7 for Cycles. Its
   **Theme** submenu picks Light, Dark, or System to follow your operating
   system.
@@ -35,17 +35,27 @@ many it has done so far.
 
 ## Add a profile
 
-A profile is how PIE reaches Jira. Choose **Add profile** and enter a name, your
-Jira URL and a personal access token. PIE keeps the token in your operating
-system's credential manager, not in its database.
+A profile is how PIE reaches Jira. Choose **Manage profiles** in the top bar,
+then **Create new profile**, and enter a name, your Jira URL and a personal
+access token. PIE keeps the token in your operating system's credential
+manager, not in its database. The same form has a Confluence part, used when
+you publish a cycle (see Publishing to Confluence below).
 
 PIE's profiles are separate from the ones Task Activity Manager and Xray Test
 Manager share, because they have no project key. A profile set up in those apps
 does not appear here, so you enter the URL and token again.
 
 You can keep several profiles, for example one for each Jira account, and switch
-between them from the list at the top of the window. **Delete profile** removes
-the selected profile and its saved token from this computer.
+between them from the list at the top of the window. Manage profiles is the
+same dialog TAM and XTM have:
+- Pick a profile on the left to edit it. Its saved queries, cases and cycles
+  stay. Leave a token field empty to keep the token already saved.
+- The star marks the profile PIE opens when it starts. Click it again to clear.
+- **Export** writes the profile to a file without its tokens. **Import from
+  file** reads one back; open the imported profile and enter a token before
+  running a query.
+- **Delete** removes the profile, its tokens, saved queries, cases and cycles
+  from this computer.
 
 ## Try PIE without Jira
 
@@ -65,7 +75,9 @@ same whenever you run it.
 Every project filter in PIE is a box you can type into: Trace, Project map,
 Statistics, Results, and the Network centre on the Link map. As you type, the
 suggestions narrow to the projects whose key or name contains it, and picking
-one applies it. Clear the box to see every project again. Text that names no
+one applies it. The suggestion list opens when you click into the box. Use the
+arrow keys and Enter to pick from it, or Escape to close it. Clear the box to
+see every project again. Text that names no
 project applies no filter, and the box says "No project matches".
 
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
@@ -77,8 +89,15 @@ either way. With no JQL yet, the box stays open.
 
 The **Project**, **Status** and **Priority** filters above the table narrow
 the rows without contacting Jira. Each lists only the values in the run, and
-they combine. While any filter hides rows, PIE says how many it shows of how
-many. A filter set to a value the next run no longer holds goes back to All.
+they combine. **Search** keeps the rows whose key, summary or project name
+contains what you type. While any filter hides rows, PIE says how many it shows
+of how many. A filter set to a value the next run no longer holds goes back to
+All.
+
+Click a column header to sort the rows by it, across every page. Click it again
+to reverse the order. Empty values stay at the bottom either way. Export to
+Excel writes the rows in the order on screen. The tables in Statistics sort the
+same way.
 
 Wherever PIE names a project, it gives the project's name with its key in
 brackets, for example "Card Platform (ALPHA)". A saved query's run from before
@@ -174,7 +193,7 @@ Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
 show the same sets three ways:
 
-Both Flow charts, on the Project map and on the Link map, can be zoomed. Use
+Both Flow charts and the Link map's Network can be zoomed. Use
 **+** and **−** above the chart, or hold Ctrl and turn the mouse wheel. The
 chart then scrolls inside its own area, and **Reset** returns it to fit.
 
@@ -187,7 +206,9 @@ chart then scrolls inside its own area, and **Reset** returns it to fit.
   are listed beside the chart.
 - **Tree** branches each baseline into its projects and each project into its
   issues, and says how many of a project's issues are finished. Choose a set
-  in the list beside it to mark its issues in the tree.
+  in the list beside it to mark its issues in the tree. Tick **Group by
+  status** to fold each project's issues under one node per status, with its
+  count. Click a status to open it. Untick it to list every issue again.
 - **Table** is the grid described above.
 
 In every view, choosing a key opens its set in Trace.
@@ -235,6 +256,10 @@ switches to the other direction and says how many links it has. Choose a key
 to open it in Trace. A run saved before PIE kept link direction asks you to
 run the query again.
 
+The grid's top-left cell has **Key** and **Name**. They put the rows and
+columns in order of project key or project name. Click the same one again to
+reverse the order. The export follows it.
+
 To narrow the Link map, type into **Add a project** above the link types and
 press Enter, or pick from the suggestions. Once you have chosen some projects,
 the grid, Flow and Network keep only the links between them. Remove a project
@@ -251,7 +276,9 @@ are drawn. The link type filters and the two tick boxes on the left apply to
 all three views.
 - **Flow** runs each link from the project it starts in, through its link type,
   to the project it points to. Bands are sized by link count. Hover over a band
-  to see its count.
+  to see its count. Type into **Left side** to keep only the links starting in
+  the projects you choose. The chart leaves room for the longest project name,
+  and scrolls sideways when the window is narrower than that.
 - **Network** puts one project in the middle, the busiest at first, with the
   projects it links to around it. Each link type has its own spoke, with its
   count, and the arrows show which way the links point. Pick the centre from
@@ -259,7 +286,11 @@ all three views.
   it to move the centre there. On a busy project the diagram draws the 24 with
   the most links, and the list names them all. Hover over a project to bring its
   name to the front, and drag a project to move it when names crowd. Choosing
-  another centre lays the projects out again.
+  another centre lays the projects out again. The centre circle grows to fit a
+  long project key. A legend under the diagram explains it: an arrow away from
+  the centre means the centre's issues link out to that project, an arrow
+  towards it means that project's issues link in, and a thicker spoke has more
+  links.
 
 **Refresh links** at the top of the list fetches the linked issues again
 without running the query. Your query's own rows stay as they were. For a
@@ -421,7 +452,7 @@ they are now, and **Delete** removes it.
 
 ### Publishing to Confluence
 
-**Confluence settings** on the Cycles tab takes the Confluence URL, the space
+The Confluence part of the profile's form in **Manage profiles** takes the Confluence URL, the space
 key and the id of the page the reports go under. Leave the page id empty to put
 them at the top of the space. The token goes to the operating system's
 credential store, never to PIE's database. Leave the token field empty to keep

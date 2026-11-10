@@ -8,6 +8,7 @@ import * as api from "../wailsjs/go/main/App";
 vi.mock("../wailsjs/go/main/App", () => ({
   StartupError: vi.fn(),
   ListProfiles: vi.fn(),
+  DefaultProfile: () => Promise.resolve(""),
   RunQuery: vi.fn(),
   ListQueries: vi.fn(),
   LastRun: vi.fn(),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AddEvidenceIssue, AddEvidenceNote, Evidence, FindEvidence, RemoveEvidence, SetEvidenceState } from "../wailsjs/go/main/App";
 import type { evidence } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 
 const KIND: Record<string, string> = {
   link: "Link",

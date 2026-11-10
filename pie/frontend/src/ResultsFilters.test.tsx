@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { query } from "../wailsjs/go/models";
 import { ResultsTable } from "./ResultsTable";
@@ -35,7 +35,8 @@ const keys = () =>
 it("narrows the rows by project, status and priority together", async () => {
   const user = userEvent.setup();
   render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
-  expect([...document.querySelectorAll(`#${screen.getByLabelText("Project").getAttribute("list")} option`)].map((o) => o.textContent)).toEqual(["A name (A)", "B name (B)"]);
+  fireEvent.focus(screen.getByLabelText("Project"));
+  expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["A name (A)", "B name (B)"]);
   await user.selectOptions(screen.getByLabelText("Status"), "Open");
   expect(keys()).toEqual(["A-1", "B-1", "B-2"]);
   await user.selectOptions(screen.getByLabelText("Priority"), "High");
@@ -64,4 +65,27 @@ it("drops a filter value the next run does not hold", async () => {
   expect(screen.getByLabelText("Status")).toHaveValue("");
   expect(keys()).toEqual(["A-1", "B-1", "B-2"]);
   expect(screen.queryByText(/^Showing/)).not.toBeInTheDocument();
+});
+
+it("sorts the rows by a clicked header, across pages, and reverses on a second click", async () => {
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Sort by Status" }));
+  expect(keys()).toEqual(["A-2", "A-1", "B-1", "B-2"]);
+  await user.click(screen.getByRole("button", { name: "Sort by Key" }));
+  await user.click(screen.getByRole("button", { name: "Sort by Key" }));
+  expect(keys()).toEqual(["B-2", "B-1", "A-2", "A-1"]);
+  expect(screen.getByRole("columnheader", { name: /Key/ })).toHaveAttribute("aria-sort", "descending");
+});
+
+it("searches the key, summary and project name as you type", async () => {
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
+  const user = userEvent.setup();
+  const search = screen.getByRole("searchbox", { name: "Search" });
+  await user.type(search, "b name");
+  expect(keys()).toEqual(["B-1", "B-2"]);
+  await user.clear(search);
+  await user.type(search, "a-2");
+  expect(keys()).toEqual(["A-2"]);
+  expect(screen.getByText("Showing 1 of 4 issues")).toBeVisible();
 });

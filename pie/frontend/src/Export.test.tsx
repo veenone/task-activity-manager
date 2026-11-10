@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogProvider } from "@agile-suite/core";
 import * as api from "../wailsjs/go/main/App";
@@ -108,4 +108,16 @@ it("exports the Results rows the filters leave", async () => {
   const got = await exported();
   expect(got).toMatchObject({ name: "pie-results", sheets: ["Results"] });
   expect(got.first.rows.map((r: string[]) => r[0])).toEqual(["A-1", "B-1"]);
+});
+
+it("exports the statistics in the order the table is sorted", async () => {
+  const both = { total: 2, issues: [issue("A-1", "done"), { ...issue("B-1", "new"), matched: true }], sets: [] };
+  render(<Statistics result={both as never} productField="" />);
+  const table = screen.getByRole("table", { name: "Per project" });
+  const user = userEvent.setup();
+  await user.click(within(table).getByRole("button", { name: "Sort by Project" }));
+  await user.click(within(table).getByRole("button", { name: "Sort by Project" }));
+  await user.click(screen.getByRole("button", { name: "Export to Excel" }));
+  const sheets = vi.mocked(api.ExportWorkbook).mock.calls[0][1];
+  expect(sheets[1].rows.map((r) => r[0])).toEqual(["B", "A"]);
 });

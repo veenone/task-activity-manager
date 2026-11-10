@@ -1,5 +1,5 @@
 import type { profile } from "../wailsjs/go/models";
-import { isDemo } from "./AddProfileDialog";
+import { isDemo } from "./ProfileForm";
 import { ThemeToggle } from "./ThemeToggle";
 
 // TopBar is the suite's header, laid out as TAM's and XTM's are: the brand and
@@ -12,8 +12,7 @@ export function TopBar({
   shownTheme,
   onProfile,
   onFields,
-  onDeleteProfile,
-  onAddProfile,
+  onManageProfiles,
   onTheme,
 }: {
   profiles: profile.Profile[] | null;
@@ -23,8 +22,7 @@ export function TopBar({
   shownTheme: string;
   onProfile: (id: string) => void;
   onFields: () => void;
-  onDeleteProfile: () => void;
-  onAddProfile: () => void;
+  onManageProfiles: () => void;
   onTheme: (theme: string) => void;
 }) {
   const selected = profiles?.find((p) => p.id === profileId);
@@ -58,27 +56,17 @@ export function TopBar({
       </div>
       <div className="topbar-zone topbar-right">
         {selected && (
-          <>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={running || !fieldsReady}
-              onClick={onFields}
-            >
-              Jira fields
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={running}
-              onClick={onDeleteProfile}
-            >
-              Delete profile
-            </button>
-          </>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={running || !fieldsReady}
+            onClick={onFields}
+          >
+            Jira fields
+          </button>
         )}
-        <button type="button" className="btn btn-ghost" onClick={onAddProfile}>
-          Add profile
+        <button type="button" className="btn btn-ghost" disabled={running} onClick={onManageProfiles}>
+          Manage profiles
         </button>
         <ThemeToggle shown={shownTheme} onChange={onTheme} />
       </div>
