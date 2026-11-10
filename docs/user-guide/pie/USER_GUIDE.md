@@ -13,7 +13,7 @@ you publish a cycle.
 ## The menu bar and the theme
 
 The menu bar has three menus:
-- **File** has Add profile, Jira fields, Run query (Ctrl+R) and Quit (Ctrl+Q).
+- **File** has Manage profiles, Jira fields, Run query (Ctrl+R) and Quit (Ctrl+Q).
 - **View** switches tabs, from Ctrl+1 for Results to Ctrl+7 for Cycles. Its
   **Theme** submenu picks Light, Dark, or System to follow your operating
   system.
@@ -35,17 +35,27 @@ many it has done so far.
 
 ## Add a profile
 
-A profile is how PIE reaches Jira. Choose **Add profile** and enter a name, your
-Jira URL and a personal access token. PIE keeps the token in your operating
-system's credential manager, not in its database.
+A profile is how PIE reaches Jira. Choose **Manage profiles** in the top bar,
+then **Create new profile**, and enter a name, your Jira URL and a personal
+access token. PIE keeps the token in your operating system's credential
+manager, not in its database. The same form has a Confluence part, used when
+you publish a cycle (see Publishing to Confluence below).
 
 PIE's profiles are separate from the ones Task Activity Manager and Xray Test
 Manager share, because they have no project key. A profile set up in those apps
 does not appear here, so you enter the URL and token again.
 
 You can keep several profiles, for example one for each Jira account, and switch
-between them from the list at the top of the window. **Delete profile** removes
-the selected profile and its saved token from this computer.
+between them from the list at the top of the window. Manage profiles is the
+same dialog TAM and XTM have:
+- Pick a profile on the left to edit it. Its saved queries, cases and cycles
+  stay. Leave a token field empty to keep the token already saved.
+- The star marks the profile PIE opens when it starts. Click it again to clear.
+- **Export** writes the profile to a file without its tokens. **Import from
+  file** reads one back; open the imported profile and enter a token before
+  running a query.
+- **Delete** removes the profile, its tokens, saved queries, cases and cycles
+  from this computer.
 
 ## Try PIE without Jira
 
@@ -421,7 +431,7 @@ they are now, and **Delete** removes it.
 
 ### Publishing to Confluence
 
-**Confluence settings** on the Cycles tab takes the Confluence URL, the space
+The Confluence part of the profile's form in **Manage profiles** takes the Confluence URL, the space
 key and the id of the page the reports go under. Leave the page id empty to put
 them at the top of the space. The token goes to the operating system's
 credential store, never to PIE's database. Leave the token field empty to keep

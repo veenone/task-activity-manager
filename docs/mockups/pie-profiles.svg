@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" role="img" aria-label="PIE Manage Profiles dialog: profiles on the left with a default star, the open profile's form on the right with Jira and Confluence parts, Export, Delete and Save">
+  <style>
+    text { font-family: Segoe UI, Arial, sans-serif; font-size: 13px; fill: #1f2328; }
+    .muted { fill: #656d76; font-size: 12px; }
+    .h { font-size: 17px; font-weight: 600; }
+    .lab { font-size: 12px; font-weight: 600; }
+    .on { fill: #ffffff; }
+  </style>
+  <rect width="1000" height="600" fill="#8c959f"/>
+  <rect x="60" y="30" width="880" height="540" rx="10" fill="#ffffff"/>
+  <text x="84" y="66" class="h">Manage Profiles</text>
+  <text x="84" y="86" class="muted">Editing here won't switch your active connection.</text>
+  <text x="904" y="66">✕</text>
+  <line x1="60" y1="100" x2="940" y2="100" stroke="#d0d7de"/>
+
+  <rect x="60" y="100" width="260" height="470" fill="#f6f8fa"/>
+  <rect x="78" y="116" width="224" height="30" rx="6" fill="#0969da"/>
+  <text x="128" y="136" class="on">+ Create new profile</text>
+  <rect x="78" y="152" width="224" height="30" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="140" y="172">Import from file…</text>
+  <text x="78" y="206" class="muted">Your profiles</text>
+  <rect x="70" y="214" width="240" height="32" rx="6" fill="#ddf4ff"/>
+  <text x="80" y="235" style="fill:#bf8700">★</text>
+  <text x="100" y="235">Old Jira</text>
+  <rect x="246" y="221" width="52" height="18" rx="9" fill="#dafbe1"/>
+  <text x="254" y="234" style="font-size:11px;fill:#1a7f37">Active</text>
+  <text x="80" y="271">☆</text>
+  <text x="100" y="271">Demo</text>
+
+  <text x="344" y="128" class="lab" style="fill:#9a6700">EDITING PROFILE</text>
+  <text x="470" y="128" class="muted">· Old Jira</text>
+  <text x="344" y="160" class="lab">Name</text>
+  <rect x="344" y="166" width="572" height="28" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="354" y="185">Old Jira</text>
+  <text x="344" y="214" class="lab">Jira URL</text>
+  <rect x="344" y="220" width="572" height="28" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="354" y="239">https://jira.example.com</text>
+  <text x="344" y="268" class="lab">Personal access token</text>
+  <rect x="344" y="274" width="572" height="28" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="354" y="293" class="muted">Leave empty to keep the stored token</text>
+
+  <rect x="344" y="318" width="572" height="190" rx="6" fill="none" stroke="#d0d7de"/>
+  <rect x="352" y="310" width="78" height="16" fill="#ffffff"/>
+  <text x="356" y="322" class="lab" style="fill:#656d76">Confluence</text>
+  <text x="356" y="344" class="muted">Published cycles go under the parent page, or at the top of the space when it is empty.</text>
+  <text x="356" y="366" class="lab">Confluence URL</text>
+  <rect x="356" y="371" width="548" height="24" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="366" y="388">https://wiki.example.com</text>
+  <text x="356" y="412" class="lab">Space key</text>
+  <rect x="356" y="417" width="266" height="24" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="366" y="434">QA</text>
+  <text x="638" y="412" class="lab">Parent page id</text>
+  <rect x="638" y="417" width="266" height="24" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="648" y="434">123456</text>
+  <text x="356" y="460" class="lab">Confluence token</text>
+  <rect x="356" y="465" width="548" height="24" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="366" y="482" class="muted">Leave empty to keep the stored token</text>
+
+  <rect x="656" y="526" width="70" height="28" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="672" y="545">Export</text>
+  <rect x="734" y="526" width="70" height="28" rx="6" fill="#cf222e"/>
+  <text x="750" y="545" class="on">Delete</text>
+  <rect x="846" y="526" width="70" height="28" rx="6" fill="#0969da"/>
+  <text x="866" y="545" class="on">Save</text>
+</svg>
