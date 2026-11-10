@@ -59,8 +59,8 @@ export function IssueGraphView({
     () => new Map(result.issues.map((i) => [i.key, i])),
     [result],
   );
+  const [start] = useState(() => busiestIssue(result.issues));
   const [graph, setGraph] = useState<Graph>(() => {
-    const start = busiestIssue(result.issues);
     if (!start) return emptyGraph();
     const first = run.get(start)!;
     const near = neighbourKeys(first)
@@ -71,10 +71,9 @@ export function IssueGraphView({
       [first, ...near].map((issue) => ({ issue, inRun: true, fetchedAt: "" })),
     ).graph;
   });
-  const [history, setHistory] = useState<History>(() => {
-    const start = busiestIssue(result.issues);
-    return start ? { keys: [start], at: 0 } : { keys: [], at: -1 };
-  });
+  const [history, setHistory] = useState<History>(() =>
+    start ? { keys: [start], at: 0 } : { keys: [], at: -1 },
+  );
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [outside, setOutside] = useState(true);
   const [finished, setFinished] = useState(true);
@@ -83,6 +82,9 @@ export function IssueGraphView({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const offline = useRef(false);
+  // One expansion at a time: each adds to the graph it read when it began,
+  // so a second running alongside would drop the first one's issues.
+  const inFlight = useRef(false);
   const canvas = useRef<CanvasApi>(null);
   const focus = history.keys[history.at] ?? null;
 
@@ -90,6 +92,16 @@ export function IssueGraphView({
   // it holds them all, otherwise from ExpandIssue, which falls back to the
   // stored copies when Jira cannot be reached.
   async function expand(key: string) {
+    if (inFlight.current) return false;
+    inFlight.current = true;
+    try {
+      return await expandNow(key);
+    } finally {
+      inFlight.current = false;
+    }
+  }
+
+  async function expandNow(key: string) {
     setError("");
     setMessage("");
     const own = graph.nodes.get(key)?.issue ?? run.get(key);
@@ -131,7 +143,8 @@ export function IssueGraphView({
     }
     const { graph: next, left } = add(graph, found);
     setGraph(next);
-    const more = want.length - PER_EXPAND;
+    // Counted on the graph as it now is, from the links Jira just sent.
+    const more = unloaded(next, key);
     if (left > 0)
       setMessage(
         `The graph holds at most ${next.nodes.size} issues; ${left} more did not fit. Start again from one of them to see further.`,

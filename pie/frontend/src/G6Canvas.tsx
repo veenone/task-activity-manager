@@ -96,10 +96,14 @@ function data(nodes: CanvasNode[], edges: CanvasEdge[], combos: CanvasCombo[], f
   };
 }
 
+// NO_COMBOS is one empty list, so a view without groups does not hand the
+// canvas a new array, and a redraw, on every render.
+const NO_COMBOS: CanvasCombo[] = [];
+
 export default function G6Canvas({
   nodes,
   edges,
-  combos = [],
+  combos = NO_COMBOS,
   focus,
   onSelect,
   label,

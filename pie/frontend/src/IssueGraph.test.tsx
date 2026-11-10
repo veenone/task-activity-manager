@@ -146,3 +146,14 @@ it("opens an issue of the run in Trace", async () => {
   await user.click(await screen.findByRole("button", { name: "Open in Trace" }));
   expect(onOpen).toHaveBeenCalledWith("A-1");
 });
+
+it("takes one expansion at a time, so a second cannot drop the first one's issues", async () => {
+  let finish!: (v: unknown) => void;
+  vi.mocked(api.ExpandIssue).mockReturnValue(new Promise((r) => (finish = r)) as never);
+  const { user } = show();
+  await user.click(await screen.findByRole("button", { name: "Expand links (1)" }));
+  await user.type(screen.getByRole("searchbox", { name: "Find an issue" }), "QQ-1{Enter}");
+  expect(api.ExpandIssue).toHaveBeenCalledTimes(1);
+  finish({ issues: [{ issue: result.issues[0], fetchedAt: "" }, { issue: issue("Z-9"), fetchedAt: "" }], offline: false, missing: [] });
+  expect(await screen.findByRole("button", { name: /^Z-9/ })).toBeVisible();
+});
