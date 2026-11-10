@@ -13,7 +13,7 @@ import {
 } from "../wailsjs/go/main/App";
 import type { profile, query, saved } from "../wailsjs/go/models";
 import { AboutModal } from "./AboutModal";
-import { AddProfileDialog, errorText, isDemo } from "./AddProfileDialog";
+import { AddProfileDialog, errorText } from "./AddProfileDialog";
 import { CasesPage } from "./CasesPage";
 import { CyclesPage } from "./CyclesPage";
 import { FieldsDialog } from "./FieldsDialog";
@@ -25,7 +25,8 @@ import { JqlField } from "./JqlField";
 import { RunNotes } from "./RunNotes";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
-import { ThemeToggle } from "./ThemeToggle";
+import { type Notice, NoticeContext, StatusBar, useRunProgress } from "./StatusBar";
+import { TopBar } from "./TopBar";
 import { useCases } from "./useCases";
 import { useMenu } from "./useMenu";
 import { type View, VIEWS } from "./views";
@@ -62,7 +63,9 @@ export default function App() {
   const [view, setView] = useState<View>("results");
   const [shownTheme, setShownTheme] = useState(() => document.documentElement.dataset.theme ?? "light");
   const [about, setAbout] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const cases = useCases(profileId, setError);
+  const progress = useRunProgress(running);
   // null until the stored names arrive, so the dialog cannot save blanks over them.
   const [fields, setFields] = useState<saved.Fields | null>(null);
   const [editingFields, setEditingFields] = useState(false);
@@ -239,53 +242,29 @@ export default function App() {
   }
 
   const hasProfile = profileId !== "";
-  const selected = profiles?.find((p) => p.id === profileId);
   // Issues reached only through a link belong to Trace and the map, not to the
   // rows the analyst asked Jira for.
   const matched = result?.issues.filter((i) => i.matched) ?? [];
 
   return (
+    <NoticeContext.Provider value={setNotice}>
     <div className="app">
-      <header className="topbar">
-        <span className="brand">Project Issue Explorer</span>
-        {selected && isDemo(selected.jiraUrl) && <span className="demo-chip">DEMO</span>}
-        <div className="pie-topbar-actions">
-          {hasProfile && (
-            <>
-              <label className="sr-only" htmlFor="pie-profile">
-                Profile
-              </label>
-              <select
-                id="pie-profile"
-                className="profile-select"
-                value={profileId}
-                disabled={running}
-                onChange={(e) => {
-                  setProfileId(e.target.value);
-                  setResult(null);
-                  setError("");
-                }}
-              >
-                {profiles?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="btn btn-ghost" disabled={running || fields === null} onClick={() => setEditingFields(true)}>
-                Jira fields
-              </button>
-              <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteProfile()}>
-                Delete profile
-              </button>
-            </>
-          )}
-          <button type="button" className="btn btn-ghost" onClick={() => setAdding(true)}>
-            Add profile
-          </button>
-          <ThemeToggle shown={shownTheme} onChange={setShownTheme} />
-        </div>
-      </header>
+      <TopBar
+        profiles={profiles}
+        profileId={profileId}
+        running={running}
+        fieldsReady={fields !== null}
+        shownTheme={shownTheme}
+        onProfile={(id) => {
+          setProfileId(id);
+          setResult(null);
+          setError("");
+        }}
+        onFields={() => setEditingFields(true)}
+        onDeleteProfile={() => void deleteProfile()}
+        onAddProfile={() => setAdding(true)}
+        onTheme={setShownTheme}
+      />
 
       <main className="pie-main">
         {profiles !== null && !hasProfile && <p className="muted">Add a profile to run a query.</p>}
@@ -343,9 +322,6 @@ export default function App() {
               <button type="submit" className="btn btn-primary" disabled={running || jql.trim() === ""}>
                 Run
               </button>
-              {running && <span className="muted">Running...</span>}
-              {!running && result && <span className="muted">{countText(result, matched.length)}</span>}
-              {!running && queryId !== 0 && runAt && <span className="muted">{runAtText(runAt)}</span>}
             </div>
           </form>
         )}
@@ -391,6 +367,16 @@ export default function App() {
           }}
         />
       )}
+      <StatusBar
+        profile={profiles?.find((p) => p.id === profileId)?.name}
+        summary={running ? "Running..." : result ? countText(result, matched.length) : undefined}
+        runAt={queryId !== 0 && runAt ? runAtText(runAt) : undefined}
+        progress={progress}
+        notice={notice}
+        onDismiss={() => setNotice(null)}
+        theme={shownTheme}
+      />
     </div>
+    </NoticeContext.Provider>
   );
 }
