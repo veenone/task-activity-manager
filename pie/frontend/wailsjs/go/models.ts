@@ -697,6 +697,7 @@ export namespace saved {
 	    name: string;
 	    jql: string;
 	    runAt: string;
+	    keepOffline: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Query(source);
@@ -708,6 +709,7 @@ export namespace saved {
 	        this.name = source["name"];
 	        this.jql = source["jql"];
 	        this.runAt = source["runAt"];
+	        this.keepOffline = source["keepOffline"];
 	    }
 	}
 	export class Run {

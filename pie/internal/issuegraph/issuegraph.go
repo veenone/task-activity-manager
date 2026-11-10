@@ -181,3 +181,36 @@ func stored(s *Store, profileID, key string) (Neighbourhood, error) {
 	}
 	return n, nil
 }
+
+// Keep stores a run's issues and fetches and stores the issues one link
+// further, for a saved query with Keep links for offline on (#464). A
+// network failure while fetching the next level leaves the run stored.
+func Keep(ctx context.Context, fetch Fetch, s *Store, profileID string, run []query.Issue, now time.Time) error {
+	if err := s.Put(profileID, run, now); err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for _, is := range run {
+		have[is.Key] = true
+	}
+	var next []string
+	for _, is := range run {
+		for _, k := range neighbours(is) {
+			if !have[k] {
+				have[k] = true
+				next = append(next, k)
+			}
+		}
+	}
+	if len(next) == 0 {
+		return nil
+	}
+	more, err := fetch(ctx, next)
+	if IsOffline(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.Put(profileID, more, now)
+}

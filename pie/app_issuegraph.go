@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/pie/internal/issuegraph"
 	"agile-suite/pie/internal/query"
 )
@@ -34,4 +35,21 @@ func (a *App) ExpandIssue(profileID, key string) (issuegraph.Neighbourhood, erro
 		return query.Issues(ctx, client, keys, ids)
 	}
 	return issuegraph.Expand(a.ctx, fetch, issuegraph.New(a.db.DB()), profileID, key, time.Now())
+}
+
+// SetKeepOffline turns Keep links for offline on or off for a saved query.
+func (a *App) SetKeepOffline(profileID string, queryID int64, on bool) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.queries.SetKeepOffline(profileID, queryID, on)
+}
+
+// keep stores a run's issues and the issues one link further, for the issue
+// graph to open offline.
+func (a *App) keep(profileID string, client *corejira.Client, ids query.Fields, run []query.Issue) error {
+	fetch := func(ctx context.Context, keys []string) ([]query.Issue, error) {
+		return query.Issues(ctx, client, keys, ids)
+	}
+	return issuegraph.Keep(a.ctx, fetch, issuegraph.New(a.db.DB()), profileID, run, time.Now())
 }

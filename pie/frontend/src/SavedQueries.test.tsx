@@ -20,6 +20,7 @@ vi.mock("../wailsjs/go/main/App", () => ({
   SetFields: vi.fn(),
   ListCases: vi.fn(),
   OpenCases: vi.fn(),
+  SetKeepOffline: vi.fn(),
 }));
 
 const weekly = { id: 7, name: "Weekly", jql: "category = X", runAt: "2026-11-06T12:00:00Z" };
@@ -165,4 +166,19 @@ it("deletes a saved query only after confirming", async () => {
   expect(api.DeleteQuery).toHaveBeenCalledWith("p1", 7);
   expect(await screen.findByRole("option", { name: "Unsaved query", selected: true })).toBeInTheDocument();
   expect(screen.queryByRole("option", { name: "Weekly" })).not.toBeInTheDocument();
+});
+
+it("keeps a saved query's links for offline when asked, and only for a saved query", async () => {
+  vi.mocked(api.LastRun).mockResolvedValue({ result: rows("A-1"), runAt: weekly.runAt, added: null, dropped: null } as never);
+  vi.mocked(api.SetKeepOffline).mockResolvedValue();
+  const user = show();
+  await screen.findByRole("option", { name: "Weekly" });
+  expect(screen.queryByRole("checkbox", { name: "Keep links for offline" })).toBeNull();
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  const box = await screen.findByRole("checkbox", { name: "Keep links for offline" });
+  expect(box).not.toBeChecked();
+  vi.mocked(api.ListQueries).mockResolvedValue([{ ...weekly, keepOffline: true }] as never);
+  await user.click(box);
+  expect(api.SetKeepOffline).toHaveBeenCalledWith("p1", 7, true);
+  expect(await screen.findByRole("checkbox", { name: "Keep links for offline" })).toBeChecked();
 });

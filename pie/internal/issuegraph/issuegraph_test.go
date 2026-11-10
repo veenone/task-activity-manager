@@ -137,3 +137,30 @@ func TestPutReplacesAnIssueFetchedAgain(t *testing.T) {
 		t.Fatalf("got %+v", got["A-1"])
 	}
 }
+
+func TestKeepStoresTheRunAndFetchesOneLevelMore(t *testing.T) {
+	s, j := open(t), world()
+	run := []query.Issue{j.issues["B-1"]}
+	if err := Keep(context.Background(), j.fetch, s, "p1", run, at); err != nil {
+		t.Fatal(err)
+	}
+	// B-1 is the run; A-1 is one link away. A-2, two away, is not fetched.
+	got, _ := s.Get("p1", []string{"A-1", "A-2", "B-1"})
+	if len(got) != 2 || got["A-2"].Issue.Key != "" {
+		t.Fatalf("kept %v", got)
+	}
+	if len(j.asked) != 1 || !slices.Equal(j.asked[0], []string{"A-1"}) {
+		t.Fatalf("asked %v", j.asked)
+	}
+}
+
+func TestKeepWithoutJiraStillStoresTheRun(t *testing.T) {
+	s, j := open(t), world()
+	j.down = true
+	if err := Keep(context.Background(), j.fetch, s, "p1", []query.Issue{j.issues["B-1"]}, at); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Get("p1", []string{"B-1"}); len(got) != 1 {
+		t.Fatal("the run was not stored")
+	}
+}
