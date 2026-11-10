@@ -137,6 +137,8 @@ func run(ctx context.Context, client *corejira.Client, jql string, extra Fields)
 	res := Result{Total: total, Issues: first}
 	step := len(first)
 	end := min(total, MaxRows)
+	done := &counter{ctx: ctx, stage: StageIssues, total: end}
+	done.add(step)
 	if step > 0 && step < end {
 		starts := []int{}
 		for s := step; s < end; s += step {
@@ -146,6 +148,7 @@ func run(ctx context.Context, client *corejira.Client, jql string, extra Fields)
 		err := parallel(len(starts), func(i int) error {
 			got, _, err := page(starts[i], min(step, end-starts[i]))
 			pages[i] = got
+			done.add(len(got))
 			return err
 		})
 		if err != nil {

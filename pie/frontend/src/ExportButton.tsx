@@ -1,42 +1,30 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { ExportWorkbook } from "../wailsjs/go/main/App";
 import { errorText } from "./AddProfileDialog";
 import type { Sheet } from "./exportSheets";
+import { NoticeContext } from "./StatusBar";
 
 // ExportButton saves what a view shows as an Excel workbook. sheets is called
-// on click, so it reads the view's filters as they are then. A cancelled
-// dialog says nothing.
+// on click, so it reads the view's filters as they are then. Where the file
+// went, or why it was not written, goes to the status bar's ribbon (#452). A
+// cancelled dialog says nothing.
 export function ExportButton({ name, sheets }: { name: string; sheets: () => Sheet[] | Promise<Sheet[]> }) {
-  const [saved, setSaved] = useState("");
-  const [error, setError] = useState("");
+  const notify = useContext(NoticeContext);
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
-    setSaved("");
-    setError("");
     try {
       const path = await ExportWorkbook(name, await sheets());
-      if (path) setSaved(path);
+      if (path) notify({ text: `Saved to ${path}` });
     } catch (e) {
-      setError(errorText(e));
+      notify({ text: `Export failed. ${errorText(e)}`, error: true });
     } finally {
       setBusy(false);
     }
   };
   return (
-    <span className="pie-export">
-      <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void save()}>
-        Export to Excel
-      </button>
-      {/* Mounted from the start, so a screen reader announces the text when it arrives. */}
-      <span role="status" className="muted">
-        {saved && `Saved to ${saved}`}
-      </span>
-      {error && (
-        <span role="alert" className="error-text">
-          {error}
-        </span>
-      )}
-    </span>
+    <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void save()}>
+      Export to Excel
+    </button>
   );
 }

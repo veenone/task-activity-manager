@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="PIE top bar in the suite layout, and the new status bar in three states: idle with the last run, a query running with a progress bar, and the export ribbon">
+  <style>
+    text { font-family: Segoe UI, Arial, sans-serif; font-size: 13px; fill: #1f2328; }
+    .muted { fill: #656d76; font-size: 12px; }
+    .cap { fill: #656d76; font-size: 12px; font-weight: 600; }
+    .brand { font-size: 15px; font-weight: 600; fill: #f0f3f6; }
+    .chrome { fill: #f0f3f6; font-size: 12px; }
+  </style>
+  <rect width="1280" height="420" fill="#ffffff"/>
+
+  <text x="16" y="22" class="cap">TOP BAR: brand and profile on the left, actions on the right</text>
+  <rect x="16" y="32" width="1248" height="44" fill="#24292f" rx="4"/>
+  <text x="32" y="59" class="brand">Project Issue Explorer</text>
+  <rect x="210" y="43" width="150" height="24" rx="4" fill="#32383f" stroke="#57606a"/>
+  <text x="220" y="59" class="chrome">Old Jira  ▾</text>
+  <rect x="900" y="43" width="86" height="24" rx="4" fill="none" stroke="#57606a"/>
+  <text x="912" y="59" class="chrome">Jira fields</text>
+  <rect x="992" y="43" width="104" height="24" rx="4" fill="none" stroke="#57606a"/>
+  <text x="1002" y="59" class="chrome">Delete profile</text>
+  <rect x="1102" y="43" width="90" height="24" rx="4" fill="none" stroke="#57606a"/>
+  <text x="1114" y="59" class="chrome">Add profile</text>
+  <text x="1214" y="60" class="chrome">☾</text>
+
+  <text x="16" y="116" class="cap">STATUS BAR, idle: profile, last run, theme</text>
+  <rect x="16" y="126" width="1248" height="26" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="30" y="143">Old Jira</text>
+  <text x="104" y="143" class="muted">1908 issues</text>
+  <text x="194" y="143" class="muted">Last run 2026-11-10 09:30</text>
+  <text x="1170" y="143" class="muted">Theme: light</text>
+
+  <text x="16" y="196" class="cap">STATUS BAR, query running: what PIE is doing and how far</text>
+  <rect x="16" y="206" width="1248" height="26" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="30" y="223">Old Jira</text>
+  <rect x="104" y="215" width="160" height="7" rx="3" fill="#ddf4ff" stroke="#d0d7de"/>
+  <rect x="104" y="215" width="58" height="7" rx="3" fill="#0969da"/>
+  <text x="276" y="223" class="muted">Fetching issues: 700 / 1908</text>
+  <text x="1170" y="223" class="muted">Theme: light</text>
+
+  <text x="16" y="276" class="cap">STATUS BAR, after an export: the ribbon, until dismissed</text>
+  <rect x="16" y="286" width="1248" height="26" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="30" y="303">Saved to C:\Users\analyst\Documents\pie-links.xlsx</text>
+  <rect x="1186" y="290" width="70" height="18" rx="4" fill="none" stroke="#d0d7de"/>
+  <text x="1196" y="303">Dismiss</text>
+
+  <text x="16" y="356" class="cap">STATUS BAR, export failed</text>
+  <rect x="16" y="366" width="1248" height="26" fill="#fbe9eb" stroke="#ff8182"/>
+  <text x="30" y="383" style="fill:#82071e">Export failed. write pie-links.xlsx: access denied</text>
+  <rect x="1186" y="370" width="70" height="18" rx="4" fill="none" stroke="#ff8182"/>
+  <text x="1196" y="383" style="fill:#82071e">Dismiss</text>
+</svg>

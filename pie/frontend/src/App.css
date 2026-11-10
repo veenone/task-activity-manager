@@ -9,13 +9,6 @@ body,
   font-size: var(--fs-md);
 }
 
-.pie-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
 .pie-main {
   display: flex;
   flex: 1;
@@ -999,11 +992,32 @@ body,
   grid-column: 1 / -1;
 }
 
-/* Export to Excel, with what happened beside it (#441). */
-.pie-export {
+/* The status bar's ribbon: where an export went, or why it failed (#452). */
+.pie-ribbon {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+.pie-ribbon > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pie-ribbon-close {
+  margin-left: auto;
+  padding: 0 8px;
+}
+
+/* A running query's progress, in the status bar (#452). */
+.pie-run-progress {
   display: inline-flex;
   gap: 8px;
   align-items: center;
+}
+.pie-run-progress .progress-bar {
+  width: 160px;
 }
 
 /* Projects chooser: a typeable box, then the chosen projects as chips (#444). */

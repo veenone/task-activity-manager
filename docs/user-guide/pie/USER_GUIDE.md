@@ -25,6 +25,14 @@ The moon or sun button at the right of the top bar switches between light and
 dark. PIE remembers the theme you pick, from either place, for the next time
 it starts.
 
+## The status bar
+
+The bar along the bottom of the window shows the profile in use, how many
+issues the last run returned, when a saved query last ran, and the theme. While
+a query runs, a progress bar takes the place of the count. It says what PIE is
+doing, **Fetching issues** and then **Following links**, and how many of how
+many it has done so far.
+
 ## Add a profile
 
 A profile is how PIE reaches Jira. Choose **Add profile** and enter a name, your
@@ -90,7 +98,7 @@ one part of the query.
 When a query matches more than 2,000 issues, PIE asks before fetching them.
 If you decline, it fetches nothing and the previous rows stay on screen. PIE
 fetches at most 5,000 issues from one run. When a query matches more, the count
-above the table says how many of the total it fetched, so narrow the query to
+in the status bar says how many of the total it fetched, so narrow the query to
 see the rest.
 
 ## Start from a Jira filter
@@ -390,6 +398,9 @@ an .xlsx of what the view is showing, with its filters applied:
 Each sheet has a bold header row that stays in view and a filter on every
 column. Counts are stored as numbers, so Excel can sum and sort them. If you
 cancel the Save dialog, nothing is written.
+
+When the file is written, the status bar says where it went. If writing fails,
+the status bar turns red and says why. Choose **Dismiss** to clear either.
 
 ## Cycles
 
