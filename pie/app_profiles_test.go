@@ -43,11 +43,11 @@ func TestUpdateProfileKeepsTheTokenAndQueriesUnlessANewTokenIsTyped(t *testing.T
 	if _, err := a.SaveQuery(p.ID, "Open bugs", "type = Bug"); err != nil {
 		t.Fatal(err)
 	}
-	got, err := a.UpdateProfile(p.ID, " Renamed ", "https://jira2.example.com", "")
+	got, err := a.UpdateProfile(p.ID, " Renamed ", "https://jira.example.com", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Name != "Renamed" || got.JiraURL != "https://jira2.example.com" {
+	if got.Name != "Renamed" || got.JiraURL != "https://jira.example.com" {
 		t.Fatalf("updated to %+v", got)
 	}
 	if creds[p.ID] != "first" {
@@ -110,5 +110,40 @@ func TestAProfileFileCarriesNoTokenAndReadsBack(t *testing.T) {
 		if _, err := readProfileFile([]byte(bad)); err == nil {
 			t.Fatalf("accepted %s", bad)
 		}
+	}
+}
+
+func TestUpdateProfileWillNotSendTheOldTokenToANewJira(t *testing.T) {
+	a, creds := profileApp(t)
+	p, err := a.CreateProfile("Old Jira", "https://jira.example.com", "first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.UpdateProfile(p.ID, "Old Jira", "https://elsewhere.example.com", ""); err == nil {
+		t.Fatal("the URL moved without a new token")
+	}
+	if got, _ := a.profiles.Get(p.ID); got.JiraURL != "https://jira.example.com" || creds[p.ID] != "first" {
+		t.Fatalf("a refused edit changed the profile: %+v, token %q", got, creds[p.ID])
+	}
+	// The same URL written differently is not a move.
+	if _, err := a.UpdateProfile(p.ID, "Old Jira", "https://jira.example.com/", ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDeletingTheDefaultProfileClearsTheDefault(t *testing.T) {
+	a, _ := profileApp(t)
+	p, err := a.CreateProfile("Demo", "demo", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetDefaultProfile(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.DeleteProfile(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.DefaultProfile(); got != "" {
+		t.Fatalf("default after delete = %q", got)
 	}
 }

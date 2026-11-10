@@ -83,11 +83,9 @@ export default function App() {
   async function loadProfiles(select?: string) {
     const list = await ListProfiles();
     setProfiles(list);
-    setProfileId((current) => {
-      const next = [select, current].find((id) => id && list.some((p) => p.id === id)) ?? list[0]?.id ?? "";
-      if (next !== current) setResult(null);
-      return next;
-    });
+    const next = [select, profileId].find((id) => id && list.some((p) => p.id === id)) ?? list[0]?.id ?? "";
+    if (next !== profileId) setResult(null);
+    setProfileId(next);
   }
 
   useEffect(() => {

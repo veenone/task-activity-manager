@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -23,7 +24,17 @@ func (a *App) UpdateProfile(id, name, jiraURL, token string) (profile.Profile, e
 		return profile.Profile{}, err
 	}
 	name, jiraURL, token = strings.TrimSpace(name), strings.TrimSpace(jiraURL), strings.TrimSpace(token)
-	// A profile moving off the demo has no stored token to keep.
+	was, err := a.profiles.Get(id)
+	if err != nil {
+		return profile.Profile{}, err
+	}
+	// The stored token belongs to the stored Jira, so a new Jira needs its own
+	// and the old one is never sent there. A profile moving off the demo has
+	// no stored token at all.
+	moved := !strings.EqualFold(strings.TrimRight(jiraURL, "/"), strings.TrimRight(was.JiraURL, "/"))
+	if moved && token == "" && !demo.Is(jiraURL) {
+		return profile.Profile{}, errors.New("enter the personal access token for the new Jira URL")
+	}
 	have := token
 	if have == "" {
 		have, _ = a.creds.Load(id)
