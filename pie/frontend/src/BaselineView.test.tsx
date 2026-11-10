@@ -135,3 +135,14 @@ it("says so when no project is marked as a baseline", () => {
   render(<BaselineView result={result as never} baselines={[]} onOpen={vi.fn()} />);
   expect(screen.getByText(/Mark a project as a baseline/)).toBeVisible();
 });
+
+it("forgets a traced issue the chosen version leaves out, and draws no empty group", async () => {
+  const { user } = show();
+  await user.click(await screen.findByRole("button", { name: /^COS-210/ }));
+  expect(screen.getByRole("button", { name: "Open COS-210 in Trace" })).toBeVisible();
+  await user.selectOptions(screen.getByRole("combobox", { name: "Version" }), "3.3.0");
+  expect(screen.queryByRole("button", { name: /in Trace/ })).toBeNull();
+  expect(list("Nodes").some((n) => n.includes("faded"))).toBe(false);
+  // 3.3.0 has no COL issue at all, so COL gets no group.
+  expect(list("Groups").some((g) => g.startsWith("d:COL"))).toBe(false);
+});
