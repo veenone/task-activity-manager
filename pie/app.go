@@ -295,6 +295,14 @@ func fieldIDs(ctx context.Context, client *corejira.Client, f saved.Fields) (que
 	return ids, nil
 }
 
+// progress is a.ctx with a reporter that sends a run's progress to the status
+// bar as run:progress events (#452).
+func (a *App) progress() context.Context {
+	return query.WithProgress(a.ctx, func(p query.Progress) {
+		runtime.EventsEmit(a.ctx, "run:progress", p)
+	})
+}
+
 // RunQuery runs JQL with a profile's connection and follows its links. With a
 // saved query's id the run is stored on it and compared with the last one; 0
 // runs the JQL without saving anything. confirmed says the analyst has agreed
@@ -315,7 +323,7 @@ func (a *App) RunQuery(profileID string, queryID int64, jql string, confirmed bo
 	if err != nil {
 		return saved.Run{}, err
 	}
-	res, err := query.Explore(a.ctx, client, jql, confirmed, ids)
+	res, err := query.Explore(a.progress(), client, jql, confirmed, ids)
 	if err != nil || queryID == 0 || res.NeedsConfirm {
 		return saved.Run{Result: res}, err
 	}

@@ -33,7 +33,7 @@ func (a *App) RefreshLinks(profileID string, queryID int64, runAt string, curren
 			own.Issues = append(own.Issues, is)
 		}
 	}
-	res := query.Follow(a.ctx, client, own, ids)
+	res := query.Follow(a.progress(), client, own, ids)
 	// A refresh that stopped partway would replace a whole run with part of
 	// one, so the stored run and the screen keep what they had.
 	if res.LinkError != "" {

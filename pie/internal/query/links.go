@@ -73,9 +73,14 @@ func Follow(ctx context.Context, client *corejira.Client, res Result, extra Fiel
 		batches := slices.Collect(slices.Chunk(pending, keysPerSearch))
 		got := make([][]Issue, len(batches))
 		errs := make([]error, len(batches))
+		// Done counts keys asked for, so a round ends at its Total even when
+		// a linked issue is gone.
+		before := len(res.Issues)
+		done := &counter{ctx: ctx, stage: StageLinks, done: before, total: before + len(pending)}
 		_ = parallel(len(batches), func(i int) error {
-			r, err := run(ctx, client, "key in ("+strings.Join(batches[i], ", ")+")", extra)
+			r, err := run(quiet(ctx), client, "key in ("+strings.Join(batches[i], ", ")+")", extra)
 			got[i], errs[i] = r.Issues, err
+			done.add(len(batches[i]))
 			return err
 		})
 		// Batches before the first failure are kept, as a sequential walk
