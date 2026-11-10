@@ -21,15 +21,18 @@ export function FiltersRow({ s, a, p }: { s: ContainerState; a: ContainerActions
     set(v);
     setBoardPage(0);
   };
+  // Execution type and environment filter only executions; on another type
+  // they are not in force, so they get no chip (#456 review).
+  const exec = kind === "testexec";
   const chips = (
     [
-      cExecType && { text: `Execution: ${cExecType === "subtask" ? "Sub-task" : "Standalone"}`, clear: () => setCExecType("") },
-      cEnv && { text: `Environment: ${cEnv}`, clear: () => setCEnv("") },
+      exec && cExecType && { text: `Execution: ${cExecType === "subtask" ? "Sub-task" : "Standalone"}`, clear: () => setCExecType("") },
+      exec && cEnv && { text: `Environment: ${cEnv}`, clear: () => setCEnv("") },
       memberFvFilter && { text: `Fix version: ${memberFvFilter}`, clear: () => member(setMemberFvFilter)("") },
       memberRunFilter && { text: `Result: ${memberRunFilter}`, clear: () => member(setMemberRunFilter)("") },
       memberLabel && { text: `Label: ${memberLabel}`, clear: () => member(setMemberLabel)("") },
       memberJqlKeys && { text: "JQL", clear: () => setMemberJqlKeys(null) },
-    ] as (Chip | "" | null)[]
+    ] as (Chip | "" | false | null)[]
   ).filter((c): c is Chip => !!c);
   const fixVersions = kind === "testexec" ? (selectedContainer?.fixVersions ?? []) : [];
 

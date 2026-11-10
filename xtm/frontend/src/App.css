@@ -1912,7 +1912,8 @@ button.defect-chip-key:hover {
   cursor: text;
 }
 .container-card-name-edit {
-  font-size: var(--fs-xl);
+  /* The same size as the name it replaces in the card's line (#456). */
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text);
   width: 100%;

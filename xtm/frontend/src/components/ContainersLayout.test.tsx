@@ -3,7 +3,7 @@ import { renderWithCaps, selectTestExecutions } from "./ContainersView.harness";
 import { describe, it, expect, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { GetContainerBoard, SyncContainers } from "../api";
+import { GetContainerBoard, ListContainers, SyncContainers } from "../api";
 
 // The layout of #456: a one-line header, a one-line card and one filter row,
 // so the member table keeps most of the height on every container type.
@@ -57,6 +57,24 @@ describe("ContainersView compact layout", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove filter Result: FAIL" }));
     expect(screen.getByRole("button", { name: "Filters" })).toBeVisible();
     expect(screen.getByText("Login works")).toBeVisible();
+  });
+
+  it("shows no execution-only filter as a chip once another type is open", async () => {
+    const list = vi.mocked(ListContainers).getMockImplementation()!;
+    vi.mocked(ListContainers).mockImplementation(async (profileId: string, kind: string) =>
+      (await list(profileId, kind)).map((c) => ({ ...c, environments: ["staging"] })),
+    );
+    renderWithCaps({});
+    await selectTestExecutions();
+    await screen.findByText("Login works");
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /test environment/i }), "staging");
+    expect(screen.getByRole("button", { name: "Filters (1)" })).toBeVisible();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Type" }), "testplan");
+    // Plans have no environments, so the filter is not in force here.
+    expect(await screen.findByRole("button", { name: "Filters" })).toBeVisible();
+    expect(screen.queryByText(/^Environment:/)).toBeNull();
+    vi.mocked(ListContainers).mockImplementation(list);
   });
 
   it("filters a Test Plan's tests by label too", async () => {
