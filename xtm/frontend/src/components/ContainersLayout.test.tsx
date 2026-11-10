@@ -77,6 +77,17 @@ describe("ContainersView compact layout", () => {
     vi.mocked(ListContainers).mockImplementation(list);
   });
 
+  it("filters by result only from Filters; the card's bar and badges just count", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+    await screen.findByText("Login works");
+    await userEvent.click(screen.getByRole("button", { name: "Show details" }));
+    const card = document.querySelector(".container-card") as HTMLElement;
+    expect(within(card).getByText("FAIL 1")).toBeVisible();
+    // Neither the badge nor the bar is a control any more.
+    expect(within(card).queryByRole("button", { name: /FAIL/ })).toBeNull();
+  });
+
   it("filters a Test Plan's tests by label too", async () => {
     vi.mocked(GetContainerBoard).mockImplementation(async () => ({
       key: "PLAN-1",

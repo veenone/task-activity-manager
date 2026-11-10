@@ -173,41 +173,19 @@ export function formatRunDate(iso: string): string {
 }
 
 // RunBar is a compact stacked bar of run-status proportions for the selected
-// container, a glanceable view of how its tests are doing. When onPick is
-// given, each segment is clickable and filters the member table to that run
-// status; the active segment stays lit while the rest dim.
-export function RunBar({
-  counts,
-  active,
-  onPick,
-}: {
-  counts: Bucket[];
-  active?: string;
-  onPick?: (label: string) => void;
-}) {
+// container, a glanceable view of how its tests are doing. It only shows:
+// the Filters row filters by result, and the bar lights the result chosen
+// there while the rest dim (#456).
+export function RunBar({ counts, active }: { counts: Bucket[]; active?: string }) {
   const sum = counts.reduce((a, b) => a + b.count, 0) || 1;
-  const filtering = !!active;
   return (
-    <div
-      className={`run-bar${onPick ? " run-bar--clickable" : ""}${filtering ? " run-bar--filtering" : ""}`}
-      title={
-        onPick
-          ? "Run-status distribution. Click a segment to filter the list"
-          : "Run-status distribution"
-      }
-    >
+    <div className={`run-bar${active ? " run-bar--filtering" : ""}`} title="Run-status distribution">
       {counts.map((b) => (
         <span
           key={b.label}
           className={`${runSegClass(b.label)}${active === b.label ? " run-seg--active" : ""}`}
           style={{ width: `${(b.count / sum) * 100}%` }}
-          title={`${b.label}: ${b.count}${onPick ? " (click to filter)" : ""}`}
-          role={onPick ? "button" : undefined}
-          tabIndex={onPick ? 0 : undefined}
-          aria-label={onPick ? `${b.label}: ${b.count}` : undefined}
-          aria-pressed={onPick ? active === b.label : undefined}
-          onClick={onPick ? () => onPick(b.label) : undefined}
-          onKeyDown={onPick ? onActivateKey(() => onPick(b.label)) : undefined}
+          title={`${b.label}: ${b.count}`}
         />
       ))}
     </div>

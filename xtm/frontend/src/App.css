@@ -1478,9 +1478,6 @@ i.sankey-node-l2 {
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
-.container-bugs-count {
-  color: var(--text-strong);
-}
 .container-bugs-list {
   list-style: none;
   margin: 0;
@@ -1547,15 +1544,6 @@ i.sankey-node-l2 {
 }
 .fix-version-chip--active:hover {
   background: var(--info-fg-strong);
-}
-/* "All" chip shown when a filter is active — slightly muted to indicate it
-   clears the current selection rather than being a data value. */
-.fix-version-chip--all {
-  background: var(--slate-muted);
-  font-weight: 400;
-}
-.fix-version-chip--all:hover {
-  background: var(--slate-solid);
 }
 /* Highlight the Fix Version cell of a row whose fix version matches the active
    filter, so it is easy to confirm which row qualified. */
@@ -1964,14 +1952,9 @@ button.defect-chip-key:hover {
 .run-bar .run-aborted {
   background: var(--text-muted);
 }
-/* The colorbar doubles as a filter control: segments show a pointer, and while
-   a status is active the other segments dim so the filtered slice reads at a
-   glance. Opacity (not an outline) keeps the active state inside the bar's
-   overflow:hidden clip. */
-.run-bar--clickable .run-seg {
-  cursor: pointer;
-  transition: opacity var(--dur-1) ease;
-}
+/* While a result filter is on, the bar's other segments dim so the filtered
+   slice reads at a glance. Opacity (not an outline) keeps the active state
+   inside the bar's overflow:hidden clip. */
 .run-bar--filtering .run-seg {
   opacity: 0.3;
 }
@@ -6508,34 +6491,9 @@ tr.row-checked:hover {
   max-width: 460px;
 }
 
-/* -274: collapsible related-bugs section inside the container detail card.
-   The header acts as a toggle; the body is scrollable and height-capped so
-   even an enormous bug list cannot push the member table below off-screen. */
-.tp-bugs-collapsible {
-  margin: 6px 0 2px;
-}
-.tp-bugs-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-.tp-bugs-header:hover {
-  color: var(--text);
-}
-.tp-bugs-chevron {
-  font-size: var(--fs-2xs);
-  display: inline-block;
-  transition: transform var(--dur-2) ease;
-}
+/* -274: the related-bugs list under the container card's line (#456). It
+   scrolls within a capped height, so even an enormous bug list cannot push
+   the member table below off-screen. */
 .tp-bugs-body {
   max-height: 160px;
   overflow-y: auto;
@@ -7432,11 +7390,9 @@ tr.row-checked:hover {
   .syncbar-fill,
   .sankey-link,
   .fix-version-chip,
-  .run-bar--clickable .run-seg,
   .sidebar-resizer,
   .detail-collapse-chevron,
   .about-close,
-  .tp-bugs-chevron,
   .cov-cr-item,
   .cov-dist-bar {
     transition: none;

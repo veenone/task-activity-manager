@@ -78,19 +78,6 @@ describe("ContainersView keyboard", () => {
     expect(screen.getByDisplayValue("Nightly run")).toBeInTheDocument();
   });
 
-  it("filters the members by run status with Enter on a run badge", async () => {
-    renderWithCaps({});
-    await selectTestExecutions();
-
-    // The result badges sit in the card's details, folded at first (#456).
-    await userEvent.click(await screen.findByRole("button", { name: "Show details" }));
-    const badge = await screen.findByRole("button", { name: "FAIL 1" });
-    badge.focus();
-    await userEvent.keyboard("{Enter}");
-
-    expect(badge).toHaveAttribute("aria-pressed", "true");
-  });
-
   it("names the Set env panel and closes it on Escape", async () => {
     renderWithCaps({});
     await selectTestExecutions();

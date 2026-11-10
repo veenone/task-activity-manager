@@ -7,13 +7,15 @@ import type { ContainerActions, ContainerViewProps } from "./useContainerActions
 // what an analyst needs while working the tests: kind, key, name, status,
 // count, a slim run bar, Related bugs and the add buttons. Parent,
 // environments, fix versions and the result badges fold behind the caret,
-// so the member table below keeps the height (#456).
+// so the member table below keeps the height (#456). The bar, badges and
+// fix versions only show; the Filters row is the one place that filters,
+// and they mark what it has chosen.
 export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActions; p: ContainerViewProps }) {
   const {
     kind, envDraft, setEnvDraft, bugsExpanded, setBugsExpanded, editingName, setEditingName,
-    nameDraft, setNameDraft, setShowAdd, setShowJUnitImport, memberFvFilter, setMemberFvFilter,
+    nameDraft, setNameDraft, setShowAdd, setShowJUnitImport, memberFvFilter,
     memberRunFilter, cardCollapsed, setCardCollapsed, caps, board, relatedBugs, focusRef,
-    kindLabel, selectedContainer, pickRunFilter, rollup,
+    kindLabel, selectedContainer, rollup,
   } = s;
   const { commitInlineRename, addEnvironment, removeEnvironment, openParent, openBug, openBreakdown } = a;
   const { isDemo, jiraUrl } = p;
@@ -67,7 +69,7 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
         </span>
         {board && board.runCounts.length > 0 && (
           <span className="container-card-runbar">
-            <RunBar counts={board.runCounts} active={memberRunFilter} onPick={pickRunFilter} />
+            <RunBar counts={board.runCounts} active={memberRunFilter} />
           </span>
         )}
         <span className="container-card-actions">
@@ -171,29 +173,10 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
             <div className="container-environments">
               <span className="container-env-label">Fix version(s)</span>
               <div className="container-env-chips">
-                {memberFvFilter && (
-                  <button
-                    key="__all"
-                    className="env-chip fix-version-chip fix-version-chip--all"
-                    title="Clear fix-version filter (show all members)"
-                    onClick={() => setMemberFvFilter("")}
-                  >
-                    All
-                  </button>
-                )}
                 {(selectedContainer.fixVersions ?? []).map((fv) => (
-                  <button
-                    key={fv}
-                    className={`env-chip fix-version-chip${memberFvFilter === fv ? " fix-version-chip--active" : ""}`}
-                    title={
-                      memberFvFilter === fv
-                        ? `Showing only members with fix version ${fv} (click to clear)`
-                        : `Filter member table to fix version ${fv}`
-                    }
-                    onClick={() => setMemberFvFilter((cur) => (cur === fv ? "" : fv))}
-                  >
+                  <span key={fv} className={`env-chip fix-version-chip${memberFvFilter === fv ? " fix-version-chip--active" : ""}`}>
                     {fv}
-                  </button>
+                  </span>
                 ))}
               </div>
             </div>
@@ -207,7 +190,6 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
                   status={b.label}
                   count={b.count}
                   active={memberRunFilter === b.label}
-                  onPick={() => pickRunFilter(b.label)}
                 />
               ))}
             </div>
