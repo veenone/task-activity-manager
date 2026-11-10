@@ -17,6 +17,7 @@ vi.mock("../wailsjs/runtime/runtime", () => ({
 vi.mock("../wailsjs/go/main/App", () => ({
   StartupError: vi.fn(),
   ListProfiles: vi.fn(),
+  DefaultProfile: () => Promise.resolve(""),
   ListQueries: vi.fn(),
   Fields: vi.fn(),
   ListCases: vi.fn(),
@@ -53,7 +54,7 @@ it("switches tabs from the View menu", async () => {
   expect(screen.getByRole("button", { name: "Link map" })).toHaveAttribute("aria-current", "page");
 });
 
-it("opens Add profile and Jira fields from the File menu", async () => {
+it("opens Manage profiles and Jira fields from the File menu", async () => {
   show();
   await screen.findByRole("navigation", { name: "Views" });
   // The menu item does nothing until the profile's fields have loaded.
@@ -61,8 +62,8 @@ it("opens Add profile and Jira fields from the File menu", async () => {
   emit("menu:fields");
   expect(await screen.findByRole("heading", { name: "Jira fields" })).toBeVisible();
   await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
-  emit("menu:add-profile");
-  expect(await screen.findByRole("heading", { name: "Add profile" })).toBeVisible();
+  emit("menu:profiles");
+  expect(await screen.findByRole("heading", { name: "Manage Profiles" })).toBeVisible();
 });
 
 it("toggles the theme from the top bar and stores the choice", async () => {

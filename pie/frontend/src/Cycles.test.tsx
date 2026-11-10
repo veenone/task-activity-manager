@@ -12,8 +12,6 @@ vi.mock("../wailsjs/go/main/App", () => ({
   RetakeCycle: vi.fn(),
   DeleteCycle: vi.fn(),
   PublishCycle: vi.fn(),
-  ConfluenceSettings: vi.fn(),
-  SetConfluenceSettings: vi.fn(),
 }));
 
 const draft = { id: 2, name: "Week 45", takenAt: "2026-11-07T10:00:00Z", publishedAt: "" };
@@ -171,33 +169,8 @@ it("writes nothing when the analyst says no to the question", async () => {
 
 it("says why a publish failed", async () => {
   const user = show();
-  vi.mocked(api.PublishCycle).mockRejectedValue("this profile has no Confluence token yet. Add one in Confluence settings");
+  vi.mocked(api.PublishCycle).mockRejectedValue("this profile has no Confluence token yet. Add one in Manage profiles");
   await user.click(await screen.findByRole("button", { name: "Publish" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("no Confluence token yet");
   expect(screen.getByRole("button", { name: "Take again" })).toBeVisible();
-});
-
-it("stores the Confluence settings with a new token", async () => {
-  const user = show();
-  vi.mocked(api.ConfluenceSettings).mockResolvedValue({
-    baseURL: "https://wiki.example.com",
-    spaceKey: "SEC",
-    rootPageID: "",
-    reportsSpaceKey: "",
-    reportsRootPageID: "",
-  } as never);
-  vi.mocked(api.SetConfluenceSettings).mockResolvedValue();
-  await user.click(await screen.findByRole("button", { name: "Confluence settings" }));
-  const dialog = await screen.findByRole("dialog");
-  expect(await within(dialog).findByLabelText("Confluence URL")).toHaveValue("https://wiki.example.com");
-  expect(within(dialog).getByLabelText("Space key")).toHaveValue("SEC");
-  await user.type(within(dialog).getByLabelText("Parent page id"), "7");
-  await user.type(within(dialog).getByLabelText("Token"), "secret");
-  await user.click(within(dialog).getByRole("button", { name: "Save" }));
-  expect(api.SetConfluenceSettings).toHaveBeenCalledWith(
-    "p1",
-    { baseURL: "https://wiki.example.com", spaceKey: "SEC", rootPageID: "7", reportsSpaceKey: "", reportsRootPageID: "" },
-    "secret",
-  );
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });

@@ -2,11 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm, usePrompt } from "@agile-suite/core";
 import { Cycles, DeleteCycle, GetCycle, PublishCycle, RetakeCycle, TakeCycle } from "../wailsjs/go/main/App";
 import type { cycles, query } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { VerdictGrid } from "./CaseGrid";
 import { ExportButton } from "./ExportButton";
 import { cycleSheets } from "./exportSheets";
-import { ConfluenceDialog } from "./ConfluenceDialog";
 import { projectLabel, projectNames } from "./linked";
 import { Card } from "./Statistics";
 
@@ -16,7 +15,6 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
   const [list, setList] = useState<cycles.Cycle[] | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [settings, setSettings] = useState(false);
   const { prompt } = usePrompt();
   const { confirm } = useConfirm();
 
@@ -77,9 +75,6 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
         <button type="button" className="btn btn-primary" onClick={() => void take()}>
           New cycle
         </button>
-        <button type="button" className="btn" onClick={() => setSettings(true)}>
-          Confluence settings
-        </button>
         {error && (
           <p role="alert" className="error-text">
             {error}
@@ -115,7 +110,6 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
           onPublished={() => void reload(openId)}
         />
       )}
-      {settings && <ConfluenceDialog profileId={profileId} onClose={() => setSettings(false)} />}
     </div>
   );
 }

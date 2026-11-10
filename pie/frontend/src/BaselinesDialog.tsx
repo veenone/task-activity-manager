@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal, useConfirm } from "@agile-suite/core";
 import { AddBaseline, AddDescendants, JiraProjects, RemoveBaseline, RemoveDescendant } from "../wailsjs/go/main/App";
 import type { cases, jira } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { projectLabel } from "./linked";
 
 // BaselinesDialog keeps the analyst's mapping of Jira projects: which are

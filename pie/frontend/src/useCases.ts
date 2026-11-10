@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ListCases, OpenCases } from "../wailsjs/go/main/App";
 import type { cases } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 
 // useCases holds the profile's cases. A slow answer for a profile no longer
 // selected is dropped, as App does for saved queries.

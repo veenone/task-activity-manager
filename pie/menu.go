@@ -34,7 +34,7 @@ func appMenu(app *App) *menu.Menu {
 	}
 	m := menu.NewMenu()
 	file := m.AddSubmenu("File")
-	file.AddText("Add profile…", nil, emit("menu:add-profile"))
+	file.AddText("Manage profiles…", nil, emit("menu:profiles"))
 	file.AddText("Jira fields…", nil, emit("menu:fields"))
 	file.AddSeparator()
 	file.AddText("Run query", keys.CmdOrCtrl("r"), emit("menu:run"))

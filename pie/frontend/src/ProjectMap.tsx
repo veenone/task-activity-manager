@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Baselines } from "../wailsjs/go/main/App";
 import type { cases, query } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { BaselinesDialog } from "./BaselinesDialog";
 import { OutOfStep, allProjects, baselineGroups, byKey, projectLabel, projectNames } from "./linked";
 import { filterSets, type MapFilter } from "./mapData";

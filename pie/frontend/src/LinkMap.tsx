@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshLinks } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { ExportButton } from "./ExportButton";
 import { linkSheets } from "./exportSheets";
 import { LinkFlow } from "./LinkFlow";

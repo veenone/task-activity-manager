@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CaseGrid as ReadGrid } from "../wailsjs/go/main/App";
 import type { cases, query } from "../wailsjs/go/models";
-import { errorText } from "./AddProfileDialog";
+import { errorText } from "./ProfileForm";
 import { projectLabel, projectNames } from "./linked";
 import { Pager, usePaged } from "./Pager";
 

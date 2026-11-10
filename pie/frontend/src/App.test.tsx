@@ -8,8 +8,7 @@ import * as api from "../wailsjs/go/main/App";
 vi.mock("../wailsjs/go/main/App", () => ({
   StartupError: vi.fn(),
   ListProfiles: vi.fn(),
-  CreateProfile: vi.fn(),
-  DeleteProfile: vi.fn(),
+  DefaultProfile: vi.fn(),
   RunQuery: vi.fn(),
   ListQueries: vi.fn(),
   SaveQuery: vi.fn(),
@@ -55,6 +54,7 @@ beforeEach(() => {
   vi.mocked(api.StartupError).mockResolvedValue("");
   vi.mocked(api.ListQueries).mockResolvedValue([]);
   vi.mocked(api.ListProfiles).mockResolvedValue([quality] as never);
+  vi.mocked(api.DefaultProfile).mockResolvedValue("");
 });
 
 describe("running a query", () => {
@@ -120,77 +120,10 @@ describe("running a query", () => {
     await runJql("x");
 
     expect(await screen.findByLabelText("Profile")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete profile" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Manage profiles" })).toBeDisabled();
 
     finish({ result: { total: 0, truncated: false, issues: [] } } as never);
     await waitFor(() => expect(screen.getByLabelText("Profile")).toBeEnabled());
-  });
-});
-
-describe("profiles", () => {
-  it("asks for a profile first when there are none", async () => {
-    vi.mocked(api.ListProfiles).mockResolvedValue([]);
-    vi.mocked(api.CreateProfile).mockResolvedValue(quality as never);
-    show();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Add profile" }));
-    await user.type(screen.getByLabelText("Name"), "Quality");
-    await user.type(screen.getByLabelText("Jira URL"), "https://jira.example.com");
-    await user.type(screen.getByLabelText("Personal access token"), "secret");
-    vi.mocked(api.ListProfiles).mockResolvedValue([quality] as never);
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(api.CreateProfile).toHaveBeenCalledWith("Quality", "https://jira.example.com", "secret");
-    expect(await screen.findByRole("option", { name: "Quality" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Personal access token")).not.toBeInTheDocument();
-  });
-
-  it("creates a demo profile without asking for a token", async () => {
-    vi.mocked(api.CreateProfile).mockResolvedValue({ id: "d1", name: "Demo", jiraUrl: "demo" } as never);
-    show();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Add profile" }));
-    await user.type(screen.getByLabelText("Name"), "Demo");
-    await user.type(screen.getByLabelText("Jira URL"), "demo");
-
-    expect(screen.queryByLabelText("Personal access token")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    expect(api.CreateProfile).toHaveBeenCalledWith("Demo", "demo", "");
-  });
-
-  it("marks a demo profile in the header while it is selected", async () => {
-    vi.mocked(api.ListProfiles).mockResolvedValue([quality, { id: "d1", name: "Demo", jiraUrl: "demo" }] as never);
-    show();
-    await screen.findByRole("option", { name: "Demo" });
-    expect(screen.queryByText("DEMO")).not.toBeInTheDocument();
-
-    await userEvent.setup().selectOptions(screen.getByLabelText("Profile"), "Demo");
-    expect(screen.getByText("DEMO")).toBeVisible();
-  });
-
-  it("keeps the form open and shows why when a profile cannot be saved", async () => {
-    vi.mocked(api.CreateProfile).mockRejectedValue("a profile needs a name");
-    show();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Add profile" }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(await screen.findByText("a profile needs a name")).toBeVisible();
-    expect(screen.getByLabelText("Name")).toBeVisible();
-  });
-
-  it("deletes a profile only after confirming", async () => {
-    vi.mocked(api.DeleteProfile).mockResolvedValue(undefined as never);
-    show();
-    const user = userEvent.setup();
-    await screen.findByRole("option", { name: "Quality" });
-    await user.click(screen.getByRole("button", { name: "Delete profile" }));
-    expect(api.DeleteProfile).not.toHaveBeenCalled();
-
-    vi.mocked(api.ListProfiles).mockResolvedValue([]);
-    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
-    expect(api.DeleteProfile).toHaveBeenCalledWith("p1");
-    expect(await screen.findByText("Add a profile to run a query.")).toBeVisible();
   });
 });
 

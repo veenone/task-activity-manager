@@ -1078,3 +1078,20 @@ body,
   font-weight: 600;
   pointer-events: none;
 }
+
+/* The Confluence part of a profile's form (#453). */
+.pie-profile-confluence {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+.pie-profile-confluence legend {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
