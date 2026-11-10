@@ -115,6 +115,10 @@ export default function G6Canvas({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const graph = useRef<Graph | null>(null);
+  // The issues and groups last laid out. Only a change to them runs the
+  // layout again; a change of style, such as the focus, is redrawn in place,
+  // so the boxes do not move under the analyst's pointer.
+  const laidOut = useRef("");
   // The latest handler, so the graph made once still calls the current one.
   const pick = useRef(onSelect);
   pick.current = onSelect;
@@ -143,7 +147,10 @@ export default function G6Canvas({
     const g = graph.current;
     if (!g) return;
     g.setData(data(nodes, edges, combos, focus));
-    void g.render().then(() => {
+    const shape = [...nodes.map((n) => `${n.id}@${n.combo ?? ""}`), ...combos.map((c) => `#${c.id}`)].sort().join(",");
+    const moved = shape !== laidOut.current;
+    laidOut.current = shape;
+    void (moved ? g.render() : g.draw()).then(() => {
       if (focus && g.hasNode(focus)) void g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
     });
   }, [nodes, edges, combos, focus]);
