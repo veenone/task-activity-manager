@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="PIE Results with a Search box, the project picker's own suggestion list open, sortable column headers, and the Link map grid's Key and Name order buttons">
+  <style>
+    text { font-family: Segoe UI, Arial, sans-serif; font-size: 13px; fill: #1f2328; }
+    .muted { fill: #656d76; font-size: 12px; }
+    .cap { fill: #656d76; font-size: 12px; font-weight: 600; }
+    .th { fill: #656d76; font-size: 12px; font-weight: 600; }
+    .mono { font-family: Consolas, monospace; }
+  </style>
+  <rect width="1200" height="520" fill="#ffffff"/>
+  <text x="16" y="22" class="cap">RESULTS: Search, the project picker's own list, sortable headers</text>
+
+  <text x="16" y="50">Search</text>
+  <rect x="16" y="56" width="220" height="30" rx="4" fill="#fff" stroke="#c9ced6"/>
+  <text x="26" y="76">reader</text>
+  <text x="252" y="50">Project</text>
+  <rect x="252" y="56" width="200" height="30" rx="4" fill="#fff" stroke="#3b5bdb"/>
+  <text x="262" y="76">rea</text>
+  <text x="468" y="50">Status</text>
+  <rect x="468" y="56" width="110" height="30" rx="4" fill="#fff" stroke="#c9ced6"/>
+  <text x="478" y="76">All  ▾</text>
+  <rect x="594" y="56" width="120" height="30" rx="4" fill="#fff" stroke="#c9ced6"/>
+  <text x="606" y="76">Export to Excel</text>
+  <text x="730" y="76" class="muted">Showing 2 of 1908 issues</text>
+
+  <rect x="16" y="104" width="1168" height="34" fill="#f5f6f8" stroke="#e3e6ea"/>
+  <text x="56" y="126" class="th">Key ▴</text>
+  <text x="170" y="126" class="th">Project ▸</text>
+  <text x="400" y="126" class="th">Type ▸</text>
+  <text x="480" y="126" class="th">Summary ▸</text>
+  <text x="860" y="126" class="th">Status ▸</text>
+  <text x="960" y="126" class="th">Priority ▸</text>
+  <text x="1060" y="126" class="th">Updated ▸</text>
+  <rect x="16" y="138" width="1168" height="32" fill="#fff" stroke="#e3e6ea"/>
+  <text x="56" y="159" class="mono">RDR-12</text>
+  <text x="170" y="159">Reader (RDR)</text>
+  <text x="400" y="159">Bug</text>
+  <text x="480" y="159">Reader resets after a long transfer</text>
+  <text x="860" y="159">Open</text>
+  <text x="960" y="159">High</text>
+  <text x="1060" y="159">2026-11-08</text>
+  <rect x="16" y="170" width="1168" height="32" fill="#fff" stroke="#e3e6ea"/>
+  <text x="56" y="191" class="mono">RDR-40</text>
+  <text x="170" y="191">Reader (RDR)</text>
+  <text x="400" y="191">Bug</text>
+  <text x="480" y="191">Reader shows the wrong firmware version</text>
+  <text x="860" y="191">In Progress</text>
+  <text x="960" y="191">Medium</text>
+  <text x="1060" y="191">2026-11-06</text>
+
+  <!-- the open suggestion list, drawn over the table -->
+  <rect x="252" y="88" width="230" height="96" rx="4" fill="#fff" stroke="#c9ced6"/>
+  <rect x="253" y="93" width="228" height="26" fill="#eef0f3" stroke="#3b5bdb" stroke-width="2"/>
+  <text x="264" y="111">Reader (RDR)</text>
+  <text x="264" y="139">Card Reader Tools (CRT)</text>
+  <text x="264" y="167">Area Reports (ARP)</text>
+
+  <text x="16" y="250" class="cap">LINK MAP GRID: the corner orders rows and columns by project key or name</text>
+  <rect x="16" y="262" width="760" height="54" fill="#f5f6f8" stroke="#e3e6ea"/>
+  <text x="28" y="282" class="th">From \ to</text>
+  <text x="28" y="304" class="th" style="fill:#1f2328">Key ▸</text>
+  <text x="80" y="304" class="th" style="fill:#1f2328">Name ▴</text>
+  <text x="200" y="294" class="th">ARP</text>
+  <text x="320" y="294" class="th">CRT</text>
+  <text x="440" y="294" class="th">RDR</text>
+  <text x="680" y="294" class="th">Total</text>
+  <rect x="16" y="316" width="760" height="32" fill="#fff" stroke="#e3e6ea"/>
+  <text x="28" y="337" class="th">Area Reports (ARP)</text>
+  <text x="200" y="337" class="muted">-</text>
+  <text x="320" y="337">Relates 2</text>
+  <text x="440" y="337">Cloners 1</text>
+  <text x="680" y="337">3</text>
+  <rect x="16" y="348" width="760" height="32" fill="#fff" stroke="#e3e6ea"/>
+  <text x="28" y="369" class="th">Card Reader Tools (CRT)</text>
+  <text x="200" y="369" class="muted">-</text>
+  <text x="320" y="369" class="muted">-</text>
+  <text x="440" y="369">Blocks 4</text>
+  <text x="680" y="369">4</text>
+  <rect x="16" y="380" width="760" height="32" fill="#fff" stroke="#e3e6ea"/>
+  <text x="28" y="401" class="th">Reader (RDR)</text>
+  <text x="200" y="401">Relates 1</text>
+  <text x="320" y="401" class="muted">-</text>
+  <text x="440" y="401" class="muted">-</text>
+  <text x="680" y="401">1</text>
+</svg>

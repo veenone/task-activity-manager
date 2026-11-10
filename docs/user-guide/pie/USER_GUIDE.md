@@ -75,7 +75,9 @@ same whenever you run it.
 Every project filter in PIE is a box you can type into: Trace, Project map,
 Statistics, Results, and the Network centre on the Link map. As you type, the
 suggestions narrow to the projects whose key or name contains it, and picking
-one applies it. Clear the box to see every project again. Text that names no
+one applies it. The suggestion list opens when you click into the box. Use the
+arrow keys and Enter to pick from it, or Escape to close it. Clear the box to
+see every project again. Text that names no
 project applies no filter, and the box says "No project matches".
 
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
@@ -87,8 +89,15 @@ either way. With no JQL yet, the box stays open.
 
 The **Project**, **Status** and **Priority** filters above the table narrow
 the rows without contacting Jira. Each lists only the values in the run, and
-they combine. While any filter hides rows, PIE says how many it shows of how
-many. A filter set to a value the next run no longer holds goes back to All.
+they combine. **Search** keeps the rows whose key, summary or project name
+contains what you type. While any filter hides rows, PIE says how many it shows
+of how many. A filter set to a value the next run no longer holds goes back to
+All.
+
+Click a column header to sort the rows by it, across every page. Click it again
+to reverse the order. Empty values stay at the bottom either way. Export to
+Excel writes the rows in the order on screen. The tables in Statistics sort the
+same way.
 
 Wherever PIE names a project, it gives the project's name with its key in
 brackets, for example "Card Platform (ALPHA)". A saved query's run from before
@@ -244,6 +253,10 @@ the summary of the issue the link starts from. The button beside the title
 switches to the other direction and says how many links it has. Choose a key
 to open it in Trace. A run saved before PIE kept link direction asks you to
 run the query again.
+
+The grid's top-left cell has **Key** and **Name**. They put the rows and
+columns in order of project key or project name. Click the same one again to
+reverse the order. The export follows it.
 
 To narrow the Link map, type into **Add a project** above the link types and
 press Enter, or pick from the suggestions. Once you have chosen some projects,
