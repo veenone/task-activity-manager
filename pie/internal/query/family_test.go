@@ -61,3 +61,31 @@ func TestIssuesFetchesKeysInBatches(t *testing.T) {
 		t.Fatalf("%d issues in %d searches", len(got), len(seen))
 	}
 }
+
+// Jira refuses a whole key in (...) search when one key is gone or hidden.
+// Issues then asks key by key and leaves the refused ones out (#464).
+func TestIssuesLeavesOutAKeyJiraRefuses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		jql := r.URL.Query().Get("jql")
+		if strings.Contains(jql, "GONE-1") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"errorMessages":["An issue with key 'GONE-1' does not exist for field 'key'."]}`))
+			return
+		}
+		var issues []string
+		for _, k := range []string{"A-1", "A-2"} {
+			if strings.Contains(jql, k) {
+				issues = append(issues, `{"key":"`+k+`","fields":{}}`)
+			}
+		}
+		_, _ = w.Write([]byte(`{"total":` + strconv.Itoa(len(issues)) + `,"issues":[` + strings.Join(issues, ",") + `]}`))
+	}))
+	defer srv.Close()
+	got, err := Issues(context.Background(), corejira.NewClient(srv.URL, "t"), []string{"A-1", "GONE-1", "A-2"}, Fields{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Key != "A-1" || got[1].Key != "A-2" {
+		t.Fatalf("got %+v", got)
+	}
+}

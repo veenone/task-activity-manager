@@ -195,10 +195,20 @@ func parallel(n int, fn func(i int) error) error {
 // readable keeps Jira's own sentence for a refused query, because it is the
 // only thing that says which clause or filter was wrong. Other failures get
 // core's wording, and anything else stays as it is.
+// worded is an error shown in Jira's own words that still unwraps to the
+// original, so a caller can tell a refusal from a failure (#464).
+type worded struct {
+	msg string
+	err error
+}
+
+func (w worded) Error() string { return w.msg }
+func (w worded) Unwrap() error { return w.err }
+
 func readable(err error) error {
 	var he *corejira.HTTPError
 	if errors.As(err, &he) && he.Code == http.StatusBadRequest && he.Message != "" {
-		return errors.New(he.Message)
+		return worded{he.Message, err}
 	}
 	if msg := corejira.Humanize(err); msg != "" {
 		return errors.New(msg)

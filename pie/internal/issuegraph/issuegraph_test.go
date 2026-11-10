@@ -2,6 +2,7 @@ package issuegraph
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"net/url"
 	"path/filepath"
@@ -162,5 +163,20 @@ func TestKeepWithoutJiraStillStoresTheRun(t *testing.T) {
 	}
 	if got, _ := s.Get("p1", []string{"B-1"}); len(got) != 1 {
 		t.Fatal("the run was not stored")
+	}
+}
+
+// A cancelled request or a bad certificate is not "offline": serving stored
+// copies then would hide a problem the analyst has to fix.
+func TestIsOfflineOnlyForAnUnreachableJira(t *testing.T) {
+	wrap := func(err error) error { return &url.Error{Op: "Get", URL: "https://jira.example.com", Err: err} }
+	if !IsOffline(wrap(errors.New("dial tcp: connection refused"))) {
+		t.Fatal("a refused connection is offline")
+	}
+	if IsOffline(wrap(context.Canceled)) {
+		t.Fatal("a cancelled request counted as offline")
+	}
+	if IsOffline(wrap(x509.UnknownAuthorityError{})) {
+		t.Fatal("an untrusted certificate counted as offline")
 	}
 }

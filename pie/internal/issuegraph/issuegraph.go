@@ -5,6 +5,7 @@ package issuegraph
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -87,11 +88,22 @@ func (e offlineError) Error() string {
 }
 
 // IsOffline reports whether err means Jira could not be reached: a network
-// failure rather than Jira refusing a request.
+// failure rather than Jira refusing a request. A cancelled request and a
+// certificate PIE does not trust are not offline: serving stored copies then
+// would hide a problem the analyst has to fix.
 func IsOffline(err error) bool {
-	var ue *url.Error
 	var oe offlineError
-	return errors.As(err, &ue) || errors.As(err, &oe)
+	if errors.As(err, &oe) {
+		return true
+	}
+	var ue *url.Error
+	if !errors.As(err, &ue) || errors.Is(err, context.Canceled) {
+		return false
+	}
+	var unknown x509.UnknownAuthorityError
+	var invalid x509.CertificateInvalidError
+	var host x509.HostnameError
+	return !errors.As(err, &unknown) && !errors.As(err, &invalid) && !errors.As(err, &host)
 }
 
 // neighbours are the keys an issue links to, its parent and its sub-tasks,
