@@ -83,9 +83,9 @@ export function BaselinesDialog({
             void change(() => AddBaseline(profileId, keyOf(newBase))).then((ok) => ok && setNewBase(""));
           }}
         >
-          <label>
-            New baseline
+          <label htmlFor="pie-new-baseline">New baseline</label>
             <Combo
+              id="pie-new-baseline"
               name="New baseline"
               className="detail-input"
               text={newBase}
@@ -95,7 +95,6 @@ export function BaselinesDialog({
               onPick={setNewBase}
               placeholder=""
             />
-          </label>
           <button type="submit" className="btn btn-ghost" disabled={newBase.trim() === ""}>
             Add baseline
           </button>
