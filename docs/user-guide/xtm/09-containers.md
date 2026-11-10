@@ -14,7 +14,7 @@ The toggle at the top left switches between **Containers** and [Bugs](#work-with
 
 ![Picking a Test Execution](images/containers-02-pick-execution.png)
 
-The card under the filters is one line: the container's type, key, name, status, test count and a small bar of its results, then **Related bugs**, **+ Add tests** and, for an execution, **Import results**. A long name is cut short; hover over it to read it whole. **Related bugs** shows how many defects are linked through its tests, and opens their list under the card. Click **▸** at the start of the card to show the details: the parent issue, the **Environments** and **Fix version(s)** of an execution, the result counts, and a plan's or set's consolidated results. The view remembers whether you left the details open.
+The card under the filters is one line: the container's type, key, name, status, test count and a small bar of its results, then **Related bugs**, **+ Add tests** and, for an execution, **Import results**. A long name is cut short; hover over it to read it whole. **Related bugs** shows how many defects are linked through its tests, and opens their list under the card. Click **▸** at the start of the card to show the details: the parent issue, the **Environments** and **Fix version(s)** of an execution, the result counts, and a plan's or set's consolidated results. The bar and the result counts only show; to filter by result or fix version, use **Filters**. The view remembers whether you left the details open.
 
 ![A Test Execution and its runs](images/containers-03-execution-card.png)
 
@@ -113,7 +113,7 @@ Type in **Add environment…** on the card to add an environment to the executio
 
 ## See results across a Test Plan or Set
 
-Pick a Test Plan or Test Set. A line above the card shows **Consolidated results across N executions**, with a badge per result. Click a badge to see which tests and executions it counts. The table shows each test's latest result.
+Pick a Test Plan or Test Set and open the card's details with **▸**. **Consolidated results across N executions** shows a badge per result. Click a badge to see which tests and executions it counts. The table shows each test's latest result.
 
 ![A Test Plan with results from 13 executions](images/containers-11-plan-rollup.png)
 
