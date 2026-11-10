@@ -42,13 +42,10 @@ export function LinkFlow({
       <div className="pie-flow-pick">
         <ProjectsChooser label="Left side" projects={starts} projectLabel={label} chosen={kept} onChange={setLeft} />
       </div>
-      <Zoom label="Link flow">
+      <Zoom label="Link flow" minWidth={width}>
         <svg
           className="pie-flow-svg"
           viewBox={`${-lead} -10 ${width} ${height + 20}`}
-          // Wider than the box, it scrolls sideways instead of shrinking
-          // its names.
-          style={{ minWidth: `${width}px` }}
           role="img"
           aria-label="Links from each project, by type, to the project they point to. The grid view counts the same links."
         >
@@ -58,7 +55,7 @@ export function LinkFlow({
             </path>
           ))}
           {nodes.map((n) => {
-            const left = n.id.startsWith("f:");
+            const isLeft = n.id.startsWith("f:");
             return (
               <g key={n.id}>
                 <rect
@@ -71,9 +68,9 @@ export function LinkFlow({
                 />
                 <text
                   className="pie-flow-label"
-                  x={left ? n.x - 6 : n.x + FLOW_NODE + 6}
+                  x={isLeft ? n.x - 6 : n.x + FLOW_NODE + 6}
                   y={n.y + n.h / 2}
-                  textAnchor={left ? "end" : "start"}
+                  textAnchor={isLeft ? "end" : "start"}
                 >
                   {`${name(n.id)} ${n.value}`}
                 </text>

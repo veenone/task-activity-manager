@@ -284,7 +284,13 @@ it("widens the flow's margins for long project names, and scrolls rather than sq
   const chart = screen.getByRole("img", { name: /Links from each project/ });
   const left = -Number(chart.getAttribute("viewBox")!.split(" ")[0]);
   expect(left).toBeGreaterThan(200);
-  expect(chart.style.minWidth).toBe(`${chart.getAttribute("viewBox")!.split(" ")[2]}px`);
+  // The zoom area keeps the chart's full width at 100%, and shrinks with the
+  // zoom, so zooming out still works.
+  const width = Number(chart.getAttribute("viewBox")!.split(" ")[2]);
+  const area = chart.closest(".pie-zoom-area") as HTMLElement;
+  expect(area.style.minWidth).toBe(`${width}px`);
+  await user.click(screen.getByRole("button", { name: "Zoom out" }));
+  expect(area.style.minWidth).toBe(`${width * 0.8}px`);
 });
 
 it("zooms the network, explains it in a legend, and fits the centre's key in its circle", async () => {
