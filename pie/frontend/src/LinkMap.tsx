@@ -9,6 +9,7 @@ import { ProjectsChooser } from "./ProjectInput";
 import { LinkNetwork } from "./LinkNetwork";
 import { byKey, projectLabel, projectNames } from "./linked";
 import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
+import { compare } from "./sort";
 
 const LINK_VIEWS = ["Grid", "Flow", "Network"] as const;
 
@@ -53,7 +54,7 @@ export function LinkMap({
     [result],
   );
   const label = (p: string) => projectLabel(p, names.get(p));
-  const { shown, projects } = useMemo(() => {
+  const { shown, found } = useMemo(() => {
     const ends = (e: Edge) => [projectOf(e.from, issues), projectOf(e.to, issues)] as const;
     const text = keyText.trim().toLowerCase();
     const kept = edges.filter((e) => {
@@ -65,8 +66,13 @@ export function LinkMap({
         (!text || e.from.toLowerCase().includes(text) || e.to.toLowerCase().includes(text))
       );
     });
-    return { shown: kept, projects: [...new Set(kept.flatMap((e) => ends(e)))].sort() };
+    return { shown: kept, found: [...new Set(kept.flatMap((e) => ends(e)))] };
   }, [edges, issues, inside, bothEnds, picked, keyText]);
+  // The grid's rows and columns, and its export, in the order chosen from
+  // its corner: by project key or by name, either way round (#454).
+  const [order, setOrder] = useState<{ by: "key" | "name"; desc: boolean }>({ by: "key", desc: false });
+  const projects = [...found].sort((a, b) => (order.desc ? -1 : 1) * compare(order.by === "key" ? a : label(a), order.by === "key" ? b : label(b)));
+  const orderBy = (by: "key" | "name") => setOrder({ by, desc: order.by === by && !order.desc });
   const everyProject = useMemo(
     () => [...new Set(edges.flatMap((e) => [projectOf(e.from, issues), projectOf(e.to, issues)]))].sort(),
     [edges, issues],
@@ -205,7 +211,26 @@ export function LinkMap({
               <table className="pie-table pie-map pie-linkmap-grid" aria-label="Projects connected by links">
                 <thead>
                   <tr>
-                    <th scope="col">From \ to</th>
+                    <th scope="col">
+                      From \ to
+                      <span className="pie-grid-order">
+                        {(["key", "name"] as const).map((by) => (
+                          <button
+                            key={by}
+                            type="button"
+                            className={`pie-sort${order.by === by ? " pie-sort-active" : ""}`}
+                            aria-label={`Sort by project ${by}`}
+                            aria-pressed={order.by === by}
+                            onClick={() => orderBy(by)}
+                          >
+                            {by === "key" ? "Key" : "Name"}
+                            <span className="pie-sort-caret" aria-hidden="true">
+                              {order.by === by ? (order.desc ? "▾" : "▴") : "▸"}
+                            </span>
+                          </button>
+                        ))}
+                      </span>
+                    </th>
                     {projects.map((p) => (
                       <th key={p} scope="col" title={label(p)}>
                         {p}

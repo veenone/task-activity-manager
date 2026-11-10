@@ -5,6 +5,7 @@ import { projectLabel, projectNames } from "./linked";
 import { ExportButton } from "./ExportButton";
 import { statisticsSheets } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
+import { useSort } from "./sort";
 import { ProjectInput } from "./ProjectInput";
 import { statistics } from "./stats";
 
@@ -35,7 +36,20 @@ export function Statistics({ result, productField }: { result: query.Result; pro
   const project = projects.includes(chosen) ? chosen : "";
   const s = statistics(result, { project, withinDays }, Date.now());
   const names = projectNames(result);
-  const { rows, pager } = usePaged(s.projects);
+  const perProject = useSort(s.projects, {
+    project: (p) => projectLabel(p.project, names.get(p.project)),
+    bases: (p) => p.bases.join(", "),
+    issues: (p) => p.issues,
+    open: (p) => p.open,
+    age: (p) => p.medianAge ?? "",
+  });
+  const byStatus = useSort(s.finished, {
+    status: (f) => f.status,
+    issues: (f) => f.issues,
+    dated: (f) => f.dated,
+    days: (f) => f.medianDays ?? "",
+  });
+  const { rows, pager } = usePaged(perProject.sorted);
   // The field is read when a query runs; a run from before it was set has none.
   const bases = productField !== "" && result.issues.some((i) => (i.bases ?? []).length > 0);
 
@@ -64,7 +78,7 @@ export function Statistics({ result, productField }: { result: query.Result; pro
           </select>
         </label>
         <span className="muted">{s.issues === 1 ? "1 issue" : `${s.issues} issues`} the query matched</span>
-        <ExportButton name="pie-statistics" sheets={() => statisticsSheets(s, (p) => projectLabel(p, names.get(p)))} />
+        <ExportButton name="pie-statistics" sheets={() => statisticsSheets({ ...s, projects: perProject.sorted, finished: byStatus.sorted }, (p) => projectLabel(p, names.get(p)))} />
       </div>
 
       <ul className="pie-stat-cards" aria-label="Headline numbers">
@@ -91,11 +105,11 @@ export function Statistics({ result, productField }: { result: query.Result; pro
       <table className="pie-table" aria-label="Per project">
         <thead>
           <tr>
-            <th scope="col">Project</th>
-            {bases && <th scope="col">Product base</th>}
-            <th scope="col">Issues</th>
-            <th scope="col">Not finished</th>
-            <th scope="col">Median age, not finished</th>
+            {perProject.th("project", "Project")}
+            {bases && perProject.th("bases", "Product base")}
+            {perProject.th("issues", "Issues")}
+            {perProject.th("open", "Not finished")}
+            {perProject.th("age", "Median age, not finished")}
           </tr>
         </thead>
         <tbody>
@@ -115,14 +129,14 @@ export function Statistics({ result, productField }: { result: query.Result; pro
       <table className="pie-table" aria-label="Finished, by status">
         <thead>
           <tr>
-            <th scope="col">Status</th>
-            <th scope="col">Issues</th>
-            <th scope="col">With a resolution date</th>
-            <th scope="col">Median time to resolve</th>
+            {byStatus.th("status", "Status")}
+            {byStatus.th("issues", "Issues")}
+            {byStatus.th("dated", "With a resolution date")}
+            {byStatus.th("days", "Median time to resolve")}
           </tr>
         </thead>
         <tbody>
-          {s.finished.map((f) => (
+          {byStatus.sorted.map((f) => (
             <tr key={f.status}>
               <td>{f.status}</td>
               <td>{f.issues}</td>

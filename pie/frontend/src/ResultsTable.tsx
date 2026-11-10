@@ -6,6 +6,7 @@ import { ProjectInput } from "./ProjectInput";
 import { ExportButton } from "./ExportButton";
 import { resultsSheet } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
+import { useSort } from "./sort";
 
 type Field = "project" | "status" | "priority" | "clientVisibility";
 const FILTERS: { field: Field; label: string }[] = [
@@ -34,18 +35,37 @@ export function ResultsTable({
 }) {
   const [chosen, setChosen] = useState<Record<Field, string>>({ project: "", status: "", priority: "", clientVisibility: "" });
   const [withCase, setWithCase] = useState<CaseFilter>("");
+  const [search, setSearch] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [openKey, setOpenKey] = useState<string | null>(null);
   const values = (f: Field) => [...new Set(issues.map((i) => i[f]))].filter(Boolean).sort();
   // A value the run no longer holds would hide every row, so it reads as All.
   const active = (f: Field) => (values(f).includes(chosen[f]) ? chosen[f] : "");
   const hasCases = caseKeys.size > 0;
-  const shown = issues.filter(
-    (i) =>
-      FILTERS.every(({ field }) => active(field) === "" || i[field] === active(field)) &&
-      (!hasCases || withCase === "" || caseKeys.has(i.key) === (withCase === "with")),
-  );
   const names = new Map(issues.map((i) => [i.project, i.projectName]));
+  const label = (p: string) => projectLabel(p, names.get(p));
+  // Search reads what the row shows: its key, summary and project (#454).
+  const words = search.trim().toLowerCase();
+  const found = (i: query.Issue) => words === "" || [i.key, i.summary, label(i.project)].some((t) => t.toLowerCase().includes(words));
+  const { sorted: shown, th } = useSort(
+    issues.filter(
+      (i) =>
+        FILTERS.every(({ field }) => active(field) === "" || i[field] === active(field)) &&
+        (!hasCases || withCase === "" || caseKeys.has(i.key) === (withCase === "with")) &&
+        found(i),
+    ),
+    {
+      key: (i) => i.key,
+      project: (i) => label(i.project),
+      type: (i) => i.type,
+      summary: (i) => i.summary,
+      status: (i) => i.status,
+      priority: (i) => i.priority,
+      clientVisibility: (i) => i.clientVisibility,
+      case: (i) => (caseKeys.has(i.key) ? "Case" : ""),
+      updated: (i) => i.updated,
+    },
+  );
   const visibility = values("clientVisibility").length > 0;
   const { rows, pager } = usePaged(shown);
   const open = shown.find((i) => i.key === openKey);
@@ -65,12 +85,25 @@ export function ResultsTable({
   return (
     <>
       <div className="pie-filters">
+        <label>
+          Search
+          <input
+            type="search"
+            className="detail-input pie-filter-select"
+            placeholder="Key, summary or project"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              pager.onPage(0);
+            }}
+          />
+        </label>
         {values("project").length > 0 && (
           <ProjectInput
             label="Project"
             allText="All"
             projects={values("project")}
-            projectLabel={(p) => projectLabel(p, names.get(p))}
+            projectLabel={label}
             value={active("project")}
             onChange={(p) => {
               setChosen({ ...chosen, project: p });
@@ -101,7 +134,7 @@ export function ResultsTable({
         <ExportButton
           name="pie-results"
           sheets={() => [
-            resultsSheet(shown, (p) => projectLabel(p, names.get(p)), { visibility, caseKeys: hasCases ? caseKeys : null }),
+            resultsSheet(shown, label, { visibility, caseKeys: hasCases ? caseKeys : null }),
           ]}
         />
         {hasCases && (
@@ -149,15 +182,15 @@ export function ResultsTable({
                     onChange={(e) => toggle(rows.map((i) => i.key), e.target.checked)}
                   />
                 </th>
-                <th scope="col">Key</th>
-                <th scope="col">Project</th>
-                <th scope="col">Type</th>
-                <th scope="col">Summary</th>
-                <th scope="col">Status</th>
-                <th scope="col">Priority</th>
-                {visibility && <th scope="col">Client visibility</th>}
-                {hasCases && <th scope="col">Case</th>}
-                <th scope="col">Updated</th>
+                {th("key", "Key")}
+                {th("project", "Project")}
+                {th("type", "Type")}
+                {th("summary", "Summary")}
+                {th("status", "Status")}
+                {th("priority", "Priority")}
+                {visibility && th("clientVisibility", "Client visibility")}
+                {hasCases && th("case", "Case")}
+                {th("updated", "Updated")}
               </tr>
             </thead>
             <tbody>

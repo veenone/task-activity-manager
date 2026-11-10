@@ -66,3 +66,26 @@ it("drops a filter value the next run does not hold", async () => {
   expect(keys()).toEqual(["A-1", "B-1", "B-2"]);
   expect(screen.queryByText(/^Showing/)).not.toBeInTheDocument();
 });
+
+it("sorts the rows by a clicked header, across pages, and reverses on a second click", async () => {
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Sort by Status" }));
+  expect(keys()).toEqual(["A-2", "A-1", "B-1", "B-2"]);
+  await user.click(screen.getByRole("button", { name: "Sort by Key" }));
+  await user.click(screen.getByRole("button", { name: "Sort by Key" }));
+  expect(keys()).toEqual(["B-2", "B-1", "A-2", "A-1"]);
+  expect(screen.getByRole("columnheader", { name: /Key/ })).toHaveAttribute("aria-sort", "descending");
+});
+
+it("searches the key, summary and project name as you type", async () => {
+  render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={async () => true} />);
+  const user = userEvent.setup();
+  const search = screen.getByRole("searchbox", { name: "Search" });
+  await user.type(search, "b name");
+  expect(keys()).toEqual(["B-1", "B-2"]);
+  await user.clear(search);
+  await user.type(search, "a-2");
+  expect(keys()).toEqual(["A-2"]);
+  expect(screen.getByText("Showing 1 of 4 issues")).toBeVisible();
+});

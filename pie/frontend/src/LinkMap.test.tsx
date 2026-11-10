@@ -236,3 +236,26 @@ it("starts no drag from a button other than the main one", async () => {
   fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
   expect(node.querySelector("circle")!.getAttribute("cx")).toBe(before);
 });
+
+it("sorts the grid's rows and columns by project key or by project name", async () => {
+  const named = {
+    ...result,
+    issues: result.issues.map((i) => ({ ...i, projectName: { A: "Zeta", B: "Alpha", C: "Mid" }[i.project] })),
+  };
+  const { user } = show(named);
+  const grid = () => screen.getByRole("table", { name: "Projects connected by links" });
+  const cols = () =>
+    within(grid())
+      .getAllByRole("columnheader")
+      .slice(1, -1)
+      .map((h) => h.textContent);
+  const rows = () => within(grid()).getAllByRole("rowheader").map((h) => h.textContent);
+  expect(cols()).toEqual(["A", "B", "C"]);
+  await user.click(within(grid()).getByRole("button", { name: "Sort by project name" }));
+  expect(cols()).toEqual(["B", "C", "A"]);
+  expect(rows()).toEqual(["Alpha (B)", "Mid (C)", "Zeta (A)"]);
+  await user.click(within(grid()).getByRole("button", { name: "Sort by project name" }));
+  expect(cols()).toEqual(["A", "C", "B"]);
+  await user.click(within(grid()).getByRole("button", { name: "Sort by project key" }));
+  expect(cols()).toEqual(["A", "B", "C"]);
+});
