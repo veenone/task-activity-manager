@@ -31,6 +31,8 @@ export function CreateProfile(arg1:string,arg2:string,arg3:string):Promise<profi
 
 export function Cycles(arg1:string):Promise<Array<cycles.Cycle>>;
 
+export function DefaultProfile():Promise<string>;
+
 export function DeleteCycle(arg1:string,arg2:number):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -40,6 +42,8 @@ export function DeleteProjectGroup(arg1:string,arg2:number):Promise<void>;
 export function DeleteQuery(arg1:string,arg2:number):Promise<void>;
 
 export function Evidence(arg1:string,arg2:number):Promise<Array<evidence.Item>>;
+
+export function ExportProfile(arg1:string):Promise<string>;
 
 export function ExportWorkbook(arg1:string,arg2:Array<workbook.Sheet>):Promise<string>;
 
@@ -52,6 +56,8 @@ export function GetCase(arg1:string,arg2:number):Promise<cases.Detail>;
 export function GetCycle(arg1:string,arg2:number):Promise<cycles.Detail>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
+
+export function ImportProfile():Promise<profile.Profile>;
 
 export function JiraFilter(arg1:string,arg2:string):Promise<jira.RawFilter>;
 
@@ -95,6 +101,8 @@ export function SetCaseNotes(arg1:string,arg2:number,arg3:string):Promise<void>;
 
 export function SetConfluenceSettings(arg1:string,arg2:profile.ConfluenceConfig,arg3:string):Promise<void>;
 
+export function SetDefaultProfile(arg1:string):Promise<void>;
+
 export function SetEvidenceState(arg1:string,arg2:number,arg3:number,arg4:string):Promise<Array<evidence.Item>>;
 
 export function SetFields(arg1:string,arg2:saved.Fields):Promise<void>;
@@ -108,5 +116,7 @@ export function StartupError():Promise<string>;
 export function TakeCycle(arg1:string,arg2:string):Promise<cycles.Cycle>;
 
 export function Theme():Promise<string>;
+
+export function UpdateProfile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<profile.Profile>;
 
 export function Version():Promise<string>;
