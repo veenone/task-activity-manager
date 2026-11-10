@@ -66,6 +66,10 @@ export function Evidence(arg1, arg2) {
   return window['go']['main']['App']['Evidence'](arg1, arg2);
 }
 
+export function ExpandIssue(arg1, arg2) {
+  return window['go']['main']['App']['ExpandIssue'](arg1, arg2);
+}
+
 export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }

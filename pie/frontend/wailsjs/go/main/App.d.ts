@@ -4,6 +4,7 @@ import {cases} from '../models';
 import {evidence} from '../models';
 import {profile} from '../models';
 import {cycles} from '../models';
+import {issuegraph} from '../models';
 import {workbook} from '../models';
 import {saved} from '../models';
 import {main} from '../models';
@@ -42,6 +43,8 @@ export function DeleteProjectGroup(arg1:string,arg2:number):Promise<void>;
 export function DeleteQuery(arg1:string,arg2:number):Promise<void>;
 
 export function Evidence(arg1:string,arg2:number):Promise<Array<evidence.Item>>;
+
+export function ExpandIssue(arg1:string,arg2:string):Promise<issuegraph.Neighbourhood>;
 
 export function ExportProfile(arg1:string):Promise<string>;
 

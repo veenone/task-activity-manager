@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -40,5 +41,23 @@ func TestRunReadsParentSubtasksAndSymmetricLinks(t *testing.T) {
 		if !slices.Contains(strings.Split(asked, ","), f) {
 			t.Fatalf("fields asked %q lack %s", asked, f)
 		}
+	}
+}
+
+func TestIssuesFetchesKeysInBatches(t *testing.T) {
+	graph := map[string]node{}
+	keys := make([]string, 0, 150)
+	for i := range 150 {
+		k := "A-" + strconv.Itoa(i+1)
+		graph[k] = node{}
+		keys = append(keys, k)
+	}
+	var seen []string
+	got, err := Issues(context.Background(), linkedJira(t, graph, nil, &seen, ""), keys, Fields{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 150 || len(seen) != 2 {
+		t.Fatalf("%d issues in %d searches", len(got), len(seen))
 	}
 }

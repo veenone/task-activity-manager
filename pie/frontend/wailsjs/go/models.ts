@@ -265,6 +265,77 @@ export namespace evidence {
 
 }
 
+export namespace issuegraph {
+	
+	export class Cached {
+	    issue: query.Issue;
+	    fetchedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Cached(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.issue = this.convertValues(source["issue"], query.Issue);
+	        this.fetchedAt = source["fetchedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Neighbourhood {
+	    issues: Cached[];
+	    offline: boolean;
+	    missing: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Neighbourhood(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.issues = this.convertValues(source["issues"], Cached);
+	        this.offline = source["offline"];
+	        this.missing = source["missing"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace jira {
 	
 	export class Project {
@@ -441,6 +512,7 @@ export namespace query {
 	    type: string;
 	    words: string;
 	    outward: boolean;
+	    symmetric: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Link(source);
@@ -452,6 +524,7 @@ export namespace query {
 	        this.type = source["type"];
 	        this.words = source["words"];
 	        this.outward = source["outward"];
+	        this.symmetric = source["symmetric"];
 	    }
 	}
 	export class Issue {
@@ -467,6 +540,8 @@ export namespace query {
 	    created: string;
 	    resolved: string;
 	    links: Link[];
+	    parent: string;
+	    subtasks: string[];
 	    bases: string[];
 	    clientVisibility: string;
 	    clientImpact: string;
@@ -490,6 +565,8 @@ export namespace query {
 	        this.created = source["created"];
 	        this.resolved = source["resolved"];
 	        this.links = this.convertValues(source["links"], Link);
+	        this.parent = source["parent"];
+	        this.subtasks = source["subtasks"];
 	        this.bases = source["bases"];
 	        this.clientVisibility = source["clientVisibility"];
 	        this.clientImpact = source["clientImpact"];

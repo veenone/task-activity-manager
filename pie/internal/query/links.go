@@ -174,3 +174,20 @@ func crosses(is Issue, l Link) bool {
 	i := strings.LastIndex(l.Key, "-")
 	return i > 0 && l.Key[:i] != is.Project
 }
+
+// Issues fetches issues by key, keysPerSearch to a search and several
+// searches at once, for the issue graph (#464). A key Jira does not return is
+// left out; a failed search fails the whole fetch.
+func Issues(ctx context.Context, client *corejira.Client, keys []string, extra Fields) ([]Issue, error) {
+	batches := slices.Collect(slices.Chunk(keys, keysPerSearch))
+	got := make([][]Issue, len(batches))
+	err := parallel(len(batches), func(i int) error {
+		r, err := run(quiet(ctx), client, "key in ("+strings.Join(batches[i], ", ")+")", extra)
+		got[i] = r.Issues
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(got...), nil
+}

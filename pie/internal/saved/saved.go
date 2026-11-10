@@ -104,6 +104,15 @@ CREATE TABLE IF NOT EXISTS report_page (
 	version    INTEGER NOT NULL,
 	PRIMARY KEY (profile_id, cycle_id)
 );
+-- Issues fetched for the Link map's issue graph, kept so it opens and
+-- expands offline (#464). A cache: Jira stays the record.
+CREATE TABLE IF NOT EXISTS graph_issue (
+	profile_id TEXT NOT NULL,
+	issue_key  TEXT NOT NULL,
+	issue      TEXT NOT NULL,
+	fetched_at TEXT NOT NULL,
+	PRIMARY KEY (profile_id, issue_key)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
@@ -113,7 +122,7 @@ CREATE TABLE IF NOT EXISTS report_page (
 var purged = []string{
 	"saved_query", "profile_setting", "profile_field",
 	"case_item", "case_project", "project_group", "project_group_member", "evidence",
-	"product_baseline", "report_cycle", "report_page",
+	"product_baseline", "report_cycle", "report_page", "graph_issue",
 }
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
