@@ -86,8 +86,11 @@ export function Combo({
             setOpen(true);
             setActive((a) => (matches.length ? (a + step + matches.length) % matches.length : -1));
           } else if (e.key === "Escape" && shown) {
+            // The list is what Escape closes; a dialog around the box stays.
             e.preventDefault();
+            e.stopPropagation();
             setOpen(false);
+            setActive(-1);
           } else if (e.key === "Enter") {
             if (shown && active >= 0 && matches[active]) {
               e.preventDefault();
