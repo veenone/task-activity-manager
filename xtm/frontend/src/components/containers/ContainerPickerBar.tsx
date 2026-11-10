@@ -5,7 +5,9 @@ import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
 // ContainerPickerBar is the row that picks a container: kind, status and
-// label filters, the container itself, and the create / sync / actions buttons.
+// label filters, the container itself, then New and Actions. It stays one
+// line: Sync and Import JUnit live in Actions, so the buttons never wrap
+// onto a second row and move about as filters change (#456).
 export function ContainerPickerBar({ s, a, p }: { s: ContainerState; a: ContainerActions; p: ContainerViewProps }) {
   const {
     kind, setKind, kinds, cStatus, setCStatus, cLabel, setCLabel, selected, setSelected, setError,
@@ -14,6 +16,18 @@ export function ContainerPickerBar({ s, a, p }: { s: ContainerState; a: Containe
   } = s;
   const { seed, cleanSample, newContainer, renameContainer, generatePytest, deleteContainer } = a;
   const { onChanged, isDemo } = p;
+  const sync = async () => {
+    setSyncing(true);
+    setError("");
+    try {
+      await SyncContainers(profileId);
+      onChanged();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSyncing(false);
+    }
+  };
   return (
       <div className="board-head">
         <label className="board-picker board-picker--secondary" data-tour="plans-type">
@@ -101,43 +115,33 @@ export function ContainerPickerBar({ s, a, p }: { s: ContainerState; a: Containe
         </label>
 
         <div className="board-head-actions">
-          <button
-            className="btn"
-            onClick={async () => {
-              setSyncing(true);
-              setError("");
-              try {
-                await SyncContainers(profileId);
-                onChanged();
-              } catch (e) {
-                setError(errMsg(e));
-              } finally {
-                setSyncing(false);
-              }
-            }}
-            disabled={syncing}
-            title="Refresh just the Test Sets / Plans / Executions from Jira (partial sync)"
-          >
-            {syncing ? "Syncing…" : "Sync"}
-          </button>
           <button className="btn btn-primary" onClick={newContainer} data-tour="plans-new">
             New {kindLabel}
           </button>
-          {kind === "testexec" && (
-            <button
-              className="btn"
-              onClick={() => setShowJUnitNewExec(true)}
-              title="Create a new Test Execution from a JUnit XML report"
-            >
-              Import JUnit
-            </button>
-          )}
           <Menu
             label="Actions"
             align="right"
             triggerClassName="btn"
             title={`${kindLabel} actions`}
             items={[
+              {
+                key: "sync",
+                label: syncing ? "Syncing…" : `Sync ${kindLabel}s`,
+                onClick: () => void sync(),
+                disabled: syncing,
+                title: "Refresh just the Test Sets / Plans / Executions from Jira (partial sync)",
+              },
+              ...(kind === "testexec"
+                ? [
+                    {
+                      key: "junit",
+                      label: "Import JUnit…",
+                      onClick: () => setShowJUnitNewExec(true),
+                      title: "Create a new Test Execution from a JUnit XML report",
+                    },
+                  ]
+                : []),
+              { key: "sync-div", divider: true },
               {
                 key: "rename",
                 label: `Rename ${kindLabel}…`,
