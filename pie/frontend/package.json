@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@agile-suite/core": "0.0.0",
+    "@antv/g6": "5.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
