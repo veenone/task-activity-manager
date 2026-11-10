@@ -6,6 +6,7 @@ import { ExportButton } from "./ExportButton";
 import { linkSheets } from "./exportSheets";
 import { LinkFlow } from "./LinkFlow";
 import { ProjectsChooser } from "./ProjectInput";
+import { IssueGraphView } from "./IssueGraphView";
 import { LinkNetwork } from "./LinkNetwork";
 import { byKey, projectLabel, projectNames } from "./linked";
 import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
@@ -20,14 +21,19 @@ export function LinkMap({
   result,
   onOpen,
   refresh: { profileId, queryId, runAt, onResult },
+  jiraUrl = "",
 }: {
   result: query.Result;
   onOpen: (key: string) => void;
+  // jiraUrl is the profile's Jira, for the issue graph's Open in Jira.
+  jiraUrl?: string;
   // refresh names the run on screen, for Refresh links: the saved query it
   // belongs to (0 for none) and when it ran.
   refresh: { profileId: string; queryId: number; runAt: string; onResult: (r: query.Result) => void };
 }) {
   const [view, setView] = useState<(typeof LINK_VIEWS)[number]>("Grid");
+  // The Network draws projects, or issues with G6 (#464).
+  const [level, setLevel] = useState<"Projects" | "Issues">("Projects");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   // onScreen is the run on screen, or null once the map is gone. A refresh whose
@@ -204,7 +210,28 @@ export function LinkMap({
           </div>
         </div>
         {view === "Flow" && <LinkFlow edges={ticked} issues={issues} label={label} />}
-        {view === "Network" && <LinkNetwork edges={ticked} issues={issues} label={label} />}
+        {view === "Network" && (
+          <>
+            <div className="view-tabs pie-map-views" role="group" aria-label="Network of">
+              {(["Projects", "Issues"] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  className={`view-tab${l === level ? " view-tab-active" : ""}`}
+                  aria-pressed={l === level}
+                  onClick={() => setLevel(l)}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            {level === "Projects" ? (
+              <LinkNetwork edges={ticked} issues={issues} label={label} />
+            ) : (
+              <IssueGraphView profileId={profileId} result={result} jiraUrl={jiraUrl} label={label} onOpen={onOpen} />
+            )}
+          </>
+        )}
         {view === "Grid" && (
           <>
             <div className="pie-results">
