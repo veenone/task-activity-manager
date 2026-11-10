@@ -189,11 +189,13 @@ export function ProjectInput({
 // ProjectsChooser picks several projects: type to add one, remove it from
 // its chip. None chosen means every project.
 export function ProjectsChooser({
+  label = "Add a project",
   projects,
   projectLabel,
   chosen,
   onChange,
 }: {
+  label?: string;
   projects: string[];
   projectLabel: (p: string) => string;
   chosen: string[];
@@ -210,9 +212,9 @@ export function ProjectsChooser({
   return (
     <div className="pie-chooser">
       <label>
-        Add a project
+        {label}
         <Combo
-          name="Add a project"
+          name={label}
           className="detail-input"
           text={text}
           onText={setText}
@@ -223,7 +225,7 @@ export function ProjectsChooser({
           placeholder="Every project"
         />
       </label>
-      <ul className="pie-chips" aria-label="Chosen projects">
+      <ul className="pie-chips" aria-label={label === "Add a project" ? "Chosen projects" : `${label}, chosen projects`}>
         {chosen.map((p) => (
           <li key={p}>
             {projectLabel(p)}

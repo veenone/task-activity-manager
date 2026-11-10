@@ -1164,3 +1164,56 @@ body,
   gap: 8px;
   margin-top: 2px;
 }
+
+/* Charts (#455). A status group in the Project map tree folds its issues. */
+.pie-tree-group > summary {
+  gap: 6px;
+  cursor: pointer;
+}
+.pie-tree-group > ul {
+  margin-top: 6px;
+}
+
+/* The Link map flow's left-side chooser sits above the chart. */
+.pie-flow-pick {
+  max-width: 360px;
+}
+
+/* Zoomed, the network keeps its own proportions and the box scrolls. */
+.pie-zoom-area .pie-network-svg {
+  max-height: none;
+}
+
+.pie-network-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.pie-network-legend li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.pie-legend-hub,
+.pie-legend-node {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+}
+.pie-legend-hub {
+  background: var(--accent);
+}
+.pie-legend-node {
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+.pie-legend-thick {
+  width: 18px;
+  height: 4px;
+  background: var(--border-strong);
+}

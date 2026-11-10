@@ -193,7 +193,7 @@ Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
 show the same sets three ways:
 
-Both Flow charts, on the Project map and on the Link map, can be zoomed. Use
+Both Flow charts and the Link map's Network can be zoomed. Use
 **+** and **−** above the chart, or hold Ctrl and turn the mouse wheel. The
 chart then scrolls inside its own area, and **Reset** returns it to fit.
 
@@ -206,7 +206,9 @@ chart then scrolls inside its own area, and **Reset** returns it to fit.
   are listed beside the chart.
 - **Tree** branches each baseline into its projects and each project into its
   issues, and says how many of a project's issues are finished. Choose a set
-  in the list beside it to mark its issues in the tree.
+  in the list beside it to mark its issues in the tree. Tick **Group by
+  status** to fold each project's issues under one node per status, with its
+  count. Click a status to open it. Untick it to list every issue again.
 - **Table** is the grid described above.
 
 In every view, choosing a key opens its set in Trace.
@@ -274,7 +276,9 @@ are drawn. The link type filters and the two tick boxes on the left apply to
 all three views.
 - **Flow** runs each link from the project it starts in, through its link type,
   to the project it points to. Bands are sized by link count. Hover over a band
-  to see its count.
+  to see its count. Type into **Left side** to keep only the links starting in
+  the projects you choose. The chart leaves room for the longest project name,
+  and scrolls sideways when the window is narrower than that.
 - **Network** puts one project in the middle, the busiest at first, with the
   projects it links to around it. Each link type has its own spoke, with its
   count, and the arrows show which way the links point. Pick the centre from
@@ -282,7 +286,11 @@ all three views.
   it to move the centre there. On a busy project the diagram draws the 24 with
   the most links, and the list names them all. Hover over a project to bring its
   name to the front, and drag a project to move it when names crowd. Choosing
-  another centre lays the projects out again.
+  another centre lays the projects out again. The centre circle grows to fit a
+  long project key. A legend under the diagram explains it: an arrow away from
+  the centre means the centre's issues link out to that project, an arrow
+  towards it means that project's issues link in, and a thicker spoke has more
+  links.
 
 **Refresh links** at the top of the list fetches the linked issues again
 without running the query. Your query's own rows stay as they were. For a
