@@ -191,7 +191,7 @@ The counts above the map always describe the whole run.
 
 Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
-show the same sets three ways:
+show the same sets three ways, and **Baseline** shows one baseline and what links to it:
 
 Both Flow charts and the Link map's Network can be zoomed. Use
 **+** and **−** above the chart, or hold Ctrl and turn the mouse wheel. The
@@ -209,6 +209,26 @@ chart then scrolls inside its own area, and **Reset** returns it to fit.
   in the list beside it to mark its issues in the tree. Tick **Group by
   status** to fold each project's issues under one node per status, with its
   count. Click a status to open it. Untick it to list every issue again.
+- **Baseline** puts one baseline in the middle. Its issues sit inside a
+  dashed boundary, each derived project in a smaller group inside it, and the
+  issues of other projects linked to them sit outside, grouped by project.
+  - Pick the baseline, a **Version** (its Fix Versions) and, to compare, a
+    second version under **Compared with**. A run saved before PIE read Fix
+    Versions shows none until you run it again.
+  - **Inside the baseline**, **Crossing its boundary** or **Both** chooses which
+    links are drawn, and the list below hides a link type.
+  - Click an issue to trace it. **Blocker chain** lights up every issue that
+    blocks it, then what blocks those, and so on; **Impact** lights up what it
+    holds up instead. Only "blocks" links are followed: clones, duplicates and
+    relates-to say nothing about which issue waits for which. The chain is
+    listed on the right; **Clear the trace** ends it.
+  - With **Only issues with links out** ticked, issues inside with no link out
+    of the baseline fold into "+ N more" per project. Click one to open it.
+  - The right-hand panel counts the baseline's health for the version: issues
+    inside, the share finished, issues blocked from outside the baseline,
+    external dependencies, linked sets out of step and the median age of open
+    issues. With a second version chosen, each number shows its change, in red
+    when it is worse.
 - **Table** is the grid described above.
 
 In every view, choosing a key opens its set in Trace.
