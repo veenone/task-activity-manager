@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
-import { Graph, NodeEvent, type GraphData, type IElementEvent } from "@antv/g6";
+import { Graph, NodeEvent, type GraphData, type IElementEvent, type LayoutOptions } from "@antv/g6";
 
 // G6Canvas is the one place PIE talks to AntV G6 (#464, #465): it draws the
 // nodes, edges and groups it is given and reports a click. Everything about
@@ -20,7 +20,7 @@ export type CanvasNode = {
 };
 export type CanvasEdge = { id: string; source: string; target: string; type: string; directed: boolean; faded?: boolean; lit?: boolean };
 export type CanvasCombo = { id: string; label: string; parent?: string; tone: "baseline" | "derived" | "external" };
-export type CanvasApi = { fit: () => void; zoom: (by: number) => void; relayout: () => void };
+export type CanvasApi = { fit: () => void; relayout: () => void };
 
 // css reads a theme token when the graph draws, so it follows light and dark.
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
@@ -99,12 +99,19 @@ function data(nodes: CanvasNode[], edges: CanvasEdge[], combos: CanvasCombo[], f
 // NO_COMBOS is one empty list, so a view without groups does not hand the
 // canvas a new array, and a redraw, on every render.
 const NO_COMBOS: CanvasCombo[] = [];
+// still runs a layout without its animation: render() resolves before an
+// animated layout ends, so a fit after it measured the old positions (#469).
+const still = (l: LayoutOptions): LayoutOptions => ({ ...l, animation: false }) as LayoutOptions;
+// COMBINED lays out groups and the nodes in them; a view without groups can
+// pass its own layout, such as a radial one around a centre.
+const COMBINED: LayoutOptions = { type: "combo-combined", spacing: 24, comboPadding: 24 };
 
 export default function G6Canvas({
   nodes,
   edges,
   combos = NO_COMBOS,
   focus,
+  layout = COMBINED,
   onSelect,
   label,
   apiRef,
@@ -113,29 +120,34 @@ export default function G6Canvas({
   edges: CanvasEdge[];
   combos?: CanvasCombo[];
   focus: string | null;
+  layout?: LayoutOptions;
   onSelect: (id: string) => void;
   label: string;
   apiRef?: Ref<CanvasApi>;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const graph = useRef<Graph | null>(null);
-  // The issues and groups last laid out. Only a change to them runs the
-  // layout again; a change of style, such as the focus, is redrawn in place,
-  // so the boxes do not move under the analyst's pointer.
-  const laidOut = useRef("");
+  // What the graph was last laid out from. Any new nodes, edges, groups or
+  // layout, which is what an option change makes, lays it out again (#469);
+  // a new focus alone is redrawn in place, so the boxes stay put.
+  const laidOut = useRef<unknown[]>([]);
+  const firstLayout = useRef(layout);
   // The latest handler, so the graph made once still calls the current one.
   const pick = useRef(onSelect);
   pick.current = onSelect;
 
   useEffect(() => {
     if (!box.current) return;
+    // A new graph has laid nothing out yet. StrictMode makes a second one on
+    // mount, and it drew without a layout, every node at 0,0, while this ref
+    // still held the first one's (#469).
+    laidOut.current = [];
     const g = new Graph({
       container: box.current,
-      autoFit: "view",
       animation: true,
       node: { type: "rect" },
       combo: { type: "rect" },
-      layout: { type: "combo-combined", spacing: 24, comboPadding: 24 },
+      layout: still(firstLayout.current),
       behaviors: ["drag-canvas", "zoom-canvas", "drag-element"],
       plugins: [{ type: "minimap", key: "minimap", size: [150, 96], position: "left-bottom" }],
     });
@@ -151,19 +163,46 @@ export default function G6Canvas({
     const g = graph.current;
     if (!g) return;
     g.setData(data(nodes, edges, combos, focus));
-    const shape = [...nodes.map((n) => `${n.id}@${n.combo ?? ""}`), ...combos.map((c) => `#${c.id}`)].sort().join(",");
-    const moved = shape !== laidOut.current;
-    laidOut.current = shape;
-    void (moved ? g.render() : g.draw()).then(() => {
-      if (focus && g.hasNode(focus)) void g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
-    });
-  }, [nodes, edges, combos, focus]);
+    const from = [nodes, edges, combos, layout];
+    const before = laidOut.current;
+    const moved = from.some((x, i) => x !== before[i]);
+    laidOut.current = from;
+    if (moved && before.length > 0 && layout !== before[3]) g.setLayout(still(layout));
+    // Fit shrinks a graph that overflows either way and centres it, but never
+    // enlarges a small one past its real size. G6's own "overflow" fit waits
+    // for the graph to overflow both ways.
+    const drawn = moved
+      ? g
+          .render()
+          .then(() => g.fitView())
+          .then(() => (g.getZoom() > 1 ? g.zoomTo(1) : undefined))
+      : g.draw();
+    drawn
+      .then(() => (focus && g.hasNode(focus) ? g.focusElement(focus, { duration: 500, easing: "ease-in-out" }) : undefined))
+      // A render still running when its graph is destroyed fails; only a
+      // failure of the live graph is worth reporting.
+      .catch((e: unknown) => {
+        if (graph.current === g) throw e;
+      });
+  }, [nodes, edges, combos, focus, layout]);
 
   useImperativeHandle(apiRef, () => ({
     fit: () => void graph.current?.fitView({ when: "always" }, { duration: 400 }),
-    zoom: (by: number) => void graph.current?.zoomBy(by, { duration: 200 }),
     relayout: () => void graph.current?.layout(),
   }));
 
-  return <div ref={box} className="pie-g6" role="img" aria-label={label} />;
+  const zoom = (by: number) => void graph.current?.zoomBy(by, { duration: 200 });
+  return (
+    <>
+      <div ref={box} className="pie-g6" role="img" aria-label={label} />
+      <div className="pie-zoom-controls" role="group" aria-label="Graph zoom">
+        <button type="button" className="btn btn-ghost" aria-label="Zoom in" onClick={() => zoom(1.25)}>
+          +
+        </button>
+        <button type="button" className="btn btn-ghost" aria-label="Zoom out" onClick={() => zoom(0.8)}>
+          −
+        </button>
+      </div>
+    </>
+  );
 }
