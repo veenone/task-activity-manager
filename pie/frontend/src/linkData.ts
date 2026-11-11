@@ -1,4 +1,5 @@
 import type { query } from "../wailsjs/go/models";
+import type { FlowPath } from "./flowLayers";
 
 // An edge is one Jira link, from its outward end to its inward end.
 export type Edge = { from: string; to: string; type: string };
@@ -46,7 +47,6 @@ export function byCell(edges: Edge[], issues: Map<string, query.Issue>): Map<str
 }
 
 const ends = (e: Edge, issues: Map<string, query.Issue>) => [projectOf(e.from, issues), projectOf(e.to, issues)] as const;
-const sorted = (xs: Iterable<string>) => [...new Set(xs)].sort();
 
 // busiest is the project at either end of the most links, "" when none.
 export function busiest(edges: Edge[], issues: Map<string, query.Issue>): string {
@@ -83,28 +83,11 @@ export function neighbours(centre: string, edges: Edge[], issues: Map<string, qu
     .sort((a, b) => b.total - a.total || a.project.localeCompare(b.project));
 }
 
-// flowLinks lays the links out for sankey(): the project a link starts in,
-// its type, and the project it points to. Each link is one key, from>to.
-export function flowLinks(edges: Edge[], issues: Map<string, query.Issue>) {
-  const pairs = new Map<string, { from: string; to: string; keys: string[] }>();
-  const add = (from: string, to: string, key: string) => {
-    const pair = pairs.get(`${from}|${to}`) ?? { from, to, keys: [] };
-    pair.keys.push(key);
-    pairs.set(`${from}|${to}`, pair);
-  };
-  for (const e of edges) {
+// flowPaths runs each link from the project it starts in, through its type,
+// to the project it points to, for the layered flow. Each link is one key,
+// from>to, and its lines take the link type's colour.
+export const flowPaths = (edges: Edge[], issues: Map<string, query.Issue>): FlowPath[] =>
+  edges.map((e) => {
     const [from, to] = ends(e, issues);
-    const key = `${e.from}>${e.to}`;
-    add(`f:${from}`, `t:${e.type}`, key);
-    add(`t:${e.type}`, `o:${to}`, key);
-  }
-  const column = (prefix: string, ids: string[]) => ids.map((id) => ({ id: `${prefix}${id}`, label: id }));
-  return {
-    columns: [
-      column("f:", sorted(edges.map((e) => ends(e, issues)[0]))),
-      column("t:", sorted(edges.map((e) => e.type))),
-      column("o:", sorted(edges.map((e) => ends(e, issues)[1]))),
-    ],
-    links: [...pairs.values()],
-  };
-}
+    return { key: `${e.from}>${e.to}`, steps: [`f:${from}`, `t:${e.type}`, `o:${to}`], type: e.type };
+  });

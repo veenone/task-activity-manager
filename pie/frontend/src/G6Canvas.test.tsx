@@ -212,3 +212,14 @@ it("leaves the camera on the whole fitted graph after a new layout, even with a 
   // Moving to the focus after fitting pushed the rest of a grown graph off the canvas.
   expect(made[0].calls).toEqual(["render", "fit", "zoom:1", "centre"]);
 });
+
+it("keeps the camera still on a new focus when told not to follow it", async () => {
+  const { rerender } = render(<G6Canvas nodes={nodes} edges={none} focus={null} follow={false} onSelect={() => {}} label="Graph" />);
+  await settle();
+  const g = made[0];
+  g.calls.length = 0;
+  // A flow lights the chosen box; moving to it hid the layers on either side.
+  rerender(<G6Canvas nodes={nodes} edges={none} focus="B-1" follow={false} onSelect={() => {}} label="Graph" />);
+  await settle();
+  expect(g.calls).toEqual(["draw"]);
+});

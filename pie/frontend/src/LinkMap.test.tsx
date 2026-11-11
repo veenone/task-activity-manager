@@ -7,16 +7,33 @@ import * as api from "../wailsjs/go/main/App";
 vi.mock("../wailsjs/go/main/App", () => ({ RefreshLinks: vi.fn() }));
 // jsdom has no canvas, so G6 is replaced by a list of what it was given.
 vi.mock("./G6Canvas", () => ({
-  default: ({ nodes, label, onSelect }: { nodes: { id: string }[]; label: string; onSelect: (id: string) => void }) => (
-    <ul aria-label={label}>
-      {nodes.map((n) => (
-        <li key={n.id}>
-          <button type="button" onClick={() => onSelect(n.id)}>
-            {n.id}
-          </button>
-        </li>
-      ))}
-    </ul>
+  default: ({
+    nodes,
+    edges,
+    label,
+    onSelect,
+  }: {
+    nodes: { id: string }[];
+    edges: { id: string; source: string; target: string; label?: string }[];
+    label: string;
+    onSelect: (id: string) => void;
+  }) => (
+    <>
+      <ul aria-label={label}>
+        {nodes.map((n) => (
+          <li key={n.id}>
+            <button type="button" onClick={() => onSelect(n.id)}>
+              {n.id}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <ul aria-label="Lines">
+        {edges.map((e) => (
+          <li key={e.id}>{`${e.source}>${e.target} ${e.label}`}</li>
+        ))}
+      </ul>
+    </>
   ),
 }));
 
@@ -157,11 +174,17 @@ it("drops a refresh that answers after the run on screen changed", async () => {
   expect(onResult).not.toHaveBeenCalled();
 });
 
-it("draws the links as a flow from project through type to project", async () => {
+const lines = async () =>
+  within(await screen.findByRole("list", { name: "Lines" }))
+    .getAllByRole("listitem")
+    .map((l) => l.textContent);
+
+it("lays the links out from project through type to project", async () => {
   const { user } = show();
   await user.click(screen.getByRole("button", { name: "Flow" }));
-  const chart = screen.getByRole("img", { name: /Links from each project, by type, to the project they point to/ });
-  expect(within(chart).getByText("A to Cloners: 1")).toBeInTheDocument();
+  const chart = await screen.findByRole("list", { name: /Links from each project, by type, to the project they point to/ });
+  expect(within(chart).getByRole("button", { name: "t:Cloners" })).toBeVisible();
+  expect(await lines()).toEqual(["f:A>t:Cloners 1", "t:Cloners>o:B 1", "f:A>t:Relates 1", "t:Relates>o:C 1"]);
   expect(screen.queryByRole("table", { name: "Projects connected by links" })).not.toBeInTheDocument();
 });
 
@@ -218,27 +241,10 @@ it("keeps only the chosen projects on the flow's left side", async () => {
   };
   const { user } = show(res);
   await user.click(screen.getByRole("button", { name: "Flow" }));
-  const chart = () => screen.getByRole("img", { name: /Links from each project/ });
-  expect(within(chart()).getByText("C to Blocks: 1")).toBeInTheDocument();
+  expect(await lines()).toContain("f:C>t:Blocks 1");
   await user.type(screen.getByRole("combobox", { name: "Left side" }), "A{Enter}");
-  expect(within(chart()).getByText("A to Cloners: 1")).toBeInTheDocument();
-  expect(within(chart()).queryByText("C to Blocks: 1")).not.toBeInTheDocument();
-});
-
-it("widens the flow's margins for long project names, and scrolls rather than squeezing them", async () => {
-  const long = "A very long project name that would be clipped";
-  const { user } = show({ ...result, issues: result.issues.map((i) => ({ ...i, projectName: i.project === "A" ? long : "" })) });
-  await user.click(screen.getByRole("button", { name: "Flow" }));
-  const chart = screen.getByRole("img", { name: /Links from each project/ });
-  const left = -Number(chart.getAttribute("viewBox")!.split(" ")[0]);
-  expect(left).toBeGreaterThan(200);
-  // The zoom area keeps the chart's full width at 100%, and shrinks with the
-  // zoom, so zooming out still works.
-  const width = Number(chart.getAttribute("viewBox")!.split(" ")[2]);
-  const area = chart.closest(".pie-zoom-area") as HTMLElement;
-  expect(area.style.minWidth).toBe(`${width}px`);
-  await user.click(screen.getByRole("button", { name: "Zoom out" }));
-  expect(area.style.minWidth).toBe(`${width * 0.8}px`);
+  expect(await lines()).toContain("f:A>t:Cloners 1");
+  expect(await lines()).not.toContain("f:C>t:Blocks 1");
 });
 
 it("draws the projects around the busiest one with G6, and hands a project to the Issues view or the grid", async () => {
