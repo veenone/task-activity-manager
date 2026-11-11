@@ -332,5 +332,12 @@ func (a *App) RunQuery(profileID string, queryID int64, jql string, confirmed bo
 	if err != nil || queryID == 0 || res.NeedsConfirm {
 		return saved.Run{Result: res}, err
 	}
+	if on, err := a.queries.KeepOffline(profileID, queryID); err == nil && on {
+		// Keep links for offline (#464): a failure here costs the offline
+		// copy, not the run, so it is logged and the run goes on.
+		if err := a.keep(profileID, client, ids, res.Issues); err != nil {
+			log.Printf("pie: keep links for offline: %v", err)
+		}
+	}
 	return a.queries.Record(profileID, queryID, jql, res, time.Now())
 }

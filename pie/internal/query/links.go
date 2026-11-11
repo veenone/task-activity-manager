@@ -2,6 +2,8 @@ package query
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"slices"
 	"strings"
 
@@ -107,6 +109,13 @@ func Follow(ctx context.Context, client *corejira.Client, res Result, extra Fiel
 	return res
 }
 
+// refused is Jira turning a search away as a bad query, such as a key that
+// does not exist, rather than failing to answer.
+func refused(err error) bool {
+	var he *corejira.HTTPError
+	return errors.As(err, &he) && he.Code == http.StatusBadRequest
+}
+
 // Sets groups issues into linked sets, in the order their first issue appears.
 // A link to an issue that was not fetched is left out.
 func Sets(issues []Issue) []Set {
@@ -173,4 +182,40 @@ func Sets(issues []Issue) []Set {
 func crosses(is Issue, l Link) bool {
 	i := strings.LastIndex(l.Key, "-")
 	return i > 0 && l.Key[:i] != is.Project
+}
+
+// Issues fetches issues by key, keysPerSearch to a search and several
+// searches at once, for the issue graph (#464). Jira refuses a whole search
+// when one key in it is gone or hidden, so a refused batch is asked again key
+// by key and the refused keys are left out. Any other failure fails the fetch.
+func Issues(ctx context.Context, client *corejira.Client, keys []string, extra Fields) ([]Issue, error) {
+	batches := slices.Collect(slices.Chunk(keys, keysPerSearch))
+	got := make([][]Issue, len(batches))
+	search := func(keys []string) ([]Issue, error) {
+		r, err := run(quiet(ctx), client, "key in ("+strings.Join(keys, ", ")+")", extra)
+		return r.Issues, err
+	}
+	err := parallel(len(batches), func(i int) error {
+		var err error
+		got[i], err = search(batches[i])
+		if !refused(err) {
+			return err
+		}
+		got[i] = nil
+		for _, k := range batches[i] {
+			one, err := search([]string{k})
+			if refused(err) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			got[i] = append(got[i], one...)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return slices.Concat(got...), nil
 }

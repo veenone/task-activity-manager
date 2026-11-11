@@ -2,7 +2,10 @@ package main
 
 import (
 	"errors"
+	"log"
+	"time"
 
+	"agile-suite/pie/internal/issuegraph"
 	"agile-suite/pie/internal/query"
 )
 
@@ -43,6 +46,10 @@ func (a *App) RefreshLinks(profileID string, queryID int64, runAt string, curren
 		if err := a.queries.ReplaceResult(profileID, queryID, runAt, res); err != nil {
 			return query.Result{}, err
 		}
+	}
+	// The issue graph's stored copies follow a refresh (#464).
+	if err := issuegraph.New(a.db.DB()).Put(profileID, res.Issues, time.Now()); err != nil {
+		log.Printf("pie: store refreshed issues: %v", err)
 	}
 	return res, nil
 }

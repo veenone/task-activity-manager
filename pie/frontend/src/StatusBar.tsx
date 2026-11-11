@@ -12,7 +12,8 @@ export type Progress = { stage: string; done: number; total: number };
 
 // NoticeContext is how a view puts a Notice in the status bar without App
 // passing a callback down to every Export button (#452).
-export const NoticeContext = createContext<(n: Notice) => void>(
+// null clears it, as the issue graph does once Jira answers again (#464).
+export const NoticeContext = createContext<(n: Notice | null) => void>(
   () => undefined,
 );
 

@@ -1217,3 +1217,117 @@ body,
   height: 4px;
   background: var(--border-strong);
 }
+
+/* The Link map's issue graph (#464): options, the G6 canvas, the details. */
+.pie-graph {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+.pie-graph-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  width: 220px;
+  overflow-y: auto;
+}
+.pie-graph-side h4,
+.pie-graph-details h4 {
+  margin: 8px 0 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.pie-graph-side .pie-check .muted {
+  margin-left: auto;
+}
+.pie-graph-found {
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.pie-graph-main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.pie-graph-main .pie-zoom-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  flex-direction: column;
+}
+.pie-graph-crumbs {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* G6 places its minimap inside this box, so it must be the positioned,
+   clipped one. */
+.pie-g6 {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+.pie-graph-details {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  width: 280px;
+  overflow-y: auto;
+}
+.pie-graph-details h3 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.pie-graph-facts {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 3px 8px;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.pie-graph-facts dt {
+  color: var(--text-muted);
+}
+.pie-graph-facts dd {
+  margin: 0;
+}
+.pie-graph-links {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.pie-graph-links li {
+  display: flex;
+  gap: 8px;
+}
+.pie-graph-links li > .muted {
+  flex: none;
+  width: 96px;
+}
+.pie-graph-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}

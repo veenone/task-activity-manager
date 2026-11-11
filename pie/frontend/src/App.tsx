@@ -23,6 +23,7 @@ import { LinkMap } from "./LinkMap";
 import { ProjectMap } from "./ProjectMap";
 import { ResultsTable } from "./ResultsTable";
 import { JqlField } from "./JqlField";
+import { KeepOffline } from "./KeepOffline";
 import { RunNotes } from "./RunNotes";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
@@ -303,9 +304,19 @@ export default function App() {
                 Save as...
               </button>
               {queryId !== 0 && (
-                <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteQuery()}>
-                  Delete query
-                </button>
+                <>
+                  <button type="button" className="btn btn-ghost" disabled={running} onClick={() => void deleteQuery()}>
+                    Delete query
+                  </button>
+                  <KeepOffline
+                    profileId={profileId}
+                    queryId={queryId}
+                    on={!!queries.find((q) => q.id === queryId)?.keepOffline}
+                    disabled={running}
+                    onChanged={() => void ListQueries(profileId).then(setQueries)}
+                    onError={setError}
+                  />
+                </>
               )}
               <JiraFilterPicker
                 profileId={profileId}
@@ -337,7 +348,12 @@ export default function App() {
         {result && view === "trace" && <TracePage result={result} focus={focus} onFocus={setFocus} />}
         {result && view === "map" && <ProjectMap profileId={profileId} result={result} onOpen={openInTrace} />}
         {result && view === "links" && (
-          <LinkMap result={result} onOpen={openInTrace} refresh={{ profileId, queryId, runAt, onResult: setResult }} />
+          <LinkMap
+            result={result}
+            onOpen={openInTrace}
+            refresh={{ profileId, queryId, runAt, onResult: setResult }}
+            jiraUrl={profiles?.find((p) => p.id === profileId)?.jiraUrl}
+          />
         )}
 
         {result && view === "stats" && <Statistics result={result} productField={fields?.productBase ?? ""} />}

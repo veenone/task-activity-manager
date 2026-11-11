@@ -28,7 +28,7 @@ const pageSize = 100
 // limiter still paces them, so this bounds waiting, not load.
 const workers = 4
 
-var fields = []string{"summary", "project", "issuetype", "status", "priority", "updated", "created", "resolutiondate", "issuelinks"}
+var fields = []string{"summary", "project", "issuetype", "status", "priority", "updated", "created", "resolutiondate", "issuelinks", "parent", "subtasks"}
 
 // Issue is one row of a query's result.
 type Issue struct {
@@ -47,6 +47,10 @@ type Issue struct {
 	Created        string `json:"created"`
 	Resolved       string `json:"resolved"`
 	Links          []Link `json:"links"`
+	// Parent is a sub-task's parent key and Subtasks an issue's sub-task keys,
+	// for the issue graph's parent edges (#464).
+	Parent   string   `json:"parent"`
+	Subtasks []string `json:"subtasks"`
 	// Bases are the values of the profile's product base field. An option field
 	// with several options gives several.
 	Bases []string `json:"bases"`
@@ -66,6 +70,9 @@ type Link struct {
 	// Outward is true when this issue is the link's outward end, so Words is
 	// the type's outward wording and the link points from here to Key.
 	Outward bool `json:"outward"`
+	// Symmetric is true for a type worded the same both ways, such as
+	// "relates to", which has no direction to draw.
+	Symmetric bool `json:"symmetric"`
 }
 
 // Result is what a run fetched. Truncated means Total is more than the query's
@@ -188,10 +195,20 @@ func parallel(n int, fn func(i int) error) error {
 // readable keeps Jira's own sentence for a refused query, because it is the
 // only thing that says which clause or filter was wrong. Other failures get
 // core's wording, and anything else stays as it is.
+// worded is an error shown in Jira's own words that still unwraps to the
+// original, so a caller can tell a refusal from a failure (#464).
+type worded struct {
+	msg string
+	err error
+}
+
+func (w worded) Error() string { return w.msg }
+func (w worded) Unwrap() error { return w.err }
+
 func readable(err error) error {
 	var he *corejira.HTTPError
 	if errors.As(err, &he) && he.Code == http.StatusBadRequest && he.Message != "" {
-		return errors.New(he.Message)
+		return worded{he.Message, err}
 	}
 	if msg := corejira.Humanize(err); msg != "" {
 		return errors.New(msg)
@@ -215,6 +232,8 @@ func toIssue(raw corejira.RawIssue) Issue {
 		Created:        text(raw.Fields["created"]),
 		Resolved:       text(raw.Fields["resolutiondate"]),
 		Links:          links(raw.Fields["issuelinks"]),
+		Parent:         named(raw.Fields["parent"], "key"),
+		Subtasks:       keys(raw.Fields["subtasks"]),
 		Matched:        true,
 	}
 }
@@ -234,11 +253,27 @@ func links(raw json.RawMessage) []Link {
 	}
 	var out []Link
 	for _, l := range ls {
+		symmetric := strings.EqualFold(strings.TrimSpace(l.Type.Inward), strings.TrimSpace(l.Type.Outward))
 		switch {
 		case l.Outward != nil && l.Outward.Key != "":
-			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward, Outward: true})
+			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward, Outward: true, Symmetric: symmetric})
 		case l.Inward != nil && l.Inward.Key != "":
-			out = append(out, Link{Key: l.Inward.Key, Type: l.Type.Name, Words: l.Type.Inward})
+			out = append(out, Link{Key: l.Inward.Key, Type: l.Type.Name, Words: l.Type.Inward, Symmetric: symmetric})
+		}
+	}
+	return out
+}
+
+// keys reads a list of issues, such as subtasks, as their keys.
+func keys(raw json.RawMessage) []string {
+	var is []struct{ Key string }
+	if json.Unmarshal(raw, &is) != nil {
+		return nil
+	}
+	out := make([]string, 0, len(is))
+	for _, i := range is {
+		if i.Key != "" {
+			out = append(out, i.Key)
 		}
 	}
 	return out

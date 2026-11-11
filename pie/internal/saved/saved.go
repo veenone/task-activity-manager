@@ -104,6 +104,22 @@ CREATE TABLE IF NOT EXISTS report_page (
 	version    INTEGER NOT NULL,
 	PRIMARY KEY (profile_id, cycle_id)
 );
+-- The saved queries whose runs also keep their issues' links for offline
+-- use (#464). A row is the choice turned on.
+CREATE TABLE IF NOT EXISTS saved_query_offline (
+	profile_id TEXT NOT NULL,
+	query_id   INTEGER NOT NULL,
+	PRIMARY KEY (profile_id, query_id)
+);
+-- Issues fetched for the Link map's issue graph, kept so it opens and
+-- expands offline (#464). A cache: Jira stays the record.
+CREATE TABLE IF NOT EXISTS graph_issue (
+	profile_id TEXT NOT NULL,
+	issue_key  TEXT NOT NULL,
+	issue      TEXT NOT NULL,
+	fetched_at TEXT NOT NULL,
+	PRIMARY KEY (profile_id, issue_key)
+);
 `
 
 // purged lists every table Purge empties for a profile. The instruction gate
@@ -113,7 +129,7 @@ CREATE TABLE IF NOT EXISTS report_page (
 var purged = []string{
 	"saved_query", "profile_setting", "profile_field",
 	"case_item", "case_project", "project_group", "project_group_member", "evidence",
-	"product_baseline", "report_cycle", "report_page",
+	"product_baseline", "report_cycle", "report_page", "graph_issue", "saved_query_offline",
 }
 
 // Schema is PIE's database: core's profile tables plus PIE's own. The tables
@@ -130,6 +146,9 @@ type Query struct {
 	Name  string `json:"name"`
 	JQL   string `json:"jql"`
 	RunAt string `json:"runAt"`
+	// KeepOffline fetches the run's issues' links too, for the issue graph
+	// to open offline (#464).
+	KeepOffline bool `json:"keepOffline"`
 }
 
 // Run is one run of a query. Added and Dropped are the matched keys that
@@ -149,7 +168,9 @@ func New(db *sql.DB) *Store { return &Store{db: db} }
 
 // List returns a profile's saved queries by name.
 func (s *Store) List(profileID string) ([]Query, error) {
-	rows, err := s.db.Query(`SELECT id, name, jql, run_at FROM saved_query WHERE profile_id = ? ORDER BY name`, profileID)
+	rows, err := s.db.Query(`SELECT id, name, jql, run_at,
+		EXISTS (SELECT 1 FROM saved_query_offline o WHERE o.profile_id = q.profile_id AND o.query_id = q.id)
+		FROM saved_query q WHERE profile_id = ? ORDER BY name`, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +178,7 @@ func (s *Store) List(profileID string) ([]Query, error) {
 	out := []Query{}
 	for rows.Next() {
 		var q Query
-		if err := rows.Scan(&q.ID, &q.Name, &q.JQL, &q.RunAt); err != nil {
+		if err := rows.Scan(&q.ID, &q.Name, &q.JQL, &q.RunAt, &q.KeepOffline); err != nil {
 			return nil, err
 		}
 		out = append(out, q)
@@ -188,7 +209,35 @@ func (s *Store) Save(profileID, name, jql string) (Query, error) {
 // Delete removes one of the profile's queries and its run.
 func (s *Store) Delete(profileID string, id int64) error {
 	r, err := s.db.Exec(`DELETE FROM saved_query WHERE profile_id = ? AND id = ?`, profileID, id)
-	return oneRow(r, err)
+	if err := oneRow(r, err); err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`DELETE FROM saved_query_offline WHERE profile_id = ? AND query_id = ?`, profileID, id)
+	return err
+}
+
+// SetKeepOffline turns Keep links for offline on or off for a query.
+func (s *Store) SetKeepOffline(profileID string, id int64, on bool) error {
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM saved_query WHERE profile_id = ? AND id = ?`, profileID, id).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.New("that saved query no longer exists")
+	}
+	if on {
+		_, err := s.db.Exec(`INSERT OR IGNORE INTO saved_query_offline (profile_id, query_id) VALUES (?, ?)`, profileID, id)
+		return err
+	}
+	_, err := s.db.Exec(`DELETE FROM saved_query_offline WHERE profile_id = ? AND query_id = ?`, profileID, id)
+	return err
+}
+
+// KeepOffline reports whether a query keeps its links for offline.
+func (s *Store) KeepOffline(profileID string, id int64) (bool, error) {
+	var on bool
+	err := s.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM saved_query_offline WHERE profile_id = ? AND query_id = ?)`, profileID, id).Scan(&on)
+	return on, err
 }
 
 // Last returns the query's stored run, with an empty RunAt if it never ran.
