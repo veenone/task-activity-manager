@@ -1,10 +1,24 @@
 import { expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LinkMap } from "./LinkMap";
 import * as api from "../wailsjs/go/main/App";
 
 vi.mock("../wailsjs/go/main/App", () => ({ RefreshLinks: vi.fn() }));
+// jsdom has no canvas, so G6 is replaced by a list of what it was given.
+vi.mock("./G6Canvas", () => ({
+  default: ({ nodes, label, onSelect }: { nodes: { id: string }[]; label: string; onSelect: (id: string) => void }) => (
+    <ul aria-label={label}>
+      {nodes.map((n) => (
+        <li key={n.id}>
+          <button type="button" onClick={() => onSelect(n.id)}>
+            {n.id}
+          </button>
+        </li>
+      ))}
+    </ul>
+  ),
+}));
 
 const link = (key: string, type: string, words: string, outward: boolean) => ({ key, type, words, outward });
 const issue = (key: string, status: string, links: object[]) => ({
@@ -151,21 +165,6 @@ it("draws the links as a flow from project through type to project", async () =>
   expect(screen.queryByRole("table", { name: "Projects connected by links" })).not.toBeInTheDocument();
 });
 
-it("centres the network on the busiest project and recentres on a neighbour", async () => {
-  const { user } = show();
-  await user.click(screen.getByRole("button", { name: "Network" }));
-  expect(screen.getByLabelText("Centre project")).toHaveValue("A");
-  const around = screen.getByRole("list", { name: "Projects linked to A" });
-  expect(
-    within(around)
-      .getAllByRole("button")
-      .map((b) => b.textContent),
-  ).toEqual(["B: Cloners 1 out", "C: Relates 1 out"]);
-  await user.click(within(around).getByRole("button", { name: /^B/ }));
-  expect(screen.getByLabelText("Centre project")).toHaveValue("B");
-  expect(screen.getByRole("img", { name: "Projects linked to B by link type" })).toBeInTheDocument();
-});
-
 it("keeps the links with an end whose key contains the text", async () => {
   const { user } = show();
   await user.type(screen.getByLabelText("Key"), "c-1");
@@ -184,57 +183,6 @@ it("keeps only the links between the projects chosen", async () => {
   expect(cell("A", "B")).toHaveTextContent("Cloners 1");
   await user.click(screen.getByRole("button", { name: "Remove A" }));
   expect(screen.getByText("No links between projects to show.")).toBeVisible();
-});
-
-it("draws a hovered project's name last, on top of the others", async () => {
-  const { user } = show();
-  await user.click(screen.getByRole("button", { name: "Network" }));
-  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
-  const node = chart.querySelector('[data-project="B"]')!;
-  fireEvent.mouseEnter(node);
-  const texts = [...chart.querySelectorAll("text")];
-  expect(texts.at(-1)).toHaveTextContent("B");
-  expect(texts.at(-1)).toHaveClass("pie-network-label-hover");
-  fireEvent.mouseLeave(node);
-  expect(chart.querySelector(".pie-network-label-hover")).toBeNull();
-});
-
-it("moves a dragged project without recentring, and lays out afresh for a new centre", async () => {
-  const { user } = show();
-  await user.click(screen.getByRole("button", { name: "Network" }));
-  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
-  const node = chart.querySelector('[data-project="B"]')!;
-  const before = node.querySelector("circle")!.getAttribute("cx");
-  fireEvent.pointerDown(node, { clientX: 0, clientY: 0, pointerId: 1 });
-  fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
-  fireEvent.pointerUp(node, { clientX: 40, clientY: 30, pointerId: 1 });
-  fireEvent.click(node);
-  expect(node.querySelector("circle")!.getAttribute("cx")).not.toBe(before);
-  expect(screen.getByLabelText("Centre project")).toHaveValue("A");
-});
-
-it("stops dragging when the browser cancels the pointer", async () => {
-  const { user } = show();
-  await user.click(screen.getByRole("button", { name: "Network" }));
-  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
-  const node = chart.querySelector('[data-project="B"]')!;
-  fireEvent.pointerDown(node, { clientX: 0, clientY: 0, pointerId: 1, button: 0 });
-  fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
-  fireEvent.pointerCancel(node, { pointerId: 1 });
-  const after = node.querySelector("circle")!.getAttribute("cx");
-  fireEvent.pointerMove(node, { clientX: 90, clientY: 90, pointerId: 1 });
-  expect(node.querySelector("circle")!.getAttribute("cx")).toBe(after);
-});
-
-it("starts no drag from a button other than the main one", async () => {
-  const { user } = show();
-  await user.click(screen.getByRole("button", { name: "Network" }));
-  const chart = screen.getByRole("img", { name: "Projects linked to A by link type" });
-  const node = chart.querySelector('[data-project="B"]')!;
-  const before = node.querySelector("circle")!.getAttribute("cx");
-  fireEvent.pointerDown(node, { clientX: 0, clientY: 0, pointerId: 1, button: 2 });
-  fireEvent.pointerMove(node, { clientX: 40, clientY: 30, pointerId: 1 });
-  expect(node.querySelector("circle")!.getAttribute("cx")).toBe(before);
 });
 
 it("sorts the grid's rows and columns by project key or by project name", async () => {
@@ -293,21 +241,20 @@ it("widens the flow's margins for long project names, and scrolls rather than sq
   expect(area.style.minWidth).toBe(`${width * 0.8}px`);
 });
 
-it("zooms the network, explains it in a legend, and fits the centre's key in its circle", async () => {
-  const res = {
-    issues: [
-      issue("ALPHABETA-1", "Open", [link("B-1", "Cloners", "clones", true)]),
-      issue("B-1", "Open", [link("ALPHABETA-1", "Cloners", "is cloned by", false)]),
-    ],
-    sets: [],
-  };
-  const { user } = show(res);
+it("draws the projects around the busiest one with G6, and hands a project to the Issues view or the grid", async () => {
+  const { user } = show();
   await user.click(screen.getByRole("button", { name: "Network" }));
-  expect(screen.getByRole("group", { name: "Link network zoom" })).toBeVisible();
-  const legend = screen.getByRole("list", { name: "Legend" });
-  expect(legend).toHaveTextContent("Centre: the project chosen");
-  expect(legend).toHaveTextContent("Arrow away from the centre: its issues link out");
-  const hub = document.querySelector(".pie-network-centre")!;
-  // Nine letters do not fit the 24-unit circle a short key gets.
-  expect(Number(hub.getAttribute("r"))).toBeGreaterThan(24);
+  const around = await screen.findByRole("list", { name: "Projects linked to A" });
+  expect(within(around).getAllByRole("button").map((b) => b.textContent)).toEqual(["A", "B", "C"]);
+  await user.click(within(around).getByRole("button", { name: "B" }));
+  await user.click(screen.getByRole("button", { name: "Show its issues" }));
+  // The issue graph starts at B's busiest issue.
+  expect(screen.getByRole("button", { name: "Issues", pressed: true })).toBeVisible();
+  expect(await screen.findByRole("complementary", { name: "Issue B-1" })).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Projects" }));
+  await user.click(await screen.findByRole("button", { name: "Open in Grid" }));
+  // The grid keeps A and the projects linked to it.
+  const grid = screen.getByRole("table", { name: "Projects connected by links" });
+  expect(within(grid).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["A", "B", "C"]);
 });

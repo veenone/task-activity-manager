@@ -193,7 +193,7 @@ Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
 show the same sets three ways, and **Baseline** shows one baseline and what links to it:
 
-Both Flow charts and the Link map's Network can be zoomed. Use
+Both Flow charts can be zoomed. Use
 **+** and **−** above the chart, or hold Ctrl and turn the mouse wheel. The
 chart then scrolls inside its own area, and **Reset** returns it to fit.
 
@@ -300,17 +300,24 @@ all three views.
   the projects you choose. The chart leaves room for the longest project name,
   and scrolls sideways when the window is narrower than that.
 - **Network** puts one project in the middle, the busiest at first, with the
-  projects it links to around it. Each link type has its own spoke, with its
-  count, and the arrows show which way the links point. Pick the centre from
-  **Centre project**, or choose a project in the diagram or in the list beside
-  it to move the centre there. On a busy project the diagram draws the 24 with
-  the most links, and the list names them all. Hover over a project to bring its
-  name to the front, and drag a project to move it when names crowd. Choosing
-  another centre lays the projects out again. The centre circle grows to fit a
-  long project key. A legend under the diagram explains it: an arrow away from
-  the centre means the centre's issues link out to that project, an arrow
-  towards it means that project's issues link in, and a thicker spoke has more
-  links.
+  projects it links to in a ring around it. Each box shows the project's key,
+  how many of its issues are in the run, and its name. There is one line per
+  link type between two projects, coloured by type, with its count on it; a
+  thicker line has more links, and the arrow points the way the links go. A
+  type worded the same both ways, such as "relates to", has no arrow.
+  - Type a key or name in **Centre on a project**, or choose a project and
+    then **Centre here**, to move the centre. **‹ Back** and **Forward ›**
+    step through the projects you centred on.
+  - Choosing a project shows on the right how many of its issues are in the
+    run, its links out and in, and every project it links to by type.
+    **Show its issues** opens **Issues** at that project's busiest issue, and
+    **Open in Grid** shows the grid for it and the projects it links to.
+  - **Relationships** hides a link type and counts each one. **Two rings**
+    adds the projects linked to the ring, dashed. **Hide lines with fewer
+    links than** drops thin lines. On a busy project each ring draws the 24
+    projects with the most links; the panel on the right names them all.
+  - Drag to pan, hold Ctrl and turn the wheel or use **+** and **−** to zoom,
+    and **Fit** to see everything. Changing a filter lays the graph out again.
 
   **Projects** and **Issues** above the diagram switch between projects and
   the issues themselves. **Issues** draws each issue as a box with its key, a

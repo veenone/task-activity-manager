@@ -2,7 +2,6 @@ import { lazy, Suspense, useContext, useMemo, useRef, useState } from "react";
 import { ExpandIssue } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
 import { BrowserOpenURL } from "../wailsjs/runtime/runtime";
-import type { LayoutOptions } from "@antv/g6";
 import type { CanvasApi } from "./G6Canvas";
 import {
   add,
@@ -14,6 +13,7 @@ import {
   looksLikeKey,
   neighbourKeys,
   PER_EXPAND,
+  radialAround,
   search,
   typeCounts,
   unloaded,
@@ -48,9 +48,12 @@ export function IssueGraphView({
   jiraUrl,
   label,
   onOpen,
+  startIn = "",
 }: {
   profileId: string;
   result: query.Result;
+  // startIn starts the graph at the busiest issue of that project (#473).
+  startIn?: string;
   jiraUrl: string;
   label: (project: string) => string;
   onOpen: (key: string) => void;
@@ -60,7 +63,7 @@ export function IssueGraphView({
     () => new Map(result.issues.map((i) => [i.key, i])),
     [result],
   );
-  const [start] = useState(() => busiestIssue(result.issues));
+  const [start] = useState(() => busiestIssue(result.issues.filter((i) => !startIn || i.project === startIn)));
   const [graph, setGraph] = useState<Graph>(() => {
     if (!start) return emptyGraph();
     const first = run.get(start)!;
@@ -164,19 +167,7 @@ export function IssueGraphView({
     if (centred) setCentre(key);
   }
 
-  // Rings of neighbours around the centre, sized to the boxes G6Canvas draws.
-  const layout = useMemo<LayoutOptions>(
-    () => ({
-      type: "radial",
-      focusNode: centre ?? undefined,
-      unitRadius: 220,
-      linkDistance: 220,
-      preventOverlap: true,
-      nodeSize: 150,
-      nodeSpacing: 20,
-    }),
-    [centre],
-  );
+  const layout = useMemo(() => radialAround(centre), [centre]);
 
   // Kept from render to render, so typing in Find does not redraw the graph.
   const { nodes, edges } = useMemo(() => {

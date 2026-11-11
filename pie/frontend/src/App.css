@@ -343,98 +343,9 @@ body,
   stroke-width: 3px;
 }
 
-/* Link map: the type column of its flow, and the project-centred network
-   (#437). Spokes are neutral; the type is in the label, not a colour. */
+/* Link map: the type column of its flow (#437). */
 .pie-flow-type {
   fill: var(--accent);
-}
-
-.pie-network {
-  display: flex;
-  flex: 1;
-  gap: 14px;
-  min-height: 0;
-  overflow: auto;
-}
-
-.pie-network-chart {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 480px;
-}
-
-.pie-network-pick {
-  display: flex;
-  white-space: nowrap;
-  gap: 8px;
-  align-items: center;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-
-.pie-network-pick select {
-  width: auto;
-}
-
-.pie-network-svg {
-  width: 100%;
-  max-height: 70vh;
-}
-
-.pie-network-spoke {
-  stroke: var(--border-strong);
-}
-
-.pie-network-spoke:hover {
-  stroke: var(--accent);
-}
-
-.pie-network-arrow {
-  fill: var(--text-muted);
-}
-
-.pie-network-centre {
-  fill: var(--accent);
-}
-
-.pie-network-node {
-  cursor: grab;
-  touch-action: none;
-}
-
-.pie-network-node:active {
-  cursor: grabbing;
-}
-
-.pie-network-node circle {
-  fill: var(--surface);
-  stroke: var(--accent);
-  stroke-width: 2px;
-}
-
-.pie-network-node:hover circle {
-  fill: var(--accent-soft);
-}
-
-.pie-network-label,
-.pie-network-type {
-  fill: var(--text);
-  font-size: var(--fs-sm);
-  paint-order: stroke;
-  stroke: var(--surface);
-  stroke-width: 3px;
-}
-
-.pie-network-type {
-  fill: var(--text-muted);
-}
-
-.pie-network-hub {
-  fill: var(--on-accent);
-  font-size: var(--fs-sm);
-  font-weight: 600;
 }
 
 .pie-flow-side {
@@ -1074,11 +985,6 @@ body,
   max-height: none;
 }
 
-.pie-network-label-hover {
-  font-weight: 600;
-  pointer-events: none;
-}
-
 /* The Confluence part of a profile's form (#453). */
 .pie-profile-confluence {
   display: flex;
@@ -1178,27 +1084,6 @@ body,
 .pie-flow-pick {
   max-width: 360px;
 }
-
-/* Zoomed, the network keeps its own proportions and the box scrolls. */
-.pie-zoom-area .pie-network-svg {
-  max-height: none;
-}
-
-.pie-network-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-}
-.pie-network-legend li {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
 .pie-legend-hub,
 .pie-legend-node {
   width: 10px;
@@ -1241,6 +1126,10 @@ body,
   font-weight: 600;
 }
 .pie-graph-side .pie-check .muted {
+  margin-left: auto;
+}
+.pie-graph-min {
+  width: 4.5em;
   margin-left: auto;
 }
 .pie-graph-found {
