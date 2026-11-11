@@ -49,7 +49,7 @@ it("stops at the canvas limit and says how many did not fit", () => {
   expect(left).toBe(5);
 });
 
-it("filters by type, by run and by finished, but keeps the issue in focus", () => {
+it("filters by type, by run and by finished, but keeps the issue in focus and the centre", () => {
   const a = issue("A-1", { links: [link("B-1", "Blocks", true), link("C-1", "Cloners", true)] });
   const { graph } = add(emptyGraph(), [
     { issue: a, inRun: true, fetchedAt: "" },
@@ -61,6 +61,8 @@ it("filters by type, by run and by finished, but keeps the issue in focus", () =
   expect(visible(graph, { ...all, hiddenTypes: new Set(["Cloners"]) }, null).edges.map((e) => e.type)).toEqual(["Blocks"]);
   expect(visible(graph, { ...all, outside: false }, null).nodes.map((n) => n.key)).toEqual(["A-1", "B-1"]);
   expect(visible(graph, { ...all, finished: false }, "B-1").nodes.map((n) => n.key)).toEqual(["A-1", "B-1", "C-1"]);
+  // The centre is kept too, even when only a filter would hide it.
+  expect(visible(graph, { ...all, outside: false }, "A-1", "C-1").nodes.map((n) => n.key)).toEqual(["A-1", "B-1", "C-1"]);
   expect(typeCounts(graph)).toEqual([["Blocks", 1], ["Cloners", 1]]);
 });
 

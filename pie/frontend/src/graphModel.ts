@@ -85,9 +85,10 @@ export function unloaded(g: Graph, key: string): number {
 export type Filter = { hiddenTypes: Set<string>; outside: boolean; finished: boolean };
 
 // visible applies the filters. The issue in focus always stays.
-export function visible(g: Graph, f: Filter, focus: string | null): { nodes: GNode[]; edges: GEdge[] } {
+// The issues in keep, the focus and the centre, stay whatever the filters say.
+export function visible(g: Graph, f: Filter, ...keep: (string | null)[]): { nodes: GNode[]; edges: GEdge[] } {
   const nodes = [...g.nodes.values()].filter(
-    (n) => n.key === focus || ((f.outside || n.inRun) && (f.finished || n.issue.statusCategory !== "done")),
+    (n) => keep.includes(n.key) || ((f.outside || n.inRun) && (f.finished || n.issue.statusCategory !== "done")),
   );
   const shown = new Set(nodes.map((n) => n.key));
   const edges = [...g.edges.values()].filter((e) => !f.hiddenTypes.has(e.type) && shown.has(e.source) && shown.has(e.target));

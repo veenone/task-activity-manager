@@ -13,13 +13,16 @@ vi.mock("./G6Canvas", () => ({
   default: ({
     nodes,
     edges,
+    layout,
     onSelect,
   }: {
     nodes: { id: string; dashed?: boolean; badge?: string }[];
     edges: { id: string }[];
+    layout?: { focusNode?: string };
     onSelect: (id: string) => void;
   }) => (
     <div>
+      <p>{`Centred on ${layout?.focusNode}`}</p>
       <ul aria-label="Nodes">
         {nodes.map((n) => (
           <li key={n.id}>
@@ -156,4 +159,17 @@ it("takes one expansion at a time, so a second cannot drop the first one's issue
   expect(api.ExpandIssue).toHaveBeenCalledTimes(1);
   finish({ issues: [{ issue: result.issues[0], fetchedAt: "" }, { issue: issue("Z-9"), fetchedAt: "" }], offline: false, missing: [] });
   expect(await screen.findByRole("button", { name: /^Z-9/ })).toBeVisible();
+});
+
+it("centres the graph on the run's busiest issue, on a key typed in Find, and on Centre here", async () => {
+  vi.mocked(api.ExpandIssue).mockResolvedValue({ issues: [{ issue: issue("CC-5"), fetchedAt: "" }], offline: false, missing: [] } as never);
+  const { user } = show();
+  expect(await screen.findByText("Centred on A-1")).toBeVisible();
+  // Choosing a node selects it and leaves the centre where it is.
+  await user.click(within(screen.getByRole("list", { name: "Nodes" })).getByRole("button", { name: "B-1" }));
+  expect(screen.getByText("Centred on A-1")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Centre here" }));
+  expect(screen.getByText("Centred on B-1")).toBeVisible();
+  await user.type(screen.getByRole("searchbox", { name: "Find an issue" }), "cc-5{Enter}");
+  expect(await screen.findByText("Centred on CC-5")).toBeVisible();
 });
