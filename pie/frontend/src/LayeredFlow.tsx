@@ -91,7 +91,7 @@ export function LayeredFlow({
     for (const l of lines)
       if (l[other] === box?.id)
         by.set(l[end], new Set([...(by.get(l[end]) ?? []), ...l.keys]));
-    return [...by].map(([id, keys]) => `${name(id)} ${keys.size}`);
+    return [...by].map(([id, keys]) => ({ id, text: `${name(id)} ${keys.size}` }));
   };
   const keys = box ? box.keys : [...new Set(paths.map((p) => p.key))];
   const title = box ? `Box ${name(box.id)}` : "Everything shown";
@@ -182,7 +182,7 @@ export function LayeredFlow({
                   <h4>{heading}</h4>
                   <ul className="pie-graph-found" aria-label={heading}>
                     {items.map((t) => (
-                      <li key={t}>{t}</li>
+                      <li key={t.id}>{t.text}</li>
                     ))}
                   </ul>
                 </section>

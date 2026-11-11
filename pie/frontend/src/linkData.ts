@@ -85,9 +85,9 @@ export function neighbours(centre: string, edges: Edge[], issues: Map<string, qu
 
 // flowPaths runs each link from the project it starts in, through its type,
 // to the project it points to, for the layered flow. Each link is one key,
-// from>to, and its lines take the link type's colour.
+// from>to:type, and its lines take the link type's colour.
 export const flowPaths = (edges: Edge[], issues: Map<string, query.Issue>): FlowPath[] =>
   edges.map((e) => {
     const [from, to] = ends(e, issues);
-    return { key: `${e.from}>${e.to}`, steps: [`f:${from}`, `t:${e.type}`, `o:${to}`], type: e.type };
+    return { key: `${e.from}>${e.to}:${e.type}`, steps: [`f:${from}`, `t:${e.type}`, `o:${to}`], type: e.type };
   });

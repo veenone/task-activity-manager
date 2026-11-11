@@ -48,5 +48,12 @@ it("lists a project's neighbours with each link type's count both ways, most lin
 
 it("runs each link from its project through its type to the other project", () => {
   const paths = flowPaths(web, projects);
-  expect(paths.find((p) => p.key === "A-1>B-1")).toEqual({ key: "A-1>B-1", steps: ["f:A", "t:Cloners", "o:B"], type: "Cloners" });
+  expect(paths.find((p) => p.key === "A-1>B-1:Cloners")).toEqual({
+    key: "A-1>B-1:Cloners",
+    steps: ["f:A", "t:Cloners", "o:B"],
+    type: "Cloners",
+  });
+  // Two types between one pair of issues are two links, not one.
+  const twice = flowPaths([...web, { from: "A-1", to: "B-1", type: "Blocks" }], projects);
+  expect(new Set(twice.map((p) => p.key)).size).toBe(twice.length);
 });
