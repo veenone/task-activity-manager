@@ -77,15 +77,28 @@ describe("ContainersView compact layout", () => {
     vi.mocked(ListContainers).mockImplementation(list);
   });
 
-  it("filters by result only from Filters; the card's bar and badges just count", async () => {
+  it("filters by result from the card's run bar too, and clears it on a second click", async () => {
     renderWithCaps({});
     await selectTestExecutions();
     await screen.findByText("Login works");
-    await userEvent.click(screen.getByRole("button", { name: "Show details" }));
     const card = document.querySelector(".container-card") as HTMLElement;
-    expect(within(card).getByText("FAIL 1")).toBeVisible();
-    // Neither the badge nor the bar is a control any more.
-    expect(within(card).queryByRole("button", { name: /FAIL/ })).toBeNull();
+    const fail = within(card).getByRole("button", { name: "FAIL: 1" });
+    await userEvent.click(fail);
+    expect(fail).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Result: FAIL")).toBeVisible();
+    await userEvent.click(fail);
+    expect(screen.queryByText("Result: FAIL")).toBeNull();
+  });
+
+  it("puts Add tests first, with Import results in the menu beside it", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+    await screen.findByText("Login works");
+    const card = document.querySelector(".container-card") as HTMLElement;
+    expect(within(card).getByRole("button", { name: "+ Add tests" })).toBeVisible();
+    expect(within(card).queryByRole("button", { name: "Import results" })).toBeNull();
+    await userEvent.click(within(card).getByRole("button", { name: "More ways to add tests" }));
+    expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add tests", "Import results…"]);
   });
 
   it("filters a Test Plan's tests by label too", async () => {

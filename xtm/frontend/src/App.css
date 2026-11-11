@@ -1374,13 +1374,11 @@ i.sankey-node-l2 {
   padding: 10px 14px;
   margin-bottom: 10px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  /* Cap the card so a data-heavy execution (many environments, sub-executions,
-     related bugs) cannot grow tall enough to push the member table off-screen
-     (RND_P_4TFINT_05-311). It scrolls internally past this height; the table
-     below keeps its space. (flex: 0 0 auto already applies via the grouped
-     rule above.) */
-  max-height: 42vh;
-  overflow-y: auto;
+  /* The card itself does not scroll, so the menu on its top line can open
+     over the table (#471). Its details scroll instead (below), and the
+     related bugs in their own box, so a data-heavy execution still cannot
+     push the member table off-screen (RND_P_4TFINT_05-311). (flex: 0 0 auto
+     already applies via the grouped rule above.) */
 }
 .container-card-top {
   display: flex;
@@ -7412,10 +7410,6 @@ tr.row-checked:hover {
   align-items: center;
   gap: 6px;
 }
-.member-jql {
-  width: 320px;
-  margin-bottom: 0;
-}
 
 /* The compact containers layout (#456). The item picker shrinks first; the
    head's buttons keep their size and place. */
@@ -7432,10 +7426,34 @@ tr.row-checked:hover {
   flex: none;
   margin-left: auto;
 }
-/* The card's one line: a slim run bar, then its buttons at the right. */
+/* The card's one line: a slim run bar, then its buttons at the right. The
+   bar's own 160px minimum made it spill over Related bugs (#471). */
 .container-card-runbar {
   flex: none;
   width: 120px;
+}
+.container-card-runbar .run-bar {
+  min-width: 0;
+}
+.run-bar button.run-seg {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+/* A main action with a menu of the others fixed to its right edge. */
+.split-btn {
+  display: inline-flex;
+}
+.split-btn > .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split-btn .split-btn-caret {
+  margin-left: -1px;
+  padding-inline: 6px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 .container-card-actions {
   display: flex;
@@ -7448,6 +7466,8 @@ tr.row-checked:hover {
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
+  max-height: 34vh;
+  overflow-y: auto;
 }
 /* One filter row: Filters, then a chip for each filter in force; open, the
    panel below holds every filter. */
@@ -7461,14 +7481,20 @@ tr.row-checked:hover {
   gap: 6px;
   align-items: center;
 }
+/* Every filter on one row, wrapping only when the window is narrow (#471). */
 .filters-row-panel {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   margin-top: 6px;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--r-2);
+}
+.filters-row-panel .container-filter-bar,
+.filters-row-panel .member-filters {
+  margin: 0;
 }
 .filter-chip {
   gap: 4px;

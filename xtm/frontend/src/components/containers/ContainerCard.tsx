@@ -1,20 +1,22 @@
 
+import { Menu } from "../Menu";
 import { RunBar, RunBadge } from "./RunCells";
 import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
 // ContainerCard is the selected container's detail. Its first line carries
 // what an analyst needs while working the tests: kind, key, name, status,
-// count, a slim run bar, Related bugs and the add buttons. Parent,
+// count, a slim run bar that filters by result, Related bugs and the add
+// button. Parent,
 // environments, fix versions and the result badges fold behind the caret,
-// so the member table below keeps the height (#456). The bar, badges and
-// fix versions only show; the Filters row is the one place that filters,
-// and they mark what it has chosen.
+// so the member table below keeps the height (#456). The badges and fix
+// versions only show and mark what the Filters row has chosen; the bar
+// filters by result too (#471).
 export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActions; p: ContainerViewProps }) {
   const {
     kind, envDraft, setEnvDraft, bugsExpanded, setBugsExpanded, editingName, setEditingName,
     nameDraft, setNameDraft, setShowAdd, setShowJUnitImport, memberFvFilter,
-    memberRunFilter, cardCollapsed, setCardCollapsed, caps, board, relatedBugs, focusRef,
+    memberRunFilter, setMemberRunFilter, setBoardPage, cardCollapsed, setCardCollapsed, caps, board, relatedBugs, focusRef,
     kindLabel, selectedContainer, rollup,
   } = s;
   const { commitInlineRename, addEnvironment, removeEnvironment, openParent, openBug, openBreakdown } = a;
@@ -69,7 +71,14 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
         </span>
         {board && board.runCounts.length > 0 && (
           <span className="container-card-runbar">
-            <RunBar counts={board.runCounts} active={memberRunFilter} />
+            <RunBar
+              counts={board.runCounts}
+              active={memberRunFilter}
+              onPick={(label) => {
+                setMemberRunFilter(memberRunFilter === label ? "" : label);
+                setBoardPage(0);
+              }}
+            />
           </span>
         )}
         <span className="container-card-actions">
@@ -84,14 +93,31 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
               Related bugs{relatedBugs.length > 0 ? ` (${relatedBugs.length})` : ""}
             </button>
           )}
-          <button className="btn container-card-add" onClick={() => setShowAdd(true)} title={`Assign tests to this ${kindLabel}`}>
-            + Add tests
-          </button>
-          {kind === "testexec" && (
-            <button className="btn" onClick={() => setShowJUnitImport(true)} title="Import test run results from a JUnit XML report">
-              Import results
+          {/* One button for the ways tests come in: Add tests first, and on
+              an execution a menu with Import results beside it (#471). */}
+          <span className="split-btn">
+            <button className="btn container-card-add" onClick={() => setShowAdd(true)} title={`Assign tests to this ${kindLabel}`}>
+              + Add tests
             </button>
-          )}
+            {kind === "testexec" && (
+              <Menu
+                label=""
+                align="right"
+                triggerClassName="btn split-btn-caret"
+                triggerLabel="More ways to add tests"
+                title="More ways to add tests"
+                items={[
+                  { key: "add", label: "Add tests", onClick: () => setShowAdd(true) },
+                  {
+                    key: "junit",
+                    label: "Import results…",
+                    onClick: () => setShowJUnitImport(true),
+                    title: "Import test run results from a JUnit XML report",
+                  },
+                ]}
+              />
+            )}
+          </span>
         </span>
       </div>
 
