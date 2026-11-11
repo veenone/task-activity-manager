@@ -89,3 +89,21 @@ func TestIssuesLeavesOutAKeyJiraRefuses(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+// The baseline view compares a baseline's Fix Versions (#465).
+func TestRunReadsFixVersions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !slices.Contains(strings.Split(r.URL.Query().Get("fields"), ","), "fixVersions") {
+			t.Errorf("fields %q", r.URL.Query().Get("fields"))
+		}
+		_, _ = w.Write([]byte(`{"total":1,"issues":[{"key":"B-2","fields":{"fixVersions":[{"name":"3.4.0"},{"name":"3.4.1"}]}}]}`))
+	}))
+	defer srv.Close()
+	res, err := Run(context.Background(), corejira.NewClient(srv.URL, "t"), "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(res.Issues[0].FixVersions, []string{"3.4.0", "3.4.1"}) {
+		t.Fatalf("fix versions %v", res.Issues[0].FixVersions)
+	}
+}

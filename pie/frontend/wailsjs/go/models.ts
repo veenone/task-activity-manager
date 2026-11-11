@@ -542,6 +542,7 @@ export namespace query {
 	    links: Link[];
 	    parent: string;
 	    subtasks: string[];
+	    fixVersions: string[];
 	    bases: string[];
 	    clientVisibility: string;
 	    clientImpact: string;
@@ -567,6 +568,7 @@ export namespace query {
 	        this.links = this.convertValues(source["links"], Link);
 	        this.parent = source["parent"];
 	        this.subtasks = source["subtasks"];
+	        this.fixVersions = source["fixVersions"];
 	        this.bases = source["bases"];
 	        this.clientVisibility = source["clientVisibility"];
 	        this.clientImpact = source["clientImpact"];

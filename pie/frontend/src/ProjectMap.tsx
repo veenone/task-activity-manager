@@ -8,12 +8,13 @@ import { filterSets, type MapFilter } from "./mapData";
 import { ExportButton } from "./ExportButton";
 import { mapSheet, setSheet } from "./exportSheets";
 import { MapFlow } from "./MapFlow";
+import { BaselineView } from "./BaselineView";
 import { MapTree } from "./MapTree";
 import { Pager, usePaged } from "./Pager";
 import { ProjectInput } from "./ProjectInput";
 import { Card } from "./Statistics";
 
-const VIEWS = ["Flow", "Tree", "Table"] as const;
+const VIEWS = ["Flow", "Tree", "Baseline", "Table"] as const;
 const NO_FILTER: MapFilter = { baseline: "", project: "", key: "" };
 
 // ProjectMap puts every linked set against every project it touches, so a
@@ -159,6 +160,9 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
       )}
       {view === "Flow" && <MapFlow sets={sets} issues={issues} groups={shown} names={names} onOpen={onOpen} />}
       {view === "Tree" && <MapTree sets={sets} issues={issues} groups={shown} names={names} onOpen={onOpen} />}
+      {view === "Baseline" && (
+        <BaselineView result={result} baselines={baselines} onOpen={onOpen} />
+      )}
       {view === "Table" && (
         <>
           <div className="pie-results">

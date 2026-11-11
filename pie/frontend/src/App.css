@@ -1331,3 +1331,11 @@ body,
   gap: 6px;
   margin-top: 6px;
 }
+
+/* The baseline comparison: a change for the worse, or for the better (#465). */
+.pie-change-bad {
+  color: var(--danger-fg-strong);
+}
+.pie-change-good {
+  color: var(--ok-text);
+}

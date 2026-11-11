@@ -28,7 +28,7 @@ const pageSize = 100
 // limiter still paces them, so this bounds waiting, not load.
 const workers = 4
 
-var fields = []string{"summary", "project", "issuetype", "status", "priority", "updated", "created", "resolutiondate", "issuelinks", "parent", "subtasks"}
+var fields = []string{"summary", "project", "issuetype", "status", "priority", "updated", "created", "resolutiondate", "issuelinks", "parent", "subtasks", "fixVersions"}
 
 // Issue is one row of a query's result.
 type Issue struct {
@@ -51,6 +51,9 @@ type Issue struct {
 	// for the issue graph's parent edges (#464).
 	Parent   string   `json:"parent"`
 	Subtasks []string `json:"subtasks"`
+	// FixVersions are the issue's Fix Version names, for the baseline view's
+	// version picker and comparison (#465).
+	FixVersions []string `json:"fixVersions"`
 	// Bases are the values of the profile's product base field. An option field
 	// with several options gives several.
 	Bases []string `json:"bases"`
@@ -234,6 +237,7 @@ func toIssue(raw corejira.RawIssue) Issue {
 		Links:          links(raw.Fields["issuelinks"]),
 		Parent:         named(raw.Fields["parent"], "key"),
 		Subtasks:       keys(raw.Fields["subtasks"]),
+		FixVersions:    names(raw.Fields["fixVersions"]),
 		Matched:        true,
 	}
 }
@@ -259,6 +263,21 @@ func links(raw json.RawMessage) []Link {
 			out = append(out, Link{Key: l.Outward.Key, Type: l.Type.Name, Words: l.Type.Outward, Outward: true, Symmetric: symmetric})
 		case l.Inward != nil && l.Inward.Key != "":
 			out = append(out, Link{Key: l.Inward.Key, Type: l.Type.Name, Words: l.Type.Inward, Symmetric: symmetric})
+		}
+	}
+	return out
+}
+
+// names reads a list of named things, such as Fix Versions, as their names.
+func names(raw json.RawMessage) []string {
+	var ns []struct{ Name string }
+	if json.Unmarshal(raw, &ns) != nil {
+		return nil
+	}
+	out := make([]string, 0, len(ns))
+	for _, n := range ns {
+		if n.Name != "" {
+			out = append(out, n.Name)
 		}
 	}
 	return out
