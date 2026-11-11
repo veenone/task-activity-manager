@@ -173,11 +173,9 @@ export function formatRunDate(iso: string): string {
 }
 
 // RunBar is a compact stacked bar of run-status proportions for the selected
-// container, a glanceable view of how its tests are doing. It only shows:
-// the Filters row filters by result, and the bar lights the result chosen
-// there while the rest dim (#456).
-// RunBar draws the results as one bar. Given onPick, each segment is a
-// button that filters the member table to its result (#471).
+// container. The result chosen in the Filters row lights while the rest dim
+// (#456). Given onPick, each segment is a button that sets that same filter
+// (#471).
 export function RunBar({ counts, active, onPick }: { counts: Bucket[]; active?: string; onPick?: (label: string) => void }) {
   const sum = counts.reduce((a, b) => a + b.count, 0) || 1;
   return (

@@ -133,3 +133,20 @@ it("clears the JQL filter", async () => {
     .click(screen.getByRole("button", { name: "Clear JQL" }));
   expect(onJqlKeys).toHaveBeenCalledWith(null);
 });
+
+it("forgets the last query and its error on another container, and on Cancel", async () => {
+  vi.mocked(api.ContainerTestsMatching).mockRejectedValue(new Error("Field 'bad' does not exist."));
+  const props = { profileId: "p1", labels: [], label: "", onLabel: vi.fn(), jqlOn: false, onJqlKeys: vi.fn() };
+  const { rerender } = render(<MemberFilters containerKey="QA-TE-1" {...props} />);
+  const user = userEvent.setup();
+  answer.value = "bad = 1";
+  await user.click(screen.getByRole("button", { name: "JQL…" }));
+  expect(await screen.findByRole("alert")).toBeVisible();
+  // Cancel clears the old refusal.
+  answer.value = null;
+  await user.click(screen.getByRole("button", { name: "JQL…" }));
+  expect(screen.queryByRole("alert")).toBeNull();
+  rerender(<MemberFilters containerKey="QA-TE-2" {...props} />);
+  await user.click(screen.getByRole("button", { name: "JQL…" }));
+  expect(answer.asked[answer.asked.length - 1]).toMatchObject({ defaultValue: "" });
+});

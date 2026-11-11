@@ -51,10 +51,18 @@ export function MemberFilters({
   const [jql, setJql] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Another container starts without the last one's query or refusal.
+  const [shownFor, setShownFor] = useState(containerKey);
+  if (shownFor !== containerKey) {
+    setShownFor(containerKey);
+    setJql("");
+    setError("");
+  }
   // JQL is the filter used least, so it asks in a dialog rather than
   // keeping a wide box on the filter row (#471). The dialog opens on the
   // last query, so a refused one can be fixed.
   const ask = async () => {
+    setError("");
     const q = (
       await prompt({
         title: "Filter the tests by JQL",

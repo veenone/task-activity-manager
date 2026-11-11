@@ -7441,6 +7441,12 @@ tr.row-checked:hover {
   border-radius: 0;
   cursor: pointer;
 }
+/* The bar clips anything outside it, so the focus ring is drawn inside. */
+.run-bar button.run-seg:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+  opacity: 1;
+}
 /* A main action with a menu of the others fixed to its right edge. */
 .split-btn {
   display: inline-flex;
