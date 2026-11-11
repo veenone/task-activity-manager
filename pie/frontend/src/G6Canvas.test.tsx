@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import G6Canvas, { type CanvasNode } from "./G6Canvas";
 
 // jsdom has no canvas, so G6's Graph is a recorder of what it was asked.
+const failNext = vi.hoisted(() => [] as string[]);
 const made = vi.hoisted(
   () => [] as { calls: string[]; options: Record<string, unknown> }[],
 );
@@ -26,7 +27,9 @@ vi.mock("@antv/g6", () => ({
     }
     render() {
       this.calls.push("render");
-      return Promise.resolve();
+      return failNext.length
+        ? Promise.reject(new Error(failNext.pop()))
+        : Promise.resolve();
     }
     draw() {
       this.calls.push("draw");
@@ -154,4 +157,47 @@ it("takes the layout it is given, and lays out again when it changes", async () 
   );
   await settle();
   expect(g.calls).toEqual(["layout:radial", "render", "fit", "zoom:1"]);
+});
+
+it("lays out again only when what is drawn changes, not for the same issues in new lists", async () => {
+  const { rerender } = render(
+    <G6Canvas
+      nodes={nodes}
+      edges={none}
+      focus={null}
+      onSelect={() => {}}
+      label="Graph"
+    />,
+  );
+  await settle();
+  const g = made[0];
+  g.calls.length = 0;
+  // A view rebuilds its lists when the focus moves; the boxes must stay put.
+  rerender(
+    <G6Canvas
+      nodes={nodes.map((n) => ({ ...n, faded: true }))}
+      edges={[]}
+      focus="B-1"
+      onSelect={() => {}}
+      label="Graph"
+    />,
+  );
+  await settle();
+  expect(g.calls).toEqual(["draw", "focus:B-1"]);
+});
+
+it("says so when the graph cannot be drawn", async () => {
+  failNext.push("bad layout");
+  render(
+    <G6Canvas
+      nodes={nodes}
+      edges={none}
+      focus={null}
+      onSelect={() => {}}
+      label="Graph"
+    />,
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The graph could not be drawn: bad layout",
+  );
 });

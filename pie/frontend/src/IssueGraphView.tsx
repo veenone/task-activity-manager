@@ -158,10 +158,10 @@ export function IssueGraphView({
     return true;
   }
 
-  async function go(key: string) {
-    if (!graph.nodes.has(key) && !(await expand(key))) return false;
+  async function go(key: string, centred = false) {
+    if (!graph.nodes.has(key) && !(await expand(key))) return;
     setHistory((h) => visit(h, key));
-    return true;
+    if (centred) setCentre(key);
   }
 
   // Rings of neighbours around the centre, sized to the boxes G6Canvas draws.
@@ -184,6 +184,7 @@ export function IssueGraphView({
       graph,
       { hiddenTypes: hidden, outside, finished },
       focus,
+      centre,
     );
     return {
       nodes: shown.nodes.map((n) => {
@@ -208,7 +209,7 @@ export function IssueGraphView({
         directed: e.directed,
       })),
     };
-  }, [graph, hidden, outside, finished, focus]);
+  }, [graph, hidden, outside, finished, focus, centre]);
   const matches = search(graph, find);
   const chosen = focus ? graph.nodes.get(focus) : undefined;
 
@@ -224,10 +225,7 @@ export function IssueGraphView({
               matches[0]?.key ??
               (looksLikeKey(find) ? find.trim().toUpperCase() : "");
             if (key)
-              void go(key).then((ok) => {
-                setFind("");
-                if (ok) setCentre(key);
-              });
+              void go(key, true).then(() => setFind(""));
           }}
         >
           <input

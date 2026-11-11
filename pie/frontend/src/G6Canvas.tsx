@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { Graph, NodeEvent, type GraphData, type IElementEvent, type LayoutOptions } from "@antv/g6";
 
 // G6Canvas is the one place PIE talks to AntV G6 (#464, #465): it draws the
@@ -127,10 +127,14 @@ export default function G6Canvas({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const graph = useRef<Graph | null>(null);
-  // What the graph was last laid out from. Any new nodes, edges, groups or
-  // layout, which is what an option change makes, lays it out again (#469);
-  // a new focus alone is redrawn in place, so the boxes stay put.
-  const laidOut = useRef<unknown[]>([]);
+  // What the graph was last laid out from: the issues, links and groups
+  // drawn, and the layout. An option that changes them lays it out again
+  // (#469). A change of style only, such as the focus or a faded trace, is
+  // redrawn in place, so the boxes stay where the analyst panned to.
+  const laidOut = useRef<{ shape: string; layout: LayoutOptions } | null>(null);
+  // Each drawing's number: a slower earlier one must not fit or focus over it.
+  const drawing = useRef(0);
+  const [failed, setFailed] = useState("");
   const firstLayout = useRef(layout);
   // The latest handler, so the graph made once still calls the current one.
   const pick = useRef(onSelect);
@@ -141,7 +145,7 @@ export default function G6Canvas({
     // A new graph has laid nothing out yet. StrictMode makes a second one on
     // mount, and it drew without a layout, every node at 0,0, while this ref
     // still held the first one's (#469).
-    laidOut.current = [];
+    laidOut.current = null;
     const g = new Graph({
       container: box.current,
       animation: true,
@@ -163,26 +167,36 @@ export default function G6Canvas({
     const g = graph.current;
     if (!g) return;
     g.setData(data(nodes, edges, combos, focus));
-    const from = [nodes, edges, combos, layout];
+    const shape = [
+      ...nodes.map((n) => `${n.id}@${n.combo ?? ""}`),
+      ...edges.map((e) => e.id),
+      ...combos.map((c) => `#${c.id}<${c.parent ?? ""}`),
+    ].join(",");
     const before = laidOut.current;
-    const moved = from.some((x, i) => x !== before[i]);
-    laidOut.current = from;
-    if (moved && before.length > 0 && layout !== before[3]) g.setLayout(still(layout));
+    const moved = !before || before.shape !== shape || before.layout !== layout;
+    laidOut.current = { shape, layout };
+    if (before && before.layout !== layout) g.setLayout(still(layout));
+    const mine = ++drawing.current;
+    const live = () => graph.current === g && drawing.current === mine;
     // Fit shrinks a graph that overflows either way and centres it, but never
     // enlarges a small one past its real size. G6's own "overflow" fit waits
     // for the graph to overflow both ways.
     const drawn = moved
       ? g
           .render()
-          .then(() => g.fitView())
-          .then(() => (g.getZoom() > 1 ? g.zoomTo(1) : undefined))
+          .then(() => (live() ? g.fitView() : undefined))
+          .then(() => (live() && g.getZoom() > 1 ? g.zoomTo(1) : undefined))
       : g.draw();
     drawn
-      .then(() => (focus && g.hasNode(focus) ? g.focusElement(focus, { duration: 500, easing: "ease-in-out" }) : undefined))
+      .then(() => {
+        if (!live()) return;
+        setFailed("");
+        if (focus && g.hasNode(focus)) return g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
+      })
       // A render still running when its graph is destroyed fails; only a
-      // failure of the live graph is worth reporting.
+      // failure of the live graph is worth showing.
       .catch((e: unknown) => {
-        if (graph.current === g) throw e;
+        if (graph.current === g) setFailed(e instanceof Error ? e.message : String(e));
       });
   }, [nodes, edges, combos, focus, layout]);
 
@@ -194,6 +208,11 @@ export default function G6Canvas({
   const zoom = (by: number) => void graph.current?.zoomBy(by, { duration: 200 });
   return (
     <>
+      {failed && (
+        <p role="alert" className="error-text">
+          {`The graph could not be drawn: ${failed}`}
+        </p>
+      )}
       <div ref={box} className="pie-g6" role="img" aria-label={label} />
       <div className="pie-zoom-controls" role="group" aria-label="Graph zoom">
         <button type="button" className="btn btn-ghost" aria-label="Zoom in" onClick={() => zoom(1.25)}>
