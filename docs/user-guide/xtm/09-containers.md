@@ -14,17 +14,17 @@ The toggle at the top left switches between **Containers** and [Bugs](#work-with
 
 ![Picking a Test Execution](images/containers-02-pick-execution.png)
 
-The card under the filters is one line: the container's type, key, name, status, test count and a small bar of its results, then **Related bugs**, **+ Add tests** and, for an execution, **Import results**. A long name is cut short; hover over it to read it whole. **Related bugs** shows how many defects are linked through its tests, and opens their list under the card. Click **▸** at the start of the card to show the details: the parent issue, the **Environments** and **Fix version(s)** of an execution, the result counts, and a plan's or set's consolidated results. The bar and the result counts only show; to filter by result or fix version, use **Filters**. The view remembers whether you left the details open.
+The card under the filters is one line: the container's type, key, name, status, test count and a small bar of its results, then **Related bugs** and **+ Add tests**. On an execution, the **▾** beside **+ Add tests** also offers **Import results…**. A long name is cut short; hover over it to read it whole. **Related bugs** shows how many defects are linked through its tests, and opens their list under the card. Click **▸** at the start of the card to show the details: the parent issue, the **Environments** and **Fix version(s)** of an execution, the result counts, and a plan's or set's consolidated results. Click a colour on the bar to show only the tests with that result, and click it again to show them all; it sets the same filter as **Result** under **Filters**. The result counts in the details only show. The view remembers whether you left the details open.
 
 ![A Test Execution and its runs](images/containers-03-execution-card.png)
 
 The table lists the member tests. For a Test Execution it adds the run columns: Execution, Date, By, Environment, Fix Version, Defects and Remarks.
 
-Above the table, **Filters** opens every filter for the view, in one panel:
+Above the table, **Filters** opens every filter for the view, on one row:
 
 - the filters for the container list: **All executions**, **All environments**, the sort, and **Set env on shown**
 - **Fix version** and **Result**, for the tests of the container you opened
-- **Label** and **JQL**, which narrow the tests the way Jira's Test Execution page does, for any container type. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. JQL asks Jira which of the container's tests also match your query, and keeps those. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL and say so.
+- **Label** and **JQL**, which narrow the tests the way Jira's Test Execution page does, for any container type. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. **JQL…** opens a box for the query, and asks Jira which of the container's tests also match it; those are kept. It opens again on your last query, so you can fix one Jira refused. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL and say so.
 
 With the panel closed, the button says how many filters are in force, for example **Filters (2)**, and each one shows beside it as a chip. Click **✕** on a chip to remove that filter.
 
@@ -143,7 +143,7 @@ On a demo profile, **Regenerate sample data** and **Clean sample data…** reset
 ### Into an existing execution
 
 1. Pick the Test Execution.
-2. Click **Import results** on its card and choose the report.
+2. On its card, click **▾** beside **+ Add tests**, choose **Import results…**, and choose the report.
 3. Check the preview. It lists the results it will apply and the testcases it skipped, with the reason.
 4. Click **Apply N results**.
 

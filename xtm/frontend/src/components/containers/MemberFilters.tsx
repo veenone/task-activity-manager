@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ContainerTestsMatching, errMsg } from "../../api";
+import { usePrompt } from "../usePrompt";
 
 type Labelled = { testKey: string; labels?: string[] };
 
@@ -46,19 +47,36 @@ export function MemberFilters({
   jqlAvailable?: boolean;
   onJqlKeys: (keys: Set<string> | null) => void;
 }) {
+  const { prompt } = usePrompt();
   const [jql, setJql] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const apply = async () => {
-    if (!jql.trim()) return;
+  // Another container starts without the last one's query or refusal.
+  const [shownFor, setShownFor] = useState(containerKey);
+  if (shownFor !== containerKey) {
+    setShownFor(containerKey);
+    setJql("");
+    setError("");
+  }
+  // JQL is the filter used least, so it asks in a dialog rather than
+  // keeping a wide box on the filter row (#471). The dialog opens on the
+  // last query, so a refused one can be fixed.
+  const ask = async () => {
+    setError("");
+    const q = (
+      await prompt({
+        title: "Filter the tests by JQL",
+        defaultValue: jql,
+        placeholder: "e.g. priority = High AND labels = smoke",
+        submitLabel: "Apply JQL",
+      })
+    )?.trim();
+    if (!q) return;
+    setJql(q);
     setBusy(true);
     setError("");
     try {
-      onJqlKeys(
-        new Set(
-          await ContainerTestsMatching(profileId, containerKey, jql.trim()),
-        ),
-      );
+      onJqlKeys(new Set(await ContainerTestsMatching(profileId, containerKey, q)));
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -68,41 +86,24 @@ export function MemberFilters({
   return (
     <div className="member-filters">
       {labels.length > 0 && (
-        <label className="member-filter">
-          Label
-          <select
-            className="container-status-filter app-select"
-            value={label}
-            onChange={(e) => onLabel(e.target.value)}
-          >
-            <option value="">All labels</option>
-            {labels.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
+        <select
+          aria-label="Label"
+          className="container-status-filter app-select"
+          value={label}
+          onChange={(e) => onLabel(e.target.value)}
+        >
+          <option value="">All labels</option>
+          {labels.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
       )}
       {jqlAvailable && (
-        <form
-          className="member-filter"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void apply();
-          }}
-        >
-          <label>
-            JQL
-            <input
-              className="detail-input member-jql"
-              value={jql}
-              placeholder="e.g. priority = High AND labels = smoke"
-              onChange={(e) => setJql(e.target.value)}
-            />
-          </label>
-          <button type="submit" className="btn" disabled={busy || !jql.trim()}>
-            Apply JQL
+        <span className="member-filter">
+          <button type="button" className="btn" disabled={busy} onClick={() => void ask()}>
+            JQL…
           </button>
           {jqlOn && (
             <button
@@ -117,7 +118,7 @@ export function MemberFilters({
               Clear JQL
             </button>
           )}
-        </form>
+        </span>
       )}
       {error && (
         <span role="alert" className="error-text">

@@ -66,38 +66,34 @@ export function FiltersRow({ s, a, p }: { s: ContainerState; a: ContainerActions
           {board && selected && (
             <div className="member-filters">
               {fixVersions.length > 0 && (
-                <label className="member-filter">
-                  Fix version
-                  <select
-                    className="container-status-filter app-select"
-                    value={memberFvFilter}
-                    onChange={(e) => member(setMemberFvFilter)(e.target.value)}
-                  >
-                    <option value="">All fix versions</option>
-                    {fixVersions.map((fv) => (
-                      <option key={fv} value={fv}>
-                        {fv}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <select
+                  aria-label="Fix version"
+                  className="container-status-filter app-select"
+                  value={memberFvFilter}
+                  onChange={(e) => member(setMemberFvFilter)(e.target.value)}
+                >
+                  <option value="">All fix versions</option>
+                  {fixVersions.map((fv) => (
+                    <option key={fv} value={fv}>
+                      {fv}
+                    </option>
+                  ))}
+                </select>
               )}
               {board.runCounts.length > 0 && (
-                <label className="member-filter">
-                  Result
-                  <select
-                    className="container-status-filter app-select"
-                    value={memberRunFilter}
-                    onChange={(e) => member(setMemberRunFilter)(e.target.value)}
-                  >
-                    <option value="">All results</option>
-                    {board.runCounts.map((b) => (
-                      <option key={b.label} value={b.label}>
-                        {b.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <select
+                  aria-label="Result"
+                  className="container-status-filter app-select"
+                  value={memberRunFilter}
+                  onChange={(e) => member(setMemberRunFilter)(e.target.value)}
+                >
+                  <option value="">All results</option>
+                  {board.runCounts.map((b) => (
+                    <option key={b.label} value={b.label}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
               )}
               <MemberFilters
                 profileId={profileId}

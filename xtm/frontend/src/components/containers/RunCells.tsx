@@ -173,21 +173,32 @@ export function formatRunDate(iso: string): string {
 }
 
 // RunBar is a compact stacked bar of run-status proportions for the selected
-// container, a glanceable view of how its tests are doing. It only shows:
-// the Filters row filters by result, and the bar lights the result chosen
-// there while the rest dim (#456).
-export function RunBar({ counts, active }: { counts: Bucket[]; active?: string }) {
+// container. The result chosen in the Filters row lights while the rest dim
+// (#456). Given onPick, each segment is a button that sets that same filter
+// (#471).
+export function RunBar({ counts, active, onPick }: { counts: Bucket[]; active?: string; onPick?: (label: string) => void }) {
   const sum = counts.reduce((a, b) => a + b.count, 0) || 1;
   return (
     <div className={`run-bar${active ? " run-bar--filtering" : ""}`} title="Run-status distribution">
-      {counts.map((b) => (
-        <span
-          key={b.label}
-          className={`${runSegClass(b.label)}${active === b.label ? " run-seg--active" : ""}`}
-          style={{ width: `${(b.count / sum) * 100}%` }}
-          title={`${b.label}: ${b.count}`}
-        />
-      ))}
+      {counts.map((b) => {
+        const cls = `${runSegClass(b.label)}${active === b.label ? " run-seg--active" : ""}`;
+        const style = { width: `${(b.count / sum) * 100}%` };
+        const name = `${b.label}: ${b.count}`;
+        return onPick ? (
+          <button
+            key={b.label}
+            type="button"
+            className={cls}
+            style={style}
+            aria-label={name}
+            aria-pressed={active === b.label}
+            title={`${name}. Click to show only these tests`}
+            onClick={() => onPick(b.label)}
+          />
+        ) : (
+          <span key={b.label} className={cls} style={style} title={name} />
+        );
+      })}
     </div>
   );
 }
