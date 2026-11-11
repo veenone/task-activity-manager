@@ -9,7 +9,9 @@ export function IssueDetails({
   unloaded,
   busy,
   canOpenInJira,
+  centred,
   onExpand,
+  onCentre,
   onTrace,
   onJira,
   onPick,
@@ -19,7 +21,9 @@ export function IssueDetails({
   unloaded: number;
   busy: boolean;
   canOpenInJira: boolean;
+  centred: boolean;
   onExpand: () => void;
+  onCentre: () => void;
   onTrace: () => void;
   onJira: () => void;
   onPick: (key: string) => void;
@@ -84,6 +88,9 @@ export function IssueDetails({
       <div className="pie-graph-actions">
         <button type="button" className="btn btn-primary" disabled={busy || unloaded === 0} onClick={onExpand}>
           {unloaded > 0 ? `Expand links (${unloaded})` : "All links shown"}
+        </button>
+        <button type="button" className="btn" disabled={centred} onClick={onCentre}>
+          Centre here
         </button>
         <button type="button" className="btn" disabled={!node.inRun} onClick={onTrace} title={node.inRun ? "" : "Only issues in the run open in Trace"}>
           Open in Trace

@@ -2,6 +2,7 @@ import { lazy, Suspense, useContext, useMemo, useRef, useState } from "react";
 import { ExpandIssue } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
 import { BrowserOpenURL } from "../wailsjs/runtime/runtime";
+import type { LayoutOptions } from "@antv/g6";
 import type { CanvasApi } from "./G6Canvas";
 import {
   add,
@@ -71,6 +72,9 @@ export function IssueGraphView({
       [first, ...near].map((issue) => ({ issue, inRun: true, fetchedAt: "" })),
     ).graph;
   });
+  // The issue the graph is laid out around (#469). Choosing a node only
+  // selects it; Find and Centre here move the centre.
+  const [centre, setCentre] = useState(start);
   const [history, setHistory] = useState<History>(() =>
     start ? { keys: [start], at: 0 } : { keys: [], at: -1 },
   );
@@ -155,9 +159,24 @@ export function IssueGraphView({
   }
 
   async function go(key: string) {
-    if (!graph.nodes.has(key) && !(await expand(key))) return;
+    if (!graph.nodes.has(key) && !(await expand(key))) return false;
     setHistory((h) => visit(h, key));
+    return true;
   }
+
+  // Rings of neighbours around the centre, sized to the boxes G6Canvas draws.
+  const layout = useMemo<LayoutOptions>(
+    () => ({
+      type: "radial",
+      focusNode: centre ?? undefined,
+      unitRadius: 220,
+      linkDistance: 220,
+      preventOverlap: true,
+      nodeSize: 150,
+      nodeSpacing: 20,
+    }),
+    [centre],
+  );
 
   // Kept from render to render, so typing in Find does not redraw the graph.
   const { nodes, edges } = useMemo(() => {
@@ -204,7 +223,11 @@ export function IssueGraphView({
             const key =
               matches[0]?.key ??
               (looksLikeKey(find) ? find.trim().toUpperCase() : "");
-            if (key) void go(key).then(() => setFind(""));
+            if (key)
+              void go(key).then((ok) => {
+                setFind("");
+                if (ok) setCentre(key);
+              });
           }}
         >
           <input
@@ -333,33 +356,12 @@ export function IssueGraphView({
             nodes={nodes}
             edges={edges}
             focus={focus}
+            layout={layout}
             onSelect={(k) => setHistory((h) => visit(h, k))}
             label={`Issues linked to ${focus}`}
             apiRef={canvas}
           />
         </Suspense>
-        <div
-          className="pie-zoom-controls"
-          role="group"
-          aria-label="Issue graph zoom"
-        >
-          <button
-            type="button"
-            className="btn btn-ghost"
-            aria-label="Zoom in"
-            onClick={() => canvas.current?.zoom(1.25)}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            aria-label="Zoom out"
-            onClick={() => canvas.current?.zoom(0.8)}
-          >
-            −
-          </button>
-        </div>
       </div>
       {chosen && (
         <IssueDetails
@@ -367,6 +369,8 @@ export function IssueGraphView({
           label={label}
           unloaded={unloaded(graph, chosen.key)}
           busy={busy}
+          centred={chosen.key === centre}
+          onCentre={() => setCentre(chosen.key)}
           canOpenInJira={!!jiraUrl && !isDemo(jiraUrl)}
           onExpand={() => void expand(chosen.key)}
           onTrace={() => onOpen(chosen.key)}

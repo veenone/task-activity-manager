@@ -319,6 +319,10 @@ all three views.
   the one it is done to ("blocks", "clones", "parent of"). "relates to" is
   dashed and has no arrow. A dashed box is an issue outside the run, and
   **+3** on a box says three of its links are not drawn yet.
+  - The graph is laid out in rings around a centre issue, at first the run's
+    issue with the most links. Press Enter on a key in **Find an issue**, or
+    choose **Centre here** in the panel, to lay it out around that issue
+    instead.
   - Click an issue to move to it. The panel on the right shows its fields, its
     links by type and, for an issue fetched from Jira, when it was fetched.
     **Expand links** draws its linked issues, 50 at a time. **Open in Trace**
@@ -326,11 +330,13 @@ all three views.
   - **‹ Back** and **Forward ›** step through the issues you visited, and the
     line beside them shows the path.
   - **Find an issue** looks among the issues drawn by key or summary. Type a
-    full key, such as ABC-120, and press Enter to fetch one that is not drawn.
+    full key, such as ABC-120, and press Enter to fetch one that is not drawn
+    and put it at the centre.
   - The **Relationships** list hides a link type, and **Show** hides issues
     outside the run or finished issues.
   - Drag to pan, hold Ctrl and turn the wheel or use **+** and **−** to zoom,
     and use **Fit** to see everything. **Re-layout** arranges the boxes again.
+    Changing a filter lays the graph out again and fits it to the window.
   - The graph holds at most 300 issues and says so when it is full.
 
   Issues outside the run are fetched from Jira and kept on this computer.
