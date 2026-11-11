@@ -155,3 +155,44 @@ it("opens the chosen project's issues, or its row of the grid", async () => {
   await user.click(screen.getByRole("button", { name: "Open in Grid" }));
   expect(onGrid).toHaveBeenCalledWith(["A", "B", "C"]);
 });
+
+it("drops a chosen project a filter hides from the details", async () => {
+  const { user } = show();
+  await screen.findByText("Centred on A");
+  await user.click(
+    within(screen.getByRole("list", { name: "Nodes" })).getByRole("button", {
+      name: /^C /,
+    }),
+  );
+  // C is linked to A only by Relates; hiding it takes C off the canvas.
+  await user.click(screen.getByRole("checkbox", { name: /Relates/ }));
+  expect(
+    screen.getByRole("complementary", { name: "Project A" }),
+  ).toBeVisible();
+});
+
+it("offers no issues for a project seen only at the far end of a link", async () => {
+  const onIssues = vi.fn();
+  const only = new Map([["A-1", issue("A-1")]]);
+  render(
+    <ProjectGraphView
+      edges={[{ from: "A-1", to: "Z-9", type: "Cloners" }]}
+      issues={only}
+      types={types}
+      label={(p) => p}
+      name={() => ""}
+      onIssues={onIssues}
+      onGrid={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.click(
+    within(await screen.findByRole("list", { name: "Nodes" })).getByRole(
+      "button",
+      { name: /^Z / },
+    ),
+  );
+  expect(
+    screen.getByRole("button", { name: "Show its issues" }),
+  ).toBeDisabled();
+});

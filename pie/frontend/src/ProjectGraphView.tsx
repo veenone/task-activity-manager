@@ -39,7 +39,10 @@ export function ProjectGraphView({
   onGrid: (projects: string[]) => void;
 }) {
   const first = useMemo(() => busiest(edges, issues), [edges, issues]);
-  const [history, setHistory] = useState<History>({ keys: [], at: -1 });
+  const [history, setHistory] = useState<History>(() => ({
+    keys: [first],
+    at: 0,
+  }));
   const [selected, setSelected] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   // The box keeps what is typed, so clearing it to type 2 does not make 12.
@@ -47,9 +50,8 @@ export function ProjectGraphView({
   const min = Math.max(1, Math.floor(Number(minText)) || 1);
   const [secondRing, setSecondRing] = useState(false);
   const canvas = useRef<CanvasApi>(null);
-  const centre = history.keys[history.at] ?? first;
   const go = (p: string) => {
-    setHistory((h) => visit(h.at < 0 ? { keys: [centre], at: 0 } : h, p));
+    setHistory((h) => visit(h, p));
     setSelected(null);
   };
 
@@ -65,6 +67,10 @@ export function ProjectGraphView({
       ].sort(),
     [edges, issues],
   );
+  // A centre the links no longer reach, after a filter or a refresh, gives
+  // way to the busiest project rather than standing alone.
+  const visited = history.keys[history.at];
+  const centre = projects.includes(visited) ? visited : first;
   // Links per type, inside one project left out, for the filter and legend.
   const counts = useMemo(() => {
     const c = new Map<string, number>();
@@ -100,7 +106,9 @@ export function ProjectGraphView({
 
   if (!centre)
     return <p className="muted">No links between projects to show.</p>;
-  const chosen = selected ?? centre;
+  // A project a filter took off the canvas is no longer the one shown.
+  const chosen =
+    selected && nodes.some((n) => n.id === selected) ? selected : centre;
   const around = neighbours(chosen, edges, issues);
   const [out, inn] = around.reduce(
     ([o, i], n) => [
@@ -177,17 +185,15 @@ export function ProjectGraphView({
           <button
             type="button"
             className="btn"
-            disabled={history.at < 0 || history.at >= history.keys.length - 1}
+            disabled={history.at >= history.keys.length - 1}
             onClick={() => (setHistory(forward), setSelected(null))}
           >
             Forward ›
           </button>
           <nav aria-label="Projects centred" className="pie-graph-crumbs">
             <span className="mono">
-              {(history.at < 0
-                ? [centre]
-                : history.keys.slice(0, history.at + 1)
-              )
+              {history.keys
+                .slice(0, history.at + 1)
                 .slice(-5)
                 .join(" › ")}
             </span>
@@ -266,6 +272,8 @@ export function ProjectGraphView({
           <button
             type="button"
             className="btn"
+            disabled={inRun === 0}
+            title={inRun === 0 ? "None of its issues are in the run" : ""}
             onClick={() => onIssues(chosen)}
           >
             Show its issues

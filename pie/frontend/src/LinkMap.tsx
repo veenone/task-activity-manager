@@ -221,7 +221,10 @@ export function LinkMap({
                   type="button"
                   className={`view-tab${l === level ? " view-tab-active" : ""}`}
                   aria-pressed={l === level}
-                  onClick={() => setLevel(l)}
+                  onClick={() => {
+                    setLevel(l);
+                    setIssuesIn("");
+                  }}
                 >
                   {l}
                 </button>

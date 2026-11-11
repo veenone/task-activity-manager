@@ -258,3 +258,14 @@ it("draws the projects around the busiest one with G6, and hands a project to th
   const grid = screen.getByRole("table", { name: "Projects connected by links" });
   expect(within(grid).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["A", "B", "C"]);
 });
+
+it("starts the issue graph at the run's busiest issue again when Issues is chosen by hand", async () => {
+  const { user } = show();
+  await user.click(screen.getByRole("button", { name: "Network" }));
+  await user.click(within(await screen.findByRole("list", { name: "Projects linked to A" })).getByRole("button", { name: "B" }));
+  await user.click(screen.getByRole("button", { name: "Show its issues" }));
+  expect(await screen.findByRole("complementary", { name: "Issue B-1" })).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Projects" }));
+  await user.click(screen.getByRole("button", { name: "Issues" }));
+  expect(await screen.findByRole("complementary", { name: "Issue A-1" })).toBeVisible();
+});
