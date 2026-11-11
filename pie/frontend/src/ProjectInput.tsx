@@ -13,6 +13,7 @@ function resolve(text: string, projects: string[], label: (p: string) => string)
 // key or name contains the text, opens on focus, and is worked with the
 // arrow keys, Enter and Escape, as an ARIA combobox.
 export function Combo({
+  id: inputId,
   name,
   text,
   onText,
@@ -23,6 +24,7 @@ export function Combo({
   placeholder,
   className,
 }: {
+  id?: string;
   // The box's accessible name. The open list sits inside the box's <label>,
   // whose text would otherwise take in every suggestion.
   name: string;
@@ -60,6 +62,7 @@ export function Combo({
       <input
         className={className}
         type="search"
+        id={inputId}
         role="combobox"
         aria-label={name}
         aria-expanded={shown}
@@ -111,10 +114,13 @@ export function Combo({
               role="option"
               aria-selected={i === active}
               className={i === active ? "pie-combo-active" : undefined}
-              // Keeps the focus in the box, so the blur does not close the
-              // list before the click lands.
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(p)}
+              // Picked on press, which also keeps the focus in the box, so the
+              // blur does not close the list first. The keyboard works the
+              // list from the box, through aria-activedescendant.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(p);
+              }}
             >
               {label(p)}
             </li>

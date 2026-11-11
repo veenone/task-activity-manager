@@ -44,6 +44,12 @@ function runAtText(iso: string): string {
   return `Last run ${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
+// chooseProfile is the first wanted id the list still holds, else its first
+// profile, else none.
+function chooseProfile(list: profile.Profile[], ...wanted: string[]): string {
+  return wanted.find((id) => id && list.some((p) => p.id === id)) ?? list[0]?.id ?? "";
+}
+
 export default function App() {
   const { confirm } = useConfirm();
   const { prompt } = usePrompt();
@@ -83,7 +89,7 @@ export default function App() {
   async function loadProfiles(select?: string) {
     const list = await ListProfiles();
     setProfiles(list);
-    const next = [select, profileId].find((id) => id && list.some((p) => p.id === id)) ?? list[0]?.id ?? "";
+    const next = chooseProfile(list, select ?? "", profileId);
     if (next !== profileId) setResult(null);
     setProfileId(next);
   }
@@ -93,10 +99,12 @@ export default function App() {
       .then((problem) => {
         setStartupError(problem);
         if (problem) return;
-        // The default profile opens at launch (#453).
-        return DefaultProfile().then((id) => {
+        // The default profile opens at launch (#453). Nothing is on screen
+        // yet, so there are no rows to clear.
+        return Promise.all([DefaultProfile(), ListProfiles()]).then(([id, list]) => {
           setDefaultId(id);
-          return loadProfiles(id);
+          setProfiles(list);
+          setProfileId(chooseProfile(list, id));
         });
       })
       .catch((e) => setError(errorText(e)));
