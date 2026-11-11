@@ -47,6 +47,10 @@ vi.mock("@antv/g6", () => ({
       this.calls.push(`zoom:${z}`);
       return Promise.resolve();
     }
+    fitCenter() {
+      this.calls.push("centre");
+      return Promise.resolve();
+    }
     focusElement(id: string) {
       this.calls.push(`focus:${id}`);
       return Promise.resolve();
@@ -100,7 +104,7 @@ it("lays out and fits again on every new set of nodes, and only redraws for a ne
   await settle();
   const g = made[0];
   // Fitting shrinks what overflows and centres, but never enlarges.
-  expect(g.calls).toEqual(["render", "fit", "zoom:1"]);
+  expect(g.calls).toEqual(["render", "fit", "zoom:1", "centre"]);
   expect(g.options.autoFit).toBeUndefined();
   g.calls.length = 0;
   const fewer = nodes.slice(0, 1);
@@ -114,7 +118,7 @@ it("lays out and fits again on every new set of nodes, and only redraws for a ne
     />,
   );
   await settle();
-  expect(g.calls).toEqual(["render", "fit", "zoom:1"]);
+  expect(g.calls).toEqual(["render", "fit", "zoom:1", "centre"]);
   g.calls.length = 0;
   rerender(
     <G6Canvas
@@ -156,7 +160,7 @@ it("takes the layout it is given, and lays out again when it changes", async () 
     />,
   );
   await settle();
-  expect(g.calls).toEqual(["layout:radial", "render", "fit", "zoom:1"]);
+  expect(g.calls).toEqual(["layout:radial", "render", "fit", "zoom:1", "centre"]);
 });
 
 it("lays out again only when what is drawn changes, not for the same issues in new lists", async () => {
@@ -200,4 +204,11 @@ it("says so when the graph cannot be drawn", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "The graph could not be drawn: bad layout",
   );
+});
+
+it("leaves the camera on the whole fitted graph after a new layout, even with a node in focus", async () => {
+  render(<G6Canvas nodes={nodes} edges={none} focus="A-1" onSelect={() => {}} label="Graph" />);
+  await settle();
+  // Moving to the focus after fitting pushed the rest of a grown graph off the canvas.
+  expect(made[0].calls).toEqual(["render", "fit", "zoom:1", "centre"]);
 });

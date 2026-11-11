@@ -1,8 +1,22 @@
+import type { LayoutOptions } from "@antv/g6";
 import type { query } from "../wailsjs/go/models";
 
 // The issue graph's model (#464): the issues on the canvas and one edge per
 // relationship, however many times an issue is loaded. Kept free of G6 so it
 // can be tested without a canvas.
+
+// radialAround lays a network out in rings around one node, sized to the
+// boxes G6Canvas draws; the issue and project networks centre on it (#469,
+// #473). The type import keeps G6 out of the app's first bundle.
+export const radialAround = (centre: string | null): LayoutOptions => ({
+  type: "radial",
+  focusNode: centre ?? undefined,
+  unitRadius: 220,
+  linkDistance: 220,
+  preventOverlap: true,
+  nodeSize: 150,
+  nodeSpacing: 20,
+});
 
 // MAX_NODES caps the canvas; PER_EXPAND caps the neighbours one expansion adds.
 export const MAX_NODES = 300;

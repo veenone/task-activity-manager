@@ -18,7 +18,18 @@ export type CanvasNode = {
   lit?: boolean;
   cluster?: boolean;
 };
-export type CanvasEdge = { id: string; source: string; target: string; type: string; directed: boolean; faded?: boolean; lit?: boolean };
+// width and label, when given, size a line by what it counts and say the count.
+export type CanvasEdge = {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  directed: boolean;
+  faded?: boolean;
+  lit?: boolean;
+  width?: number;
+  label?: string;
+};
 export type CanvasCombo = { id: string; label: string; parent?: string; tone: "baseline" | "derived" | "external" };
 export type CanvasApi = { fit: () => void; relayout: () => void };
 
@@ -73,7 +84,14 @@ function data(nodes: CanvasNode[], edges: CanvasEdge[], combos: CanvasCombo[], f
       target: e.target,
       style: {
         stroke: edgeColour(e.type),
-        lineWidth: e.lit ? 3 : e.type.toLowerCase().includes("parent") ? 2.5 : 1.5,
+        lineWidth: e.width ?? (e.lit ? 3 : e.type.toLowerCase().includes("parent") ? 2.5 : 1.5),
+        labelText: e.label,
+        labelFill: css("--text"),
+        labelFontSize: 11,
+        labelBackground: !!e.label,
+        labelBackgroundFill: css("--surface"),
+        labelBackgroundRadius: 4,
+        labelPadding: [1, 4],
         lineDash: e.directed ? undefined : [5, 4],
         endArrow: e.directed,
         opacity: e.faded ? 0.25 : 1,
@@ -153,6 +171,8 @@ export default function G6Canvas({
       combo: { type: "rect" },
       layout: still(firstLayout.current),
       behaviors: ["drag-canvas", "zoom-canvas", "drag-element"],
+      // Two link types between the same pair bend apart instead of overlapping.
+      transforms: ["process-parallel-edges"],
       plugins: [{ type: "minimap", key: "minimap", size: [150, 96], position: "left-bottom" }],
     });
     g.on(NodeEvent.CLICK, (e: IElementEvent) => pick.current(e.target.id));
@@ -185,13 +205,16 @@ export default function G6Canvas({
       ? g
           .render()
           .then(() => (live() ? g.fitView() : undefined))
-          .then(() => (live() && g.getZoom() > 1 ? g.zoomTo(1) : undefined))
+          // zoomTo does not keep the graph centred, so centre it again.
+          .then(() => (live() && g.getZoom() > 1 ? g.zoomTo(1).then(() => g.fitCenter()) : undefined))
       : g.draw();
     drawn
       .then(() => {
         if (!live()) return;
         setFailed("");
-        if (focus && g.hasNode(focus)) return g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
+        // After a new layout the fit shows everything; moving to the focus
+        // then pushed the rest of a grown graph off the canvas (#473).
+        if (!moved && focus && g.hasNode(focus)) return g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
       })
       // A render still running when its graph is destroyed fails; only a
       // failure of the live graph is worth showing.

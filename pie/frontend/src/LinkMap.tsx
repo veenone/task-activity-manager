@@ -7,7 +7,7 @@ import { linkSheets } from "./exportSheets";
 import { LinkFlow } from "./LinkFlow";
 import { ProjectsChooser } from "./ProjectInput";
 import { IssueGraphView } from "./IssueGraphView";
-import { LinkNetwork } from "./LinkNetwork";
+import { ProjectGraphView } from "./ProjectGraphView";
 import { byKey, projectLabel, projectNames } from "./linked";
 import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
 import { compare } from "./sort";
@@ -34,6 +34,8 @@ export function LinkMap({
   const [view, setView] = useState<(typeof LINK_VIEWS)[number]>("Grid");
   // The Network draws projects, or issues with G6 (#464).
   const [level, setLevel] = useState<"Projects" | "Issues">("Projects");
+  // The project the issue graph starts in, when the project network sent it.
+  const [issuesIn, setIssuesIn] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   // onScreen is the run on screen, or null once the map is gone. A refresh whose
@@ -219,16 +221,41 @@ export function LinkMap({
                   type="button"
                   className={`view-tab${l === level ? " view-tab-active" : ""}`}
                   aria-pressed={l === level}
-                  onClick={() => setLevel(l)}
+                  onClick={() => {
+                    setLevel(l);
+                    setIssuesIn("");
+                  }}
                 >
                   {l}
                 </button>
               ))}
             </div>
             {level === "Projects" ? (
-              <LinkNetwork edges={ticked} issues={issues} label={label} />
+              <ProjectGraphView
+                edges={ticked}
+                issues={issues}
+                types={types}
+                label={label}
+                name={(p) => names.get(p) ?? ""}
+                onIssues={(p) => {
+                  setIssuesIn(p);
+                  setLevel("Issues");
+                }}
+                onGrid={(ps) => {
+                  setPicked(ps);
+                  setView("Grid");
+                }}
+              />
             ) : (
-              <IssueGraphView profileId={profileId} result={result} jiraUrl={jiraUrl} label={label} onOpen={onOpen} />
+              <IssueGraphView
+                key={issuesIn}
+                profileId={profileId}
+                result={result}
+                startIn={issuesIn}
+                jiraUrl={jiraUrl}
+                label={label}
+                onOpen={onOpen}
+              />
             )}
           </>
         )}
