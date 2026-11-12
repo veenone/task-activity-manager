@@ -2,10 +2,39 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProjectMap } from "./ProjectMap";
-import { filterSets, sankey } from "./mapData";
+import { filterSets } from "./mapData";
 import * as api from "../wailsjs/go/main/App";
 
 vi.mock("../wailsjs/go/main/App", () => ({ Baselines: vi.fn() }));
+// jsdom has no canvas, so G6 is replaced by lists of what it was given.
+vi.mock("./G6Canvas", () => ({
+  default: ({
+    nodes,
+    edges,
+    label,
+    onSelect,
+  }: {
+    nodes: { id: string; label: string; sub?: string }[];
+    edges: { id: string; source: string; target: string; label?: string; faded?: boolean }[];
+    label: string;
+    onSelect: (id: string) => void;
+  }) => (
+    <div>
+      <ul aria-label={label}>
+        {nodes.map((n) => (
+          <li key={n.id}>
+            <button type="button" onClick={() => onSelect(n.id)}>{`${n.label} · ${n.sub}`}</button>
+          </li>
+        ))}
+      </ul>
+      <ul aria-label="Lines">
+        {edges.map((e) => (
+          <li key={e.id}>{`${e.source}>${e.target} ${e.label}${e.faded ? " faded" : ""}`}</li>
+        ))}
+      </ul>
+    </div>
+  ),
+}));
 
 const issue = (key: string, status: string, statusCategory: string) => ({
   key,
@@ -45,19 +74,53 @@ it("counts what the map shows above the views", async () => {
   ).toEqual(["1 of 2 linked sets out of step", "1 issues still to fix", "4 issues across 3 projects", "1 baselines, and 1 project under none"]);
 });
 
-it("flows issues from baseline to project to fix state, and lists the sets out of step", async () => {
-  const { user, onOpen } = show();
-  const flow = screen.getByRole("img", {
-    name: /Issues by baseline, project and fix state/,
-  });
-  expect(await within(flow).findByText("Baseline A")).toBeInTheDocument();
-  expect(within(flow).getByText("B to Fix missing: 1 (B-1)")).toBeInTheDocument();
-  expect(within(flow).getByText("C to Fixed everywhere: 1 (C-2)")).toBeInTheDocument();
-  expect(within(flow).getByText("Fixed, others behind 1")).toBeInTheDocument();
+const lines = async () =>
+  within(await screen.findByRole("list", { name: "Lines" }))
+    .getAllByRole("listitem")
+    .map((l) => l.textContent);
 
-  const behind = screen.getByRole("list", { name: "Sets out of step" });
-  await user.click(within(behind).getByRole("button", { name: "B-1 Open" }));
+it("lays issues out from baseline to project to fix state, and lists the issues missing a fix", async () => {
+  const { user, onOpen } = show();
+  const flow = await screen.findByRole("list", { name: /Issues by baseline, project and fix state/ });
+  expect(await within(flow).findByRole("button", { name: "Baseline A · 3 issues" })).toBeVisible();
+  expect(await lines()).toEqual([
+    "b:A>p:A 2",
+    "p:A>s:behind 1",
+    "b:A>p:B 1",
+    "p:B>s:missing 1",
+    "p:A>s:everywhere 1",
+    "b:>p:C 1",
+    "p:C>s:everywhere 1",
+  ]);
+  const panel = screen.getByRole("complementary", { name: "Everything shown" });
+  await user.click(within(panel).getByRole("button", { name: "B-1 Open" }));
   expect(onOpen).toHaveBeenCalledWith("B-1");
+});
+
+it("lights the paths through a chosen box and gives its fix states", async () => {
+  const { user } = show();
+  const flow = await screen.findByRole("list", { name: /Issues by baseline/ });
+  await user.click(await within(flow).findByRole("button", { name: "C · 1 issue" }));
+  const panel = screen.getByRole("complementary", { name: "Box C" });
+  const items = (name: string) =>
+    within(within(panel).getByRole("list", { name }))
+      .getAllByRole("listitem")
+      .map((l) => l.textContent);
+  expect(items("Fix states")).toEqual(["Fixed everywhere 1"]);
+  expect(items("Comes from")).toEqual(["No baseline 1"]);
+  expect(within(panel).queryByRole("button", { name: "B-1 Open" })).not.toBeInTheDocument();
+  expect((await lines()).filter((l) => !l.endsWith("faded"))).toEqual(["b:>p:C 1", "p:C>s:everywhere 1"]);
+});
+
+it("joins the layers either side of a hidden one, and drops lines under the minimum", async () => {
+  const { user } = show();
+  await screen.findByRole("list", { name: /Issues by baseline/ });
+  await user.click(screen.getByRole("checkbox", { name: "Project layer" }));
+  expect(await lines()).toContain("b:A>s:missing 1");
+  await user.click(screen.getByRole("checkbox", { name: "Project layer" }));
+  await user.clear(screen.getByLabelText("Hide lines with fewer issues than"));
+  await user.type(screen.getByLabelText("Hide lines with fewer issues than"), "2");
+  expect(await lines()).toEqual(["b:A>p:A 2"]);
 });
 
 it("branches baselines into projects and issues, and marks a chosen set across the tree", async () => {
@@ -79,42 +142,9 @@ it("branches baselines into projects and issues, and marks a chosen set across t
 
 it("applies Out of step only to the flow", async () => {
   const { user } = show();
+  await screen.findByRole("list", { name: /Issues by baseline/ });
   await user.click(screen.getByLabelText("Out of step only"));
-  const flow = screen.getByRole("img", { name: /Issues by baseline/ });
-  expect(within(flow).queryByText(/Fixed everywhere/)).not.toBeInTheDocument();
-});
-
-it("stacks a node's bands without overlap and sizes nodes by their issues", () => {
-  const { nodes, bands } = sankey(
-    [
-      [{ id: "x", label: "x" }],
-      [
-        { id: "p", label: "p" },
-        { id: "q", label: "q" },
-      ],
-    ],
-    [
-      { from: "x", to: "p", keys: ["1", "2", "3"] },
-      { from: "x", to: "q", keys: ["4"] },
-    ],
-    { width: 200, height: 110, gap: 10 },
-  );
-  const [x, p, q] = nodes;
-  expect([x.value, p.value, q.value]).toEqual([4, 3, 1]);
-  expect([x.y, x.h, p.y, p.h, q.y, q.h]).toEqual([0, 100, 0, 75, 85, 25]);
-  // The band to q leaves x where the band to p ends.
-  expect(bands[1].path.startsWith(`M${x.x + 12},75 `)).toBe(true);
-});
-
-it("grows the chart rather than squash a column of many nodes", () => {
-  const column = Array.from({ length: 30 }, (_, i) => ({ id: `n${i}`, label: `n${i}` }));
-  const { nodes, height } = sankey(
-    [[{ id: "x", label: "x" }], column],
-    column.map((c) => ({ from: "x", to: c.id, keys: [c.id] })),
-    { width: 200, height: 100, gap: 10 },
-  );
-  expect(nodes.every((n) => n.h > 0)).toBe(true);
-  expect(nodes.at(-1)!.y + nodes.at(-1)!.h).toBeLessThanOrEqual(height);
+  expect((await lines()).some((l) => l.includes("everywhere"))).toBe(false);
 });
 
 const groups = [
@@ -137,7 +167,7 @@ it("keeps the sets that pass every filter", () => {
 it("filters every view by project and key, says how many show, and clears", async () => {
   const { user } = show();
   await screen.findByRole("option", { name: "Baseline A" });
-  await user.type(screen.getByLabelText("Project"), "C");
+  await user.type(screen.getByRole("combobox", { name: "Project" }), "C");
   expect(screen.getByText("Showing 1 of 2 linked sets")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Table" }));
   const table = screen.getByRole("table", { name: "Project map" });
@@ -152,8 +182,8 @@ it("filters every view by project and key, says how many show, and clears", asyn
 
 it("offers only the chosen baseline's projects", async () => {
   const { user } = show();
-  await user.selectOptions(await screen.findByLabelText("Baseline"), "A");
-  fireEvent.focus(screen.getByLabelText("Project"));
+  await user.selectOptions(await screen.findByRole("combobox", { name: "Baseline" }), "A");
+  fireEvent.focus(screen.getByRole("combobox", { name: "Project" }));
   expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["A", "B"]);
 });
 
@@ -171,20 +201,20 @@ it("forgets a chosen project the next run no longer reaches, instead of showing 
   const user = userEvent.setup();
   const view = render(<ProjectMap profileId="p1" result={result as never} onOpen={vi.fn()} />);
   await screen.findByRole("option", { name: "Baseline A" });
-  await user.type(screen.getByLabelText("Project"), "C");
+  await user.type(screen.getByRole("combobox", { name: "Project" }), "C");
   const next = { ...result, sets: [result.sets[0]] };
   view.rerender(<ProjectMap profileId="p1" result={next as never} onOpen={vi.fn()} />);
-  expect(screen.getByLabelText("Project")).toHaveValue("");
+  expect(screen.getByRole("combobox", { name: "Project" })).toHaveValue("");
   expect(screen.queryByText("No linked sets to show.")).not.toBeInTheDocument();
 });
 
 it("empties project text that named nothing when filters are cleared", async () => {
   const { user } = show();
   await screen.findByRole("option", { name: "Baseline A" });
-  await user.type(screen.getByLabelText("Project"), "zzz");
+  await user.type(screen.getByRole("combobox", { name: "Project" }), "zzz");
   await user.click(screen.getByLabelText("Out of step only"));
   await user.click(screen.getByRole("button", { name: "Clear filters" }));
-  expect(screen.getByLabelText("Project")).toHaveValue("");
+  expect(screen.getByRole("combobox", { name: "Project" })).toHaveValue("");
   expect(screen.queryByText("No project matches")).not.toBeInTheDocument();
 });
 

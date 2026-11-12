@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { query } from "../wailsjs/go/models";
-import { busiest, byCell, type Edge, flowLinks, neighbours } from "./linkData";
+import { busiest, byCell, type Edge, flowPaths, neighbours } from "./linkData";
 
 const issue = (key: string, project: string) => ({ key, project }) as query.Issue;
 
@@ -47,12 +47,13 @@ it("lists a project's neighbours with each link type's count both ways, most lin
 });
 
 it("runs each link from its project through its type to the other project", () => {
-  const { columns, links } = flowLinks(web, projects);
-  expect(columns.map((c) => c.map((n) => n.id))).toEqual([
-    ["f:A", "f:B", "f:C"],
-    ["t:Blocks", "t:Cloners", "t:Relates"],
-    ["o:A", "o:B"],
-  ]);
-  expect(links.find((l) => l.from === "f:A" && l.to === "t:Cloners")?.keys).toEqual(["A-1>B-1", "A-2>B-1"]);
-  expect(links.find((l) => l.from === "t:Cloners" && l.to === "o:B")?.keys).toHaveLength(2);
+  const paths = flowPaths(web, projects);
+  expect(paths.find((p) => p.key === "A-1>B-1:Cloners")).toEqual({
+    key: "A-1>B-1:Cloners",
+    steps: ["f:A", "t:Cloners", "o:B"],
+    type: "Cloners",
+  });
+  // Two types between one pair of issues are two links, not one.
+  const twice = flowPaths([...web, { from: "A-1", to: "B-1", type: "Blocks" }], projects);
+  expect(new Set(twice.map((p) => p.key)).size).toBe(twice.length);
 });

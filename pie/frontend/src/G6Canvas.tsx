@@ -43,6 +43,8 @@ const statusColour = (s?: string) => css(s === "done" ? "--ok-text" : s === "ind
 const OTHERS = ["--chart-added", "--ok-text", "--info-fg", "--chart-committed"];
 export function edgeColour(type: string): string {
   const t = type.toLowerCase();
+  // A flow line with no type is plain.
+  if (!t) return css("--border-strong");
   if (t.includes("block")) return css("--danger-solid");
   if (t.includes("clon")) return css("--chart-carried");
   if (t.includes("duplic")) return css("--warn-fg");
@@ -130,6 +132,7 @@ export default function G6Canvas({
   combos = NO_COMBOS,
   focus,
   layout = COMBINED,
+  follow = true,
   onSelect,
   label,
   apiRef,
@@ -139,6 +142,8 @@ export default function G6Canvas({
   combos?: CanvasCombo[];
   focus: string | null;
   layout?: LayoutOptions;
+  // follow moves the camera to the focus; a flow keeps its layers in view.
+  follow?: boolean;
   onSelect: (id: string) => void;
   label: string;
   apiRef?: Ref<CanvasApi>;
@@ -214,14 +219,14 @@ export default function G6Canvas({
         setFailed("");
         // After a new layout the fit shows everything; moving to the focus
         // then pushed the rest of a grown graph off the canvas (#473).
-        if (!moved && focus && g.hasNode(focus)) return g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
+        if (follow && !moved && focus && g.hasNode(focus)) return g.focusElement(focus, { duration: 500, easing: "ease-in-out" });
       })
       // A render still running when its graph is destroyed fails; only a
       // failure of the live graph is worth showing.
       .catch((e: unknown) => {
         if (graph.current === g) setFailed(e instanceof Error ? e.message : String(e));
       });
-  }, [nodes, edges, combos, focus, layout]);
+  }, [nodes, edges, combos, focus, layout, follow]);
 
   useImperativeHandle(apiRef, () => ({
     fit: () => void graph.current?.fitView({ when: "always" }, { duration: 400 }),

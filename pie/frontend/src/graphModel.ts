@@ -19,6 +19,10 @@ export const radialAround = (centre: string | null): LayoutOptions => ({
 });
 
 // MAX_NODES caps the canvas; PER_EXPAND caps the neighbours one expansion adds.
+// countWidth sizes a line by how many links or issues it stands for; the log
+// keeps a line of hundreds from swallowing the canvas.
+export const countWidth = (count: number) => 1 + Math.log2(1 + count) * 1.5;
+
 export const MAX_NODES = 300;
 export const PER_EXPAND = 50;
 export const PARENT = "Parent / sub-task";

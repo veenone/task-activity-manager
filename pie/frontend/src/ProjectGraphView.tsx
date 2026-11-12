@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import type { CanvasApi } from "./G6Canvas";
-import { back, forward, type History, radialAround, visit } from "./graphModel";
+import { back, countWidth, forward, type History, radialAround, visit } from "./graphModel";
 import {
   busiest,
   type Edge,
@@ -97,7 +97,7 @@ export function ProjectGraphView({
         target: e.target,
         type: e.type,
         directed: !undirected.has(e.type),
-        width: 1 + Math.log2(1 + e.count) * 1.5,
+        width: countWidth(e.count),
         label: String(e.count),
       })),
     };

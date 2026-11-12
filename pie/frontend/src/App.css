@@ -286,7 +286,6 @@ body,
   margin-left: auto;
 }
 
-.pie-flow,
 .pie-tree-view {
   display: flex;
   flex: 1;
@@ -295,59 +294,7 @@ body,
   overflow: auto;
 }
 
-.pie-flow-svg {
-  flex: 1;
-  min-width: 480px;
-  height: auto;
-  max-height: 100%;
-}
-
-.pie-flow-band {
-  opacity: 0.35;
-}
-
-.pie-flow-band:hover {
-  opacity: 0.7;
-}
-
-.pie-flow-plain {
-  fill: var(--border-strong);
-}
-
-.pie-flow-missing {
-  fill: var(--warn-solid);
-}
-
-.pie-flow-behind {
-  fill: var(--accent);
-}
-
-.pie-flow-everywhere {
-  fill: var(--ok-solid);
-}
-
-.pie-flow-open {
-  fill: var(--text-muted);
-}
-
-.pie-flow-node.pie-flow-plain {
-  fill: var(--text-muted);
-}
-
-.pie-flow-label {
-  fill: var(--text);
-  font-size: var(--fs-sm);
-  dominant-baseline: middle;
-  paint-order: stroke;
-  stroke: var(--surface);
-  stroke-width: 3px;
-}
-
-/* Link map: the type column of its flow (#437). */
-.pie-flow-type {
-  fill: var(--accent);
-}
-
+/* The Tree view's list of sets beside it. */
 .pie-flow-side {
   flex: none;
   width: 260px;
@@ -956,33 +903,10 @@ body,
   font-size: var(--fs-sm);
 }
 
-/* A zoomable chart: the area is drawn wider than its box, and the box
-   scrolls (#448). */
-.pie-zoom {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  min-height: 0;
-}
-
 .pie-zoom-controls {
   display: flex;
   gap: 4px;
   align-items: center;
-}
-
-.pie-zoom-box {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.pie-zoom-area .pie-flow-svg {
-  width: 100%;
-  min-width: 0;
-  max-height: none;
 }
 
 /* The Confluence part of a profile's form (#453). */
@@ -1080,10 +1004,6 @@ body,
   margin-top: 6px;
 }
 
-/* The Link map flow's left-side chooser sits above the chart. */
-.pie-flow-pick {
-  max-width: 360px;
-}
 .pie-legend-hub,
 .pie-legend-node {
   width: 10px;

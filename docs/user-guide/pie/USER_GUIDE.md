@@ -193,17 +193,26 @@ Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
 show the same sets three ways, and **Baseline** shows one baseline and what links to it:
 
-Both Flow charts can be zoomed. Use
-**+** and **−** above the chart, or hold Ctrl and turn the mouse wheel. The
-chart then scrolls inside its own area, and **Reset** returns it to fit.
+Both Flow diagrams work the same way. Boxes stand in layers from left to
+right, and a line joins two boxes for the issues or links that pass through
+both, its width and number giving the count.
+- Choose a box to light every path through it and fade the rest. The panel
+  on the right names the boxes it comes from and goes to, with counts.
+  **Show everything** clears the choice.
+- **Layers** on the left hides a layer, and the layers either side of it are
+  joined directly. **Hide lines with fewer issues than** (or **links**) drops
+  thin lines and any box left without one.
+- Drag to pan, hold Ctrl and turn the wheel or use **+** and **−** to zoom,
+  **Fit** to see everything, and **Re-layout** to lay the boxes out again.
 
 - **Flow** draws each issue as a line from its baseline to its project to
   one of four states. *Fix missing* is an open issue in a set out of step: the
   fix was made elsewhere and still has to be made here. *Fixed, others behind*
   is a finished issue in such a set. *Fixed everywhere* and *Open
-  everywhere* are issues in sets that are in step. A band is as wide as the
-  number of issues in it; hover over it to see the keys. The sets out of step
-  are listed beside the chart.
+  everywhere* are issues in sets that are in step. The *Fix missing* box is
+  outlined in red. The panel on the right counts the fix states of the box
+  you chose, or of everything, and lists the issues still missing a fix;
+  choose one to open it in Trace.
 - **Tree** branches each baseline into its projects and each project into its
   issues, and says how many of a project's issues are finished. Choose a set
   in the list beside it to mark its issues in the tree. Tick **Group by
@@ -295,10 +304,9 @@ column totals each row.
 are drawn. The link type filters and the two tick boxes on the left apply to
 all three views.
 - **Flow** runs each link from the project it starts in, through its link type,
-  to the project it points to. Bands are sized by link count. Hover over a band
-  to see its count. Type into **Left side** to keep only the links starting in
-  the projects you choose. The chart leaves room for the longest project name,
-  and scrolls sideways when the window is narrower than that.
+  to the project it points to. Its lines take the colour of their link type.
+  Type into **Left side** to keep only the links starting in the projects you
+  choose.
 - **Network** puts one project in the middle, the busiest at first, with the
   projects it links to in a ring around it. Each box shows the project's key,
   how many of its issues are in the run, and its name. There is one line per
