@@ -69,9 +69,9 @@ it("exports Trace's linked sets", async () => {
   expect(got.first.rows).toHaveLength(2);
 });
 
-it("exports the Project map's table and its sets", async () => {
+it("exports the Project map's coverage and its sets", async () => {
   render(<ProjectMap profileId="p1" result={result} onOpen={vi.fn()} />);
-  expect(await exported()).toMatchObject({ name: "pie-project-map", sheets: ["Project map", "Linked sets"] });
+  expect(await exported()).toMatchObject({ name: "pie-project-map", sheets: ["Coverage", "Linked sets"] });
 });
 
 it("exports the Link map's grid and links", async () => {
