@@ -3,18 +3,18 @@ import { Baselines } from "../wailsjs/go/main/App";
 import type { cases, query } from "../wailsjs/go/models";
 import { errorText } from "./ProfileForm";
 import { BaselinesDialog } from "./BaselinesDialog";
-import { OutOfStep, allProjects, baselineGroups, byKey, projectLabel, projectNames } from "./linked";
+import { allProjects, baselineGroups, byKey, projectLabel, projectNames } from "./linked";
 import { filterSets, type MapFilter } from "./mapData";
 import { ExportButton } from "./ExportButton";
 import { mapSheet, setSheet } from "./exportSheets";
 import { MapFlow } from "./MapFlow";
 import { BaselineView } from "./BaselineView";
 import { MapTree } from "./MapTree";
-import { Pager, usePaged } from "./Pager";
+import { MapCoverage } from "./MapCoverage";
 import { ProjectInput } from "./ProjectInput";
 import { Card } from "./Statistics";
 
-const VIEWS = ["Flow", "Tree", "Baseline", "Table"] as const;
+const VIEWS = ["Flow", "Tree", "Baseline", "Coverage"] as const;
 const NO_FILTER: MapFilter = { baseline: "", project: "", key: "" };
 
 // ProjectMap puts every linked set against every project it touches, so a
@@ -33,7 +33,6 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
   const names = projectNames(result);
   const groups = baselineGroups(allProjects(result.sets), baselines);
   const projects = groups.flatMap((g) => g.projects);
-  const grouped = groups.some((g) => g.baseline !== null);
   // The filters narrow every view; the count cards stay on the whole run.
   // A baseline or project that a new run or a baselines edit took away counts
   // as no choice, so the map never empties under a select that shows none.
@@ -42,7 +41,6 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
   const live: MapFilter = { baseline, project: pickable.includes(filter.project) ? filter.project : "", key: filter.key };
   const sets = filterSets(result.sets, groups, live).filter((s) => !onlyOutOfStep || s.outOfStep);
   const filtered = onlyOutOfStep || live.baseline !== "" || live.project !== "" || live.key.trim() !== "";
-  const { rows, pager } = usePaged(sets);
   // Flow and Tree draw only the projects the shown sets reach.
   const shown = baselineGroups(allProjects(sets), baselines);
   const inSets = new Set(result.sets.flatMap((s) => s.keys));
@@ -63,7 +61,6 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
     };
   }, [profileId]);
 
-  const span = grouped ? 2 : undefined;
   return (
     <div className="pie-linked">
       <div className="pie-filters">
@@ -127,7 +124,7 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
           name="pie-project-map"
           sheets={() => {
             const label = (p: string) => projectLabel(p, names.get(p));
-            return [mapSheet(sets, projects, issues, label), setSheet(sets, issues, label)];
+            return [mapSheet(sets, groups, issues, label), setSheet(sets, issues, label)];
           }}
         />
         <div className="view-tabs pie-map-views" role="group" aria-label="Map view">
@@ -163,71 +160,7 @@ export function ProjectMap({ profileId, result, onOpen }: { profileId: string; r
       {view === "Baseline" && (
         <BaselineView result={result} baselines={baselines} onOpen={onOpen} />
       )}
-      {view === "Table" && (
-        <>
-          <div className="pie-results">
-            <table className="pie-table pie-map" aria-label="Project map">
-              <thead>
-                <tr>
-                  <th scope="col" rowSpan={span}>
-                    Linked set
-                  </th>
-                  {grouped
-                    ? groups.map((g) => (
-                        <th key={g.baseline ?? ""} scope="colgroup" colSpan={g.projects.length}>
-                          {g.baseline === null ? "No baseline" : `Baseline ${projectLabel(g.baseline, names.get(g.baseline))}`}
-                        </th>
-                      ))
-                    : projects.map((p) => (
-                        <th key={p} scope="col">
-                          {projectLabel(p, names.get(p))}
-                        </th>
-                      ))}
-                  <th scope="col" rowSpan={span}>
-                    State
-                  </th>
-                </tr>
-                {grouped && (
-                  <tr>
-                    {projects.map((p) => (
-                      <th key={p} scope="col">
-                        {projectLabel(p, names.get(p))}
-                      </th>
-                    ))}
-                  </tr>
-                )}
-              </thead>
-              <tbody>
-                {rows.map((s) => (
-                  <tr key={s.keys[0]}>
-                    <th scope="row" className="mono">
-                      {s.keys[0]}
-                    </th>
-                    {projects.map((p) => {
-                      const here = s.keys.filter((k) => issues.get(k)?.project === p);
-                      return (
-                        <td key={p}>
-                          {here.length === 0
-                            ? "-"
-                            : here.map((k) => (
-                                <button key={k} type="button" className="pie-map-key" onClick={() => onOpen(k)}>
-                                  <span className="mono">{k}</span> {issues.get(k)?.status}
-                                </button>
-                              ))}
-                        </td>
-                      );
-                    })}
-                    <td>
-                      <OutOfStep outOfStep={s.outOfStep} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pager label="Project map" {...pager} />
-        </>
-      )}
+      {view === "Coverage" && <MapCoverage sets={sets} groups={groups} issues={issues} names={names} onOpen={onOpen} />}
       {sets.length === 0 && <p className="muted">No linked sets to show.</p>}
       {editing && <BaselinesDialog profileId={profileId} baselines={baselines} onChange={setBaselines} onClose={() => setEditing(false)} />}
     </div>

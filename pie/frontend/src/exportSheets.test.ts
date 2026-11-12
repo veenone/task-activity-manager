@@ -19,11 +19,18 @@ it("lists each issue of each linked set on its own row", () => {
   });
 });
 
-it("puts each set against each project, as the map's table does", () => {
-  expect(mapSheet(sets, ["A", "B", "C"], issues, label)).toEqual({
-    name: "Project map",
-    header: ["Linked set", "Alpha (A)", "B", "C", "State"],
-    rows: [["A-1", "A-1 Closed", "B-1 Open", "", "Out of step"]],
+it("writes the coverage matrix, with a gap where the baseline misses the set", () => {
+  const groups = [
+    { baseline: "A", projects: ["A", "B", "C"] },
+    { baseline: null, projects: ["D"] },
+  ];
+  expect(mapSheet(sets, groups, issues, label)).toEqual({
+    name: "Coverage",
+    header: ["Linked set", "Alpha (A)", "B", "C", "D", "Covered", "State"],
+    rows: [
+      ["Coverage", "100%", "100%", "0%", "", "", ""],
+      ["A-1", "A-1 Closed", "B-1 Open", "gap", "", "2 of 3", "Fix missing"],
+    ],
   });
 });
 

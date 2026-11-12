@@ -140,6 +140,37 @@ it("branches baselines into projects and issues, and marks a chosen set across t
   expect(onOpen).toHaveBeenCalledWith("C-2");
 });
 
+const rowText = (table: HTMLElement) =>
+  within(table)
+    .getAllByRole("rowheader")
+    .map((h) => [h.textContent, ...within(h.closest("tr")!).queryAllByRole("cell").map((c) => c.textContent)].join(" | "));
+
+it("lays each set against its baselines' projects, with gaps and coverage", async () => {
+  const { user, onOpen } = show();
+  await screen.findByRole("option", { name: "Baseline A" });
+  await user.click(screen.getByRole("button", { name: "Coverage" }));
+  const table = screen.getByRole("table", { name: "Coverage" });
+  expect(rowText(table)).toEqual([
+    "Coverage | 100% | 50% |  |  | ",
+    "A-1 | A-1 | B-1 | · | 2 of 2 | Fixed, others behind",
+    "A-2 | A-2 | gap | C-2 | 2 of 3 | Fix missing",
+  ]);
+  await user.click(within(table).getByRole("button", { name: "C-2 Rejected" }));
+  expect(onOpen).toHaveBeenCalledWith("C-2");
+});
+
+it("keeps only sets with a gap, and sorts the least covered first", async () => {
+  const { user } = show();
+  await screen.findByRole("option", { name: "Baseline A" });
+  await user.click(screen.getByRole("button", { name: "Coverage" }));
+  const table = screen.getByRole("table", { name: "Coverage" });
+  const sets = () => rowText(table).slice(1).map((r) => r.split(" | ")[0]);
+  await user.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "Least covered first");
+  expect(sets()).toEqual(["A-2", "A-1"]);
+  await user.click(screen.getByRole("checkbox", { name: "Gaps only" }));
+  expect(sets()).toEqual(["A-2"]);
+});
+
 it("applies Out of step only to the flow", async () => {
   const { user } = show();
   await screen.findByRole("list", { name: /Issues by baseline/ });
@@ -169,13 +200,13 @@ it("filters every view by project and key, says how many show, and clears", asyn
   await screen.findByRole("option", { name: "Baseline A" });
   await user.type(screen.getByRole("combobox", { name: "Project" }), "C");
   expect(screen.getByText("Showing 1 of 2 linked sets")).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Table" }));
-  const table = screen.getByRole("table", { name: "Project map" });
-  expect(within(table).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["A-2"]);
+  await user.click(screen.getByRole("button", { name: "Coverage" }));
+  const table = screen.getByRole("table", { name: "Coverage" });
+  expect(within(table).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["Coverage", "A-2"]);
 
   await user.click(screen.getByRole("button", { name: "Clear filters" }));
   await user.type(screen.getByLabelText("Key"), "b-1");
-  expect(within(table).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["A-1"]);
+  expect(within(table).getAllByRole("rowheader").map((h) => h.textContent)).toEqual(["Coverage", "A-1"]);
   const counts = screen.getByRole("list", { name: "Map counts" });
   expect(within(counts).getByText("1 of 2")).toBeVisible();
 });

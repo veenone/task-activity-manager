@@ -281,6 +281,110 @@ body,
   color: var(--text);
 }
 
+/* Project map › Coverage: a cell is a done or open key, a hatched gap, or a
+   dot, and each baseline project's column shows its share of the sets (#473). */
+.pie-cov-bar,
+.pie-cov-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.pie-cov-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pie-cov-legend {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+
+.pie-table .pie-cov-cell {
+  text-align: center;
+}
+
+/* Keys stack in a cell when a set has two in one project; the rest of
+   the row centres on them. */
+.pie-cov-table tbody th,
+.pie-cov-table tbody td {
+  vertical-align: middle;
+}
+
+.pie-cov-key,
+.pie-cov-gap {
+  display: inline-block;
+  min-width: 72px;
+  margin: 1px 0;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-1);
+  font-size: var(--fs-sm);
+}
+
+button.pie-cov-key {
+  cursor: pointer;
+}
+
+button.pie-cov-key:hover {
+  text-decoration: underline;
+}
+
+button.pie-cov-key:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.pie-cov-done {
+  background: var(--ok-tint);
+  color: var(--ok-text);
+}
+
+.pie-cov-open {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+
+.pie-cov-gap {
+  border: 1px dashed var(--danger-solid);
+  background: repeating-linear-gradient(135deg, var(--danger-tint) 0 6px, transparent 6px 12px);
+  color: var(--danger-text);
+}
+
+.pie-cov-share td {
+  font-weight: 600;
+  text-align: center;
+}
+
+.pie-cov-meter {
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: var(--r-full);
+  background: linear-gradient(to right, var(--ok-solid) var(--share), var(--border-subtle) var(--share));
+}
+
+.pie-cov-state-missing {
+  color: var(--danger-text);
+}
+
+.pie-cov-state-behind {
+  color: var(--warn-text);
+}
+
+.pie-cov-state-everywhere {
+  color: var(--ok-text);
+}
+
+.pie-cov-state-open {
+  color: var(--text-muted);
+}
+
 /* Project map views: Flow and Tree */
 .pie-map-views {
   margin-left: auto;

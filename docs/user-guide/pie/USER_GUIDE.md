@@ -165,10 +165,9 @@ your query matched. The two other pages show the sets:
   project by project, with status, age and how each issue links to the others
   (for example "clones ALPHA-101"). An issue your query did not match is
   marked "Not in the query".
-- **Project map** has a row for each set and a column for each project. A
-  cell gives the key and status of each issue the set has in that project, or
-  a dash when it has none. Choose a key to open its set in Trace, where the set list opens on the page
-  that holds it.
+- **Project map** shows the same sets as a flow, a tree, a baseline graph
+  and a coverage matrix, described below. Choose a key in any of them to open
+  its set in Trace, where the set list opens on the page that holds it.
 
 A set is **out of step** when at least one of its issues is finished in Jira
 (its status is in Jira's done category) and at least one is not. That is the
@@ -185,12 +184,12 @@ about:
   chosen baseline's projects.
 - **Key** keeps the sets with a key that contains what you type.
 
-The filters apply to Flow, Tree and Table together. A line says how many sets
+The filters apply to Flow, Tree and Coverage together. A line says how many sets
 are showing out of the whole run, and **Clear filters** brings them all back.
 The counts above the map always describe the whole run.
 
 Above the map, PIE counts the sets out of step, the issues in them that are
-still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Table**
+still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Coverage**
 show the same sets three ways, and **Baseline** shows one baseline and what links to it:
 
 Both Flow diagrams work the same way. Boxes stand in layers from left to
@@ -238,7 +237,24 @@ both, its width and number giving the count.
     external dependencies, linked sets out of step and the median age of open
     issues. With a second version chosen, each number shows its change, in red
     when it is worse.
-- **Table** is the grid described above.
+- **Coverage** has a row for each set and a column for each project, the
+  projects grouped under their baselines.
+  - A cell holds the set's issue in that project: green when it is finished,
+    amber when it is open. Hover over a key to see its status.
+  - A red hatched **gap** is a project of a baseline the set reaches through
+    another of its projects, with no issue of its own. That is usually a fix
+    still to be made there. A dot means the set never reaches that baseline,
+    so nothing is missing. Projects under no baseline never show a gap.
+  - The **Coverage** row gives each baseline project's share of the sets that
+    reach its baseline. **Covered** says how many of a set's baseline
+    projects it has an issue in.
+  - **State** is *Fix missing* when the set has a gap, *Fixed, others behind*
+    when it is out of step, and otherwise *Fixed everywhere* or *Open
+    everywhere*.
+  - **Gaps only** keeps the sets with a gap. **Sort** puts the least covered
+    sets first.
+  - With no baselines set there are no gaps, and the matrix lists each set's
+    issues by project.
 
 In every view, choosing a key opens its set in Trace.
 
@@ -488,7 +504,8 @@ an .xlsx of what the view is showing, with its filters applied:
 - **Results** writes every row its filters leave, across all pages, in the
   table's columns.
 - **Trace** writes the linked sets it lists, one issue per row.
-- **Project map** writes its table, and the same sets one issue per row.
+- **Project map** writes its coverage matrix, with the coverage row first,
+  and the same sets one issue per row. Gaps only and Sort do not change it.
 - **Link map** writes its grid and every link the grid counts.
 - **Statistics** writes the headline numbers and both tables, for the project
   and time range you chose.

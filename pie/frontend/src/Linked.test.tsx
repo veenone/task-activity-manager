@@ -71,7 +71,7 @@ async function runAndOpen(view: "Trace" | "Project map", res: object = result) {
   await user.type(await screen.findByLabelText("JQL"), "q");
   await user.click(screen.getByRole("button", { name: "Run" }));
   await user.click(await screen.findByRole("button", { name: view }));
-  if (view === "Project map") await user.click(screen.getByRole("button", { name: "Table" }));
+  if (view === "Project map") await user.click(screen.getByRole("button", { name: "Coverage" }));
   return user;
 }
 
@@ -94,37 +94,37 @@ it("lists only the issues the query matched in the results table", async () => {
 });
 
 describe("project map", () => {
-  it("gives each set a row, each project a column, and a dash where a project has none", async () => {
+  it("gives each set a row, each project a column, and a dot where a project has none", async () => {
     await runAndOpen("Project map");
-    const map = screen.getByRole("table", { name: "Project map" });
+    const map = screen.getByRole("table", { name: "Coverage" });
     const headers = within(map).getAllByRole("columnheader").map((h) => h.textContent);
-    expect(headers).toEqual(["Linked set", "A", "B", "C", "State"]);
+    expect(headers).toEqual(["Linked set", "A", "B", "C", "Covered", "State"]);
 
     const first = within(map).getByRole("rowheader", { name: "A-1" }).closest("tr")!;
     const cells = within(first).getAllByRole("cell").map((c) => c.textContent);
-    expect(cells).toEqual(["A-1 Closed", "B-1 Open", "-", "Out of step"]);
+    expect(cells).toEqual(["A-1", "B-1", "·", "2 of 2", "Fixed, others behind"]);
     const second = within(map).getByRole("rowheader", { name: "A-2" }).closest("tr")!;
-    expect(within(second).getAllByRole("cell").at(-1)).toHaveTextContent("In step");
+    expect(within(second).getAllByRole("cell").at(-1)).toHaveTextContent("Fixed everywhere");
   });
 
   it("groups the project columns by baseline, with projects under none last", async () => {
     vi.mocked(api.Baselines).mockResolvedValue([{ key: "B", descendants: ["C"] }]);
     await runAndOpen("Project map");
-    const map = screen.getByRole("table", { name: "Project map" });
+    const map = screen.getByRole("table", { name: "Coverage" });
     expect(await within(map).findByRole("columnheader", { name: "Baseline B" })).toHaveAttribute("colspan", "2");
     const [top, keys] = within(map).getAllByRole("row");
     const text = (r: HTMLElement) => within(r).getAllByRole("columnheader").map((h) => h.textContent);
-    expect(text(top)).toEqual(["Linked set", "Baseline B", "No baseline", "State"]);
+    expect(text(top)).toEqual(["Linked set", "Baseline B", "No baseline", "Covered", "State"]);
     expect(text(keys)).toEqual(["B", "C", "A"]);
 
     const first = within(map).getByRole("rowheader", { name: "A-1" }).closest("tr")!;
-    expect(within(first).getAllByRole("cell").map((c) => c.textContent)).toEqual(["B-1 Open", "-", "A-1 Closed", "Out of step"]);
+    expect(within(first).getAllByRole("cell").map((c) => c.textContent)).toEqual(["B-1", "gap", "A-1", "2 of 3", "Fix missing"]);
   });
 
   it("narrows to sets out of step", async () => {
     const user = await runAndOpen("Project map");
     await user.click(screen.getByLabelText("Out of step only"));
-    const map = screen.getByRole("table", { name: "Project map" });
+    const map = screen.getByRole("table", { name: "Coverage" });
     expect(within(map).getByRole("rowheader", { name: "A-1" })).toBeVisible();
     expect(within(map).queryByRole("rowheader", { name: "A-2" })).not.toBeInTheDocument();
   });

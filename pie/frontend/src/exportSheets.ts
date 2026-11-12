@@ -1,6 +1,8 @@
 import type { cases, cycles, query } from "../wailsjs/go/models";
 import type { Edge } from "./linkData";
 import { projectOf } from "./linkData";
+import { type Cell, coverage, percent } from "./coverage";
+import { FIX_STATES } from "./mapData";
 import type { Stats } from "./stats";
 
 // A Sheet is what ExportWorkbook writes: every cell is text, and Go stores a
@@ -27,21 +29,29 @@ export function setSheet(sets: query.Set[], issues: Map<string, query.Issue>, la
   };
 }
 
-// mapSheet is the Project map's table: a row per set, a column per project.
-export function mapSheet(sets: query.Set[], projects: string[], issues: Map<string, query.Issue>, label: Label): Sheet {
+// mapSheet is the Project map's coverage matrix: a row per set, a column per
+// project in baseline order, and the coverage of each column first.
+export function mapSheet(
+  sets: query.Set[],
+  groups: { baseline: string | null; projects: string[] }[],
+  issues: Map<string, query.Issue>,
+  label: Label,
+): Sheet {
+  const { rows, columns } = coverage(sets, groups, issues);
+  const cell = (c: Cell) =>
+    c === "gap" ? "gap" : c === "none" ? "" : c.keys.map((k) => `${k} ${issues.get(k)?.status ?? ""}`.trim()).join("; ");
   return {
-    name: "Project map",
-    header: ["Linked set", ...projects.map(label), "State"],
-    rows: sets.map((s) => [
-      s.keys[0],
-      ...projects.map((p) =>
-        s.keys
-          .filter((k) => issues.get(k)?.project === p)
-          .map((k) => `${k} ${issues.get(k)?.status ?? ""}`.trim())
-          .join("; "),
-      ),
-      s.outOfStep ? "Out of step" : "In step",
-    ]),
+    name: "Coverage",
+    header: ["Linked set", ...columns.map((c) => label(c.project)), "Covered", "State"],
+    rows: [
+      ["Coverage", ...columns.map((c) => (c.share === null ? "" : percent(c.share))), "", ""],
+      ...rows.map((r) => [
+        r.set.keys[0],
+        ...r.cells.map(cell),
+        `${r.covered} of ${r.of}`,
+        FIX_STATES.find((f) => f.id === r.state)?.label ?? r.state,
+      ]),
+    ],
   };
 }
 
