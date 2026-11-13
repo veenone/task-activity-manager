@@ -24,7 +24,7 @@ Above the table, **Filters** opens every filter for the view, on one row:
 
 - the filters for the container list: **All executions**, **All environments**, the sort, and **Set env on shown**
 - **Fix version** and **Result**, for the tests of the container you opened
-- **Label** and **JQL**, which narrow the tests the way Jira's Test Execution page does, for any container type. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. **JQL…** opens a box for the query, and asks Jira which of the container's tests also match it; those are kept. It opens again on your last query, so you can fix one Jira refused. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL and say so.
+- **Label** and **JQL**, which narrow the tests the way Jira's Test Execution page does, for any container type. Label keeps the tests that carry the label you pick, from the local cache, so it works offline. **JQL…** opens a box for the query, and asks Jira which of the container's tests also match it; those are kept. It opens again on your last query, so you can fix one Jira refused. It needs a connection, Jira's own message shows when the query is refused, and **Clear JQL** shows every test again. The demo profile and Kiwi profiles have no JQL, so the button is left out.
 
 With the panel closed, the button says how many filters are in force, for example **Filters (2)**, and each one shows beside it as a chip. Click **✕** on a chip to remove that filter.
 

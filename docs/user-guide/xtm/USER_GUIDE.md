@@ -1,6 +1,6 @@
 # Xray Test Manager — User Guide
 
-**Version:** 1.10.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** QA engineers,
+**Version:** 1.11.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** QA engineers,
 test leads, and anyone managing Xray test cases in Jira Data Center.
 
 Xray Test Manager is a lightweight Windows desktop app for managing **Xray test
@@ -16,6 +16,102 @@ you commit.
 > view and state to capture for each one. The fastest way to produce every
 > screenshot is to run the app against a **demo profile** (no Jira required —
 > see [Demo mode](#demo-mode-try-it-without-jira)).
+
+---
+
+## What's new in 1.11.0
+
+Version 1.11.0 adds Zephyr Essential as a third backend and makes Xray's
+parameterized tests work end to end: datasets you can write, a catalog of
+them, and iteration results on a live profile. Results now go through Commit
+like every other edit, labels and components get their own tools, and an open
+Test Execution gives its tests most of the window.
+
+**Zephyr Essential**
+- **A third backend.** Choose **Backend: Zephyr Essential** on a profile and
+  give it the same Jira URL and token an Xray profile takes. XTM reads its
+  tests, steps and test cycles. In a cycle you can set results, set each
+  step's result, create a cycle and add tests to it, all through Commit. See
+  [Working with a Zephyr Essential profile](#working-with-a-zephyr-essential-profile).
+- **Each backend offers its own result names.** The result dropdown used to
+  offer Xray's six everywhere. A Zephyr profile now offers the results its
+  instance defines.
+- **Custom fields say where they live.** On a Zephyr profile the detail panel
+  groups them under **On the test**, **On an execution** and **On a step**.
+  Xray and Kiwi profiles look as before.
+- **The Containers view offers only the kinds a backend has.** Test Set and
+  Test Plan no longer appear on a Kiwi or Zephyr profile.
+
+**Datasets and parameterized runs**
+- **Write a test's dataset.** The test detail panel in Browse creates and
+  edits a dataset: Text and List parameters, rows in run order, CSV import,
+  and a `${` macro button on each step field that inserts a parameter. See
+  [Where editing and results happen](#where-editing-and-results-happen).
+- **A Datasets view.** **View → Datasets** scans the profile and lists each
+  parameterized test once, with its Plan and Execution overrides and the
+  containers that use it. See [Datasets](#datasets).
+- **Iterations on a live Xray profile.** A dataset test in a Test Execution
+  expands into its iterations, with the values each ran with and the steps
+  already substituted. Pick an iteration's result, or tick several and apply
+  one result to all of them. See [A test with a dataset](#a-test-with-a-dataset).
+- **JUnit results reach iterations.** An imported testcase that carries the
+  dataset's parameters as properties is matched to its iteration. A match that
+  is unclear asks you to choose or leave it out before anything applies.
+
+**Results go through Commit**
+- **An iteration result waits for Commit.** It used to be written to Xray the
+  moment you picked it. It is now journalled like every other edit, marked
+  **not committed** until you commit, and can be discarded from Pending
+  changes.
+- **A refresh keeps what you set.** Refreshing a run no longer overwrites an
+  iteration or step result you have not committed yet.
+- **A step result can no longer lock its test.** A result that cannot be
+  written is skipped at commit and left pending, rather than holding the test
+  in a conflict nothing could clear.
+
+**Labels, components and steps**
+- **A label picker.** The Labels field suggests labels already on your tests,
+  so a typo no longer creates a new label. **Labels…** in the bulk toolbar adds
+  and removes several labels across a selection. See [Labels](#labels).
+- **Manage labels.** **More → Labels…** renames, merges or deletes a label
+  across every test that carries it.
+- **Components.** A test's components are edited with the same kind of
+  picker, in bulk too, and the **Components** tab creates, edits, deletes and
+  bulk-creates the project's components. See
+  [Project components](#project-components-components-tab).
+- **Replace step text.** **Replace step text…** in the bulk toolbar finds a
+  string in the steps of the selected tests and replaces it, after a preview of
+  every match. See [Bulk operations](#bulk-operations).
+
+**Preconditions and creating tests**
+- **Import preconditions** from CSV or XLSX, with a template to download. See
+  [Importing preconditions](#importing-preconditions).
+- **Preconditions show their workflow status**, and the list sorts and
+  searches by it.
+- **Required fields are asked for.** New Test and New precondition ask for any
+  field the Jira project requires on create, instead of the create failing at
+  commit. A Generic or Cucumber precondition keeps its type.
+
+**Test Executions**
+- **The tests get the room.** The execution's card is one line, with a slim
+  run bar, **Related bugs** and **+ Add tests**. The filters fold into one
+  **Filters** row; each filter in force shows as a chip beside it that you can
+  remove. See [Test Sets, Plans & Executions](#test-sets-plans-executions-containers).
+- **Click the run bar to filter.** A segment keeps the tests with that result,
+  the same filter as **Filters › Result**. Click it again to clear it.
+- **Filter by label and by JQL.** **Label** works offline from the local
+  cache. **JQL…** opens a dialog and asks Jira which of the execution's tests
+  match your query.
+- **One Add tests button.** **+ Add tests** is the main action, and the **▾**
+  menu beside it holds **Import results…** on a Test Execution.
+
+**The window**
+- **The status bar** says whether the local store is ready and which theme is
+  in force, and shows a failed sync as a ribbon across it in plain words.
+- **Sync works on Jira 9 and newer**, which removed an endpoint the sync used
+  to stop on.
+- **Deleting a profile removes all of its data**, where it used to leave most
+  of its tables behind.
 
 ---
 
@@ -925,14 +1021,31 @@ You can:
   Execution** (the button follows the kind selector), and allocate tests to it.
 - Add or remove member tests.
 - For a **Test Execution**, set each member's **run result** inline (e.g. PASS /
-  FAIL / TODO), or apply one result to many selected members at once. A compact
-  bar summarizes the run-status mix.
-- For a **Test Execution**, narrow its tests the way Jira's Test Execution page
-  does. **Label** keeps the tests that carry a label, read from the local cache,
-  so it works offline. **JQL** asks Jira which of the execution's tests also
-  match your query and keeps those; it needs a connection, and Jira's own
-  message shows if the query is refused. **Clear JQL** shows every test again.
-  The demo profile and Kiwi profiles have no JQL and say so.
+  FAIL / TODO), or apply one result to many selected members at once. A slim
+  bar on the card summarizes the run-status mix. Click one of its segments to
+  keep only the tests with that result, and click it again to show them all.
+- Add tests with **+ Add tests** on the card. On a Test Execution the **▾**
+  menu beside it also holds **Import results…** (see
+  [Import JUnit XML results](#import-junit-xml-results)).
+
+The open container's card takes one line: its kind, key, name, status, test
+count, run bar, **Related bugs** and **+ Add tests**. Below it, the **Filters**
+button opens one row holding the container list's filters and, for the open
+container, **Fix version**, **Result**, **Label** and **JQL…**. The button
+counts the filters in force, and each one shows as a chip beside it, so a
+filter is never out of sight. Remove a chip to clear that filter. The test
+table takes the rest of the window.
+
+For a **Test Execution**, the filters narrow its tests the way Jira's Test
+Execution page does:
+- **Label** keeps the tests that carry a label, read from the local cache, so
+  it works offline.
+- **JQL…** opens a dialog for a query and asks Jira which of the execution's
+  tests also match it. It needs a connection, and Jira's own message shows
+  beside the button if the query is refused; the dialog opens on your last
+  query so you can fix it. **Clear JQL**, or removing the chip, shows every
+  test again. The demo profile and Kiwi profiles have no JQL, so the button
+  is left out.
 
 ![Figure 23: Run results per test](images/23-execution-runstatus.png)
 *Figure 23 — Each member's run result shows in the Execution column (PASS /
