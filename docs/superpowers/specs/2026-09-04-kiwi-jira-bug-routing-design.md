@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-04
 **Base:** `main` @ `caa163b`
-**Jira:** [RND_P_4TFINT_05-359](https://jira-01.sf.st.intranet/browse/RND_P_4TFINT_05-359), fixVersion V1.10.0
+**Jira:** the internal Jira ticket, fixVersion V1.10.0
 **Status:** design approved; pending spec review
 
 ## Goal

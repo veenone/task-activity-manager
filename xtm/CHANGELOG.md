@@ -8,6 +8,8 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-13
+
 ### Added
 
 **Zephyr Essential can be chosen as a backend, and connects**
@@ -414,7 +416,7 @@ on tests and the Components view, are below.
   sync; the stage runs a full pass with a generation sweep rather than an
   incremental watermark, so nothing needs resyncing by hand.
 - This is the prerequisite for transitioning a precondition
-  (RND_P_4TFINT_05-451, v1.11.0): there was no status to move one from.
+  (planned): there was no status to move one from.
 
 ### Fixed
 
@@ -1108,6 +1110,7 @@ with on-commit sync, bulk operations, Test Sets/Plans/Executions, Test
 Repository folders, preconditions, CSV/XLSX import & export, pytest scaffold,
 statistics dashboard, diagnostics, light/dark themes, profile management).
 
+[1.11.0]: https://github.com/veenone/task-activity-manager/releases/tag/xtm/v1.11.0
 [1.10.0]: https://github.com/veenone/xray-testcase-manager/releases/tag/xtm/v1.10.0
 [1.9.0]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.9.0
 [1.8.0]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.8.0
