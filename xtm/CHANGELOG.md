@@ -107,7 +107,56 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   when the run changes, so ticks cannot carry over onto another execution's
   rows.
 
+**Write a test's dataset, and see every dataset in one place**
+- The test detail panel in Browse creates and edits a dataset the way Xray
+  lays one out: Text and List parameters, rows in run order, and CSV import
+  (#301). Each step field has a `${` button that inserts a parameter, so a
+  macro is not typed by hand.
+- **View → Datasets** scans the profile and lists each parameterized test
+  once, with its Plan and Execution overrides and the containers that use it
+  (#301, #307). It follows the app's layout and controls.
+- A demo profile keeps the datasets it commits (#307).
+
+**JUnit results reach dataset iterations**
+- An imported testcase that carries the dataset's parameters as properties is
+  matched to the iteration that ran with those values, and its result is
+  queued for that iteration (#301). This works when importing into a new Test
+  Execution too.
+- A match that is unclear asks you to choose an iteration or leave the
+  testcase out before anything applies.
+
+**Filter an open container's tests by label and by JQL**
+- **Label** keeps the tests that carry a label. It reads the local cache, so
+  it works offline (#446).
+- **JQL…** asks Jira which of the container's tests also match a query and
+  keeps those. Jira's own message shows if the query is refused, and the
+  dialog opens on the last query so it can be fixed (#446, #471).
+- A query ending in ORDER BY, common in a saved filter's JQL, works: the
+  clause is dropped before the query is wrapped. The filter clears when a
+  sync changes the container's test list, so new tests are not hidden by an
+  old answer. The demo profile and Kiwi profiles have no JQL, so the button
+  is left out.
+
+**The migration bridge reports datasets**
+- Publishing to a target that cannot create datasets, such as Xray to Zephyr,
+  now lists the datasets that would be lost as a gap. A target that cannot
+  take steps at all blocks the publish (#378).
+
 ### Changed
+
+**An open container gives its tests the room**
+- At 1280 by 800 an open Test Execution showed about four test rows. The
+  header is now one line, with Sync and Import JUnit under **Actions**, and
+  the card is one line: kind, key, name, status, test count, a slim run bar,
+  **Related bugs** and **+ Add tests** (#456). Parent, environments, fix
+  versions and a plan's consolidated results fold behind the caret.
+- One **Filters** row holds the container list's filters and, for the open
+  container, Fix version, Result, Label and JQL. Closed, it counts them and
+  shows each as a chip you can remove (#456).
+- Clicking a segment of the run bar keeps the tests with that result, the
+  same filter as **Filters › Result**, and a second click clears it. **+ Add
+  tests** is the main action, with **Import results…** in the **▾** menu
+  beside it on a Test Execution (#471).
 
 **An iteration result is committed, not written on the pick**
 - Picking a result for a dataset iteration no longer sends it to Xray straight
@@ -129,6 +178,13 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   mark that goes with it.
 
 ### Fixed
+
+**Deleting a profile left most of its data behind**
+- Purging a profile swept 15 of the 40 tables keyed by profile, so
+  requirements, bugs, runs, execution plans, coverage and the publish map
+  stayed on disk (#272). The same purge runs when a profile's project, URL or
+  backend changes, so stale rows outlived that too. Every profile-keyed table
+  is now swept, and a test seeded from the live schema keeps it that way.
 
 **The container type picker offered kinds the backend does not have**
 - The Containers view offered Test Set and Test Plan on every profile,
