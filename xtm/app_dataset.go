@@ -192,16 +192,10 @@ func (a *App) ImportDatasetCSV(content string, current testrepo.Dataset) (testre
 // It exports what is on screen rather than what is cached, so an export taken
 // mid-edit is the table the user is looking at.
 func (a *App) ExportDatasetCSV(testKey string, ds testrepo.Dataset) (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export dataset",
-		DefaultFilename: exportFilename(testKey + "-dataset.csv"),
-		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export dataset", exportFilename(testKey+"-dataset.csv"),
+		runtime.FileFilter{DisplayName: "CSV", Pattern: "*.csv"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	if err := os.WriteFile(path, jira.DatasetCSV(toJiraDataset(ds)), 0o644); err != nil {
 		return "", fmt.Errorf("write dataset: %w", err)

@@ -439,16 +439,10 @@ func (a *App) ExportProfile(id string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encode profile: %w", err)
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export profile",
-		DefaultFilename: exportFilename(sanitizeFilename(p.Name) + "-profile.json"),
-		Filters:         []runtime.FileFilter{{DisplayName: "JSON", Pattern: "*.json"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil // cancelled
+	path, err := a.askSavePath("Export profile", exportFilename(sanitizeFilename(p.Name)+"-profile.json"),
+		runtime.FileFilter{DisplayName: "JSON", Pattern: "*.json"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write profile: %w", err)
@@ -3304,16 +3298,10 @@ func (a *App) ExportPytest(profileID, containerKey, style string) (string, error
 	if style == "unittest" {
 		suffix = "_unittest"
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Save Python scaffold",
-		DefaultFilename: exportFilename("test_" + sanitizeFilename(containerKey) + suffix + ".py"),
-		Filters:         []runtime.FileFilter{{DisplayName: "Python", Pattern: "*.py"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Save Python scaffold", exportFilename("test_"+sanitizeFilename(containerKey)+suffix+".py"),
+		runtime.FileFilter{DisplayName: "Python", Pattern: "*.py"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
 		return "", fmt.Errorf("write pytest: %w", err)
@@ -3999,16 +3987,9 @@ func (a *App) ExportGapReport(result testrepo.GapResult, format string) (string,
 			{DisplayName: "CSV", Pattern: "*.csv"},
 		}
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export gap analysis report",
-		DefaultFilename: exportFilename(defaultName),
-		Filters:         filters,
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export gap analysis report", exportFilename(defaultName), filters...)
+	if err != nil || path == "" {
+		return "", err
 	}
 	writeFormat := "csv"
 	if strings.HasSuffix(strings.ToLower(path), ".xlsx") {
@@ -4031,19 +4012,11 @@ func (a *App) ExportTests(profileID string, q testrepo.Query) (string, error) {
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export tests",
-		DefaultFilename: exportFilename("tests-export.xlsx"),
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Excel", Pattern: "*.xlsx"},
-			{DisplayName: "CSV", Pattern: "*.csv"},
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export tests", exportFilename("tests-export.xlsx"),
+		runtime.FileFilter{DisplayName: "Excel", Pattern: "*.xlsx"},
+		runtime.FileFilter{DisplayName: "CSV", Pattern: "*.csv"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	format := "xlsx"
 	if strings.HasSuffix(strings.ToLower(path), ".csv") {
@@ -4066,19 +4039,11 @@ func (a *App) ExportRequirementAudit(profileID string) (string, error) {
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export requirement audit",
-		DefaultFilename: exportFilename("requirement-audit.xlsx"),
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Excel", Pattern: "*.xlsx"},
-			{DisplayName: "CSV", Pattern: "*.csv"},
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export requirement audit", exportFilename("requirement-audit.xlsx"),
+		runtime.FileFilter{DisplayName: "Excel", Pattern: "*.xlsx"},
+		runtime.FileFilter{DisplayName: "CSV", Pattern: "*.csv"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	format := "xlsx"
 	if strings.HasSuffix(strings.ToLower(path), ".csv") {
@@ -4107,16 +4072,10 @@ func (a *App) ExportBugsWithRunHistory(profileID string, bugKeys []string) (stri
 		return "", fmt.Errorf("no bug keys provided")
 	}
 
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export bugs",
-		DefaultFilename: exportFilename("bugs-run-history.xlsx"),
-		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export bugs", exportFilename("bugs-run-history.xlsx"),
+		runtime.FileFilter{DisplayName: "Excel", Pattern: "*.xlsx"})
+	if err != nil || path == "" {
+		return "", err
 	}
 
 	// Load the backend for the live detail fetch.
@@ -4200,16 +4159,10 @@ func (a *App) ExportTraceability(profileID, kind string, planFilters, execFilter
 	if err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export traceability",
-		DefaultFilename: exportFilename("traceability-" + kind + ".xlsx"),
-		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export traceability", exportFilename("traceability-"+kind+".xlsx"),
+		runtime.FileFilter{DisplayName: "Excel", Pattern: "*.xlsx"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	data, err := a.repo.ExportTraceabilitySheets(profileID, projectKey, kind, planFilters, execFilters, reqFilters, parentFilters, crossProject)
 	if err != nil {
@@ -4229,16 +4182,10 @@ func (a *App) ExportDashboard(profileID, folder, component, status string) (stri
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export dashboard",
-		DefaultFilename: exportFilename("dashboard.xlsx"),
-		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath("Export dashboard", exportFilename("dashboard.xlsx"),
+		runtime.FileFilter{DisplayName: "Excel", Pattern: "*.xlsx"})
+	if err != nil || path == "" {
+		return "", err
 	}
 	data, err := a.repo.ExportDashboardSheets(profileID, folder, component, status)
 	if err != nil {
@@ -4259,16 +4206,9 @@ var (
 // saveTemplate asks where to save an import template and writes data there.
 // Returns the saved path, or "" when the user cancels.
 func (a *App) saveTemplate(title, filename string, filter runtime.FileFilter, data []byte) (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           title,
-		DefaultFilename: filename,
-		Filters:         []runtime.FileFilter{filter},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
+	path, err := a.askSavePath(title, filename, filter)
+	if err != nil || path == "" {
+		return "", err
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write template: %w", err)
