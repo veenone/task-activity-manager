@@ -215,23 +215,10 @@ func (r *Repository) BulkReplaceRequirements(profileID string, testKeys, toRemov
 
 // testRequirementKeys returns the requirement keys a single Test covers.
 func (r *Repository) testRequirementKeys(profileID, testKey string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "read test requirement keys",
 		`SELECT requirement_key FROM test_requirement
 		 WHERE profile_id = ? AND test_key = ? ORDER BY requirement_key`,
 		profileID, testKey)
-	if err != nil {
-		return nil, fmt.Errorf("read test requirement keys: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }
 
 // --- Requirement sources (config) ---

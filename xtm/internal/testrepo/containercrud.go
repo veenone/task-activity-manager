@@ -201,21 +201,8 @@ func (r *Repository) DeleteContainer(profileID, key string) error {
 
 // containerMembers returns the Test keys linked to a Container.
 func containerMembers(tx *sql.Tx, profileID, key string) ([]string, error) {
-	rows, err := tx.Query(
+	return queryColumn[string](tx, "read container members",
 		`SELECT test_key FROM test_container_test WHERE profile_id = ? AND container_key = ?`,
 		profileID, key,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("read container members: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }

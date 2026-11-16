@@ -201,22 +201,9 @@ func (r *Repository) DeletePrecondition(profileID, key string) error {
 
 // preconditionLinkedTests returns the Test keys linked to a Precondition.
 func preconditionLinkedTests(tx *sql.Tx, profileID, key string) ([]string, error) {
-	rows, err := tx.Query(
+	return queryColumn[string](tx, "read precondition links",
 		`SELECT test_key FROM test_precondition
 		 WHERE profile_id = ? AND precondition_key = ?`,
 		profileID, key,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("read precondition links: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }

@@ -947,44 +947,18 @@ func (r *Repository) BulkReplacePreconditions(profileID string, testKeys, toRemo
 
 // preconditionKeys returns the Precondition keys currently linked to a Test.
 func (r *Repository) preconditionKeys(profileID, testKey string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "read precondition keys",
 		`SELECT precondition_key FROM test_precondition
 		 WHERE profile_id = ? AND test_key = ? ORDER BY precondition_key`,
 		profileID, testKey)
-	if err != nil {
-		return nil, fmt.Errorf("read precondition keys: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }
 
 // preconditionKeysTx is preconditionKeys within an open transaction.
 func preconditionKeysTx(tx *sql.Tx, profileID, testKey string) ([]string, error) {
-	rows, err := tx.Query(
+	return queryColumn[string](tx, "read precondition keys",
 		`SELECT precondition_key FROM test_precondition
 		 WHERE profile_id = ? AND test_key = ? ORDER BY precondition_key`,
 		profileID, testKey)
-	if err != nil {
-		return nil, fmt.Errorf("read precondition keys: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }
 
 // uniqueSorted returns the input with duplicates removed and sorted, so a
@@ -1303,7 +1277,7 @@ type ExternalTest struct {
 // project (the bulk pull only fetches the profile's project). The sync caches
 // the basics of these via ReplaceExternalTests so the board can show them.
 func (r *Repository) ContainerMemberKeysMissingTests(profileID string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "find missing member tests",
 		`SELECT DISTINCT l.test_key
 		 FROM test_container_test l
 		 LEFT JOIN test_case t
@@ -1311,20 +1285,6 @@ func (r *Repository) ContainerMemberKeysMissingTests(profileID string) ([]string
 		 WHERE l.profile_id = ? AND t.jira_key IS NULL
 		 ORDER BY l.test_key`,
 		profileID)
-	if err != nil {
-		return nil, fmt.Errorf("find missing member tests: %w", err)
-	}
-	defer rows.Close()
-
-	out := []string{}
-	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			return nil, err
-		}
-		out = append(out, key)
-	}
-	return out, rows.Err()
 }
 
 // ReplaceExternalTests wipes a profile's external_test cache and rewrites it
@@ -1591,23 +1551,10 @@ func (r *Repository) SeedSampleContainers(profileID, projectKey string) (SeedRes
 	}
 
 	const seedTestCap = 400
-	rows, err := r.db.Query(
+	testKeys, err := queryColumn[string](r.db, "read tests to seed",
 		`SELECT jira_key FROM test_case WHERE profile_id = ?
 		 ORDER BY jira_key LIMIT ?`, profileID, seedTestCap)
 	if err != nil {
-		return result, fmt.Errorf("read tests to seed: %w", err)
-	}
-	testKeys := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			rows.Close()
-			return result, err
-		}
-		testKeys = append(testKeys, k)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
 		return result, err
 	}
 	if len(testKeys) == 0 {
@@ -2360,61 +2307,25 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 // set when building the selection.
 func (r *Repository) ListMatchingKeys(profileID string, q Query) ([]string, error) {
 	whereSQL, args := buildTestFilter(profileID, q)
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "list matching keys",
 		"SELECT jira_key FROM test_case "+whereSQL, args...,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("list matching keys: %w", err)
-	}
-	defer rows.Close()
-
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }
 
 // AllTestKeys returns every cached Test key for a profile.
 func (r *Repository) AllTestKeys(profileID string) ([]string, error) {
-	rows, err := r.db.Query(`SELECT jira_key FROM test_case WHERE profile_id = ?`, profileID)
-	if err != nil {
-		return nil, fmt.Errorf("list test keys: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
+	return queryColumn[string](r.db, "list test keys", `SELECT jira_key FROM test_case WHERE profile_id = ?`, profileID)
 }
 
 // AllContainerKeys returns every cached container key for a profile.
 // Used by the cross-project execution discovery pass to identify already-known
 // executions so newly discovered ones can be deduped.
 func (r *Repository) AllContainerKeys(profileID string) (map[string]bool, error) {
-	rows, err := r.db.Query(`SELECT jira_key FROM test_container WHERE profile_id = ?`, profileID)
+	keys, err := queryColumn[string](r.db, "list container keys", `SELECT jira_key FROM test_container WHERE profile_id = ?`, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("list container keys: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-	out := map[string]bool{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out[k] = true
-	}
-	return out, rows.Err()
+	return keySet(keys), nil
 }
 
 // ListComponents returns the distinct Jira components across a profile's Tests
@@ -2456,23 +2367,10 @@ func (r *Repository) ListComponents(profileID string) ([]Bucket, error) {
 // synced Tests, sorted — the local fallback/supplement for the status filter so
 // the dropdown is never empty even if the workflow fetch fails.
 func (r *Repository) ListTestStatuses(profileID string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "list test statuses",
 		`SELECT DISTINCT status FROM test_case
 		 WHERE profile_id = ? AND status <> '' ORDER BY status`,
 		profileID)
-	if err != nil {
-		return nil, fmt.Errorf("list test statuses: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var s string
-		if err := rows.Scan(&s); err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
 }
 
 // GetTest returns one Test by its Jira key, or ErrNotFound.
@@ -2715,25 +2613,16 @@ func (r *Repository) addRequirementCoverage(profileID string, stats *Statistics,
 // requirement-coverage panel can be narrowed to the active dashboard filter.
 func (r *Repository) subsetKeyToReqSet(profileID, scope string, scopeArgs []any) (map[string]bool, error) {
 	args := append([]any{profileID}, scopeArgs...)
-	rows, err := r.db.Query(
+	keys, err := queryColumn[string](r.db, "scope requirement coverage",
 		`SELECT DISTINCT l.requirement_key
 		 FROM test_requirement l
 		 WHERE l.profile_id = ?
 		   AND l.test_key IN (SELECT jira_key FROM `+scope+`)`,
 		args...)
 	if err != nil {
-		return nil, fmt.Errorf("scope requirement coverage: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-	set := map[string]bool{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		set[k] = true
-	}
-	return set, rows.Err()
+	return keySet(keys), nil
 }
 
 // addContainerStats fills the Test Set / Plan / Execution counts and the
@@ -3455,27 +3344,13 @@ func (r *Repository) ReorderTestSteps(profileID, testKey string, orderedXrayIDs 
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	rows, err := tx.Query(
+	currentIDs, err := queryColumn[string](tx, "read current step order",
 		`SELECT xray_id FROM test_step WHERE profile_id = ? AND test_key = ? ORDER BY idx`,
 		profileID, testKey,
 	)
 	if err != nil {
-		return fmt.Errorf("read current step order: %w", err)
-	}
-	currentIDs := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return err
-		}
-		currentIDs = append(currentIDs, id)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
 		return err
 	}
-	rows.Close()
 
 	if len(currentIDs) == 0 {
 		return fmt.Errorf("test %s has no steps to reorder", testKey)
@@ -4135,24 +4010,11 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 // as for a single discard. Returns the number discarded; on the first failure it
 // stops and returns how many were undone so the user can see partial progress.
 func (r *Repository) DiscardAllPendingChanges(profileID string) (int, error) {
-	rows, err := r.db.Query(
+	ids, err := queryColumn[int64](r.db, "list pending changes",
 		`SELECT id FROM pending_change WHERE profile_id = ? ORDER BY id`,
 		profileID,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("list pending changes: %w", err)
-	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		ids = append(ids, id)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
 		return 0, err
 	}
 
@@ -4392,7 +4254,7 @@ func likeEscape(s string) string {
 // success having deleted nothing (#369).
 func (r *Repository) DiscardTestChanges(profileID, testKey string) error {
 	key := likeEscape(testKey)
-	rows, err := r.db.Query(
+	ids, err := queryColumn[int64](r.db, "list test pending changes",
 		`SELECT id FROM pending_change
 		 WHERE profile_id = ? AND (
 		       entity_key = ?
@@ -4402,19 +4264,6 @@ func (r *Repository) DiscardTestChanges(profileID, testKey string) error {
 		profileID, testKey, key+":%", "%:"+key, "%:"+key+":%",
 	)
 	if err != nil {
-		return fmt.Errorf("list test pending changes: %w", err)
-	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		ids = append(ids, id)
-	}
-	_ = rows.Close()
-	if err := rows.Err(); err != nil {
 		return err
 	}
 	for _, id := range ids {

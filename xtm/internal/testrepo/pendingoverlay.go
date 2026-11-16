@@ -11,23 +11,14 @@ import (
 // pendingKeys returns the entity keys that have a pending change of the given
 // type.
 func pendingKeys(tx *sql.Tx, profileID, entityType string) (map[string]bool, error) {
-	rows, err := tx.Query(
+	keys, err := queryColumn[string](tx, "read pending "+entityType+" keys",
 		`SELECT DISTINCT entity_key FROM pending_change
 		 WHERE profile_id = ? AND entity_type = ?`,
 		profileID, entityType)
 	if err != nil {
-		return nil, fmt.Errorf("read pending %s keys: %w", entityType, err)
+		return nil, err
 	}
-	defer rows.Close()
-	out := map[string]bool{}
-	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			return nil, err
-		}
-		out[key] = true
-	}
-	return out, rows.Err()
+	return keySet(keys), nil
 }
 
 // reapplyFieldEdits writes every pending field edit of entityType back onto
