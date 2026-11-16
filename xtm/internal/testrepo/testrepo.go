@@ -4038,6 +4038,49 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("revert run status: %w", err)
 		}
+	case entityTestRunDefect, entityTestRunComment:
+		// The column holds only the local edit; empty means "show the synced
+		// value", which is what the setters write when an edit returns to it.
+		execKey, runTestKey, ok := splitRunKey(entityKey)
+		if !ok {
+			return fmt.Errorf("malformed run key %q", entityKey)
+		}
+		col := "run_defects"
+		if entityType == entityTestRunComment {
+			col = "run_comment"
+		}
+		if _, err := tx.Exec(
+			fmt.Sprintf(`UPDATE test_container_test SET %s = ''
+			 WHERE profile_id = ? AND container_key = ? AND test_key = ?`, col),
+			profileID, execKey, runTestKey,
+		); err != nil {
+			return fmt.Errorf("revert %s: %w", col, err)
+		}
+	case entityTestRunStep:
+		// entity_key is "<execKey>:<testKey>:<stepResultID>" (runStepEntityKey).
+		parts, ok := splitIterationEntityKey(entityKey, 3)
+		if !ok {
+			return fmt.Errorf("malformed step result key %q", entityKey)
+		}
+		if _, err := tx.Exec(
+			`UPDATE test_run_step SET status = ?
+			 WHERE profile_id = ? AND exec_key = ? AND test_key = ? AND step_result_id = ?`,
+			beforeVal, profileID, parts[0], parts[1], parts[2],
+		); err != nil {
+			return fmt.Errorf("revert step result: %w", err)
+		}
+	case entityContainerEnv:
+		// before_val is the JSON list SetContainerEnvironments journalled.
+		var before []string
+		if err := json.Unmarshal([]byte(beforeVal), &before); err != nil {
+			return fmt.Errorf("decode environments snapshot: %w", err)
+		}
+		if _, err := tx.Exec(
+			`UPDATE test_container SET environments = ? WHERE profile_id = ? AND jira_key = ?`,
+			encodeEnvironments(before), profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("revert container environments: %w", err)
+		}
 	case entityTestReview:
 		// Restore the prior review from the before snapshot (empty verdict
 		// means there was no review, so the row is removed).
