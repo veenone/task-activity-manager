@@ -83,57 +83,6 @@ const (
 	CoverageFailed    = "FAILED"
 )
 
-// --- Sync upsert (full replace, mirroring container links) ---
-
-// ReplaceAllRequirements rewrites the cached requirement set for a profile.
-func (r *Repository) ReplaceAllRequirements(profileID string, reqs []Requirement) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.Exec(`DELETE FROM requirement WHERE profile_id = ?`, profileID); err != nil {
-		return fmt.Errorf("clear requirements: %w", err)
-	}
-	for _, rq := range reqs {
-		if _, err := tx.Exec(
-			`INSERT OR REPLACE INTO requirement
-			   (profile_id, jira_key, project_key, issue_type, summary, status, updated_at,
-			    priority, components, fix_versions, sprint, description, epic_key)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			profileID, rq.Key, rq.ProjectKey, rq.IssueType, rq.Summary, rq.Status, rq.Updated,
-			rq.Priority, rq.Components, rq.FixVersions, rq.Sprint, rq.Description, rq.EpicKey,
-		); err != nil {
-			return fmt.Errorf("insert requirement %s: %w", rq.Key, err)
-		}
-	}
-	return tx.Commit()
-}
-
-// ReplaceAllRequirementLinks rewrites the cached Test <-> Requirement links.
-func (r *Repository) ReplaceAllRequirementLinks(profileID string, links []RequirementLink) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.Exec(`DELETE FROM test_requirement WHERE profile_id = ?`, profileID); err != nil {
-		return fmt.Errorf("clear requirement links: %w", err)
-	}
-	for _, l := range links {
-		if _, err := tx.Exec(
-			`INSERT OR REPLACE INTO test_requirement
-			   (profile_id, test_key, requirement_key, link_id) VALUES (?, ?, ?, ?)`,
-			profileID, l.TestKey, l.RequirementKey, l.LinkID,
-		); err != nil {
-			return fmt.Errorf("insert requirement link %s->%s: %w", l.TestKey, l.RequirementKey, err)
-		}
-	}
-	return tx.Commit()
-}
-
 // --- Linking (Phase 2) ---
 
 // SetTestRequirements replaces the set of requirements a Test covers and queues
