@@ -51,27 +51,8 @@ func (r *Repository) GetTraceabilitySankey(profileID, projectKey string, planFil
 		return out, err
 	}
 
-	q := `SELECT l.container_key, l.test_key, l.run_status
-		 FROM test_container_test l
-		 JOIN test_container c
-		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
-		 WHERE l.profile_id = ? AND c.kind = 'testexec'`
-	args := []any{profileID}
-	if execs := nonEmptyKeys(execFilters); len(execs) > 0 {
-		q += " AND l.container_key IN (" + sqlPlaceholders(len(execs)) + ")"
-		for _, e := range execs {
-			args = append(args, e)
-		}
-	}
-	if plans := nonEmptyKeys(planFilters); len(plans) > 0 {
-		q += " AND l.test_key IN (SELECT test_key FROM test_container_test" +
-			" WHERE profile_id = ? AND container_key IN (" + sqlPlaceholders(len(plans)) + "))"
-		args = append(args, profileID)
-		for _, p := range plans {
-			args = append(args, p)
-		}
-	}
-	execRows, err := r.db.Query(q, args...)
+	from, args := executionRunsFrom(profileID, planFilters, execFilters)
+	execRows, err := r.db.Query(`SELECT l.container_key, l.test_key, l.run_status`+from, args...)
 	if err != nil {
 		return out, fmt.Errorf("read execution runs: %w", err)
 	}
@@ -242,4 +223,33 @@ func projectKeyOf(key string) string {
 		return key[:i]
 	}
 	return key
+}
+
+// executionRunsFrom returns the FROM and WHERE clause, with its arguments, for
+// the execution members the traceability view covers: every member of a Test
+// Execution, narrowed to the given executions and to Tests in the given plans.
+// The diagram and its table export both read through it, so a filter cannot
+// apply to one and not the other.
+func executionRunsFrom(profileID string, planFilters, execFilters []string) (string, []any) {
+	q := `
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ? AND c.kind = 'testexec'`
+	args := []any{profileID}
+	if execs := nonEmptyKeys(execFilters); len(execs) > 0 {
+		q += " AND l.container_key IN (" + sqlPlaceholders(len(execs)) + ")"
+		for _, e := range execs {
+			args = append(args, e)
+		}
+	}
+	if plans := nonEmptyKeys(planFilters); len(plans) > 0 {
+		q += " AND l.test_key IN (SELECT test_key FROM test_container_test" +
+			" WHERE profile_id = ? AND container_key IN (" + sqlPlaceholders(len(plans)) + "))"
+		args = append(args, profileID)
+		for _, p := range plans {
+			args = append(args, p)
+		}
+	}
+	return q, args
 }

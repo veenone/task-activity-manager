@@ -60,29 +60,9 @@ func (r *Repository) ExecutionTableRows(profileID, projectKey string, planFilter
 		return nil, err
 	}
 
-	q := `SELECT l.container_key, l.test_key, l.run_status
-		 FROM test_container_test l
-		 JOIN test_container c
-		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
-		 WHERE l.profile_id = ? AND c.kind = 'testexec'`
-	args := []any{profileID}
-	if execs := nonEmptyKeys(execFilters); len(execs) > 0 {
-		q += " AND l.container_key IN (" + sqlPlaceholders(len(execs)) + ")"
-		for _, e := range execs {
-			args = append(args, e)
-		}
-	}
-	if plans := nonEmptyKeys(planFilters); len(plans) > 0 {
-		q += " AND l.test_key IN (SELECT test_key FROM test_container_test" +
-			" WHERE profile_id = ? AND container_key IN (" + sqlPlaceholders(len(plans)) + "))"
-		args = append(args, profileID)
-		for _, p := range plans {
-			args = append(args, p)
-		}
-	}
-	q += " ORDER BY l.container_key, l.test_key"
-
-	rows, err := r.db.Query(q, args...)
+	from, args := executionRunsFrom(profileID, planFilters, execFilters)
+	rows, err := r.db.Query(
+		`SELECT l.container_key, l.test_key, l.run_status`+from+` ORDER BY l.container_key, l.test_key`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("read execution threads: %w", err)
 	}
@@ -191,25 +171,10 @@ func (r *Repository) SubTaskTableRows(profileID string, parentFilters []string, 
 		return nil, err
 	}
 
-	q := `SELECT c.parent_key, l.container_key, l.test_key, l.run_status
-		 FROM test_container_test l
-		 JOIN test_container c
-		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
-		 WHERE l.profile_id = ? AND c.kind = 'testexec' AND c.parent_key != ''`
-	args := []any{profileID}
-	if !crossProject {
-		q += ` AND EXISTS (SELECT 1 FROM test_case t
-			 WHERE t.profile_id = l.profile_id AND t.jira_key = l.test_key)`
-	}
-	if parents := nonEmptyKeys(parentFilters); len(parents) > 0 {
-		q += " AND c.parent_key IN (" + sqlPlaceholders(len(parents)) + ")"
-		for _, p := range parents {
-			args = append(args, p)
-		}
-	}
-	q += " ORDER BY c.parent_key, l.container_key, l.test_key"
-
-	rows, err := r.db.Query(q, args...)
+	from, args := subTaskRunsFrom(profileID, parentFilters, crossProject)
+	rows, err := r.db.Query(
+		`SELECT c.parent_key, l.container_key, l.test_key, l.run_status`+from+
+			` ORDER BY c.parent_key, l.container_key, l.test_key`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("read sub-task threads: %w", err)
 	}
