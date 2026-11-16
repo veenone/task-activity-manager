@@ -46,31 +46,10 @@ func (r *Repository) ReplaceAllRequirements(profileID string, reqs []Requirement
 	); err != nil {
 		return fmt.Errorf("reapply pending requirement deletes: %w", err)
 	}
-	if err := reapplyRequirementEdits(tx, profileID); err != nil {
+	if err := reapplyFieldEdits(tx, profileID, "requirement", entityRequirementEdit, requirementEditFields); err != nil {
 		return err
 	}
 	return tx.Commit()
-}
-
-// reapplyRequirementEdits writes every pending requirement_edit value back
-// onto its column.
-func reapplyRequirementEdits(tx *sql.Tx, profileID string) error {
-	for field, col := range requirementEditFields {
-		if _, err := tx.Exec(
-			fmt.Sprintf(
-				`UPDATE requirement SET %s = (
-				   SELECT p.after_val FROM pending_change p
-				   WHERE p.profile_id = requirement.profile_id AND p.entity_type = ?
-				     AND p.entity_key = requirement.jira_key AND p.field = ?)
-				 WHERE profile_id = ? AND jira_key IN (
-				   SELECT entity_key FROM pending_change
-				   WHERE profile_id = ? AND entity_type = ? AND field = ?)`, col),
-			entityRequirementEdit, field, profileID, profileID, entityRequirementEdit, field,
-		); err != nil {
-			return fmt.Errorf("reapply pending requirement %s edits: %w", field, err)
-		}
-	}
-	return nil
 }
 
 // ReplaceAllRequirementLinks rewrites the cached Test <-> Requirement links.
