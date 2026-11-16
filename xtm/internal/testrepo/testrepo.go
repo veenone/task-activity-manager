@@ -901,50 +901,6 @@ func (r *Repository) SetTestPreconditions(profileID, testKey string, precondKeys
 	return tx.Commit()
 }
 
-// BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
-// Preconditions across a batch of Tests (FR-13.6), computing each Test's new
-// set and queuing it via SetTestPreconditions. A Test already in the desired
-// state is reported as succeeded.
-func (r *Repository) BulkAssociatePreconditions(profileID string, testKeys, precondKeys []string, add bool) (BulkEditResult, error) {
-	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
-	for _, testKey := range testKeys {
-		current, err := r.preconditionKeys(profileID, testKey)
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		newSet := applyPreconditionDelta(current, precondKeys, add)
-		if err := r.SetTestPreconditions(profileID, testKey, newSet); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, testKey)
-	}
-	return result, nil
-}
-
-// BulkReplacePreconditions swaps Preconditions across a batch of Tests: for each
-// Test it removes toRemove and adds toAdd in one apply, computing the new set as
-// (current minus toRemove) plus toAdd and queuing it via SetTestPreconditions
-// (FR-13.6). A Test already in the desired state is reported as succeeded.
-func (r *Repository) BulkReplacePreconditions(profileID string, testKeys, toRemove, toAdd []string) (BulkEditResult, error) {
-	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
-	for _, testKey := range testKeys {
-		current, err := r.preconditionKeys(profileID, testKey)
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		newSet := applyReplaceDelta(current, toRemove, toAdd)
-		if err := r.SetTestPreconditions(profileID, testKey, newSet); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, testKey)
-	}
-	return result, nil
-}
-
 // preconditionKeys returns the Precondition keys currently linked to a Test.
 func (r *Repository) preconditionKeys(profileID, testKey string) ([]string, error) {
 	return queryColumn[string](r.db, "read precondition keys",
@@ -978,48 +934,6 @@ func uniqueSorted(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-// applyPreconditionDelta returns the sorted set produced by adding or removing
-// delta keys from current.
-func applyPreconditionDelta(current, delta []string, add bool) []string {
-	set := make(map[string]struct{}, len(current))
-	for _, k := range current {
-		set[k] = struct{}{}
-	}
-	for _, k := range delta {
-		if add {
-			set[k] = struct{}{}
-		} else {
-			delete(set, k)
-		}
-	}
-	out := make([]string, 0, len(set))
-	for k := range set {
-		out = append(out, k)
-	}
-	return uniqueSorted(out)
-}
-
-// applyReplaceDelta returns the sorted set produced by removing toRemove from
-// current and then adding toAdd. Removal happens first so a key present in both
-// lists ends up added. Shared by the bulk precondition / requirement swap paths.
-func applyReplaceDelta(current, toRemove, toAdd []string) []string {
-	set := make(map[string]struct{}, len(current))
-	for _, k := range current {
-		set[k] = struct{}{}
-	}
-	for _, k := range toRemove {
-		delete(set, k)
-	}
-	for _, k := range toAdd {
-		set[k] = struct{}{}
-	}
-	out := make([]string, 0, len(set))
-	for k := range set {
-		out = append(out, k)
-	}
-	return uniqueSorted(out)
 }
 
 // CreatePrecondition creates a new Precondition locally and queues it for
