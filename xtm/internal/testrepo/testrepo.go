@@ -3613,7 +3613,11 @@ func (r *Repository) addStep(profileID, testKey string, s Step) (Step, error) {
 // the Test already has. Returns the Test's full step list after the clone.
 func (r *Repository) CloneTestSteps(profileID, targetKey string, sourceSteps []Step) ([]Step, error) {
 	for _, s := range sourceSteps {
-		if _, err := r.AddTestStep(profileID, targetKey, s.Action, s.Data, s.Expected); err != nil {
+		// addStep assigns the id and position; the content, a called test
+		// included, is the source step's.
+		if _, err := r.addStep(profileID, targetKey, Step{
+			Action: s.Action, Data: s.Data, Expected: s.Expected, CalledTestKey: s.CalledTestKey,
+		}); err != nil {
 			return nil, err
 		}
 	}
