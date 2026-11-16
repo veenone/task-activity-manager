@@ -1,6 +1,7 @@
 package testrepo
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 )
@@ -24,7 +25,8 @@ type reqqLinkSnap struct {
 
 // ReplaceAllReqReqLinks overwrites the cached Requirement->Requirement links for
 // a profile (used by the syncer during a full requirements sync). It replaces
-// all links in one transaction.
+// all links in one transaction, then reapplies link edits still waiting for
+// commit.
 func (r *Repository) ReplaceAllReqReqLinks(profileID string, links []ReqReqLink) error {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -47,7 +49,85 @@ func (r *Repository) ReplaceAllReqReqLinks(profileID string, links []ReqReqLink)
 			return fmt.Errorf("insert requirement link %s->%s: %w", l.FromKey, l.ToKey, err)
 		}
 	}
+	if err := reapplyReqReqLinkSets(tx, profileID); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+// reapplyReqReqLinkSets puts every pending req_req_link_set back on top of
+// freshly synced links: the requirement's links of that type become exactly
+// the targets the row asks for. A link the sync returned keeps its id, so a
+// later removal can still delete it in Jira.
+func reapplyReqReqLinkSets(tx *sql.Tx, profileID string) error {
+	rows, err := tx.Query(
+		`SELECT entity_key, field, after_val FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ?`,
+		profileID, entityReqReqLinkSet)
+	if err != nil {
+		return fmt.Errorf("read pending req-link sets: %w", err)
+	}
+	type set struct {
+		from, linkType string
+		targets        []string
+	}
+	var sets []set
+	for rows.Next() {
+		var s set
+		var after string
+		if err := rows.Scan(&s.from, &s.linkType, &after); err != nil {
+			rows.Close()
+			return err
+		}
+		s.targets = decodeKeys(after)
+		sets = append(sets, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, s := range sets {
+		synced := map[string]string{}
+		idRows, err := tx.Query(
+			`SELECT to_requirement_key, link_id FROM requirement_link
+			 WHERE profile_id = ? AND from_requirement_key = ? AND link_type = ?`,
+			profileID, s.from, s.linkType)
+		if err != nil {
+			return fmt.Errorf("read synced req links of %s: %w", s.from, err)
+		}
+		for idRows.Next() {
+			var to, id string
+			if err := idRows.Scan(&to, &id); err != nil {
+				idRows.Close()
+				return err
+			}
+			synced[to] = id
+		}
+		idRows.Close()
+		if err := idRows.Err(); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec(
+			`DELETE FROM requirement_link
+			 WHERE profile_id = ? AND from_requirement_key = ? AND link_type = ?`,
+			profileID, s.from, s.linkType,
+		); err != nil {
+			return fmt.Errorf("reapply req-link set for %s: %w", s.from, err)
+		}
+		for _, to := range s.targets {
+			if _, err := tx.Exec(
+				`INSERT OR REPLACE INTO requirement_link
+				   (profile_id, from_requirement_key, to_requirement_key, link_type, link_id)
+				 VALUES (?, ?, ?, ?, ?)`,
+				profileID, s.from, to, s.linkType, synced[to],
+			); err != nil {
+				return fmt.Errorf("reapply req link %s->%s: %w", s.from, to, err)
+			}
+		}
+	}
+	return nil
 }
 
 // GetRequirementLinks returns the outbound Requirement->Requirement links for a
