@@ -221,16 +221,10 @@ func (a *App) ExportCoverageReport(profileID, versionID string) (path string, er
 	if err != nil {
 		return "", err
 	}
-	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Export coverage report",
-		DefaultFilename: "coverage-report.xlsx",
-		Filters:         []runtime.FileFilter{{DisplayName: "Excel Workbook", Pattern: "*.xlsx"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if dest == "" {
-		return "", nil // cancelled
+	dest, err := a.askSavePath("Export coverage report", "coverage-report.xlsx",
+		runtime.FileFilter{DisplayName: "Excel Workbook", Pattern: "*.xlsx"})
+	if err != nil || dest == "" {
+		return "", err
 	}
 	if err := os.WriteFile(dest, data, 0o644); err != nil {
 		return "", fmt.Errorf("write file: %w", err)
