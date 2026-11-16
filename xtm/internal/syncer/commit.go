@@ -219,6 +219,27 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		changes = filterChangesByID(changes, only)
 	}
 
+	// Create new Requirements next, for the same reason: RenameRequirement
+	// rewrites the still-pending coverage, edit and link rows that named the
+	// "NEW-REQ-N" placeholder, so they go out under the key Jira assigned.
+	// A create that fails stays pending and is retried on the next commit.
+	if requirementWritesSupported(caps) {
+		var newRequirementRows []testrepo.PendingChange
+		for _, c := range changes {
+			if c.EntityType == "requirement_create" {
+				newRequirementRows = append(newRequirementRows, c)
+			}
+		}
+		if len(newRequirementRows) > 0 {
+			e.commitRequirementCreates(ctx, profileID, newRequirementRows, &result)
+			changes, err = e.repo.ListPendingChanges(profileID)
+			if err != nil {
+				return result, err
+			}
+			changes = filterChangesByID(changes, only)
+		}
+	}
+
 	// Group by parent Test key, preserving discovery order so the commit
 	// run is deterministic. Step entity_keys are "<testKey>:<xrayID>" — we
 	// strip the suffix to put step changes under the same Test bucket as
@@ -942,7 +963,6 @@ testLoop:
 		e.commitRequirements(ctx, profileID, requirementRows, &result)
 		e.commitRequirementEdits(ctx, profileID, requirementEditRows, &result)
 		e.commitRequirementDeletes(ctx, profileID, requirementDeleteRows, &result)
-		e.commitRequirementCreates(ctx, profileID, requirementCreateRows, &result)
 		e.commitReqReqLinks(ctx, profileID, reqReqLinkRows, &result)
 	} else {
 		e.skipRows(requirementRows, skipReasonRequirements, &result)
