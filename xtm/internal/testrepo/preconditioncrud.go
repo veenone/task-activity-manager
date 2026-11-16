@@ -2,7 +2,6 @@ package testrepo
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -147,52 +146,11 @@ func (r *Repository) DeletePrecondition(profileID, key string) error {
 		return err
 	}
 
-	// If this Precondition was only ever created locally, cancel the create and
-	// any superseded edit rows instead of queuing a remote delete.
-	var addID int64
-	addErr := tx.QueryRow(
-		`SELECT id FROM pending_change
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-		profileID, entityPreconditionAdd, key,
-	).Scan(&addID)
-	if addErr == nil {
-		for _, et := range []string{entityPreconditionAdd, entityPreconditionEdit} {
-			if _, err := tx.Exec(
-				`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-				profileID, et, key,
-			); err != nil {
-				return fmt.Errorf("cancel precondition create rows: %w", err)
-			}
-		}
-		if err := writeAudit(
-			tx, profileID, entityPreconditionAdd, key, "precondition-create-cancelled",
-			"precondition", snap.Summary, "", "",
-		); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}
-	if !errors.Is(addErr, sql.ErrNoRows) {
-		return fmt.Errorf("probe pending precondition add: %w", addErr)
-	}
-
-	// Committed Precondition: drop any superseded edit rows, then queue the
-	// delete with a snapshot for discard.
-	if _, err := tx.Exec(
-		`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-		profileID, entityPreconditionEdit, key,
-	); err != nil {
-		return fmt.Errorf("clear superseded precondition edits: %w", err)
-	}
-	encoded, _ := json.Marshal(snap)
-	if err := upsertPendingChange(
-		tx, profileID, entityPreconditionDelete, key, "precondition", string(encoded), "1", "",
-	); err != nil {
-		return err
-	}
-	if err := writeAudit(
-		tx, profileID, entityPreconditionDelete, key, "delete-precondition-local",
-		"precondition", string(encoded), "", "",
+	// A Precondition that was only created locally has its create cancelled,
+	// along with its edit rows.
+	if _, err := queueDelete(
+		tx, profileID, key, entityPreconditionAdd, entityPreconditionDelete, "precondition", snap.Summary, snap,
+		entityPreconditionEdit,
 	); err != nil {
 		return err
 	}

@@ -122,34 +122,19 @@ func (r *Repository) DeleteRequirement(profileID, key string) error {
 	if err := rewriteRequirementSets(tx, profileID, key, ""); err != nil {
 		return err
 	}
-	// A requirement Jira has never seen has nothing to delete there: cancel
-	// its create instead of queuing a remote delete.
-	cancelled, err := cancelRequirementCreate(tx, profileID, key, snap.Summary)
+	cancelled, err := queueDelete(
+		tx, profileID, key, entityRequirementCreate, entityRequirementDelete, "requirement", snap.Summary, snap,
+		entityRequirementEdit,
+	)
 	if err != nil {
 		return err
 	}
+	// A requirement Jira has never seen takes its local links with it, so
+	// nothing about it reaches Jira.
 	if cancelled {
-		return tx.Commit()
-	}
-	// Drop any superseded edit row.
-	if _, err := tx.Exec(
-		`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-		profileID, entityRequirementEdit, key,
-	); err != nil {
-		return fmt.Errorf("clear superseded requirement edits: %w", err)
-	}
-
-	encoded, _ := json.Marshal(snap)
-	if err := upsertPendingChange(
-		tx, profileID, entityRequirementDelete, key, "requirement", string(encoded), "1", "",
-	); err != nil {
-		return err
-	}
-	if err := writeAudit(
-		tx, profileID, entityRequirementDelete, key, "delete-requirement-local",
-		"requirement", string(encoded), "", "",
-	); err != nil {
-		return err
+		if err := dropLocalRequirementLinks(tx, profileID, key); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

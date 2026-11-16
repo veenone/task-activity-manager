@@ -147,52 +147,11 @@ func (r *Repository) DeleteContainer(profileID, key string) error {
 		return fmt.Errorf("delete container memberships: %w", err)
 	}
 
-	// If this container was only ever created locally, cancel the create and
-	// its membership/edit pending rows instead of queuing a remote delete.
-	var addID int64
-	addErr := tx.QueryRow(
-		`SELECT id FROM pending_change
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'container'`,
-		profileID, entityContainerAdd, key,
-	).Scan(&addID)
-	if addErr == nil {
-		for _, et := range []string{entityContainerAdd, entityMembershipAdd, entityMembershipRemove, entityContainerEdit} {
-			if _, err := tx.Exec(
-				`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-				profileID, et, key,
-			); err != nil {
-				return fmt.Errorf("cancel container create rows: %w", err)
-			}
-		}
-		if err := writeAudit(
-			tx, profileID, entityContainerAdd, key, "container-create-cancelled", "container", snap.Summary, "", "",
-		); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}
-	if !errors.Is(addErr, sql.ErrNoRows) {
-		return fmt.Errorf("probe pending container add: %w", addErr)
-	}
-
-	// Committed container: drop any superseded edit/membership rows, then queue
-	// the delete with a snapshot for discard.
-	for _, et := range []string{entityContainerEdit, entityMembershipAdd, entityMembershipRemove} {
-		if _, err := tx.Exec(
-			`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-			profileID, et, key,
-		); err != nil {
-			return fmt.Errorf("clear superseded container rows: %w", err)
-		}
-	}
-	encoded, _ := json.Marshal(snap)
-	if err := upsertPendingChange(
-		tx, profileID, entityContainerDelete, key, "container", string(encoded), "1", "",
-	); err != nil {
-		return err
-	}
-	if err := writeAudit(
-		tx, profileID, entityContainerDelete, key, "delete-container-local", "container", string(encoded), "", "",
+	// A container that was only created locally has its create cancelled,
+	// along with its membership and edit rows.
+	if _, err := queueDelete(
+		tx, profileID, key, entityContainerAdd, entityContainerDelete, "container", snap.Summary, snap,
+		entityMembershipAdd, entityMembershipRemove, entityContainerEdit,
 	); err != nil {
 		return err
 	}

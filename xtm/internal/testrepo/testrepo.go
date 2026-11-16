@@ -1058,54 +1058,11 @@ func (r *Repository) RenamePrecondition(profileID, oldKey, newKey string) error 
 // it) inside every precondition_set pending row's before / after key-lists. A
 // row whose after-set ends up equal to its before-set is dropped (no-op).
 func rewritePreconditionSets(tx *sql.Tx, profileID, oldKey, newKey string) error {
-	rows, err := tx.Query(
-		`SELECT id, before_val, after_val FROM pending_change
-		 WHERE profile_id = ? AND entity_type = ?`,
-		profileID, entityPreconditionSet)
-	if err != nil {
-		return fmt.Errorf("read precondition sets: %w", err)
-	}
-	type row struct {
-		id            int64
-		before, after string
-	}
-	var rs []row
-	for rows.Next() {
-		var x row
-		if err := rows.Scan(&x.id, &x.before, &x.after); err != nil {
-			rows.Close()
-			return err
-		}
-		rs = append(rs, x)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	for _, x := range rs {
-		before := substituteKey(decodeKeys(x.before), oldKey, newKey)
-		after := substituteKey(decodeKeys(x.after), oldKey, newKey)
-		if equalOrder(before, after) {
-			if _, err := tx.Exec(
-				`DELETE FROM pending_change WHERE profile_id = ? AND id = ?`,
-				profileID, x.id,
-			); err != nil {
-				return fmt.Errorf("drop precondition set: %w", err)
-			}
-			continue
-		}
-		bj, _ := json.Marshal(before)
-		aj, _ := json.Marshal(after)
-		if _, err := tx.Exec(
-			`UPDATE pending_change SET before_val = ?, after_val = ?
-			 WHERE profile_id = ? AND id = ?`,
-			string(bj), string(aj), profileID, x.id,
-		); err != nil {
-			return fmt.Errorf("update precondition set: %w", err)
-		}
-	}
-	return nil
+	return rewritePendingSets(tx, profileID, entityPreconditionSet, func(beforeJSON, afterJSON string) (string, string, bool) {
+		before := substituteKey(decodeKeys(beforeJSON), oldKey, newKey)
+		after := substituteKey(decodeKeys(afterJSON), oldKey, newKey)
+		return encodeKeys(before), encodeKeys(after), equalOrder(before, after)
+	})
 }
 
 // decodeKeys parses a JSON string array, returning nil on malformed input.
