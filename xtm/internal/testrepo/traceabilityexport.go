@@ -1,7 +1,6 @@
 package testrepo
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 
@@ -540,11 +539,4 @@ func (r *Repository) ExportTraceabilitySheets(profileID, projectKey, kind string
 		}
 	}
 	return data, nil
-}
-
-// writeOutlineTreeSheetFromBytes is a thin helper used in tests: it opens a
-// workbook from raw bytes with excelize and returns the file handle. The caller
-// is responsible for calling f.Close().
-func writeOutlineTreeSheetFromBytes(data []byte) (*excelize.File, error) {
-	return excelize.OpenReader(bytes.NewReader(data))
 }

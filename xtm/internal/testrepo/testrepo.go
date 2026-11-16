@@ -4001,32 +4001,15 @@ func (r *Repository) ListPendingChanges(profileID string) ([]PendingChange, erro
 // ListAuditEntries returns the most recent audit log entries for a profile.
 // A limit ≤ 0 or > 1000 defaults to 200.
 func (r *Repository) ListAuditEntries(profileID string, limit int) ([]AuditEntry, error) {
-	if limit <= 0 || limit > 1000 {
-		limit = 200
-	}
-	rows, err := r.db.Query(
-		`SELECT id, occurred_at, actor, entity_type, entity_key, action, field, before_val, after_val, note
-		 FROM audit_log WHERE profile_id = ?
-		 ORDER BY occurred_at DESC, id DESC LIMIT ?`,
-		profileID, limit,
-	)
+	entries, err := journal.Entries(r.db, profileID, "", limit)
 	if err != nil {
-		return nil, fmt.Errorf("list audit entries: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-
-	out := []AuditEntry{}
-	for rows.Next() {
-		var a AuditEntry
-		if err := rows.Scan(
-			&a.ID, &a.OccurredAt, &a.Actor, &a.EntityType, &a.EntityKey,
-			&a.Action, &a.Field, &a.BeforeVal, &a.AfterVal, &a.Note,
-		); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
+	out := make([]AuditEntry, len(entries))
+	for i, e := range entries {
+		out[i] = AuditEntry(e)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // --- Bulk operations (FR-3) ---
@@ -4343,10 +4326,6 @@ func dropPendingChange(tx *sql.Tx, profileID, entityType, entityKey, field strin
 func writeAudit(tx *sql.Tx, profileID, entityType, entityKey, action, field, beforeVal, afterVal, note string) error {
 	return journal.Audit(tx, profileID, entityType, entityKey, action, field, beforeVal, afterVal, note)
 }
-
-// currentActor returns the OS username for the audit trail, falling back to
-// "user" if it cannot be resolved.
-func currentActor() string { return journal.Actor() }
 
 // scanner abstracts *sql.Row and *sql.Rows so scanTest serves Get and List.
 type scanner interface {

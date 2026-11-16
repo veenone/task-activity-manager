@@ -506,16 +506,6 @@ func ParseRecords(data []byte, isXlsx bool) ([][]string, error) {
 // cell, so column auto-mapping no longer recognizes "Summary".
 var utf8BOMBytes = []byte{0xEF, 0xBB, 0xBF}
 
-// stripUTF8BOM removes a leading UTF-8 BOM so the first column header (commonly
-// Summary) maps cleanly and gap analysis can proceed.
-func stripUTF8BOM(data []byte) []byte { return importfile.StripUTF8BOM(data) }
-
-// readCSV parses CSV content leniently (variable field counts allowed).
-func readCSV(content string) ([][]string, error) { return importfile.ReadCSV(content) }
-
-// parseXLSX reads the first worksheet of an XLSX file into rows (FR-10.1).
-func parseXLSX(data []byte) ([][]string, error) { return importfile.ParseXLSX(data) }
-
 // ImportTemplateCSV returns a starter CSV with the supported columns (FR-10.3),
 // matching the current Test fields (Components included) and the export column
 // order so an export round-trips through import. Labels are space-separated;
