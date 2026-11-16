@@ -171,67 +171,12 @@ func (r *Repository) SetTestRequirements(profileID, testKey string, reqKeys []st
 	return tx.Commit()
 }
 
-// BulkAssociateRequirements adds or removes a set of requirement links across
-// many Tests at once, reporting per-Test success/failure.
-func (r *Repository) BulkAssociateRequirements(profileID string, testKeys, reqKeys []string, add bool) (BulkEditResult, error) {
-	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
-	for _, testKey := range testKeys {
-		current, err := r.testRequirementKeys(profileID, testKey)
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		newSet := applyPreconditionDelta(current, reqKeys, add)
-		if err := r.SetTestRequirements(profileID, testKey, newSet); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, testKey)
-	}
-	return result, nil
-}
-
-// BulkReplaceRequirements swaps requirement links across many Tests: for each
-// Test it removes toRemove and adds toAdd in one apply, computing the new set as
-// (current minus toRemove) plus toAdd and queuing it via SetTestRequirements.
-// A Test already in the desired state is reported as succeeded.
-func (r *Repository) BulkReplaceRequirements(profileID string, testKeys, toRemove, toAdd []string) (BulkEditResult, error) {
-	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
-	for _, testKey := range testKeys {
-		current, err := r.testRequirementKeys(profileID, testKey)
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		newSet := applyReplaceDelta(current, toRemove, toAdd)
-		if err := r.SetTestRequirements(profileID, testKey, newSet); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, testKey)
-	}
-	return result, nil
-}
-
 // testRequirementKeys returns the requirement keys a single Test covers.
 func (r *Repository) testRequirementKeys(profileID, testKey string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "read test requirement keys",
 		`SELECT requirement_key FROM test_requirement
 		 WHERE profile_id = ? AND test_key = ? ORDER BY requirement_key`,
 		profileID, testKey)
-	if err != nil {
-		return nil, fmt.Errorf("read test requirement keys: %w", err)
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }
 
 // --- Requirement sources (config) ---

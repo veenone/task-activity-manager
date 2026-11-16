@@ -116,23 +116,10 @@ func (r *Repository) RunsForTest(profileID, testKey string) ([]TestRunRow, error
 
 // ExecPlansForExec returns the plan keys linked to the given execution key.
 func (r *Repository) ExecPlansForExec(profileID, execKey string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "query exec plans",
 		`SELECT plan_key FROM exec_plan WHERE profile_id = ? AND exec_key = ? ORDER BY plan_key`,
 		profileID, execKey,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("query exec plans: %w", err)
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var k string
-		if err := rows.Scan(&k); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
 }
 
 // RunStatuses is the standard Xray Test Run result vocabulary offered when

@@ -122,34 +122,19 @@ func (r *Repository) DeleteRequirement(profileID, key string) error {
 	if err := rewriteRequirementSets(tx, profileID, key, ""); err != nil {
 		return err
 	}
-	// A requirement Jira has never seen has nothing to delete there: cancel
-	// its create instead of queuing a remote delete.
-	cancelled, err := cancelRequirementCreate(tx, profileID, key, snap.Summary)
+	cancelled, err := queueDelete(
+		tx, profileID, key, entityRequirementCreate, entityRequirementDelete, "requirement", snap.Summary, snap,
+		entityRequirementEdit,
+	)
 	if err != nil {
 		return err
 	}
+	// A requirement Jira has never seen takes its local links with it, so
+	// nothing about it reaches Jira.
 	if cancelled {
-		return tx.Commit()
-	}
-	// Drop any superseded edit row.
-	if _, err := tx.Exec(
-		`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
-		profileID, entityRequirementEdit, key,
-	); err != nil {
-		return fmt.Errorf("clear superseded requirement edits: %w", err)
-	}
-
-	encoded, _ := json.Marshal(snap)
-	if err := upsertPendingChange(
-		tx, profileID, entityRequirementDelete, key, "requirement", string(encoded), "1", "",
-	); err != nil {
-		return err
-	}
-	if err := writeAudit(
-		tx, profileID, entityRequirementDelete, key, "delete-requirement-local",
-		"requirement", string(encoded), "", "",
-	); err != nil {
-		return err
+		if err := dropLocalRequirementLinks(tx, profileID, key); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -302,17 +287,6 @@ func (r *Repository) RenameRequirement(profileID, oldKey, newKey string) error {
 
 // nextNewReqKey allocates an unused "NEW-REQ-N" placeholder.
 func nextNewReqKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("NEW-REQ-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM requirement WHERE profile_id = ? AND jira_key = ?`, profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp req key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "req key", "NEW-REQ-",
+		`SELECT 1 FROM requirement WHERE profile_id = ? AND jira_key = ?`, profileID)
 }

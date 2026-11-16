@@ -38,26 +38,10 @@ func (r *Repository) ReplaceProjectFieldOptions(profileID, projectKey, field str
 // (profile, project, field) triple, sorted alphabetically. Returns an empty
 // (non-nil) slice when nothing is cached.
 func (r *Repository) ListProjectFieldOptions(profileID, projectKey, field string) ([]string, error) {
-	rows, err := r.db.Query(
+	return queryColumn[string](r.db, "list project field options",
 		`SELECT value FROM project_field_option
 		 WHERE profile_id = ? AND project_key = ? AND field = ?
 		 ORDER BY value`,
 		profileID, projectKey, field,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("list project field options: %w", err)
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var v string
-		if err := rows.Scan(&v); err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-	}
-	if out == nil {
-		out = []string{}
-	}
-	return out, rows.Err()
 }

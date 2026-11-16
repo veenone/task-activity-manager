@@ -3,7 +3,6 @@ package testrepo
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -424,19 +423,8 @@ func insertLocalTest(tx *sql.Tx, profileID string, p testCreatePayload, auditAct
 // nextTempTestKey returns a Test key of the form "NEW-N" not already used in
 // this profile.
 func nextTempTestKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("NEW-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM test_case WHERE profile_id = ? AND jira_key = ?`, profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp test key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "test key", "NEW-",
+		`SELECT 1 FROM test_case WHERE profile_id = ? AND jira_key = ?`, profileID)
 }
 
 // RenameTest rewrites a Test's key across the cache, used by the commit path to
@@ -517,16 +505,6 @@ func ParseRecords(data []byte, isXlsx bool) ([][]string, error) {
 // editors prepend to saved CSVs. Left in place it fuses onto the first header
 // cell, so column auto-mapping no longer recognizes "Summary".
 var utf8BOMBytes = []byte{0xEF, 0xBB, 0xBF}
-
-// stripUTF8BOM removes a leading UTF-8 BOM so the first column header (commonly
-// Summary) maps cleanly and gap analysis can proceed.
-func stripUTF8BOM(data []byte) []byte { return importfile.StripUTF8BOM(data) }
-
-// readCSV parses CSV content leniently (variable field counts allowed).
-func readCSV(content string) ([][]string, error) { return importfile.ReadCSV(content) }
-
-// parseXLSX reads the first worksheet of an XLSX file into rows (FR-10.1).
-func parseXLSX(data []byte) ([][]string, error) { return importfile.ParseXLSX(data) }
 
 // ImportTemplateCSV returns a starter CSV with the supported columns (FR-10.3),
 // matching the current Test fields (Components included) and the export column
