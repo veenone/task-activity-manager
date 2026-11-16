@@ -377,88 +377,41 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Each editable field's UPDATE branch checks for a pending change on
-	// that (profile, test, field) and, if one exists, keeps the existing
-	// local value instead of overwriting from the incoming sync.
+	// A sync must not undo an edit that has not been committed: each column
+	// below keeps its local value while a pending change exists for its field
+	// on that (profile, test).
+	set := []string{
+		"jira_id = excluded.jira_id",
+		"fix_versions = excluded.fix_versions",
+		"updated_at = excluded.updated_at",
+	}
+	for _, g := range []struct{ field, col string }{
+		{"summary", "summary"},
+		{"description", "description"},
+		{"status", "status"},
+		{"priority", "priority"},
+		{"labels", "labels"},
+		{"components", "components"},
+		{"exec_type", "exec_type"},
+		{"folder", "folder_id"},
+		{"cucumber_scenario", "cucumber_scenario"},
+		{"cucumber_type", "cucumber_type"},
+		{"generic_definition", "generic_definition"},
+	} {
+		set = append(set, fmt.Sprintf(
+			`%[2]s = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = '%[1]s'
+		     ) THEN test_case.%[2]s ELSE excluded.%[2]s END`, g.field, g.col))
+	}
 	stmt, err := tx.Prepare(
 		`INSERT INTO test_case
 		   (profile_id, jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id, components, exec_type, fix_versions, cucumber_scenario, cucumber_type, generic_definition)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
-		   jira_id      = excluded.jira_id,
-		   components   = excluded.components,
-		   fix_versions = excluded.fix_versions,
-		   exec_type    = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'exec_type'
-		     ) THEN test_case.exec_type ELSE excluded.exec_type END,
-		   summary      = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'summary'
-		     ) THEN test_case.summary ELSE excluded.summary END,
-		   description  = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'description'
-		     ) THEN test_case.description ELSE excluded.description END,
-		   status       = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'status'
-		     ) THEN test_case.status ELSE excluded.status END,
-		   priority     = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'priority'
-		     ) THEN test_case.priority ELSE excluded.priority END,
-		   labels       = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'labels'
-		     ) THEN test_case.labels ELSE excluded.labels END,
-		   updated_at   = excluded.updated_at,
-		   folder_id    = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'folder'
-		     ) THEN test_case.folder_id ELSE excluded.folder_id END,
-		   cucumber_scenario  = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'cucumber_scenario'
-		     ) THEN test_case.cucumber_scenario ELSE excluded.cucumber_scenario END,
-		   cucumber_type      = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'cucumber_type'
-		     ) THEN test_case.cucumber_type ELSE excluded.cucumber_type END,
-		   generic_definition = CASE WHEN EXISTS (
-		       SELECT 1 FROM pending_change
-		       WHERE pending_change.profile_id  = excluded.profile_id
-		         AND pending_change.entity_type = 'test_case'
-		         AND pending_change.entity_key  = excluded.jira_key
-		         AND pending_change.field       = 'generic_definition'
-		     ) THEN test_case.generic_definition ELSE excluded.generic_definition END`)
+		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET ` + strings.Join(set, ", "))
 	if err != nil {
 		return fmt.Errorf("prepare upsert: %w", err)
 	}
