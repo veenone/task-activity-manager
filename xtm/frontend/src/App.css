@@ -69,10 +69,6 @@
   font-weight: 600;
 }
 
-.spacer {
-  flex: 1;
-}
-
 /* Bar-native button: blends into the dark topbar instead of a bright chip. */
 .topbar-btn {
   display: inline-flex;
@@ -86,10 +82,6 @@
   color: var(--chrome-text);
   font-size: var(--fs-md);
   white-space: nowrap;
-}
-.topbar-btn:hover:not(:disabled) {
-  background: var(--chrome-btn-hover);
-  border-color: var(--chrome-btn-hover-border);
 }
 
 .menu-panel {
@@ -131,10 +123,6 @@
 .menu-item:hover:not(:disabled) {
   background: var(--chrome-menu-hover);
   color: var(--on-accent);
-}
-.menu-item:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 .menu-item-danger {
   color: var(--chrome-danger-text);
@@ -258,10 +246,6 @@
   cursor: pointer;
   text-decoration: underline;
 }
-.link-btn:disabled {
-  color: var(--text-muted);
-  cursor: default;
-}
 
 /* Test Steps list in the detail panel (FR-2.5). Each <li> stacks the
    action and, optionally, Data and Expected rows. */
@@ -279,13 +263,6 @@
 }
 
 /* Clone-steps modal: source picker + per-step selection. */
-.clone-src-pick {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 4px 2px;
-  font-size: var(--fs-md);
-}
 .clone-src-head {
   display: flex;
   align-items: center;
@@ -339,10 +316,6 @@
 .steps-list li {
   margin-bottom: 8px;
 }
-.step-action {
-  color: var(--text);
-  margin-bottom: 2px;
-}
 .step-row {
   display: flex;
   gap: 6px;
@@ -353,10 +326,6 @@
   font-weight: 600;
   color: var(--text-muted);
   min-width: 64px;
-}
-.step-value {
-  flex: 1;
-  white-space: pre-wrap;
 }
 .step-edit {
   width: 100%;
@@ -1062,13 +1031,6 @@
   gap: 6px;
   flex-wrap: wrap;
 }
-.board-head-actions .btn {
-  font-size: var(--fs-sm);
-}
-.board-seed {
-  margin-left: auto;
-  font-size: var(--fs-sm);
-}
 /* Traceability Sankey (FR-9) */
 /* ===== Traceability Sankey ===== */
 .sankey-panel {
@@ -1462,20 +1424,6 @@ i.sankey-node-l2 {
 }
 /* Related defects for the selected container (an execution's bugs, incl.
    cross-project member bugs). */
-.container-bugs {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 6px 0 2px;
-}
-.container-bugs-label {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
 .container-bugs-list {
   list-style: none;
   margin: 0;
@@ -1910,16 +1858,6 @@ button.defect-chip-key:hover {
   margin: 0 0 12px;
   outline: 2px solid transparent;
 }
-/* Bar and its count badges share one row (bar grows, badges sit beside it) so
-   the run summary costs a single line in the card instead of two (#311
-   follow-up). Wraps to stacked only when the card gets narrow. */
-.container-card-runs {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
 .run-bar {
   display: flex;
   flex: 1 1 200px;
@@ -2000,22 +1938,9 @@ button.defect-chip-key:hover {
   border-bottom: none;
 }
 
-.sync-detail {
-  max-width: 360px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-muted);
-}
-
 /* Each mapping field (label over select) fills its grid cell. */
 .import-mapping .bulk-row select {
   width: 100%;
-}
-@media (max-width: 560px) {
-  .import-mapping {
-    grid-template-columns: 1fr;
-  }
 }
 /* Unknown-component warning in the import modal (RND_P_4TFINT_05-340). */
 .import-unknown-components {
@@ -2407,10 +2332,6 @@ tr.row-selected td:first-child {
   font-size: var(--fs-xs);
   white-space: nowrap;
 }
-.empty-row {
-  text-align: center;
-  padding: 32px !important;
-}
 .table-error {
   padding: 8px 14px;
 }
@@ -2478,10 +2399,6 @@ tr.row-selected td:first-child {
   margin-left: auto;
   flex-shrink: 0;
 }
-.folder-item:hover .folder-actions {
-  display: inline-flex;
-  gap: 1px;
-}
 .folder-action {
   background: transparent;
   border: none;
@@ -2490,9 +2407,6 @@ tr.row-selected td:first-child {
   font-size: var(--fs-xs);
   padding: 0 3px;
   line-height: 1;
-}
-.folder-action:hover {
-  color: var(--info-fg);
 }
 .folder-item > .folder-action {
   display: none;
@@ -2703,18 +2617,6 @@ tr.row-selected td:first-child {
 }
 .detail-fields dd {
   margin: 0;
-}
-.detail-desc {
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 10px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: var(--fs-sm);
-  max-height: 320px;
-  overflow: auto;
 }
 .detail-note {
   margin-top: 14px;
@@ -2975,10 +2877,6 @@ tr.row-selected td:first-child {
   font-weight: 600;
   margin: 0 0 14px;
 }
-.reqs-detail-actions {
-  display: flex;
-  gap: 6px;
-}
 /* Edit-mode form in the requirement detail pane — fields stacked vertically
    using the .precond-field layout pattern. */
 .reqs-detail-edit-form {
@@ -3105,12 +3003,6 @@ tr.row-selected td:first-child {
 .src-edit-notice {
   font-size: var(--fs-sm);
   margin: 0 0 4px;
-}
-.src-add {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
 }
 
 /* Requirements list in the test detail panel */
@@ -3691,9 +3583,6 @@ tr.row-selected td:first-child {
   padding: 7px 0;
   border-top: 1px solid var(--border-subtle);
 }
-.about-row:first-of-type {
-  border-top: none;
-}
 .about-row dt {
   font-size: var(--fs-xs);
   color: var(--text-muted);
@@ -3713,11 +3602,6 @@ tr.row-selected td:first-child {
   text-align: left;
 }
 
-.pending-footnote {
-  font-size: var(--fs-xs);
-  padding: 8px 16px 12px;
-  border-top: 1px solid var(--border-subtle);
-}
 .commit-result {
   padding: 10px 16px;
   border-top: 1px solid var(--border-subtle);
@@ -3750,18 +3634,6 @@ tr.row-selected td:first-child {
   margin: 4px 0 0;
   padding: 0;
 }
-.conflict-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 6px 0;
-  border-top: 1px solid rgba(146, 64, 14, 0.18);
-}
-.conflict-row-main {
-  flex: 1;
-  min-width: 0;
-}
 .conflict-row-actions {
   display: flex;
   gap: 6px;
@@ -3790,9 +3662,6 @@ tr.row-selected td:first-child {
   flex-shrink: 0;
   font-size: var(--fs-md);
 }
-.bulk-count {
-  font-weight: 600;
-}
 
 /* Selection checkboxes in the grid */
 .select-col {
@@ -3820,9 +3689,6 @@ tr.row-checked:hover {
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-}
-.prompt-modal .bulk-body {
-  padding: 16px;
 }
 
 /* Bulk-edit modal */
@@ -3987,11 +3853,6 @@ tr.row-checked:hover {
   font-size: var(--fs-md);
   color: var(--text);
   cursor: pointer;
-}
-.junit-new-exec-summary-line {
-  margin: 0;
-  font-size: var(--fs-md);
-  line-height: 1.5;
 }
 
 .link-btn {
@@ -4876,7 +4737,6 @@ tr.row-checked:hover {
 .dup-card .dup-tiles { padding: 0; }
 
 /* Requirement source fields — labelled with descriptions (FR — requirements). */
-.src-add { display: flex; flex-direction: column; gap: 14px; }
 .src-field { display: flex; flex-direction: column; gap: 3px; }
 .src-field-label { font-weight: 600; font-size: var(--fs-md); color: var(--text); }
 .src-field-help { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.45; }
@@ -5037,7 +4897,6 @@ tr.row-checked:hover {
   min-height: 0;
 }
 .dup-body .detail { min-width: min(48vw, 800px); }
-.dup-pager { margin: 8px 6px 2px; }
 
 /* Duplicates: side-by-side step comparison modal (#4). */
 .dup-compare-modal {
@@ -5116,9 +4975,6 @@ tr.row-checked:hover {
 }
 .dup-compare-legend { flex: 1; text-align: left; }
 .dup-compare-ref { margin: 0 0 8px; font-size: var(--fs-sm); }
-
-/* Requirement filter input must not stretch to fill the column height (#1). */
-.reqs-filter { flex: 0 0 auto; }
 
 /* Requirement issue-type badge variants (#2). */
 .req-kind-story { background: color-mix(in srgb, var(--info-fg) 16%, transparent); color: var(--info-fg); }
@@ -5282,47 +5138,6 @@ tr.row-checked:hover {
   flex-direction: column;
   overflow: hidden;
   padding: 16px 20px;
-}
-.testcalls-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-.testcalls-head h2 {
-  margin: 0;
-}
-.testcalls-stats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.testcalls-stat {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px 10px;
-}
-.testcalls-stat b {
-  color: var(--text);
-}
-.testcalls-stat-broken {
-  color: var(--warn-fg);
-  border-color: var(--warn-border);
-}
-.testcalls-stat-broken b {
-  color: var(--warn-fg);
-}
-.testcalls-stat-cycle {
-  color: var(--danger-fg-strong);
-  border-color: var(--danger-border);
-}
-.testcalls-stat-cycle b {
-  color: var(--danger-fg-strong);
 }
 .testcalls-empty {
   margin-top: 24px;
@@ -5663,14 +5478,6 @@ tr.row-checked:hover {
 .backend-chip-kiwi {
   background: var(--kiwi-bg);
   color: var(--kiwi-text);
-}
-/* The detail pane reuses ProfileForm, which carries its own card padding /
-   background for standalone use; inside the modal the modal already provides
-   the inset, so flatten it to align with the list pane. */
-.profiles-detail .profile-form {
-  padding: 0;
-  background: none;
-  border-radius: 0;
 }
 .profiles-mode-title {
   font-size: var(--fs-lg);
@@ -6191,10 +5998,6 @@ tr.row-checked:hover {
   gap: 8px;
   flex-wrap: wrap;
   margin: 6px 0;
-}
-.container-filter-bar .container-filter {
-  flex: 1 1 220px;
-  min-width: 160px;
 }
 .container-filter-count {
   font-size: var(--fs-sm);
