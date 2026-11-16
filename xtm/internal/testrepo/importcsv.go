@@ -460,6 +460,10 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 		{"test_precondition", "test_key"},
 		{"test_container_test", "test_key"},
 		{"test_dataset", "test_key"},
+		{"test_requirement", "test_key"},
+		{"test_custom_field", "test_key"},
+		{"test_review", "test_key"},
+		{"test_bug", "test_key"},
 	} {
 		if _, err := tx.Exec(
 			fmt.Sprintf(`UPDATE %s SET %s = ? WHERE profile_id = ? AND %s = ?`,
@@ -470,15 +474,16 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 		}
 	}
 	// Rewrite still-pending changes that key off the Test so they commit against
-	// the real key — folder/field edits (test_case), precondition sets, reviews,
-	// comments and datasets key by the bare Test key; step rows key by
-	// "<testKey>:<xrayID>".
+	// the real key — folder/field edits (test_case), precondition and
+	// requirement sets, reviews, comments and datasets key by the bare Test key;
+	// step rows key by "<testKey>:<xrayID>" and custom fields by
+	// "<testKey>:<fieldId>". A new bug carries the Test's key in its payload.
 	// The test_create row is intentionally left alone: it is committed by id and
 	// then deleted, so its key is immaterial.
 	if _, err := tx.Exec(
 		`UPDATE pending_change SET entity_key = ?
 		 WHERE profile_id = ? AND entity_key = ?
-		   AND entity_type IN ('test_case','precondition_set','test_review','issue_comment','test_dataset')`,
+		   AND entity_type IN ('test_case','precondition_set','requirement_set','test_review','issue_comment','test_dataset')`,
 		newKey, profileID, oldKey,
 	); err != nil {
 		return fmt.Errorf("rewrite test pending rows: %w", err)
@@ -486,10 +491,18 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 	if _, err := tx.Exec(
 		`UPDATE pending_change SET entity_key = ? || substr(entity_key, ?)
 		 WHERE profile_id = ? AND entity_key LIKE ?
-		   AND entity_type IN ('test_step','test_step_delete','test_step_add','test_step_order')`,
+		   AND entity_type IN ('test_step','test_step_delete','test_step_add','test_step_order','custom_field')`,
 		newKey, len(oldKey)+1, profileID, oldKey+":%",
 	); err != nil {
 		return fmt.Errorf("rewrite test step pending rows: %w", err)
+	}
+	if _, err := tx.Exec(
+		`UPDATE pending_change SET after_val = json_set(after_val, '$.testKey', ?)
+		 WHERE profile_id = ? AND entity_type = 'bug_create'
+		   AND json_extract(after_val, '$.testKey') = ?`,
+		newKey, profileID, oldKey,
+	); err != nil {
+		return fmt.Errorf("rewrite new bug pending rows: %w", err)
 	}
 	return tx.Commit()
 }
