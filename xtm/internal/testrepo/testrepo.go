@@ -1017,20 +1017,8 @@ func createPreconditionTx(tx *sql.Tx, profileID, projectKey, summary, ptype, des
 // nextTempPreconditionKey returns a precondition key of the form
 // "new-precond-N" not already used in this profile.
 func nextTempPreconditionKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("new-precond-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM precondition WHERE profile_id = ? AND jira_key = ?`,
-			profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp precondition key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "precondition key", "new-precond-",
+		`SELECT 1 FROM precondition WHERE profile_id = ? AND jira_key = ?`, profileID)
 }
 
 // RenamePrecondition rewrites a Precondition's key across the cache and any
@@ -1898,20 +1886,8 @@ func (r *Repository) CreateContainerAllocation(profileID, projectKey, kind, summ
 // nextTempContainerKey returns a container key of the form "new-container-N"
 // not already used by another container in this profile.
 func nextTempContainerKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("new-container-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM test_container WHERE profile_id = ? AND jira_key = ?`,
-			profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp container key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "container key", "new-container-",
+		`SELECT 1 FROM test_container WHERE profile_id = ? AND jira_key = ?`, profileID)
 }
 
 // RenameContainer rewrites a Container's key across the cache, used by the
@@ -3209,20 +3185,8 @@ func (r *Repository) CloneTestSteps(profileID, targetKey string, sourceSteps []S
 // by another step on this Test. New steps need a placeholder id until Xray
 // assigns the real one at commit time.
 func nextTempStepID(tx *sql.Tx, profileID, testKey string) (string, error) {
-	for n := 1; ; n++ {
-		id := fmt.Sprintf("new-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
-			profileID, testKey, id,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return id, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp step id: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "step id", "new-",
+		`SELECT 1 FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`, profileID, testKey)
 }
 
 // RenameTestStepID rewrites a cached step's xray_id, used by the commit path

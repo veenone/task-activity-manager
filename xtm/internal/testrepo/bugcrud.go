@@ -111,19 +111,8 @@ func (r *Repository) RenameBug(profileID, oldKey, newKey string) error {
 // nextNewBugKey allocates an unused "NEW-BUG-N" placeholder (mirrors the temp-key
 // probe loop in importcsv.go's reserveTempKey, namespaced for bugs).
 func nextNewBugKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("NEW-BUG-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM bug WHERE profile_id = ? AND jira_key = ?`, profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp bug key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "bug key", "NEW-BUG-",
+		`SELECT 1 FROM bug WHERE profile_id = ? AND jira_key = ?`, profileID)
 }
 
 // MarkBugCreated records the real issue key on a queued bug_create whose

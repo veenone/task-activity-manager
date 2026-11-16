@@ -3,7 +3,6 @@ package testrepo
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -424,19 +423,8 @@ func insertLocalTest(tx *sql.Tx, profileID string, p testCreatePayload, auditAct
 // nextTempTestKey returns a Test key of the form "NEW-N" not already used in
 // this profile.
 func nextTempTestKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("NEW-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM test_case WHERE profile_id = ? AND jira_key = ?`, profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp test key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "test key", "NEW-",
+		`SELECT 1 FROM test_case WHERE profile_id = ? AND jira_key = ?`, profileID)
 }
 
 // RenameTest rewrites a Test's key across the cache, used by the commit path to

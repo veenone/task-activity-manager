@@ -302,17 +302,6 @@ func (r *Repository) RenameRequirement(profileID, oldKey, newKey string) error {
 
 // nextNewReqKey allocates an unused "NEW-REQ-N" placeholder.
 func nextNewReqKey(tx *sql.Tx, profileID string) (string, error) {
-	for n := 1; ; n++ {
-		key := fmt.Sprintf("NEW-REQ-%d", n)
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM requirement WHERE profile_id = ? AND jira_key = ?`, profileID, key,
-		).Scan(&one)
-		if errors.Is(err, sql.ErrNoRows) {
-			return key, nil
-		}
-		if err != nil {
-			return "", fmt.Errorf("probe temp req key: %w", err)
-		}
-	}
+	return nextFreeKey(tx, "req key", "NEW-REQ-",
+		`SELECT 1 FROM requirement WHERE profile_id = ? AND jira_key = ?`, profileID)
 }
