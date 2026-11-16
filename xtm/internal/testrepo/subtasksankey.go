@@ -58,26 +58,8 @@ func (r *Repository) GetSubTaskTraceability(profileID string, parentFilters []st
 		return out, err
 	}
 
-	q := `SELECT c.parent_key, l.container_key, l.run_status
-		 FROM test_container_test l
-		 JOIN test_container c
-		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
-		 WHERE l.profile_id = ? AND c.kind = 'testexec' AND c.parent_key != ''`
-	args := []any{profileID}
-	if !crossProject {
-		// Exclude members that have no local test_case row (they live in another
-		// project, cached only in external_test): the legacy behavior dropped
-		// such cross-project members from the flow.
-		q += ` AND EXISTS (SELECT 1 FROM test_case t
-			 WHERE t.profile_id = l.profile_id AND t.jira_key = l.test_key)`
-	}
-	if parents := nonEmptyKeys(parentFilters); len(parents) > 0 {
-		q += " AND c.parent_key IN (" + sqlPlaceholders(len(parents)) + ")"
-		for _, p := range parents {
-			args = append(args, p)
-		}
-	}
-	rows, err := r.db.Query(q, args...)
+	from, args := subTaskRunsFrom(profileID, parentFilters, crossProject)
+	rows, err := r.db.Query(`SELECT c.parent_key, l.container_key, l.run_status`+from, args...)
 	if err != nil {
 		return out, fmt.Errorf("read sub-task runs: %w", err)
 	}
@@ -136,4 +118,30 @@ func (r *Repository) GetSubTaskTraceability(profileID string, parentFilters []st
 	out.Links = append(out.Links, flatten(parentExec)...)
 	out.Links = append(out.Links, flatten(execStatus)...)
 	return out, nil
+}
+
+// subTaskRunsFrom returns the FROM and WHERE clause, with its arguments, for
+// the members of sub-task executions, narrowed to the given parents. The
+// diagram and its table export both read through it.
+func subTaskRunsFrom(profileID string, parentFilters []string, crossProject bool) (string, []any) {
+	q := `
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ? AND c.kind = 'testexec' AND c.parent_key != ''`
+	args := []any{profileID}
+	if !crossProject {
+		// Exclude members that have no local test_case row (they live in another
+		// project, cached only in external_test): the legacy behavior dropped
+		// such cross-project members from the flow.
+		q += ` AND EXISTS (SELECT 1 FROM test_case t
+			 WHERE t.profile_id = l.profile_id AND t.jira_key = l.test_key)`
+	}
+	if parents := nonEmptyKeys(parentFilters); len(parents) > 0 {
+		q += " AND c.parent_key IN (" + sqlPlaceholders(len(parents)) + ")"
+		for _, p := range parents {
+			args = append(args, p)
+		}
+	}
+	return q, args
 }
