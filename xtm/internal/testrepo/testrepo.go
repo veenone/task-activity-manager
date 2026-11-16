@@ -4024,43 +4024,18 @@ type TestRename struct {
 // disagree. This method deliberately does not re-derive anything; it only
 // checks that what the preview was based on is still true.
 func (r *Repository) BulkRenameTests(profileID string, renames []TestRename) (BulkEditResult, error) {
-	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
-	for _, rn := range renames {
-		var current string
-		err := r.db.QueryRow(
-			`SELECT summary FROM test_case WHERE profile_id = ? AND jira_key = ?`,
-			profileID, rn.Key,
-		).Scan(&current)
-		if errors.Is(err, sql.ErrNoRows) {
-			result.Failed = append(result.Failed, BulkFailure{
-				TestKey: rn.Key,
-				Error:   "test not found",
-			})
-			continue
-		}
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: rn.Key, Error: err.Error()})
-			continue
-		}
+	keys := make([]string, len(renames))
+	for i, rn := range renames {
+		keys[i] = rn.Key
+	}
+	return r.bulkEditField(profileID, "summary", keys, func(i int, current string) (string, error) {
 		// Reject a rename computed from a summary that has since moved. Without
 		// this a sync during the open modal silently reverts what it just pulled.
-		if current != rn.ExpectedBefore {
-			result.Failed = append(result.Failed, BulkFailure{
-				TestKey: rn.Key,
-				Error:   "summary changed since the preview was taken",
-			})
-			continue
+		if current != renames[i].ExpectedBefore {
+			return "", errors.New("summary changed since the preview was taken")
 		}
-		if err := r.EditTestField(profileID, rn.Key, "summary", rn.Summary); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{
-				TestKey: rn.Key,
-				Error:   err.Error(),
-			})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, rn.Key)
-	}
-	return result, nil
+		return renames[i].Summary, nil
+	})
 }
 
 // BulkEditTests applies a single field-level operation to a batch of Tests,
@@ -4069,53 +4044,21 @@ func (r *Repository) BulkRenameTests(profileID string, renames []TestRename) (Bu
 // failure doesn't block the others. No-op edits — for example, add_label
 // when the label is already present — are reported as succeeded.
 func (r *Repository) BulkEditTests(profileID string, testKeys []string, op BulkEdit) (BulkEditResult, error) {
-	result := BulkEditResult{
-		Succeeded: []string{},
-		Failed:    []BulkFailure{},
-	}
-
 	field, err := resolveBulkField(op)
+	if err == nil {
+		_, ok := editableFields[field]
+		if !ok {
+			err = fmt.Errorf("field %q is not editable", field)
+		}
+	}
 	if err != nil {
-		return result, fmt.Errorf("bulk edit: %w", err)
+		return BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}, fmt.Errorf("bulk edit: %w", err)
 	}
-	col, ok := editableFields[field]
-	if !ok {
-		return result, fmt.Errorf("bulk edit: field %q is not editable", field)
-	}
-
-	readSQL := fmt.Sprintf(
-		`SELECT %s FROM test_case WHERE profile_id = ? AND jira_key = ?`, col,
-	)
-
-	for _, key := range testKeys {
-		var current string
-		err := r.db.QueryRow(readSQL, profileID, key).Scan(&current)
-		if errors.Is(err, sql.ErrNoRows) {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: "not found"})
-			continue
-		}
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
-			continue
-		}
-		newVal, applyErr := applyBulkOperation(op, current)
-		if applyErr != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: applyErr.Error()})
-			continue
-		}
-		if newVal == current {
-			// No-op (e.g. add_label when the label is already present) —
-			// still report success so the user knows the request was handled.
-			result.Succeeded = append(result.Succeeded, key)
-			continue
-		}
-		if err := r.EditTestField(profileID, key, field, newVal); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, key)
-	}
-	return result, nil
+	// A no-op, such as add_label when the label is already present, comes back
+	// as the current value and is reported as succeeded.
+	return r.bulkEditField(profileID, field, testKeys, func(_ int, current string) (string, error) {
+		return applyBulkOperation(op, current)
+	})
 }
 
 // resolveBulkField derives which test_case column the operation targets.

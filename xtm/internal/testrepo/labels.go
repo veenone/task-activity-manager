@@ -57,33 +57,14 @@ func (r *Repository) BulkEditLabels(profileID string, testKeys []string, add, re
 		return result, fmt.Errorf("bulk labels: %w", err)
 	}
 
-	for _, key := range testKeys {
-		var current string
-		err := r.db.QueryRow(
-			`SELECT labels FROM test_case WHERE profile_id = ? AND jira_key = ?`,
-			profileID, key,
-		).Scan(&current)
-		if errors.Is(err, sql.ErrNoRows) {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: "not found"})
-			continue
-		}
-		if err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
-			continue
-		}
+	return r.bulkEditField(profileID, "labels", testKeys, func(_ int, current string) (string, error) {
 		before := strings.Fields(current)
 		next := strings.Join(addLabels(removeLabels(before, remove), add), " ")
 		if next == strings.Join(before, " ") {
-			result.Succeeded = append(result.Succeeded, key)
-			continue
+			return current, nil
 		}
-		if err := r.EditTestField(profileID, key, "labels", next); err != nil {
-			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, key)
-	}
-	return result, nil
+		return next, nil
+	})
 }
 
 // validateLabelEdit rejects an empty request, a label Jira would refuse, and
