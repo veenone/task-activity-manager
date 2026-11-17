@@ -69,21 +69,6 @@
   font-weight: 600;
 }
 
-/* Bar-native button: blends into the dark topbar instead of a bright chip. */
-.topbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-chip-border);
-  border-radius: 5px;
-  padding: 5px 11px;
-  cursor: pointer;
-  color: var(--chrome-text);
-  font-size: var(--fs-md);
-  white-space: nowrap;
-}
-
 .menu-panel {
   position: absolute;
   top: calc(100% + 6px);
@@ -106,26 +91,9 @@
     transform: none;
   }
 }
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: transparent;
-  border: none;
-  border-radius: 5px;
-  padding: 7px 9px;
-  cursor: pointer;
-  color: var(--chrome-menu-text);
-  font-size: var(--fs-md);
-  text-align: left;
-}
 .menu-item:hover:not(:disabled) {
   background: var(--chrome-menu-hover);
   color: var(--on-accent);
-}
-.menu-item-danger {
-  color: var(--chrome-danger-text);
 }
 .menu-item-danger:hover:not(:disabled) {
   background: var(--chrome-danger-hover);
@@ -843,9 +811,6 @@
   margin-bottom: 10px;
   flex-wrap: nowrap;
   min-width: 0;
-}
-.board-picker select {
-  min-width: 280px;
 }
 /* The Type and Status pickers hold a few short options each, so they need far
    less width than the item picker beside them. */
@@ -1938,10 +1903,6 @@ button.defect-chip-key:hover {
   border-bottom: none;
 }
 
-/* Each mapping field (label over select) fills its grid cell. */
-.import-mapping .bulk-row select {
-  width: 100%;
-}
 /* Unknown-component warning in the import modal (RND_P_4TFINT_05-340). */
 .import-unknown-components {
   margin-top: 10px;
@@ -2385,49 +2346,12 @@ tr.row-selected td:first-child {
   background: transparent;
 }
 
-.folder-tree {
-  width: 240px;
-  flex-shrink: 0;
-  background: var(--surface-3);
-  border-right: 1px solid var(--border);
-  overflow: auto;
-  padding: 6px 0;
-  font-size: var(--fs-sm);
-}
-.folder-actions {
-  display: none;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.folder-action {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  padding: 0 3px;
-  line-height: 1;
-}
 .folder-item > .folder-action {
   display: none;
   margin-left: auto;
 }
 .folder-item:hover > .folder-action {
   display: inline-block;
-}
-.folder-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  /* Rows grow to their content so long names / deep nesting overflow and the
-     tree scrolls horizontally; min-width keeps short rows (and their hover /
-     selection background) spanning the full sidebar width. */
-  width: max-content;
-  min-width: 100%;
 }
 .folder-filter-button {
   border: 0;
@@ -3326,27 +3250,6 @@ tr.row-selected td:first-child {
   }
 }
 
-/* Profile form and modal */
-.profile-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--surface);
-  padding: 18px;
-  border-radius: 6px;
-  text-align: left;
-}
-.profile-form h2 {
-  font-size: var(--fs-lg);
-}
-.profile-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-
 /* .detail-input is defined once, in frontend/core/styles/primitives.css.
    The copy that sat here was byte-identical, so the fix that gave it a
    stated line-height reached TAM and not XTM (#323). */
@@ -3466,34 +3369,8 @@ tr.row-selected td:first-child {
 }
 
 /* Pending changes button + modal */
-.btn-pending {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(244, 185, 66, 0.14);
-  border: 1px solid var(--chrome-pending);
-  color: var(--chrome-pending);
-  border-radius: 5px;
-  padding: 5px 11px;
-  cursor: pointer;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  white-space: nowrap;
-}
 .btn-pending:hover:not(:disabled) {
   background: rgba(244, 185, 66, 0.24);
-}
-.pending-modal {
-  width: min(840px, 92vw);
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
-}
-.pending-head h2 {
-  font-size: var(--fs-lg);
-  margin: 0;
 }
 .pending-empty {
   padding: 32px;
@@ -3522,22 +3399,6 @@ tr.row-selected td:first-child {
     opacity: 1;
     transform: none;
   }
-}
-.about-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: calc(var(--z-sticky) + 1);
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--chrome-menu-text);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  line-height: 1;
-  transition: background var(--dur-1);
 }
 .about-close:hover {
   background: rgba(255, 255, 255, 0.22);
@@ -3573,33 +3434,6 @@ tr.row-selected td:first-child {
   font-size: var(--fs-md);
   line-height: 1.55;
   color: var(--text-muted);
-}
-
-.about-row {
-  display: grid;
-  grid-template-columns: 78px 1fr;
-  gap: 10px;
-  align-items: baseline;
-  padding: 7px 0;
-  border-top: 1px solid var(--border-subtle);
-}
-.about-row dt {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-.about-row dd {
-  margin: 0;
-  min-width: 0;
-  font-size: var(--fs-xs);
-  color: var(--text-strong);
-  /* One line per value. word-break: break-all split the database path
-     mid-word and cost the row a second line. CSS truncation does not truncate
-     the text itself, so selecting the readout for a bug report still yields
-     the whole path, and the title attribute shows it on hover. */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
 }
 
 .commit-result {
@@ -3682,15 +3516,6 @@ tr.row-checked:hover {
   background: var(--warn-bg);
 }
 
-/* In-app prompt (replaces window.prompt, unsupported in WebView2) */
-.prompt-modal {
-  width: min(460px, 92vw);
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
-}
-
 /* Bulk-edit modal */
 .bulk-modal {
   width: min(560px, 92vw);
@@ -3702,28 +3527,6 @@ tr.row-checked:hover {
 /* Restore rounded corners on the footer now that overflow:visible no longer clips them. */
 .bulk-modal .pending-actions {
   border-radius: 0 0 8px 8px;
-}
-.bulk-body {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.bulk-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-.bulk-row span {
-  font-weight: 600;
-}
-.bulk-row select,
-.bulk-row input,
-.bulk-row textarea {
-  font-size: var(--fs-md);
-  color: var(--text);
 }
 .bulk-row select {
   padding: 5px 8px;
@@ -5414,18 +5217,6 @@ tr.row-checked:hover {
 }
 
 /* Manage Profiles modal */
-.profiles-modal-head h2 {
-  margin: 0;
-}
-.profiles-list {
-  display: flex;
-  flex-direction: column;
-  width: 240px;
-  flex: 0 0 240px;
-  min-height: 0;
-  border-right: 1px solid var(--card-border);
-  padding-right: 12px;
-}
 .profiles-list-row-selected,
 .profiles-list-row-selected:hover {
   background: var(--accent-soft, rgba(56, 132, 222, 0.18));
@@ -5478,46 +5269,6 @@ tr.row-checked:hover {
 .backend-chip-kiwi {
   background: var(--kiwi-bg);
   color: var(--kiwi-text);
-}
-.profiles-mode-title {
-  font-size: var(--fs-lg);
-  font-weight: 620;
-  color: var(--text-strong);
-  letter-spacing: -0.01em;
-}
-/* The profile name is human text, not a code key: match the header's own
-   sans face and size so it sits on the kicker's baseline instead of reading
-   as a mismatched monospace token. */
-.profiles-mode-title .mono {
-  font-family: inherit;
-  font-size: inherit;
-  font-weight: 620;
-}
-.profiles-active-caution svg {
-  flex: none;
-  margin-top: 1px;
-}
-.profiles-active-caution b {
-  font-weight: 700;
-}
-/* Start state shown on open: nothing editable until the user picks a
-   profile or chooses to create one. */
-.profiles-empty {
-  margin: auto;
-  text-align: center;
-  max-width: 300px;
-  padding: 32px 0;
-}
-.profiles-empty h3 {
-  margin: 0 0 6px;
-  font-size: var(--fs-lg);
-  color: var(--text-strong);
-  font-weight: 600;
-}
-.profiles-empty p {
-  margin: 0 0 16px;
-  font-size: var(--fs-md);
-  color: var(--text-muted);
 }
 .pat-field {
   display: flex;
