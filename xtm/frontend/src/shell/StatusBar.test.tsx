@@ -40,7 +40,7 @@ describe("StatusBar", () => {
     expect(ribbon).toHaveTextContent("Jira rejected this profile's token.");
     // The count is what the bar shows when nothing is wrong; a failure
     // replaces it, so finding it here would mean the ribbon never rendered.
-    expect(screen.queryByText(/4,210 tests/)).toBeNull();
+    expect(screen.queryByText(`${(4210).toLocaleString()} tests`, { exact: false })).toBeNull();
   });
 
   // A new run supersedes the last run's failure: the bar shows what is
@@ -67,7 +67,7 @@ describe("StatusBar", () => {
     );
 
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByText(/4,210 tests/)).toBeInstanceOf(HTMLElement);
+    expect(screen.getByText(`${(4210).toLocaleString()} tests`, { exact: false })).toBeInstanceOf(HTMLElement);
   });
 });
 
