@@ -232,8 +232,8 @@ describe("EpicsView", () => {
       truncated: false, issueTotal: 2238, orphanTotal: 5988,
     });
     renderView();
-    expect(await screen.findByRole("tab", { name: "No epic, 5,988 issues" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Under epics, 2,238 issues" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: `No epic, ${(5988).toLocaleString()} issues` })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: `Under epics, ${(2238).toLocaleString()} issues` })).toBeInTheDocument();
     expect(screen.queryByRole("treeitem", { name: /No epic/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/more. Use the search to narrow./)).not.toBeInTheDocument();
   });
@@ -249,7 +249,7 @@ describe("EpicsView", () => {
       total: 5988,
     });
     renderView();
-    await user.click(await screen.findByRole("tab", { name: "No epic, 5,988 issues" }));
+    await user.click(await screen.findByRole("tab", { name: `No epic, ${(5988).toLocaleString()} issues` }));
     expect(await screen.findByText("Never filed under an epic")).toBeInTheDocument();
     // The read behind the tab must carry the filter, or the grid would show
     // the whole project under a tab that says otherwise.

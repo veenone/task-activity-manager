@@ -163,9 +163,9 @@ describe("pages and project names in the views", () => {
 
   it("pages the map's rows and names its columns", async () => {
     render(<ProjectMap profileId="p1" result={many} onOpen={() => {}} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Table" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Coverage" }));
     expect(screen.getByRole("columnheader", { name: "B name (B)" })).toBeVisible();
-    expect(within(screen.getByRole("table", { name: "Project map" })).getAllByRole("row")).toHaveLength(26);
+    expect(within(screen.getByRole("table", { name: "Coverage" })).getAllByRole("row")).toHaveLength(26);
   });
 
   it("names projects in the Statistics filter and table", () => {
