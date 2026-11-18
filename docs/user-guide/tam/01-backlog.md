@@ -42,7 +42,7 @@ Below that are sections you can open and close:
 - **Comments** lists the issue's comments, with a note saying how old the cached copy is. They are read-only here; add one in Jira.
 - **Links** lists the issue's links and adds one. **Check** confirms the key you typed exists and shows its summary, and **Add** queues the link for the next commit.
 - **Covered by tests** lists the Xray tests that cover this issue, for a project that uses XTM alongside TAM.
-- **Work log** lists what has been logged and adds an entry: time spent and a comment.
+- **Work log** lists what has been logged and adds an entry: time spent, when the work started, and a comment. Started opens on the current date and time; change it to log work done earlier, such as yesterday.
 - **Done agreement** shows the team's definition of done from the [Rituals](08-rituals.md) pages, so it is readable while the issue is.
 - **Activity** is the issue's history.
 

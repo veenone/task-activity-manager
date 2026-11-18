@@ -152,8 +152,8 @@ export function useWorklogs(profileId: string, key: string, open: boolean) {
 export function useLogWork(profileId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, timeSpent, comment }: { key: string; timeSpent: string; comment: string }) =>
-      call(() => LogWork(profileId, key, timeSpent, comment)),
+    mutationFn: ({ key, timeSpent, comment, started }: { key: string; timeSpent: string; comment: string; started: string }) =>
+      call(() => LogWork(profileId, key, timeSpent, comment, started)),
     onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
   });
 }

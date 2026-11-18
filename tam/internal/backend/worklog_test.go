@@ -105,3 +105,28 @@ func TestNewWorklogDraftRefusesAZeroDuration(t *testing.T) {
 		t.Errorf("draft error = %q, want the same sentence ParseWorkSeconds gives: %v", err, direct)
 	}
 }
+
+func TestParseWorkStartedReadsTheFormsWallClockInTheLoggersZone(t *testing.T) {
+	jakarta := time.FixedZone("WIB", 7*3600)
+	now := time.Date(2026, 11, 17, 14, 5, 42, 123_000_000, jakarta)
+
+	got, err := backend.ParseWorkStarted("2026-11-16T09:30", now)
+	if err != nil {
+		t.Fatalf("ParseWorkStarted: %v", err)
+	}
+	// The minute is the one chosen; the seconds are the clock's own, so two
+	// entries given the same minute still journal as two rows.
+	const layout = "2006-01-02T15:04:05.000-0700"
+	if want := "2026-11-16T09:30:42.123+0700"; got.Format(layout) != want {
+		t.Errorf("started = %s, want %s", got.Format(layout), want)
+	}
+
+	blank, err := backend.ParseWorkStarted("  ", now)
+	if err != nil || !blank.Equal(now) {
+		t.Errorf("blank = %v, %v, want now", blank, err)
+	}
+
+	if _, err := backend.ParseWorkStarted("16/11/2026 9am", now); err == nil || !strings.Contains(err.Error(), "16/11/2026 9am") {
+		t.Errorf("err = %v, want a refusal naming what was typed", err)
+	}
+}

@@ -145,8 +145,10 @@ export const AddLink = (profileId: string, key: string, link: LinkDraft): Promis
 // rather than anything the store caches.
 export const ListWorklogs: (profileId: string, key: string) => Promise<Worklog[]> =
   App.ListWorklogs as unknown as (profileId: string, key: string) => Promise<Worklog[]>;
-// LogWork journals an entry. Nothing reaches Jira until Commit.
-export const LogWork: (profileId: string, key: string, timeSpent: string, comment: string) => Promise<void> =
+// LogWork journals an entry. started is the wall clock of the form's Started
+// field ("2026-11-16T09:30"), and blank means now. Nothing reaches Jira until
+// Commit.
+export const LogWork: (profileId: string, key: string, timeSpent: string, comment: string, started: string) => Promise<void> =
   App.LogWork;
 // CheckWorkDuration is the duration rule on its own, so the form can refuse
 // what was typed where it was typed. It is the same rule LogWork applies, so

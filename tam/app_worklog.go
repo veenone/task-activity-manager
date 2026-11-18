@@ -44,16 +44,21 @@ func (a *App) ListWorklogs(profileID, key string) ([]backend.Worklog, error) {
 	return append(logs, pending...), nil
 }
 
-// LogWork journals an entry against the issue. time.Now() carries the
-// machine's own zone, and that offset is what dates the entry in Jira: the
+// LogWork journals an entry against the issue. started is the wall clock the
+// form's Started field holds, and blank means now. Either way the entry is
+// read on time.Now()'s zone, and that offset is what dates it in Jira: the
 // user logging an hour at 01:00 logged it today, not yesterday evening in
 // UTC. Nothing reaches Jira here; Commit sends it.
-func (a *App) LogWork(profileID, key, timeSpent, comment string) error {
+func (a *App) LogWork(profileID, key, timeSpent, comment, started string) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
 		return err
 	}
-	d, err := backend.NewWorklogDraft(timeSpent, comment, time.Now())
+	at, err := backend.ParseWorkStarted(started, time.Now())
+	if err != nil {
+		return err
+	}
+	d, err := backend.NewWorklogDraft(timeSpent, comment, at)
 	if err != nil {
 		return err
 	}

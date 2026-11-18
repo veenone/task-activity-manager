@@ -46,7 +46,7 @@ func seedWorklogApp(t *testing.T) (*App, string, *worklogBackend) {
 
 func TestListWorklogsPutsThePendingEntriesAfterJirasOwn(t *testing.T) {
 	a, id, b := seedWorklogApp(t)
-	if err := a.LogWork(id, "PLAT-1", "2h 30m", "Pairing"); err != nil {
+	if err := a.LogWork(id, "PLAT-1", "2h 30m", "Pairing", ""); err != nil {
 		t.Fatalf("LogWork: %v", err)
 	}
 	if len(b.writes) != 0 {
@@ -88,7 +88,7 @@ func TestListWorklogsOnADraftNeverAsksJira(t *testing.T) {
 	if err != nil {
 		t.Fatalf("draft: %v", err)
 	}
-	if err := a.LogWork(id, key, "45m", "Kickoff"); err != nil {
+	if err := a.LogWork(id, key, "45m", "Kickoff", ""); err != nil {
 		t.Fatalf("LogWork: %v", err)
 	}
 
@@ -112,7 +112,7 @@ func TestLogWorkAndCheckWorkDurationRefuseTheSameValues(t *testing.T) {
 			t.Errorf("CheckWorkDuration(%q) allowed it", bad)
 			continue
 		}
-		logged := a.LogWork(id, "PLAT-1", bad, "")
+		logged := a.LogWork(id, "PLAT-1", bad, "", "")
 		if logged == nil || logged.Error() != checked.Error() {
 			t.Errorf("LogWork(%q) = %v, want the same refusal the form got: %v", bad, logged, checked)
 		}
@@ -123,5 +123,39 @@ func TestLogWorkAndCheckWorkDurationRefuseTheSameValues(t *testing.T) {
 	logs, _ := a.ListWorklogs(id, "PLAT-1")
 	if len(logs) != 1 {
 		t.Errorf("logs = %+v, want only Jira's entry: no refusal wrote a row", logs)
+	}
+}
+
+// Work done yesterday is logged against yesterday. The form sends the wall
+// clock the user chose, and the entry carries it with this machine's offset
+// for that day, which is what Jira dates the entry by.
+func TestLogWorkDatesTheEntryByTheChosenStart(t *testing.T) {
+	a, id, _ := seedWorklogApp(t)
+	if err := a.LogWork(id, "PLAT-1", "1h", "Catching up", "2026-11-16T09:30"); err != nil {
+		t.Fatalf("LogWork: %v", err)
+	}
+	logs, err := a.ListWorklogs(id, "PLAT-1")
+	if err != nil {
+		t.Fatalf("ListWorklogs: %v", err)
+	}
+	if len(logs) != 2 || !logs[1].Pending {
+		t.Fatalf("logs = %+v, want Jira's entry and the pending one", logs)
+	}
+	started := logs[1].Started
+	offset := time.Date(2026, 11, 16, 9, 30, 0, 0, time.Local).Format("-0700")
+	if !strings.HasPrefix(started, "2026-11-16T09:30:") || !strings.HasSuffix(started, offset) {
+		t.Errorf("started = %q, want 09:30 on 16 Nov at %s", started, offset)
+	}
+}
+
+func TestLogWorkRefusesAStartItCannotRead(t *testing.T) {
+	a, id, _ := seedWorklogApp(t)
+	err := a.LogWork(id, "PLAT-1", "1h", "", "yesterday morning")
+	if err == nil || !strings.Contains(err.Error(), "yesterday morning") {
+		t.Fatalf("LogWork = %v, want a refusal naming what was typed", err)
+	}
+	logs, _ := a.ListWorklogs(id, "PLAT-1")
+	if len(logs) != 1 {
+		t.Errorf("logs = %+v, want only Jira's entry: the refusal wrote no row", logs)
 	}
 }
