@@ -16,8 +16,8 @@ import {
   ListUnpushableEdits,
 } from "../api";
 import { ENTITY_BOARD_CREATE, ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, SPRINT_ENTITIES, isMoveEntity } from "../api";
-import { ENTITY_WORKLOG } from "../api";
-import type { DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange, Worklog } from "../api";
+import { ENTITY_ATTACHMENT, ENTITY_WORKLOG } from "../api";
+import type { AttachmentDraft, DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange, Worklog } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 import { invalidateSprintWrites } from "./sprints";
@@ -204,6 +204,7 @@ export interface PendingGroup {
   edits: PendingChange[];
   links: { row: PendingChange; link: LinkDraft }[];
   worklogs: { row: PendingChange; log: Worklog }[];
+  attachments: { row: PendingChange; file: AttachmentDraft }[];
   moves: PendingChange[];
 }
 
@@ -226,7 +227,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     const id = `${kind}:${row.entityKey}`;
     let g = byKey.get(id);
     if (!g) {
-      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], worklogs: [], moves: [] };
+      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], worklogs: [], attachments: [], moves: [] };
       byKey.set(id, g);
     }
     if (row.entityType === "issue_create") {
@@ -263,6 +264,12 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     } else if (row.entityType === ENTITY_WORKLOG) {
       try {
         g.worklogs.push({ row, log: JSON.parse(row.afterVal) as Worklog });
+      } catch {
+        g.edits.push(row);
+      }
+    } else if (row.entityType === ENTITY_ATTACHMENT) {
+      try {
+        g.attachments.push({ row, file: JSON.parse(row.afterVal) as AttachmentDraft });
       } catch {
         g.edits.push(row);
       }

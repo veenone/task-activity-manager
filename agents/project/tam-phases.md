@@ -2485,6 +2485,32 @@ entered. Kiwi profile file refused.
                           of an opaque node)
       wailsjs/           GENERATED bindings, do not hand-edit
 
+## Issue attachments (#514)
+
+The detail panel's Attachments section lists Jira's files and journals new
+ones. Call flow for a new file: `AttachmentsSection` -> `PickAttachmentFiles`
+(the native dialog, alone in its binding so the rest is testable) ->
+`AttachFiles(profileID, key, paths)` -> `backend.NewAttachmentDraft` (stat,
+regular file) -> `issuerepo.AttachFile` -> journal row. Commit's
+`attachments` phase uploads through `backend.AttachmentBackend.AddAttachment`.
+
+- Journal entity `attachment`, field = the file's absolute path, after_val =
+  `AttachmentDraft` JSON. The path is the field so the same file picked twice
+  is one row. The file is not copied into the store; Commit stats it first
+  and reports a missing one as a non-retryable failure.
+- The phase runs before `worklogs`, which stays last: a test pins the last
+  phase by name.
+- Upload is `POST /rest/api/2/issue/{key}/attachments`, multipart, part name
+  `file`, with `X-Atlassian-Token: no-check`. Without that header Jira
+  answers 403. The body is streamed through a pipe.
+- There is no list endpoint; the files come from `GET
+  /issue/{key}?fields=attachment`.
+- A download follows the `content` link from that listing, and only when it
+  starts with the client's base URL. The request carries the token, so a
+  link to another host is refused. `SaveAttachment` takes an id and looks
+  the link up itself; the window never supplies a URL.
+- Not built: deleting an attachment in Jira, preview, drag and drop.
+
 ## Commands
 
     wails dev                      # run with hot reload

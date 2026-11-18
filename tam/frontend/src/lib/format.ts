@@ -217,3 +217,17 @@ export function sprintRelative(
     elapsed: span.day / span.length,
   };
 }
+
+// fileSize is a byte count as a person reads one: "512 B", "2 KB", "1.4 MB".
+// Sizes are in powers of 1024, which is what Windows and Jira both show.
+export function fileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 1024) return `${Math.max(0, Math.round(bytes || 0))} B`;
+  const units = ["KB", "MB", "GB"];
+  let n = bytes / 1024;
+  let u = 0;
+  while (n >= 1024 && u < units.length - 1) {
+    n /= 1024;
+    u++;
+  }
+  return `${n >= 10 || Number.isInteger(n) ? Math.round(n) : n.toFixed(1)} ${units[u]}`;
+}

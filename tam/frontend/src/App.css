@@ -1191,3 +1191,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .dashboard-ranking th { text-align: start; color: var(--text-muted); font-weight: 600; font-size: 0.9em; border-bottom: 1px solid var(--border-subtle); }
 .dashboard-ranking td { padding: 2px 0; border-bottom: 1px solid var(--border-subtle); }
 .dashboard-ranking td:last-child, .dashboard-ranking th:last-child { text-align: end; font-variant-numeric: tabular-nums; }
+
+/* Attachments section of the detail panel. The row is a .linked-row; the
+   name takes the slack and is cut with an ellipsis, so a long file name
+   cannot push Save or Discard out of the panel. */
+.attachment-row { align-items: center; }
+.attachment-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-save { padding: 2px 7px; font-size: var(--fs-xs); }

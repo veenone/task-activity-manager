@@ -18,6 +18,7 @@ import { SprintField } from "./SprintField";
 import { ActivityTab } from "./ActivityTab";
 import { AddLinkForm } from "./AddLinkForm";
 import { WorkLogSection } from "./WorkLogSection";
+import { AttachmentsSection } from "./AttachmentsSection";
 import { DoneAgreementSection, agreementProgressLine } from "./DoneAgreementSection";
 import { useDoneAgreement } from "../queries/doneAgreement";
 
@@ -403,6 +404,12 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
               ))}
             </ul>
           )}
+      </Section>
+
+      {/* Closed like the rest, and read from Jira on expand like the work
+          log under it. */}
+      <Section title="Attachments" open={open.attachments ?? false} onToggle={() => toggle("attachments")}>
+        <AttachmentsSection profileId={profileId} issueKey={issue.key} open={open.attachments ?? false} />
       </Section>
 
       {/* Closed like the rest, which is what makes fetching Jira's entries on

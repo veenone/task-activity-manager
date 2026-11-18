@@ -236,6 +236,8 @@ export interface CommitResult {
   // logged names each worklog entry pushed; optional for the reason
   // createdSprints is, since fixtures written before it do not carry it.
   logged?: { key: string; timeSpent: string }[];
+  // attached names each file uploaded; optional for the same reason.
+  attached?: { key: string; name: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
   moved?: CommitMove[];
   conflicts: Conflict[];

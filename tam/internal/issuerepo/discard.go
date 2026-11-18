@@ -114,6 +114,9 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		// them, so the journal row is the whole of it. Without this case the
 		// default branch below would read the row's field as an issue column
 		// and try to write the started stamp into it.
+	case p.EntityType == EntityAttachment:
+		// The same for a file to upload: the journal row is the whole of
+		// it, and the file itself was never copied anywhere to clean up.
 	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank, p.EntityType == EntityIssueBoard:
 		// A board add has no column to put back either, the way a rank has
 		// none: revertMove asks holdsMove first, which is false for both,

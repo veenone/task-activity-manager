@@ -34,8 +34,12 @@ type Backend struct {
 	// worklogs holds the entries keyed by issue: the closed sprint's sample
 	// (demo.SampleWorklogs), which the reports' time figures are drawn from,
 	// plus whatever a Commit pushed this run. Only Sprint 11 is seeded.
-	worklogs    map[string][]backend.Worklog
-	sprintState map[int]string
+	worklogs map[string][]backend.Worklog
+	// attachments holds the files a Commit pushed this run, keyed by issue,
+	// and nextAttachment the id the last one took. The sample seeds none.
+	attachments    map[string][]demoAttachment
+	nextAttachment int
+	sprintState    map[int]string
 	// sprintDraft holds the name and dates a start was given, beside
 	// sprintState, so a demo start can show the reader what the dialog just
 	// set instead of falling back to the dataset's own, unstarted values.
