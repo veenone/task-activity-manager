@@ -78,6 +78,10 @@ const VIEW_WORDS: Record<string, { purpose: string; body: string }> = {
     purpose: "The same grid, narrowed to the issues assigned to you in Jira.",
     body: "Your own work, in rank order. The rest of the project is a tab away.",
   },
+  worklog: {
+    purpose: "A week of your own logged time, issue by issue and day by day.",
+    body: "Pick a cell to log work on that issue and day. A workday under the target stays listed above the grid until it is filled.",
+  },
   epics: {
     purpose: "The project's epics with their children underneath, for seeing how a body of work is broken down.",
     body: "Open an epic to see what hangs off it and how much of it has landed.",

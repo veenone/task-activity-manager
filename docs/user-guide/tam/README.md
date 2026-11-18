@@ -11,6 +11,7 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 | [Getting started](00-getting-started.md) | Profiles, demo mode, syncing, the local-first loop, committing, conflicts, settings |
 | [Backlog](01-backlog.md) | The issue grid, filters, the detail panel, creating issues, importing, exporting |
 | [Assigned to me](02-assigned.md) | The same grid, narrowed to your own issues |
+| [Worklog](09-worklog.md) | A week of your own logged time, and filling the days that came up short |
 | [Epics](03-epics.md) | The epic to story to task tree, and what hangs off an epic |
 | [Boards](04-boards.md) | Columns, cards, moving work, swimlanes, column limits, sprint ceremonies |
 | [Sprints](05-sprints.md) | Every sprint a board has, what is in each, and creating, starting and completing them |
@@ -20,14 +21,15 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 
 ## Switching views
 
-Each view has a tab in the band under the top bar. The **View** menu lists the same eight with the shortcuts Ctrl+1 to Ctrl+8:
+Each view has a tab in the band under the top bar. The **View** menu lists the same nine with the shortcuts Ctrl+1 to Ctrl+9:
 
 | Shortcut | View | Shortcut | View |
 |---|---|---|---|
-| Ctrl+1 | Backlog | Ctrl+5 | Sprints |
-| Ctrl+2 | Assigned to me | Ctrl+6 | Reports |
-| Ctrl+3 | Epics | Ctrl+7 | Dashboards |
-| Ctrl+4 | Boards | Ctrl+8 | Rituals |
+| Ctrl+1 | Backlog | Ctrl+6 | Sprints |
+| Ctrl+2 | Assigned to me | Ctrl+7 | Reports |
+| Ctrl+3 | Worklog | Ctrl+8 | Dashboards |
+| Ctrl+4 | Epics | Ctrl+9 | Rituals |
+| Ctrl+5 | Boards | | |
 
 **Ctrl+B** shows or hides the navigation rail down the left side, which lists the same views. The rail is off by default and its state is remembered.
 
@@ -37,7 +39,7 @@ TAM writes nothing to Jira until you press Commit. Editing a field, dragging a c
 
 Everything else in these guides assumes that loop. [Getting started](00-getting-started.md) walks through it.
 
-## One document instead of nine
+## One document instead of ten
 
 [USER_GUIDE.md](USER_GUIDE.md) is the same material as one numbered document, which is what the PDF is built from. The pages here are the ones to read on screen and the ones to edit; the single file carries the same content for distribution.
 

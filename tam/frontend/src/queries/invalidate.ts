@@ -38,6 +38,7 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     // for as long as the query stays fresh (#68).
     peopleKeys.projectTypes(profileId),
     [profileId, "sprintReport"] as const,
+    keys.worklogWeeks(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }
@@ -61,4 +62,6 @@ export function invalidateWrites(qc: QueryClient, profileId: string, key?: strin
   // that read, which is how a bulk fill lands there before the next sync.
   qc.invalidateQueries({ queryKey: [profileId, "board"] });
   qc.invalidateQueries({ queryKey: [profileId, "boardSprintDetails"] });
+  // A logged or discarded entry changes the Worklog view's cells and totals.
+  qc.invalidateQueries({ queryKey: keys.worklogWeeks(profileId) });
 }

@@ -2485,6 +2485,35 @@ entered. Kiwi profile file refused.
                           of an opaque node)
       wailsjs/           GENERATED bindings, do not hand-edit
 
+## The Worklog view (#512)
+
+A week grid of the connected user's own time, tabbed after Assigned to me, so
+its accelerator is Ctrl+3 and every view after it moved one key down again.
+
+Call flow: `WorklogView` -> `useWorklogWeek` -> `App.WorklogWeek(profileID,
+fromDay, toDay)` -> `backend.OwnWorklogBackend.WorklogsBy` for Jira's entries,
+`issuerepo.AllPendingWorklogs` for the journal's, `ListIssuesForExport` with
+`AssigneeName` for the rows -> `worklogweek.Build`, which is pure. Nothing is
+stored: worklogs are read from Jira each time, like the panel's section.
+
+- Days are text, `2006-01-02`. An entry belongs to the day its `started`
+  stamp reads in its own offset, the first ten characters. No instant is
+  converted anywhere, in Go or in `lib/worklogWeek.ts`.
+- The JQL is `worklogAuthor = currentUser() AND worklogDate >= .. AND
+  worklogDate <= ..`, widened one day each side, because Jira evaluates
+  `worklogDate` in the zone of the user's Jira profile. The range is applied
+  again to each entry.
+- A search returns every worklog on a matching issue, other people's too, and
+  at most 20 per issue. Entries are narrowed to the author, and an issue with
+  more than came back is read whole through `Worklogs`.
+- A row with `cached: false` is an issue Jira answered that the cache does not
+  hold. `LogWork` journals against cached issues only, so the grid draws its
+  hours and no button.
+- Every range's query key sits under `keys.worklogWeeks(profileId)`, which
+  `invalidateWrites` and `invalidateProfileData` both invalidate.
+- The day target is the profile setting `worklog_day_hours`; unset or not a
+  number between 0 and 24 reads as 8.
+
 ## Commands
 
     wails dev                      # run with hot reload

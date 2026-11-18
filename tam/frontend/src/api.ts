@@ -24,3 +24,4 @@ export * from "./api/pending";
 export * from "./api/importer";
 export * from "./api/rituals";
 export * from "./api/dashboards";
+export * from "./api/worklog";

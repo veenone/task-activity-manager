@@ -60,14 +60,11 @@ func (r *Repository) PendingWorklogs(ctx context.Context, profileID, key string)
 		if p.EntityType != EntityWorklog {
 			continue
 		}
-		var d backend.WorklogDraft
-		if err := json.Unmarshal([]byte(p.AfterVal), &d); err != nil {
-			return nil, fmt.Errorf("decode pending worklog %d: %w", p.ID, err)
+		log, err := pendingWorklog(p)
+		if err != nil {
+			return nil, err
 		}
-		logs = append(logs, backend.Worklog{
-			Started: d.Started, TimeSpent: d.TimeSpent, Seconds: d.Seconds, Comment: d.Comment,
-			Pending: true, PendingID: p.ID,
-		})
+		logs = append(logs, log)
 	}
 	return logs, nil
 }
