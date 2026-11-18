@@ -130,6 +130,30 @@ func NewWorklogDraft(timeSpent, comment string, at time.Time) (WorklogDraft, err
 	}, nil
 }
 
+// startedInputLayout is what the Log work form sends: the wall clock of a
+// date-and-time field, with no zone, because the user chose it on this
+// machine's clock.
+const startedInputLayout = "2006-01-02T15:04"
+
+// ParseWorkStarted reads the start the user chose for an entry. A blank one
+// is now, which is what an entry was dated by before the form had the field.
+//
+// The chosen minute is read in now's zone, so the entry carries the offset
+// that dates it in Jira. It keeps now's seconds: the journal is unique on an
+// issue's started stamp, and two entries given the same minute would
+// otherwise be one row, the second replacing the first.
+func ParseWorkStarted(typed string, now time.Time) (time.Time, error) {
+	typed = strings.TrimSpace(typed)
+	if typed == "" {
+		return now, nil
+	}
+	at, err := time.ParseInLocation(startedInputLayout, typed, now.Location())
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%q is not a date and time TAM can read. Pick the day and the time the work started", typed)
+	}
+	return at.Add(time.Duration(now.Second())*time.Second + time.Duration(now.Nanosecond())), nil
+}
+
 // FamilyWorklogBackend reads the work logged on an issue's sub-tasks.
 //
 // It is its own optional interface rather than part of WorklogBackend

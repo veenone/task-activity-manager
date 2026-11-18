@@ -33,10 +33,10 @@ in one app is already set up in the other.
   [Finding issues](#finding-issues).
 - **Epics splits in two.** **Under epics** holds the tree, **No epic** holds
   every issue that sits under none, as a flat list with its own pager. Each tab
-  is labelled with the count of its own side. See [Epics](#8-epics).
+  is labelled with the count of its own side. See [Epics](#9-epics).
 - **Dashboards says who wrote each filter.** The **Saved filter** picker groups
   what you have starred in Jira under **Your filters** and **Shared with you**.
-  See [Dashboards](#12-dashboards).
+  See [Dashboards](#13-dashboards).
 - **One dropdown for the issue type filter**, where a project with five types
   used to spend five controls and push the action buttons onto a second row.
 - **A failed sync says what to change.** The status bar becomes a red ribbon
@@ -56,16 +56,17 @@ See [`CHANGELOG.md`](../../../tam/CHANGELOG.md) for the full history.
 5. [The loop: edit, review, commit](#5-the-loop-edit-review-commit)
 6. [Backlog](#6-backlog)
 7. [Assigned to me](#7-assigned-to-me)
-8. [Epics](#8-epics)
-9. [Boards](#9-boards)
-10. [Sprints](#10-sprints)
-11. [Reports](#11-reports)
-12. [Dashboards](#12-dashboards)
-13. [Rituals](#13-rituals)
-14. [Syncing](#14-syncing)
-15. [Settings and profile management](#15-settings-and-profile-management)
-16. [Diagnostics and troubleshooting](#16-diagnostics-and-troubleshooting)
-17. [Glossary](#17-glossary)
+8. [Worklog](#8-worklog)
+9. [Epics](#9-epics)
+10. [Boards](#10-boards)
+11. [Sprints](#11-sprints)
+12. [Reports](#12-reports)
+13. [Dashboards](#13-dashboards)
+14. [Rituals](#14-rituals)
+15. [Syncing](#15-syncing)
+16. [Settings and profile management](#16-settings-and-profile-management)
+17. [Diagnostics and troubleshooting](#17-diagnostics-and-troubleshooting)
+18. [Glossary](#18-glossary)
 
 ---
 
@@ -111,7 +112,7 @@ The rest are optional:
   details cached until you press **Refresh**, which is what to set if you work
   with no connection.
 - **Confluence Rituals** and **Reports root page** are for the
-  [Rituals](#13-rituals) and [Reports](#11-reports) views, and can be added
+  [Rituals](#14-rituals) and [Reports](#12-reports) views, and can be added
   later.
 
 **Test connection** checks the URL and the token. **Create profile** saves it.
@@ -145,10 +146,10 @@ The native menu bar carries the same things:
 | Menu | Items |
 | --- | --- |
 | **File** | Profiles…, Settings…, Sync (**Ctrl+R**), Full Sync (**Ctrl+Shift+R**), Quit (**Ctrl+Q**) |
-| **View** | The eight views (**Ctrl+1** to **Ctrl+8**), and Navigation Rail (**Ctrl+B**) |
+| **View** | The nine views (**Ctrl+1** to **Ctrl+9**), and Navigation Rail (**Ctrl+B**) |
 | **Help** | Diagnostics…, About |
 
-The views, in menu order: Backlog, Assigned to me, Epics, Boards, Sprints,
+The views, in menu order: Backlog, Assigned to me, Worklog, Epics, Boards, Sprints,
 Reports, Dashboards, Rituals.
 
 A status bar reading `38 of 2,943 issues` means the scope JQL, or an issue type
@@ -235,7 +236,7 @@ date, with the time tracking figures and bar under them.
 | **Comments** | Lists the issue's comments, with a note saying how old the cached copy is. |
 | **Links** | Lists the issue's links and adds one. **Check** confirms the key exists and shows its summary; **Add** queues the link. |
 | **Covered by tests** | The Xray tests covering this issue, for a project that uses XTM alongside TAM. |
-| **Work log** | What has been logged, and a form to log time and a comment. |
+| **Work log** | What has been logged, and a form to log time, when the work started, and a comment. |
 | **Done agreement** | The team's definition of done from the ritual pages, readable while the issue is. |
 | **Activity** | The issue's history. |
 
@@ -290,7 +291,35 @@ note says so until the next sync.
 There is no **+ New** or **Import** here: an issue you create is not assigned
 to you until somebody assigns it. Both live in the Backlog.
 
-## 8. Epics
+## 8. Worklog
+
+A week of your own logged time: your issues down the side, the days across the
+top, and what you logged in each cell. Only your own entries are counted.
+
+The first group of rows is every open issue assigned to you. Under it are the
+other issues you logged time on in the week shown. A cell adds Jira's entries
+to the pending ones, and a dot marks a cell with a pending entry.
+
+Each workday header measures the day against the **Day target**, 8 hours by
+default and kept per profile. A day that reached it reads `8h, complete`. A
+past day that did not reads `2h 30m short` or `nothing logged`. Today and the
+days ahead read as a running total, `2h of 8h`. Weekends have no target.
+
+Press a cell to open the panel for that issue and day. It holds the **Log
+work** form, how the day stands, and every entry you logged that day. Started
+is filled in with the time the day's last entry ended, or 09:00. **Fill the
+day** puts the missing time into the form. The entry is journalled and reaches
+Jira on Commit.
+
+A strip above the grid lists the workdays in the last 14 days that are under
+the target. Picking one opens it, and **Log and go to next gap** logs the
+entry and moves on to the next.
+
+The view does not edit or delete entries Jira already holds, and it does not
+know about holidays or leave. An issue you logged on that TAM has not synced
+is listed with its time but cannot be logged on from here.
+
+## 9. Epics
 
 Two tabs: the work under each epic, and the work filed under none. Each is
 labelled with the number of issues on its side, for example
@@ -319,7 +348,7 @@ issue's **Epic** moves it in the tree as soon as the change is saved, and the
 row flashes where it lands. **+ New epic** opens the create dialog with the
 type fixed to epic.
 
-## 9. Boards
+## 10. Boards
 
 Your Jira board: its columns, the cards in them, and the sprint ceremonies.
 
@@ -386,7 +415,7 @@ unfinished then. Where the board is not drawing every card, the dialog says how
 many it cannot name. Completing a sprint with other changes pending asks you to
 commit first.
 
-## 10. Sprints
+## 11. Sprints
 
 Where the board answers "where is this card", this view answers "what is in
 this sprint, and what happens to it next".
@@ -420,7 +449,7 @@ from.
 Where TAM cannot be sure of a sprint's size it says "at least" rather than
 quoting a number that might be low.
 
-## 11. Reports
+## 12. Reports
 
 What a sprint review starts with, rebuilt from Jira's own history rather than
 read from a chart endpoint.
@@ -463,7 +492,7 @@ Three buttons take the report off the screen, all rendering the same document:
 spreadsheet** and **Export a deck**. Exports go to the folder in **File →
 Settings…**. None of them touches Jira.
 
-## 12. Dashboards
+## 13. Dashboards
 
 A dashboard is one of your saved Jira filters, counted and kept.
 
@@ -495,7 +524,7 @@ thing with Jira unreachable and the same thing again a week later. **Refresh**
 re-runs that filter and restamps it; nothing refreshes on its own. **Remove**
 takes the panel off the view and leaves the Jira filter alone.
 
-## 13. Rituals
+## 14. Rituals
 
 The Confluence pages a team keeps around its ceremonies, per sprint. It needs
 the **Confluence Rituals** settings on the profile; without them the view says
@@ -532,7 +561,7 @@ Confluence**, with **Recreate on next Sync** and **Remove local copy**.
 Every ritual page lives under a root page set in the profile. Changing the root
 re-syncs straight afterwards.
 
-## 14. Syncing
+## 15. Syncing
 
 **Sync** at the right of the top bar offers:
 
@@ -549,7 +578,7 @@ it finished. A failed sync is reported there too.
 details again. It takes the same lock a sync does, so the two never run at
 once, and neither does a report rebuild or a ritual sync.
 
-## 15. Settings and profile management
+## 16. Settings and profile management
 
 **File → Settings…** holds the **Report export folder**, where spreadsheets and
 decks are written.
@@ -563,7 +592,7 @@ Switching profiles is blocked while a sync or a commit is running.
 **Help → Take the tour** walks through the view you are on; **Take the
 first-run tour** walks through the whole loop.
 
-## 16. Diagnostics and troubleshooting
+## 17. Diagnostics and troubleshooting
 
 **Help → Diagnostics** shows the database paths, the build and the recent log.
 It is the first thing to collect when something misbehaves.
@@ -578,7 +607,7 @@ It is the first thing to collect when something misbehaves.
 | Sync, Commit or Refresh is disabled | Another of them, a report rebuild or a ritual sync holds the profile's lock. |
 | The Rituals view says it cannot sync | Add the Confluence settings to the profile. |
 
-## 17. Glossary
+## 18. Glossary
 
 | Term | What it means |
 | --- | --- |

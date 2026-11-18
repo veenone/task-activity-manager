@@ -1192,6 +1192,59 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .dashboard-ranking td { padding: 2px 0; border-bottom: 1px solid var(--border-subtle); }
 .dashboard-ranking td:last-child, .dashboard-ranking th:last-child { text-align: end; font-variant-numeric: tabular-nums; }
 
+/* Worklog view: a week of the reader's own time. The grid takes the Backlog
+   grid's box and the form the detail panel's, so the two sit flush the way
+   they do in every other view. */
+.worklog-view .filter-bar .detail-input { width: auto; }
+.worklog-view .filter-bar .worklog-filter { width: 220px; }
+.worklog-period { min-width: 170px; text-align: center; font-size: var(--fs-lg); font-weight: 600; }
+.worklog-target { display: inline-flex; align-items: center; gap: 6px; }
+.worklog-target .detail-input { width: 64px; }
+.worklog-meter { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.worklog-meter .progress-bar { width: 140px; }
+.worklog-gaps { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; padding: 8px 12px; border: 1px solid var(--warn-border); border-radius: var(--r-1); background: var(--warn-soft); }
+.worklog-gaps-title { font-weight: 600; color: var(--warn-text); }
+.worklog-gap { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; font-size: var(--fs-sm); }
+.worklog-gap[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.worklog-scroll { flex: 1; min-height: 0; overflow: auto; }
+.worklog-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.worklog-table th,
+.worklog-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); text-align: left; font-weight: 400; vertical-align: middle; }
+.worklog-table thead th { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--text-strong); vertical-align: bottom; }
+.worklog-table .worklog-issue-head { font-weight: 600; }
+.worklog-table .worklog-day { width: 92px; text-align: center; }
+.worklog-table .worklog-day.worklog-weekend { width: 68px; }
+.worklog-table .worklog-sum { width: 72px; text-align: center; font-weight: 600; border-left: 1px solid var(--border-subtle); }
+.worklog-day-name { display: block; font-weight: 600; }
+.worklog-day .progress-bar { margin: 5px 0 3px; }
+.worklog-day-state { display: block; font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; }
+.worklog-state-complete { color: var(--ok-text); }
+.worklog-state-short { color: var(--warn-text); }
+.worklog-state-open { color: var(--text-muted); }
+.worklog-table .worklog-weekend { background: var(--surface-sunken); }
+.worklog-table .worklog-today { background: var(--accent-soft); }
+.worklog-table thead .worklog-today { box-shadow: inset 0 2px 0 var(--accent); }
+.worklog-group th { padding-top: 10px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.worklog-group .detail-section-count { margin-left: 4px; }
+.worklog-issue-line { display: flex; align-items: center; gap: 6px; }
+.worklog-key { color: var(--accent); font-weight: 600; }
+.worklog-summary { display: block; margin-top: 2px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.worklog-row-selected .worklog-issue { box-shadow: inset 3px 0 0 var(--accent); }
+.worklog-table .worklog-cell { padding: 0; text-align: center; font-weight: 600; }
+.worklog-cell-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: var(--hit-desktop); padding: 0 4px; background: transparent; border: none; color: inherit; font: inherit; cursor: pointer; }
+.worklog-cell-btn:hover { background: var(--row-hover); }
+.worklog-cell-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-inset); }
+.worklog-cell-btn[aria-pressed="true"] { outline: var(--focus-ring); outline-offset: var(--focus-offset-inset); background: var(--accent-soft); color: var(--accent); }
+.worklog-add { color: var(--text-muted); font-weight: 400; }
+.worklog-table .worklog-empty { padding: 32px; text-align: center; }
+.worklog-foot { flex: none; margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface-2); }
+.worklog-panel-day { margin-top: 12px; padding-top: 0; border-top: none; }
+.worklog-panel-total { margin: 6px 0 0; }
+.worklog-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 104px; }
+.worklog-preset { padding: 2px 8px; font-size: var(--fs-sm); }
+.worklog-preset-fill { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.worklog-entry-comment { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Attachments section of the detail panel. The row is a .linked-row; the
    name takes the slack and is cut with an ellipsis, so a long file name
    cannot push Save or Discard out of the panel. */

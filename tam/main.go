@@ -72,12 +72,13 @@ func main() {
 var menuViews = []struct{ id, label, accelerator string }{
 	{"backlog", "Backlog", "1"},
 	{"assigned", "Assigned to me", "2"},
-	{"epics", "Epics", "3"},
-	{"boards", "Boards", "4"},
-	{"sprints", "Sprints", "5"},
-	{"reports", "Reports", "6"},
-	{"dashboards", "Dashboards", "7"},
-	{"rituals", "Rituals", "8"},
+	{"worklog", "Worklog", "3"},
+	{"epics", "Epics", "4"},
+	{"boards", "Boards", "5"},
+	{"sprints", "Sprints", "6"},
+	{"reports", "Reports", "7"},
+	{"dashboards", "Dashboards", "8"},
+	{"rituals", "Rituals", "9"},
 }
 
 // appMenu is the native menu bar, and TAM's primary navigation: the View menu

@@ -18,6 +18,7 @@ import {journal} from '../models';
 import {importfile} from '../models';
 import {sprints} from '../models';
 import {syncer} from '../models';
+import {worklogweek} from '../models';
 
 export function AddDashboardByFilterID(arg1:string,arg2:string):Promise<dashboardrepo.Dashboard>;
 
@@ -171,7 +172,7 @@ export function ListUnpushableEdits(arg1:string):Promise<Array<issuerepo.Unpusha
 
 export function ListWorklogs(arg1:string,arg2:string):Promise<Array<backend.Worklog>>;
 
-export function LogWork(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function LogWork(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function LookupIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 
@@ -248,3 +249,5 @@ export function TestConnection(arg1:string,arg2:string,arg3:string,arg4:boolean)
 export function TestProfileConnection(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
 
 export function UpdateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<profile.Profile>;
+
+export function WorklogWeek(arg1:string,arg2:string,arg3:string):Promise<worklogweek.View>;
