@@ -3,6 +3,7 @@ import { Menu, LiveRegion, SyncRibbon, ViewTabs, useProfile, useTour, errMsg } f
 import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
+import { WorklogView } from "./components/WorklogView";
 import { TOURS, TOUR_VERSION, shouldOfferTour } from "./tour/steps";
 import type { View } from "./nav";
 import { useModal } from "./modals";
@@ -315,6 +316,8 @@ export default function App() {
               <BacklogView />
             ) : current.id === "assigned" ? (
               <AssignedToMeView />
+            ) : current.id === "worklog" ? (
+              <WorklogView />
             ) : current.id === "epics" ? (
               <EpicsView />
             ) : current.id === "boards" ? (
