@@ -79,6 +79,10 @@ Discarding an attachment row deletes the journal row only. No file was copied, s
 
 `AttachmentsSection` sits above Work log in `IssueDetailPanel` and is read on expand. Pending changes shows an Attachment line per file with a note that the file must stay at its path. The commit banner counts uploaded attachments.
 
+Mock-up of the section, the Pending changes rows and the commit result, with example data:
+
+![Issue attachments mock-up](../../mockups/tam-issue-attachments.png)
+
 ## Left to the builder
 
 Wording of empty and error states, and styling within the existing list rows.
