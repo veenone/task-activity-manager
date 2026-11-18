@@ -235,7 +235,7 @@ date, with the time tracking figures and bar under them.
 | **Comments** | Lists the issue's comments, with a note saying how old the cached copy is. |
 | **Links** | Lists the issue's links and adds one. **Check** confirms the key exists and shows its summary; **Add** queues the link. |
 | **Covered by tests** | The Xray tests covering this issue, for a project that uses XTM alongside TAM. |
-| **Work log** | What has been logged, and a form to log time and a comment. |
+| **Work log** | What has been logged, and a form to log time, when the work started, and a comment. |
 | **Done agreement** | The team's definition of done from the ritual pages, readable while the issue is. |
 | **Activity** | The issue's history. |
 

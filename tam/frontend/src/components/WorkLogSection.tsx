@@ -27,6 +27,7 @@ export function WorkLogSection({ profileId, issueKey, open }: Props) {
   const { notice } = useNotice();
   const [timeSpent, setTimeSpent] = useState("");
   const [comment, setComment] = useState("");
+  const [started, setStarted] = useState(nowInput);
   const [error, setError] = useState("");
 
   // The duration is checked by the Go side, which is where the rule lives, so
@@ -48,9 +49,10 @@ export function WorkLogSection({ profileId, issueKey, open }: Props) {
     e.preventDefault();
     if (!(await check())) return;
     try {
-      await logWork.mutateAsync({ key: issueKey, timeSpent, comment });
+      await logWork.mutateAsync({ key: issueKey, timeSpent, comment, started });
       setTimeSpent("");
       setComment("");
+      setStarted(nowInput());
     } catch (err) {
       setError(errMsg(err));
     }
@@ -123,6 +125,16 @@ export function WorkLogSection({ profileId, issueKey, open }: Props) {
             onBlur={() => { if (timeSpent.trim()) void check(); }}
           />
         </label>
+        <label className="edit-row" htmlFor="worklog-started">
+          <span className="muted small">Started</span>
+          <input
+            id="worklog-started"
+            className="detail-input"
+            type="datetime-local"
+            value={started}
+            onChange={(e) => { setStarted(e.target.value); setError(""); }}
+          />
+        </label>
         <label className="edit-row" htmlFor="worklog-comment">
           <span className="muted small">Comment</span>
           <input
@@ -142,6 +154,15 @@ export function WorkLogSection({ profileId, issueKey, open }: Props) {
       </form>
     </>
   );
+}
+
+// nowInput is this moment as a date-and-time field holds it: the reader's own
+// wall clock to the minute, with no zone. The Go side reads it on the
+// machine's zone, which is the offset Jira dates the entry by.
+function nowInput(): string {
+  const d = new Date();
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
 // worklogEntryLine is the one sentence the Pending changes dialog reads a

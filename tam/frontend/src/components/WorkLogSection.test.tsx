@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, createQueryClient } from "@agile-suite/core";
@@ -83,9 +83,38 @@ describe("WorkLogSection", () => {
     const add = screen.getByRole("button", { name: "Log work" });
     await waitFor(() => expect(add).toBeEnabled());
     await user.click(add);
-    await waitFor(() => expect(api.LogWork).toHaveBeenCalledWith("p1", "PLAT-412", "45m", "Rebasing"));
+    // Started was left alone, so the entry carries the minute the form
+    // opened on: a wall clock with no zone, which the Go side reads on its own.
+    await waitFor(() =>
+      expect(api.LogWork).toHaveBeenCalledWith(
+        "p1", "PLAT-412", "45m", "Rebasing", expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+      ),
+    );
     expect(screen.getByLabelText("Time spent")).toHaveValue("");
     expect(screen.getByLabelText("Comment")).toHaveValue("");
+  });
+
+  it("journals an entry against the start the user chose", async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await screen.findByText("3h 30m logged over 2 entries");
+    await user.type(screen.getByLabelText("Time spent"), "1h");
+    fireEvent.change(screen.getByLabelText("Started"), { target: { value: "2026-11-16T09:30" } });
+    await user.click(screen.getByRole("button", { name: "Log work" }));
+    await waitFor(() => expect(api.LogWork).toHaveBeenCalledWith("p1", "PLAT-412", "1h", "", "2026-11-16T09:30"));
+    // The next entry is most likely about now again, not about yesterday.
+    expect(screen.getByLabelText("Started")).not.toHaveValue("2026-11-16T09:30");
+  });
+
+  it("shows the refusal when the start cannot be read, and keeps what was typed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.LogWork).mockRejectedValue(new Error(`"x" is not a date and time TAM can read.`));
+    renderSection();
+    await screen.findByText("3h 30m logged over 2 entries");
+    await user.type(screen.getByLabelText("Time spent"), "1h");
+    await user.click(screen.getByRole("button", { name: "Log work" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("is not a date and time TAM can read");
+    expect(screen.getByLabelText("Time spent")).toHaveValue("1h");
   });
 
   it("refuses a duration Jira would refuse, where it was typed, and journals nothing", async () => {

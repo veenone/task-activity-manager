@@ -167,7 +167,7 @@ export function ListUnpushableEdits(arg1:string):Promise<Array<issuerepo.Unpusha
 
 export function ListWorklogs(arg1:string,arg2:string):Promise<Array<backend.Worklog>>;
 
-export function LogWork(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function LogWork(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function LookupIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 
