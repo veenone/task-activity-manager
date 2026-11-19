@@ -14,6 +14,8 @@ import { useSubtaskType } from "../queries/people";
 import { IssueFilters } from "./IssueFilters";
 import { NO_FILTER, isFiltered, queryFields } from "../lib/issueFilter";
 import type { IssueFilter } from "../lib/issueFilter";
+import { PERM_CREATE_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 // The page sizes the pager offers. 25 stays the default so the first render
 // is unchanged; the larger steps are for planning, where paging 25 at a time
@@ -48,6 +50,7 @@ interface IssueListViewProps {
 // table.
 export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote, onPage }: IssueListViewProps) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
+  const createDenied = useDenial(activeId)(PERM_CREATE_ISSUES);
   const [text, setText] = useState("");
   // Type, status and assignee are one object because IssueFilters sets them
   // as one, which is also what makes a profile switch one reset rather than
@@ -206,12 +209,12 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
           {exporting ? "Exporting" : "Export"}
         </button>
         {showImport && (
-          <button type="button" className="btn filter-import" disabled={!activeId} onClick={() => openModal("import")}>
+          <button type="button" className="btn filter-import" disabled={!activeId || !!createDenied} title={createDenied || undefined} onClick={() => openModal("import")}>
             Import
           </button>
         )}
         {showCreate && (
-          <button type="button" className="btn btn-primary filter-new" disabled={!activeId} onClick={() => openModal("newIssue")}>
+          <button type="button" className="btn btn-primary filter-new" disabled={!activeId || !!createDenied} title={createDenied || undefined} onClick={() => openModal("newIssue")}>
             + New
           </button>
         )}

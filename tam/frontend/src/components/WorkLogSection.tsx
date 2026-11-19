@@ -5,6 +5,8 @@ import { CheckWorkDuration } from "../api";
 import type { Worklog } from "../api";
 import { useDiscardById, useLogWork, useWorklogs, worklogTotal } from "../queries/pending";
 import { day, plural, workDuration } from "../lib/format";
+import { PERM_WORK_ON_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 interface Props {
   profileId: string;
@@ -23,6 +25,7 @@ interface Props {
 export function WorkLogSection({ profileId, issueKey, open }: Props) {
   const logs = useWorklogs(profileId, issueKey, open);
   const logWork = useLogWork(profileId);
+  const denied = useDenial(profileId)(PERM_WORK_ON_ISSUES, issueKey);
   const discard = useDiscardById(profileId);
   const { notice } = useNotice();
   const [timeSpent, setTimeSpent] = useState("");
@@ -148,8 +151,8 @@ export function WorkLogSection({ profileId, issueKey, open }: Props) {
         </label>
         {error && <p className="error-text small" role="alert">{error}</p>}
         <div className="edit-actions">
-          <button type="submit" className="btn btn-primary" disabled={!timeSpent.trim() || logWork.isPending}>Log work</button>
-          <span className="muted small">Journaled now, pushed on Commit.</span>
+          <button type="submit" className="btn btn-primary" disabled={!timeSpent.trim() || logWork.isPending || !!denied} title={denied || undefined}>Log work</button>
+          <span className="muted small">{denied || "Journaled now, pushed on Commit."}</span>
         </div>
       </form>
     </>

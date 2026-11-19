@@ -578,6 +578,17 @@ it finished. A failed sync is reported there too.
 details again. It takes the same lock a sync does, so the two never run at
 once, and neither does a report rebuild or a ritual sync.
 
+A sync also asks Jira what your token may do in the project. An action you
+lack the Jira permission for is disabled, and hovering it names the
+permission: Manage Sprints for the sprint actions, Schedule Issues for ranking
+and sprint moves, Create Issues for new issues and import, Edit Issues for
+field edits, Transition Issues for column moves, Assign Issues for the
+assignee, Link Issues, Work On Issues for logging work, and Create
+Attachments. TAM disables only what Jira said no to, so before the first sync,
+in demo mode, and for a card from another project, everything stays enabled
+and Jira decides at commit. Sync again after an administrator changes your
+permissions. Column limits and creating a board are not covered.
+
 ## 16. Settings and profile management
 
 **File → Settings…** holds the **Report export folder**, where spreadsheets and

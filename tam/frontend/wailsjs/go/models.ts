@@ -1602,6 +1602,22 @@ export namespace main {
 	        this.logPath = source["logPath"];
 	    }
 	}
+	export class PermissionView {
+	    project: string;
+	    byProject: Record<string, any>;
+	    names: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new PermissionView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.project = source["project"];
+	        this.byProject = source["byProject"];
+	        this.names = source["names"];
+	    }
+	}
 	export class RitualMacroPreview {
 	    supported: boolean;
 	    jql: string;

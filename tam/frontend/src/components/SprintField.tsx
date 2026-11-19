@@ -2,6 +2,8 @@ import { errMsg, useNotice } from "@agile-suite/core";
 import type { Issue, SprintOption } from "../api";
 import { useMoveToSprint } from "../queries/boards";
 import { duplicateNameIds, sprintOptionLabel } from "../lib/sprintOptions";
+import { PERM_SCHEDULE_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 interface Props {
   profileId: string;
@@ -36,7 +38,8 @@ export function SprintField({ profileId, issue, sprints, busy, emptyNote }: Prop
   // never offers. Dropping it would leave the select showing the backlog for
   // a card that is in a sprint, so it is added as its own option.
   const known = sprints.some((s) => String(s.id) === issue.sprintId);
-  const disabled = busy || move.isPending;
+  const denied = useDenial(profileId)(PERM_SCHEDULE_ISSUES, issue.key);
+  const disabled = busy || move.isPending || !!denied;
   const dupIds = duplicateNameIds(sprints);
 
   return (
@@ -46,6 +49,7 @@ export function SprintField({ profileId, issue, sprints, busy, emptyNote }: Prop
         aria-label="Sprint"
         value={issue.sprintId}
         disabled={disabled}
+        title={denied || undefined}
         onChange={(e) =>
           move.mutate(
             { key: issue.key, sprintId: e.target.value },

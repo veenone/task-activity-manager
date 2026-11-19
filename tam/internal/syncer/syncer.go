@@ -149,6 +149,8 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 		log.Printf("tam: store the issue types of %s for %s: %v", projectKey, profileID, err)
 	}
 
+	e.syncPermissions(ctx, profileID, projectKey)
+
 	// What the project holds, before the profile's scope JQL and the
 	// incremental cut-off narrow it. maxResults of zero asks for the count
 	// alone, so this is one cheap request and not a second pass. A failure

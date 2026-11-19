@@ -12,6 +12,7 @@ import (
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/committer"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/permission"
 	"agile-suite/tam/internal/sprints"
 )
 
@@ -50,6 +51,9 @@ func (a *App) EditIssue(profileID, key, field, value string) error {
 	if strings.TrimSpace(key) == "" {
 		return errors.New("issue key is empty")
 	}
+	if err := a.allowOnIssue(profileID, key, editPermission(field)); err != nil {
+		return err
+	}
 	return a.repo.EditField(a.ctx, profileID, key, field, value)
 }
 
@@ -57,6 +61,9 @@ func (a *App) EditIssue(profileID, key, field, value string) error {
 func (a *App) CreateIssue(profileID string, draft backend.IssueDraft) (string, error) {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
+		return "", err
+	}
+	if err := a.allow(p.ID, p.ProjectKey, permission.CreateIssues); err != nil {
 		return "", err
 	}
 	return a.repo.CreateDraft(a.ctx, p.ID, p.ProjectKey, draft)
@@ -215,6 +222,9 @@ func (a *App) LookupIssue(profileID, key string) (backend.Issue, error) {
 func (a *App) AddLink(profileID, key string, link backend.LinkDraft) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
+		return err
+	}
+	if err := a.allowOnIssue(p.ID, key, permission.LinkIssues); err != nil {
 		return err
 	}
 	return a.repo.AddLink(a.ctx, p.ID, strings.TrimSpace(key), link)

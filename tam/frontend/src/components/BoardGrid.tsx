@@ -7,6 +7,7 @@ import { BoardCard } from "./BoardCard";
 import { ColumnLimit } from "./ColumnLimit";
 import { CardMoveMenu } from "./CardMoveMenu";
 import type { BoardMoves } from "./useBoardMoves";
+import { PERM_SCHEDULE_ISSUES, PERM_TRANSITION_ISSUES } from "../api/permissions";
 
 // EDGE is how close to the edge of the scroller a drag has to come before
 // the board scrolls itself, and STEP is how far it scrolls each time.
@@ -31,6 +32,9 @@ interface Props {
   // committing is a Commit in flight: the cards stop being draggable while
   // one is pushing.
   committing: boolean;
+  // denial answers why this account cannot make a kind of move on a card,
+  // or "" when it can. Absent means nothing is held back.
+  denial?: (perm: string, issueKey?: string) => string;
   onSelect: (issue: Issue, e: MouseEvent<HTMLDivElement>) => void;
   onFocusCard: (id: string) => void;
   onKeyDown: (e: KeyboardEvent, id: string) => void;
@@ -61,7 +65,7 @@ function scrollNearEdge(e: DragEvent<HTMLElement>) {
 // is the card. A screen reader reading a lane therefore hears every card
 // with the column it sits in, which the card's own label repeats.
 export function BoardGrid({
-  view, swimlane, selectedKey, checked, focusId, moves, flashKey, sprints, sprintId, committing,
+  view, swimlane, selectedKey, checked, focusId, moves, flashKey, sprints, sprintId, committing, denial,
   onSelect, onFocusCard, onKeyDown,
 }: Props) {
   const target = moves.target;
@@ -142,7 +146,7 @@ export function BoardGrid({
                           move={moves.moves.get(issue.key) ?? { state: "", reason: "" }}
                           flashed={flashKey === issue.key}
                           dragging={moves.dragKey === issue.key}
-                          draggable={!committing}
+                          draggable={!committing && !(denial?.(PERM_TRANSITION_ISSUES, issue.key) && denial?.(PERM_SCHEDULE_ISSUES, issue.key))}
                           menu={(
                             <CardMoveMenu
                               issueKey={issue.key}
@@ -151,6 +155,8 @@ export function BoardGrid({
                               sprints={issue.type === "subtask" ? [] : sprints}
                               sprintId={issue.type === "subtask" ? "" : sprintId}
                               disabled={committing}
+                              columnDenied={denial?.(PERM_TRANSITION_ISSUES, issue.key)}
+                              sprintDenied={denial?.(PERM_SCHEDULE_ISSUES, issue.key)}
                               onColumn={(to) => moves.moveToColumn(issue.key, to)}
                               onSprint={(sprint) => moves.moveToSprint(issue.key, sprint)}
                             />

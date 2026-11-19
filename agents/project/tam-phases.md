@@ -2540,6 +2540,35 @@ regular file) -> `issuerepo.AttachFile` -> journal row. Commit's
   the link up itself; the window never supplies a URL.
 - Not built: deleting an attachment in Jira, preview, drag and drop.
 
+## Jira permissions (#516)
+
+A sync stores what the token may do in the profile's project, and actions
+whose permission Jira denied are disabled. Call flow: `Engine.Sync` ->
+`syncPermissions` -> `backend.PermissionBackend.Permissions` ->
+`permission.Gated` -> `issuerepo.PutPermissions` (profile setting
+`jira_permissions`, JSON by project). Read side: `GetPermissions` ->
+`usePermissions` / `useDenial(profileId)` in `queries/permissions.ts`.
+
+- The rule is in `permission.Set.Allows`: refuse only on a stored `false`.
+  No answer, a key Jira did not list, and a project nobody asked about are
+  all allowed. `lib/permissions.ts` `denial` is the same rule in the
+  frontend; change both together.
+- To gate a new action: call `a.allow` (profile's project) or
+  `a.allowOnIssue` (the issue key's project) in the binding before it
+  journals, add a row to the table test in `app_permissions_test.go`, and
+  disable the control with `useDenial`. A new permission key goes in
+  `permission.Names` and in `api/permissions.ts`.
+- `MANAGE_SPRINTS_PERMISSION` is the Manage Sprints key as Jira Software
+  names it in permission schemes. It has not been read back from a live
+  `mypermissions` answer here; a wrong key reads as unknown and gates
+  nothing.
+- A draft sprint's edit and delete, and a dry-run import, are not gated:
+  none of them reaches Jira.
+- Not gated: column limits and board creation. Board administration is not
+  a project permission and Data Center has no public endpoint for it.
+- The demo backend does not implement `PermissionBackend`, which is how
+  demo mode allows everything.
+
 ## Commands
 
     wails dev                      # run with hot reload

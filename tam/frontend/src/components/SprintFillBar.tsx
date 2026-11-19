@@ -18,6 +18,9 @@ interface Props {
   // the board's own bar leaves out the sprint on screen.
   sprints: Sprint[];
   busy: boolean;
+  // denied is why this account cannot move cards between sprints, empty
+  // when it can.
+  denied?: string;
   // onFill takes the destination's sprint id, "" for the backlog, which is
   // the same shape JournalSprintMoves takes.
   onFill: (sprintId: string) => void;
@@ -33,7 +36,7 @@ interface Props {
 // It is the board's own selection bar, class for class, because it is the
 // same action: the two screens differ in what a selection can be made over,
 // not in what happens to it.
-export function SprintFillBar({ count, sprints, busy, onFill, onClear }: Props) {
+export function SprintFillBar({ count, sprints, busy, denied = "", onFill, onClear }: Props) {
   const [target, setTarget] = useState("");
   const chosen = sprints.find((s) => String(s.id) === target);
   // The backlog is always a destination, so the bar always has one to offer:
@@ -62,7 +65,8 @@ export function SprintFillBar({ count, sprints, busy, onFill, onClear }: Props) 
       <button
         type="button"
         className="btn btn-primary"
-        disabled={busy || !ready}
+        disabled={busy || !ready || !!denied}
+        title={denied || undefined}
         // This is not what stops a second press: a disabled button
         // dispatches no click at all, so the line never runs while a fill
         // is in flight. It guards the handler rather than the button, and

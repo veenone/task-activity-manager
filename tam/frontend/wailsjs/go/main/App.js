@@ -182,6 +182,10 @@ export function GetLinkTypes(arg1) {
   return window['go']['main']['App']['GetLinkTypes'](arg1);
 }
 
+export function GetPermissions(arg1) {
+  return window['go']['main']['App']['GetPermissions'](arg1);
+}
+
 export function GetProfileSetting(arg1, arg2) {
   return window['go']['main']['App']['GetProfileSetting'](arg1, arg2);
 }

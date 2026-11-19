@@ -39,6 +39,8 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     peopleKeys.projectTypes(profileId),
     [profileId, "sprintReport"] as const,
     keys.worklogWeeks(profileId),
+    // A sync is the only thing that rereads what the token may do.
+    keys.permissions(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }

@@ -34,6 +34,7 @@ interface Props {
   sprints: Sprint[];
   sprintId: string;
   committing: boolean;
+  denial?: (perm: string, issueKey?: string) => string;
   canSync: boolean;
   onSync: () => void;
   onSelect: (issue: Issue, e: MouseEvent<HTMLDivElement>) => void;
@@ -47,7 +48,7 @@ interface Props {
 // offers one.
 export function BoardBody({
   boards, view, filtered, unavailable, hasBoards, hasSprint, swimlane, selectedKey, checked, focusId, moves, flashKey,
-  sprints, sprintId, committing, canSync, onSync, onSelect, onFocusCard, onKeyDown,
+  sprints, sprintId, committing, denial, canSync, onSync, onSelect, onFocusCard, onKeyDown,
 }: Props) {
   if (boards.isError) {
     return (
@@ -135,6 +136,7 @@ export function BoardBody({
             sprints={sprints}
             sprintId={sprintId}
             committing={committing}
+            denial={denial}
             onSelect={onSelect}
             onFocusCard={onFocusCard}
             onKeyDown={onKeyDown}

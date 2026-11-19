@@ -4,6 +4,8 @@ import type { Attachment } from "../api";
 import { useAttachFiles, useAttachments, useSaveAttachment } from "../queries/attachments";
 import { useDiscardById } from "../queries/pending";
 import { day, fileSize } from "../lib/format";
+import { PERM_CREATE_ATTACHMENTS } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 interface Props {
   profileId: string;
@@ -22,6 +24,7 @@ export function AttachmentsSection({ profileId, issueKey, open }: Props) {
   const attach = useAttachFiles(profileId);
   const save = useSaveAttachment(profileId);
   const discard = useDiscardById(profileId);
+  const denied = useDenial(profileId)(PERM_CREATE_ATTACHMENTS, issueKey);
   const { notice } = useNotice();
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
@@ -105,8 +108,8 @@ export function AttachmentsSection({ profileId, issueKey, open }: Props) {
       {saved && <p className="muted small" role="status">{saved}</p>}
       {error && <p className="error-text small" role="alert">{error}</p>}
       <div className="edit-actions">
-        <button type="button" className="btn" disabled={attach.isPending} onClick={() => void onAttach()}>Attach files</button>
-        <span className="muted small">Journaled now, uploaded on Commit.</span>
+        <button type="button" className="btn" disabled={attach.isPending || !!denied} title={denied || undefined} onClick={() => void onAttach()}>Attach files</button>
+        <span className="muted small">{denied || "Journaled now, uploaded on Commit."}</span>
       </div>
     </>
   );

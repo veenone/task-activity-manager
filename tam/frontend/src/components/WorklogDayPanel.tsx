@@ -7,6 +7,8 @@ import { useDiscardById, useLogWork } from "../queries/pending";
 import { workDuration } from "../lib/format";
 import { dayLabel, dayState, entryDay, nextStart, seconds } from "../lib/worklogWeek";
 import type { WorklogCell } from "./WorklogGrid";
+import { PERM_WORK_ON_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 interface Props {
   profileId: string;
@@ -33,6 +35,7 @@ const PRESETS = ["30m", "1h", "2h", "4h"];
 // reaches Jira on Commit.
 export function WorklogDayPanel({ profileId, rows, cell, entries, target, today, nextGap, onSelect, onClose }: Props) {
   const logWork = useLogWork(profileId);
+  const denial = useDenial(profileId);
   const discard = useDiscardById(profileId);
   const { notice } = useNotice();
   const [timeSpent, setTimeSpent] = useState("");
@@ -50,6 +53,7 @@ export function WorklogDayPanel({ profileId, rows, cell, entries, target, today,
   const offer = nextStart(dayEntries, cell.day);
   const started = typedStart?.offer === offer ? typedStart.value : offer;
   const missing = target - logged;
+  const denied = denial(PERM_WORK_ON_ISSUES, row?.issue.key);
 
   async function check(): Promise<boolean> {
     try {
@@ -172,14 +176,14 @@ export function WorklogDayPanel({ profileId, rows, cell, entries, target, today,
             </label>
             {error && <p className="error-text small" role="alert">{error}</p>}
             <div className="edit-actions">
-              <button type="submit" className="btn btn-primary" disabled={!timeSpent.trim() || logWork.isPending}>Log work</button>
+              <button type="submit" className="btn btn-primary" disabled={!timeSpent.trim() || logWork.isPending || !!denied} title={denied || undefined}>Log work</button>
               {nextGap && (
-                <button type="button" className="btn" disabled={!timeSpent.trim() || logWork.isPending} onClick={() => void log(true)}>
+                <button type="button" className="btn" disabled={!timeSpent.trim() || logWork.isPending || !!denied} title={denied || undefined} onClick={() => void log(true)}>
                   Log and go to next gap
                 </button>
               )}
             </div>
-            <span className="muted small">Journaled now, pushed on Commit.</span>
+            <span className="muted small">{denied || "Journaled now, pushed on Commit."}</span>
           </form>
         )}
 

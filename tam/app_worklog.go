@@ -7,6 +7,7 @@ import (
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/permission"
 )
 
 // ListWorklogs is what the Work log section shows: the entries Jira holds for
@@ -52,6 +53,9 @@ func (a *App) ListWorklogs(profileID, key string) ([]backend.Worklog, error) {
 func (a *App) LogWork(profileID, key, timeSpent, comment, started string) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
+		return err
+	}
+	if err := a.allowOnIssue(p.ID, key, permission.WorkOnIssues); err != nil {
 		return err
 	}
 	at, err := backend.ParseWorkStarted(started, time.Now())
