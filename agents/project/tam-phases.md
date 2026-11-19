@@ -2558,10 +2558,9 @@ whose permission Jira denied are disabled. Call flow: `Engine.Sync` ->
   journals, add a row to the table test in `app_permissions_test.go`, and
   disable the control with `useDenial`. A new permission key goes in
   `permission.Names` and in `api/permissions.ts`.
-- `MANAGE_SPRINTS_PERMISSION` is the Manage Sprints key as Jira Software
-  names it in permission schemes. It has not been read back from a live
-  `mypermissions` answer here; a wrong key reads as unknown and gates
-  nothing.
+- `MANAGE_SPRINTS_PERMISSION` is the Manage Sprints key, confirmed against
+  a live `mypermissions` answer on 2026-11-19. A key Jira does not list
+  reads as unknown and gates nothing.
 - A draft sprint's edit and delete, and a dry-run import, are not gated:
   none of them reaches Jira.
 - Not gated: column limits and board creation. Board administration is not

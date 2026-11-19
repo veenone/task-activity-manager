@@ -57,7 +57,7 @@ Each sync reads what the token may do in the profile's project and stores the an
 
 `GET /rest/api/2/mypermissions?projectKey=KEY` answers every permission by key with `havePermission`. The `permissions` filter was ignored by the instance recorded in the domain playbook, so TAM reads the full list and keeps the nine keys it acts on.
 
-The key for Manage Sprints, `MANAGE_SPRINTS_PERMISSION`, has not been confirmed against a live instance. If an instance names it differently, the key is absent from the answer, which reads as unknown and leaves the sprint actions enabled.
+The key for Manage Sprints is `MANAGE_SPRINTS_PERMISSION`, confirmed against a live `mypermissions` answer on 2026-11-19. If an instance ever names it differently, the key is absent from the answer, which reads as unknown and leaves the sprint actions enabled.
 
 ### Backend
 
