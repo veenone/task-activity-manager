@@ -249,6 +249,14 @@ after whatever your project calls a subtask. An issue created here and not yet
 committed is marked **Draft**, and a field with an uncommitted edit carries a
 pending mark.
 
+The **Attachments** section lists the files Jira holds for the issue, with
+size, author and date, and **Save** downloads one. **Attach files** picks one
+file or several and queues each as a pending change; they are uploaded on
+commit. TAM keeps the path of a picked file and not a copy, so the file has to
+stay where it is until then. A file that has gone, or one Jira refuses, is
+named in the commit result and stays pending while the others upload. Removing
+an attachment already in Jira is done in Jira.
+
 ### Creating, importing, exporting
 
 **+ New** opens the create dialog. **Type** and **Summary** are required;

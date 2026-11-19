@@ -4,6 +4,7 @@ import type { PendingChange } from "../api";
 import type { PendingGroup } from "../queries/pending";
 import { moveWords } from "../lib/moveValue";
 import { worklogEntryLine } from "./WorkLogSection";
+import { attachmentLine } from "./AttachmentsSection";
 import { boardDraftLine, draftLine, sprintChangeLine, sprintChangeName, sprintChangeNote, sprintDraftLine } from "./pendingWords";
 
 interface Props {
@@ -128,6 +129,11 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
     ...g.worklogs.map(({ row, log }) => ({
       row, field: "Work log", before: "", after: worklogEntryLine(log),
       discardLabel: `Discard the ${log.timeSpent} entry on ${g.key}`,
+    })),
+    ...g.attachments.map(({ row, file }) => ({
+      row, field: "Attachment", before: "", after: attachmentLine(file.name, file.size),
+      notes: [note(`Uploaded from ${file.path} on Commit, so the file has to stay there until then.`)],
+      discardLabel: `Discard ${file.name} on ${g.key}`,
     })),
     ...g.moves.map((row) => {
       const { label, from, to } = moveWords(row.entityType, row.beforeVal, row.afterVal);

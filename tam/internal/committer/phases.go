@@ -47,6 +47,8 @@ type phase struct {
 //  7. worklogs, last because an entry names one issue and waits on nothing
 //     else, so it has no reason to run before a phase that other rows depend
 //     on and every reason to run after the creates that give it its key.
+//     Attachments run just before them for the same reason: a file names one
+//     issue and nothing waits on it.
 func phases() []phase {
 	return []phase{
 		{name: "boards", run: func(ctx context.Context, r *commitRun) { r.createBoards(ctx) }},
@@ -59,6 +61,7 @@ func phases() []phase {
 		{name: "edits", run: func(ctx context.Context, r *commitRun) { r.pushEdits(ctx) }},
 		{name: "board moves", run: func(ctx context.Context, r *commitRun) { r.e.commitBoardMoves(ctx, r.profileID, r.res, r.deps) }},
 		{name: "links", run: func(ctx context.Context, r *commitRun) { r.e.commitLinks(ctx, r.profileID, r.res, r.deps) }},
+		{name: "attachments", run: func(ctx context.Context, r *commitRun) { r.pushAttachments(ctx) }},
 		{name: "worklogs", run: func(ctx context.Context, r *commitRun) { r.pushWorklogs(ctx) }},
 	}
 }

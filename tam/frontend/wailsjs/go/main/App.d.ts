@@ -26,6 +26,8 @@ export function AddIssuesToBoard(arg1:string,arg2:Array<string>,arg3:number,arg4
 
 export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<void>;
 
+export function AttachFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
+
 export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
 
 export function BoardAllocation(arg1:string,arg2:number):Promise<Array<reports.Person>>;
@@ -130,6 +132,8 @@ export function LastRitualSync(arg1:string,arg2:number):Promise<string>;
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
 
+export function ListAttachments(arg1:string,arg2:string):Promise<Array<backend.Attachment>>;
+
 export function ListBoardSprintDetails(arg1:string,arg2:number):Promise<Array<boardrepo.SprintDetail>>;
 
 export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrepo.Sprint>>;
@@ -178,6 +182,8 @@ export function MoveIssueToSprint(arg1:string,arg2:string,arg3:string):Promise<v
 
 export function PendingInSprint(arg1:string,arg2:number):Promise<number>;
 
+export function PickAttachmentFiles():Promise<Array<string>>;
+
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
 
 export function PublishSprintReport(arg1:string,arg2:number,arg3:number,arg4:reportout.Document):Promise<reportout.Published>;
@@ -197,6 +203,8 @@ export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Pro
 export function ResolveRitualConflict(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<void>;
 
 export function RitualMacroIssues(arg1:string,arg2:string):Promise<main.RitualMacroPreview>;
+
+export function SaveAttachment(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function SaveImportTemplate(arg1:string):Promise<string>;
 

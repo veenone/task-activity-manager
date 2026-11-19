@@ -25,3 +25,4 @@ export * from "./api/importer";
 export * from "./api/rituals";
 export * from "./api/dashboards";
 export * from "./api/worklog";
+export * from "./api/attachments";

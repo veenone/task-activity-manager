@@ -13,6 +13,10 @@ export const keys = {
   // section is open.
   worklogs: (profileId: string, key: string) =>
     [profileId, "issue", key, "worklogs"] as const,
+  // One issue's attachments, Jira's files plus the pending ones. Under the
+  // issue's own key for the reason the worklog is.
+  attachments: (profileId: string, key: string) =>
+    [profileId, "issue", key, "attachments"] as const,
   // One issue's done agreement: the items it is held to and the ticks made
   // against it. The board is in the key because the agreement is a document
   // of the board's, and the sprint because a sprint's additions are part of

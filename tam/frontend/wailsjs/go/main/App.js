@@ -14,6 +14,10 @@ export function AddLink(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddLink'](arg1, arg2, arg3);
 }
 
+export function AttachFiles(arg1, arg2, arg3) {
+  return window['go']['main']['App']['AttachFiles'](arg1, arg2, arg3);
+}
+
 export function AutoMapImport(arg1) {
   return window['go']['main']['App']['AutoMapImport'](arg1);
 }
@@ -222,6 +226,10 @@ export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
 }
 
+export function ListAttachments(arg1, arg2) {
+  return window['go']['main']['App']['ListAttachments'](arg1, arg2);
+}
+
 export function ListBoardSprintDetails(arg1, arg2) {
   return window['go']['main']['App']['ListBoardSprintDetails'](arg1, arg2);
 }
@@ -318,6 +326,10 @@ export function PendingInSprint(arg1, arg2) {
   return window['go']['main']['App']['PendingInSprint'](arg1, arg2);
 }
 
+export function PickAttachmentFiles() {
+  return window['go']['main']['App']['PickAttachmentFiles']();
+}
+
 export function PreviewImport(arg1, arg2) {
   return window['go']['main']['App']['PreviewImport'](arg1, arg2);
 }
@@ -356,6 +368,10 @@ export function ResolveRitualConflict(arg1, arg2, arg3, arg4, arg5) {
 
 export function RitualMacroIssues(arg1, arg2) {
   return window['go']['main']['App']['RitualMacroIssues'](arg1, arg2);
+}
+
+export function SaveAttachment(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SaveAttachment'](arg1, arg2, arg3, arg4);
 }
 
 export function SaveImportTemplate(arg1) {

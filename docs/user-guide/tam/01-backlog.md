@@ -52,6 +52,18 @@ An issue that can hold subtasks has a button under its fields to draft one benea
 
 An issue created here and not yet committed is marked **Draft**, and a field with an uncommitted edit carries a pending mark.
 
+### Attachments
+
+The **Attachments** section, above Work log, lists the files Jira holds for the issue with each one's size, who attached it and when. **Save** downloads a file to a place you choose.
+
+**Attach files** opens the file picker; pick one file or several. Each is queued as a pending change and shown as pending in the list, where it can be discarded. The files are uploaded when you commit.
+
+TAM remembers where a picked file is and does not copy it, so the file has to stay at that path until the commit. If it has been moved or deleted by then, the commit says so for that file and uploads the rest; put the file back and commit again, or discard the change.
+
+Jira decides what it accepts. A file over the instance's size limit, or an upload to an issue you may not attach to, comes back from the commit with Jira's own reason and stays pending.
+
+Removing an attachment that is already in Jira is done in Jira.
+
 ## Create an issue
 
 **+ New** opens the dialog. **Type** and **Summary** are required; **Description**, **Priority**, **Labels** (a comma list), **Story points**, **Assignee**, **Epic**, **Parent** and **Sprint** are optional. TAM checks which fields your Jira project requires and says so while the dialog is open.

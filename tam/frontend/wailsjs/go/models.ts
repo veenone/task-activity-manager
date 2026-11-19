@@ -1,5 +1,35 @@
 export namespace backend {
 	
+	export class Attachment {
+	    id: string;
+	    name: string;
+	    author: string;
+	    authorName: string;
+	    created: string;
+	    size: number;
+	    mimeType: string;
+	    path: string;
+	    pending: boolean;
+	    pendingId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Attachment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.author = source["author"];
+	        this.authorName = source["authorName"];
+	        this.created = source["created"];
+	        this.size = source["size"];
+	        this.mimeType = source["mimeType"];
+	        this.path = source["path"];
+	        this.pending = source["pending"];
+	        this.pendingId = source["pendingId"];
+	    }
+	}
 	export class Comment {
 	    id: string;
 	    author: string;
@@ -749,6 +779,20 @@ export namespace boardrepo {
 
 export namespace committer {
 	
+	export class Attached {
+	    key: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Attached(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.name = source["name"];
+	    }
+	}
 	export class FieldConflict {
 	    field: string;
 	    base: string;
@@ -935,6 +979,7 @@ export namespace committer {
 	    sprintsChanged: string[];
 	    linked: Linked[];
 	    logged: Logged[];
+	    attached: Attached[];
 	    moved: Moved[];
 	    conflicts: Conflict[];
 	    failures: Failure[];
@@ -953,6 +998,7 @@ export namespace committer {
 	        this.sprintsChanged = source["sprintsChanged"];
 	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.logged = this.convertValues(source["logged"], Logged);
+	        this.attached = this.convertValues(source["attached"], Attached);
 	        this.moved = this.convertValues(source["moved"], Moved);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
 	        this.failures = this.convertValues(source["failures"], Failure);
