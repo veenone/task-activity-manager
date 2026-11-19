@@ -110,6 +110,8 @@ export function GetIssueDetail(arg1:string,arg2:string):Promise<backend.IssueDet
 
 export function GetLinkTypes(arg1:string):Promise<Array<backend.LinkType>>;
 
+export function GetPermissions(arg1:string):Promise<main.PermissionView>;
+
 export function GetProfileSetting(arg1:string,arg2:string):Promise<string>;
 
 export function GetSettings():Promise<settings.Settings>;

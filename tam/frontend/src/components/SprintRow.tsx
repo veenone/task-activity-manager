@@ -35,6 +35,8 @@ interface Props {
   // waiting names what Commit will do to this sprint, "Deleting on Commit",
   // or is empty when nothing waits.
   waiting?: string;
+  // denied is why this account cannot manage sprints, empty when it can.
+  denied?: string;
   onToggle: () => void;
   onKeyDown: (e: KeyboardEvent) => void;
   actions: SprintActions;
@@ -81,7 +83,7 @@ function badgeTone(state: string): BadgeTone {
 // and the copy for a sprint with no goal at all still belongs under the
 // expanded sprint, where a sentence has a line to itself.
 export function SprintRow({
-  detail, rowId, index, open, focused, flashed, busy, waiting, onToggle, onKeyDown, actions,
+  detail, rowId, index, open, focused, flashed, busy, waiting, denied = "", onToggle, onKeyDown, actions,
 }: Props) {
   // The board's own unassigned work arrives in the same list and under the
   // same shape, and is not a sprint: it has no state to badge, no dates to
@@ -89,21 +91,24 @@ export function SprintRow({
   const isSprint = detail.state !== UNASSIGNED_SPRINT_STATE;
   const dates = isSprint ? sprintDates(detail) || "no dates" : "no dates";
 
+  // A draft is local until Commit, so it can still be rewritten or thrown
+  // away by an account Jira would not let manage sprints.
+  const held = detail.draft ? "" : denied;
   const items: MenuItem[] = [];
   // A draft can be started, since Commit creates it before it starts it,
   // but a sprint that is not in Jira cannot have run, so Complete is shown
   // and held back to say what Commit unlocks.
   if (detail.draft || detail.state === "future") {
-    items.push({ key: "start", label: "Start sprint…", disabled: busy, onClick: actions.onStart });
+    items.push({ key: "start", label: "Start sprint…", disabled: busy || !!denied, title: denied || undefined, onClick: actions.onStart });
   }
   if (detail.draft) {
     items.push({ key: "complete", label: "Complete sprint…", disabled: true, title: DRAFT_SPRINT_HINT });
   } else if (detail.state === "active") {
-    items.push({ key: "complete", label: "Complete sprint…", disabled: busy, onClick: actions.onComplete });
+    items.push({ key: "complete", label: "Complete sprint…", disabled: busy || !!denied, title: denied || undefined, onClick: actions.onComplete });
   }
   if (items.length > 0) items.push({ key: "manage", divider: true });
-  items.push({ key: "edit", label: "Edit sprint…", disabled: busy, onClick: actions.onEdit });
-  items.push({ key: "delete", label: "Delete sprint…", danger: true, disabled: busy, onClick: actions.onDelete });
+  items.push({ key: "edit", label: "Edit sprint…", disabled: busy || !!held, title: held || undefined, onClick: actions.onEdit });
+  items.push({ key: "delete", label: "Delete sprint…", danger: true, disabled: busy || !!held, title: held || undefined, onClick: actions.onDelete });
   // A draft reads "Draft" in the badge and the tree's own label, in the
   // amber every other thing waiting for Commit wears.
   const label = detail.draft ? "Draft" : stateLabel(detail.state);

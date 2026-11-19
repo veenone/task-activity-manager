@@ -10,6 +10,7 @@ import (
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/permission"
 )
 
 // ListAttachments is what the Attachments section shows: the files Jira
@@ -67,6 +68,9 @@ func (a *App) PickAttachmentFiles() ([]string, error) {
 func (a *App) AttachFiles(profileID, key string, paths []string) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
+		return err
+	}
+	if err := a.allowOnIssue(p.ID, key, permission.CreateAttachments); err != nil {
 		return err
 	}
 	drafts := make([]backend.AttachmentDraft, 0, len(paths))

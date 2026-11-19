@@ -8,6 +8,8 @@ import { useEditIssue, useEditableFields } from "../queries/pending";
 import { useEpics } from "../queries/tree";
 import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
+import { PERM_ASSIGN_ISSUES, PERM_EDIT_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 // The syntax the user picked for one issue's description, keyed by profile,
 // key and field so two issues never share a choice. It is module level and
@@ -95,6 +97,11 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
   // a pick into a re-render.
   const [, bumpFormat] = useState(0);
   const edit = useEditIssue(profileId);
+  // Assigning is its own permission in Jira, so the two are read apart: an
+  // account that may edit but not assign keeps every field but that one.
+  const denial = useDenial(profileId);
+  const editDenied = denial(PERM_EDIT_ISSUES, issue.key);
+  const assignDenied = denial(PERM_ASSIGN_ISSUES, issue.key);
   const epics = useEpics(profileId);
   const screen = useEditableFields(profileId, issue.type, issue.key);
 
@@ -280,7 +287,7 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
               fallbackLabel={issue.assignee}
               onChange={(v) => set("assignee", v)}
               describedBy={describedBy}
-              disabled={busy || shut}
+              disabled={busy || shut || !!assignDenied}
             />
           ) : f.id === "priority" ? (
             <PriorityPicker
@@ -341,11 +348,13 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
         </p>
       )}
       <div className="edit-actions">
-        <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending || busy}>
+        <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending || busy || !!editDenied} title={editDenied || undefined}>
           {edit.isPending ? "Saving" : "Save edit"}
         </button>
         {error ? (
           <span className="error-text small" role="alert">{error}</span>
+        ) : editDenied || assignDenied ? (
+          <span className="muted small">{editDenied || assignDenied}</span>
         ) : saved ? (
           <span className="muted small" role="status">Saved. Commit pushes it to Jira.</span>
         ) : (

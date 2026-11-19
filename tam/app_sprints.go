@@ -11,6 +11,7 @@ import (
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/permission"
 	"agile-suite/tam/internal/sprints"
 )
 
@@ -52,6 +53,9 @@ func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, s
 	}
 	defer a.release(p.ID)
 
+	if err := a.allow(p.ID, p.ProjectKey, permission.ManageSprints); err != nil {
+		return err
+	}
 	d, err := sprints.DraftSprint(backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end})
 	if err != nil {
 		return err
@@ -82,6 +86,9 @@ func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo str
 	}
 	defer a.release(p.ID)
 
+	if err := a.allow(p.ID, p.ProjectKey, permission.ManageSprints); err != nil {
+		return err
+	}
 	if moveTo, err = a.sprintService(p, nil).CheckComplete(a.ctx, p.ID, boardID, sprintID, moveTo); err != nil {
 		return err
 	}

@@ -21,6 +21,8 @@ import { WorkLogSection } from "./WorkLogSection";
 import { AttachmentsSection } from "./AttachmentsSection";
 import { DoneAgreementSection, agreementProgressLine } from "./DoneAgreementSection";
 import { useDoneAgreement } from "../queries/doneAgreement";
+import { PERM_CREATE_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 // Section is one collapsible block of the panel. XTM's detail sidebar stacks
 // its sections under uppercase headings rather than hiding them behind tabs,
@@ -137,6 +139,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const { status } = useSync();
   const busy = status !== "idle";
   const subtaskType = useSubtaskType(profileId);
+  const createDenied = useDenial(profileId)(PERM_CREATE_ISSUES, issue.key);
   // The sprint whose additions this issue is held to. A card on a kanban
   // board, or one in the sprint's backlog, is in none and sees the board's
   // items alone. The query behind it reads nothing unless there is a board.
@@ -301,7 +304,8 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
             type="button"
             className="btn"
             onClick={() => setDrafting(true)}
-            title={`Draft a ${subtaskType.data} under ${issue.key}`}
+            disabled={!!createDenied}
+            title={createDenied || `Draft a ${subtaskType.data} under ${issue.key}`}
           >
             + {subtaskType.data}
           </button>

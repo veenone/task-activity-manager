@@ -17,6 +17,8 @@ import { EpicsTabs, epicsPanelId, epicsTabId } from "./EpicsTabs";
 import type { EpicsTab } from "./EpicsTabs";
 import { NO_FILTER, isFiltered, queryFields } from "../lib/issueFilter";
 import type { IssueFilter } from "../lib/issueFilter";
+import { PERM_CREATE_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 const SEARCH_DELAY_MS = 250;
 
@@ -42,6 +44,7 @@ function findIssue(tree: EpicTreeData, key: string): Issue | undefined {
 // the same detail panel the Backlog uses for whichever issue is selected.
 export function EpicsView() {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
+  const createDenied = useDenial(activeId)(PERM_CREATE_ISSUES);
   const [text, setText] = useState("");
   const [sprintId, setSprintId] = useState("");
   const [filter, setFilter] = useState<IssueFilter>(NO_FILTER);
@@ -168,7 +171,7 @@ export function EpicsView() {
         <button type="button" className="btn" onClick={() => setExpanded(new Set())}>
           Collapse all
         </button>
-        <button type="button" className="btn btn-primary filter-new" disabled={!activeId} onClick={() => openModal("newIssue")}>
+        <button type="button" className="btn btn-primary filter-new" disabled={!activeId || !!createDenied} title={createDenied || undefined} onClick={() => openModal("newIssue")}>
           + New epic
         </button>
       </div>

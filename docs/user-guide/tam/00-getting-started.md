@@ -49,6 +49,26 @@ When a sync fails, the whole bar turns into a red ribbon saying what Jira answer
 
 **Refresh**, next to Sync, is narrower: it re-reads the view you are on and fetches issue details again. It takes the same lock a sync does, so the two cannot run at once.
 
+### What your account may do
+
+A sync also asks Jira what your token is allowed to do in the project. An action you do not have the Jira permission for is disabled, and hovering it names the permission to ask a Jira administrator for:
+
+| Jira permission | What it controls in TAM |
+|---|---|
+| Manage Sprints | Creating, editing, starting, completing and deleting a sprint |
+| Schedule Issues | Ranking a card and moving it to a sprint |
+| Create Issues | New issue, new subtask and import |
+| Edit Issues | Saving field edits in the detail panel |
+| Transition Issues | Moving a card to another board column |
+| Assign Issues | Changing the assignee |
+| Link Issues | Adding a link |
+| Work On Issues | Logging work |
+| Create Attachments | Attaching files |
+
+TAM only disables what Jira said no to. Before the first sync, in demo mode, and for a card that belongs to another project, everything stays enabled and Jira decides at commit. If an administrator changes your permissions, sync again to pick the change up.
+
+Column limits and creating a board are not covered: Jira does not report board administration through this check.
+
 ## The loop: edit, review, commit
 
 When you have uncommitted work, a **N pending** button appears in the top bar.

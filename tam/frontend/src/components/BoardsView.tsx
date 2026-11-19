@@ -24,6 +24,7 @@ import { BoardSummaryLine } from "./BoardNotes";
 import { BoardsToolbar } from "./BoardsToolbar";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useBoardMoves } from "./useBoardMoves";
+import { useDenial } from "../queries/permissions";
 
 // BoardsView is the board: XTM's board head over the board's own columns,
 // the cards in them, and the lines that say what the board is not showing.
@@ -34,6 +35,7 @@ import { useBoardMoves } from "./useBoardMoves";
 // which are the only writes here that do not wait for Commit.
 export function BoardsView() {
   const { activeId } = useProfile<Profile, Settings>();
+  const denial = useDenial(activeId);
   const { canSync, lastBoards, lastCommit, runBoardsRefresh, status } = useSync();
   // A commit in flight is the one thing that holds a move back, and it
   // holds all three of them back: the drag, the menu, and the keys.
@@ -318,6 +320,7 @@ export function BoardsView() {
             sprints={openSprints}
             sprintId={effectiveSprintId}
             committing={committing}
+            denial={denial}
             canSync={canSync && !sync.isPending}
             onSync={() => sync.mutate()}
             onSelect={clickCard}

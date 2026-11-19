@@ -4,6 +4,8 @@ import { call, errMsg, toPlainText } from "@agile-suite/core";
 import { LookupIssue } from "../api";
 import type { Issue, LinkDraft } from "../api";
 import { useAddLink, useLinkTypes } from "../queries/pending";
+import { PERM_LINK_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 interface Props {
   profileId: string;
@@ -18,6 +20,7 @@ interface Props {
 export function AddLinkForm({ profileId, issueKey, onAdded }: Props) {
   const types = useLinkTypes(profileId);
   const add = useAddLink(profileId);
+  const denied = useDenial(profileId)(PERM_LINK_ISSUES, issueKey);
   const [choice, setChoice] = useState("");
   const [key, setKey] = useState("");
   const [target, setTarget] = useState<Issue | null>(null);
@@ -93,8 +96,8 @@ export function AddLinkForm({ profileId, issueKey, onAdded }: Props) {
       {types.isError && <p className="error-text small">Link types could not be read: {types.error.message}</p>}
       {error && <p className="error-text small" role="alert">{error}</p>}
       <div className="edit-actions">
-        <button type="submit" className="btn btn-primary" disabled={!target || !selected || add.isPending}>Add</button>
-        <span className="muted small">Journaled now, pushed on Commit.</span>
+        <button type="submit" className="btn btn-primary" disabled={!target || !selected || add.isPending || !!denied} title={denied || undefined}>Add</button>
+        <span className="muted small">{denied || "Journaled now, pushed on Commit."}</span>
       </div>
     </form>
   );

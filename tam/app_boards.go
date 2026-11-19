@@ -10,6 +10,7 @@ import (
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/permission"
 	"agile-suite/tam/internal/syncer"
 )
 
@@ -111,6 +112,9 @@ func (a *App) MoveIssueToColumn(profileID, key, statusID string) error {
 	if err := requireMove(profileID, key); err != nil {
 		return err
 	}
+	if err := a.allowOnIssue(profileID, key, permission.TransitionIssues); err != nil {
+		return err
+	}
 	return a.repo.MoveToColumn(a.ctx, profileID, key, statusID)
 }
 
@@ -140,6 +144,9 @@ func (a *App) RankIssue(profileID, key, neighbourKey string, before bool, boardI
 	if err := requireMove(profileID, key); err != nil {
 		return err
 	}
+	if err := a.allowOnIssue(profileID, key, permission.ScheduleIssues); err != nil {
+		return err
+	}
 	return a.repo.RankIssue(a.ctx, profileID, key, strings.TrimSpace(neighbourKey), before, boardID)
 }
 
@@ -158,6 +165,9 @@ func (a *App) MoveIssueToSprint(profileID, key, sprintID string) error {
 		return err
 	}
 	if err := requireMove(profileID, key); err != nil {
+		return err
+	}
+	if err := a.allowOnIssue(profileID, key, permission.ScheduleIssues); err != nil {
 		return err
 	}
 	sprintID = strings.TrimSpace(sprintID)
@@ -199,6 +209,9 @@ func (a *App) JournalSprintMoves(profileID string, keys []string, sprintID strin
 	}
 	if len(keys) == 0 {
 		return 0, errors.New("no cards are selected")
+	}
+	if err := a.allowOnIssues(profileID, keys, permission.ScheduleIssues); err != nil {
+		return 0, err
 	}
 	sprintID = strings.TrimSpace(sprintID)
 	if sprintID != "" {

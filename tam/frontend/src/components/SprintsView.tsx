@@ -23,6 +23,8 @@ import { NO_FILTER, filterIssues } from "../lib/issueFilter";
 import type { IssueFilter } from "../lib/issueFilter";
 import { StartSprintModal } from "./StartSprintModal";
 import { useSprintSelection } from "./useSprintSelection";
+import { PERM_MANAGE_SPRINTS, PERM_SCHEDULE_ISSUES } from "../api/permissions";
+import { useDenial } from "../queries/permissions";
 
 // SprintsView is the board's sprints as a list rather than as a picker: every
 // sprint the board has, the work in each one, and every action a sprint has,
@@ -33,6 +35,8 @@ export function SprintsView() {
   const { runQuietLock } = useSync();
   const { confirm } = useConfirm();
   const { notice } = useNotice();
+  const denial = useDenial(activeId);
+  const sprintsDenied = denial(PERM_MANAGE_SPRINTS);
   const [boardId, setBoardId] = useState(0);
   const [showClosed, setShowClosed] = useState(false);
   const [issueFilter, setIssueFilter] = useState<IssueFilter>(NO_FILTER);
@@ -342,6 +346,7 @@ export function SprintsView() {
         movedRowId={movedRowId}
         busyRowId={busyRowId}
         waiting={waiting}
+        denied={sprintsDenied}
         onStart={setStarting}
         onComplete={(d) => void askComplete(d)}
         onEdit={setEditing}
@@ -387,7 +392,7 @@ export function SprintsView() {
 
         <div className="board-head-actions">
           {details.isFetching && !details.isLoading && <span className="muted small">Refreshing</span>}
-          <button type="button" className="btn" disabled={!board} onClick={() => setCreating(true)}>New sprint</button>
+          <button type="button" className="btn" disabled={!board || !!sprintsDenied} title={sprintsDenied || undefined} onClick={() => setCreating(true)}>New sprint</button>
         </div>
       </div>
 
@@ -411,6 +416,7 @@ export function SprintsView() {
           count={selection.count}
           sprints={openSprints}
           busy={fill.isPending}
+          denied={denial(PERM_SCHEDULE_ISSUES)}
           onFill={onFill}
           onClear={selection.reset}
         />

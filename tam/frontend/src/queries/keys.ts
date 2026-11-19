@@ -83,6 +83,8 @@ export const keys = {
   // range sits under one prefix, so a local write refreshes the week on
   // screen and the fortnight behind it together.
   worklogWeeks: (profileId: string) => [profileId, "worklogWeek"] as const,
+  // What the last sync learned the token may do, per project.
+  permissions: (profileId: string) => [profileId, "permissions"] as const,
   worklogWeek: (profileId: string, fromDay: string, toDay: string) =>
     [profileId, "worklogWeek", fromDay, toDay] as const,
   worklogDayHours: (profileId: string) => [profileId, "worklogDayHours"] as const,

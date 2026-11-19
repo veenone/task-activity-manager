@@ -7,6 +7,7 @@ import (
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/permission"
 	"agile-suite/tam/internal/sprints"
 )
 
@@ -51,6 +52,9 @@ func (a *App) CreateSprint(profileID string, boardID int, name, goal, start, end
 	}
 	defer a.release(p.ID)
 
+	if err := a.allow(p.ID, p.ProjectKey, permission.ManageSprints); err != nil {
+		return SprintCreated{}, err
+	}
 	d, err := sprints.DraftSprint(backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end})
 	if err != nil {
 		return SprintCreated{}, err
@@ -97,6 +101,13 @@ func (a *App) EditSprint(profileID string, boardID, sprintID int, name, goal, st
 	}
 	defer a.release(p.ID)
 
+	// A draft is local until Commit, so rewriting one is not gated: whoever
+	// holds a draft was allowed to make it.
+	if sprintID >= 0 {
+		if err := a.allow(p.ID, p.ProjectKey, permission.ManageSprints); err != nil {
+			return err
+		}
+	}
 	d, err := sprints.DraftSprint(backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end})
 	if err != nil {
 		return err
@@ -128,6 +139,9 @@ func (a *App) DeleteSprint(profileID string, boardID, sprintID int) error {
 
 	if sprintID < 0 {
 		return a.repo.DiscardDraftSprint(a.ctx, p.ID, sprintID)
+	}
+	if err := a.allow(p.ID, p.ProjectKey, permission.ManageSprints); err != nil {
+		return err
 	}
 	if err := a.sprintService(p, nil).CheckDelete(a.ctx, p.ID, sprintID); err != nil {
 		return err

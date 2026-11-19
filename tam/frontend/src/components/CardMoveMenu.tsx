@@ -18,6 +18,10 @@ interface Props {
   sprints: Sprint[];
   sprintId: string;
   disabled: boolean;
+  // columnDenied and sprintDenied are why this account cannot make that
+  // kind of move on this card, empty when it can.
+  columnDenied?: string;
+  sprintDenied?: string;
   onColumn: (col: number) => void;
   onSprint: (sprint: Sprint | null) => void;
 }
@@ -32,11 +36,11 @@ interface Props {
 // "Actions" on a plain button, rather than as a menu of its own kind: the
 // items say what they do, and a card is not the place to teach a second
 // vocabulary for the same control.
-export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabled, onColumn, onSprint }: Props) {
+export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabled, columnDenied = "", sprintDenied = "", onColumn, onSprint }: Props) {
   const items: MenuItem[] = [];
   columns.forEach((column, i) => {
     if (i === col || (column.statusIds ?? []).length === 0) return;
-    items.push({ key: `col-${i}`, label: `Move to ${column.name}`, disabled, onClick: () => onColumn(i) });
+    items.push({ key: `col-${i}`, label: `Move to ${column.name}`, disabled: disabled || !!columnDenied, title: columnDenied || undefined, onClick: () => onColumn(i) });
   });
   const others = sprints.filter((s) => String(s.id) !== sprintId);
   if (others.length > 0 || sprintId) {
@@ -45,12 +49,13 @@ export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabl
       items.push({
         key: `sprint-${sprint.id}`,
         label: `Move to ${sprintOptionLabel(sprint, new Set())}`,
-        disabled,
+        disabled: disabled || !!sprintDenied,
+        title: sprintDenied || undefined,
         onClick: () => onSprint(sprint),
       });
     }
     if (sprintId) {
-      items.push({ key: "backlog", label: "Move to the backlog", disabled, onClick: () => onSprint(null) });
+      items.push({ key: "backlog", label: "Move to the backlog", disabled: disabled || !!sprintDenied, title: sprintDenied || undefined, onClick: () => onSprint(null) });
     }
   }
   if (items.length === 0) return null;

@@ -16,6 +16,7 @@ import (
 	jirabackend "agile-suite/tam/internal/backend/jira"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/importer"
+	"agile-suite/tam/internal/permission"
 )
 
 // maxImportBytes is the largest decoded upload ImportIssues and PreviewImport
@@ -76,6 +77,13 @@ func (a *App) ImportIssues(profileID, contentB64 string, isXlsx bool, fileName s
 		return importer.Result{}, err
 	}
 	defer a.release(p.ID)
+	// A dry run writes nothing, so it stays open to an account that cannot
+	// create: it is how that account learns what the file would have made.
+	if !dryRun {
+		if err := a.allow(p.ID, p.ProjectKey, permission.CreateIssues); err != nil {
+			return importer.Result{}, err
+		}
+	}
 	records, err := decodeImport(contentB64, isXlsx)
 	if err != nil {
 		return importer.Result{}, err
