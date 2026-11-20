@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 
 import { afterEach } from "vitest";
 import { cleanup, configure } from "@testing-library/react";
+import { clearAllViewState } from "@agile-suite/core";
 
 // findBy* waits 1000ms by default, which is generous on an idle machine and
 // not always enough when fourteen test files run in parallel: a query that
@@ -17,6 +18,11 @@ configure({ asyncUtilTimeout: 5000 });
 // file, so a second test rendering the same component sees two of everything.
 // Registered here rather than per file so component tests get it for free.
 afterEach(cleanup);
+
+// Views keep their filters and selection in a module-level store that
+// outlives an unmount (#524), so it is emptied between tests too, or one
+// test's picked board or search would open the next test's view.
+afterEach(clearAllViewState);
 
 // jsdom implements no layout, so Element.scrollIntoView is undefined and any
 // component that scrolls a row into view throws under test. A no-op keeps the

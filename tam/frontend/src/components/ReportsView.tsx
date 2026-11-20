@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { call, errMsg, useProfile } from "@agile-suite/core";
+import { call, errMsg, useProfile, useViewState } from "@agile-suite/core";
+import { useBoardChoice } from "../lib/boardChoice";
 import { CancelSprintReport } from "../api";
 import type { Profile, Settings, SprintReport } from "../api";
 import { useBoardAllocation, useBoards, useBoardSprints } from "../queries/boards";
@@ -45,13 +46,13 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   // never end up in a report.
   const reportFrame = useRef<HTMLDivElement>(null);
   const { runReport, progress, running } = useSync();
-  const [boardId, setBoardId] = useState(0);
+  const [boardId, setBoardId] = useBoardChoice(activeId);
   // A sprint id of 0 asks the backend for the board's most recent closed
   // sprint, which is the report the morning after a sprint closes starts
   // from. When none has closed yet, the first active sprint is the default.
-  const [sprintId, setSprintId] = useState(0);
+  const [sprintId, setSprintId] = useViewState(activeId, "reports", "sprintId", 0);
   const [canceling, setCanceling] = useState(false);
-  const [tab, setTab] = useState<ReportTab>("sprint");
+  const [tab, setTab] = useViewState<ReportTab>(activeId, "reports", "tab", "sprint");
 
   // Both belong to the profile they were chosen for, so a switch clears
   // them in the render that first sees the new id, the way SprintsView

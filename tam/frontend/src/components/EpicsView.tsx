@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useProfile } from "@agile-suite/core";
+import { useProfile, useViewState } from "@agile-suite/core";
 import type { EpicTreeData, Issue, Profile, Settings, TreeQuery } from "../api";
 import { useEpicTree } from "../queries/tree";
 import { useSprints } from "../queries/issues";
@@ -45,14 +45,14 @@ function findIssue(tree: EpicTreeData, key: string): Issue | undefined {
 export function EpicsView() {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const createDenied = useDenial(activeId)(PERM_CREATE_ISSUES);
-  const [text, setText] = useState("");
-  const [sprintId, setSprintId] = useState("");
-  const [filter, setFilter] = useState<IssueFilter>(NO_FILTER);
-  const [showDone, setShowDone] = useState(false);
-  const [selectedKey, setSelectedKey] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [text, setText] = useViewState(activeId, "epics", "text", "");
+  const [sprintId, setSprintId] = useViewState(activeId, "epics", "sprintId", "");
+  const [filter, setFilter] = useViewState<IssueFilter>(activeId, "epics", "filter", NO_FILTER);
+  const [showDone, setShowDone] = useViewState(activeId, "epics", "showDone", false);
+  const [selectedKey, setSelectedKey] = useViewState(activeId, "epics", "selectedKey", "");
+  const [expanded, setExpanded] = useViewState<Set<string>>(activeId, "epics", "expanded", new Set());
   const [movedKey, setMovedKey] = useState("");
-  const [tab, setTab] = useState<EpicsTab>("epics");
+  const [tab, setTab] = useViewState<EpicsTab>(activeId, "epics", "tab", "epics");
 
   // A parentKey edit made in the detail panel journals the change and the
   // tree query is invalidated with it, so the freshly loaded tree carries

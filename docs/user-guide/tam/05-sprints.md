@@ -6,7 +6,7 @@ The Boards view answers where a card is. This one answers what is in a sprint an
 
 ## The list
 
-Pick a **Board** and the sprints appear as a tree: a sprint, and the issues in it beneath. The board's unassigned work is folded in as a row of its own, so nothing on the board is missing from this page.
+Pick a **Board** and the sprints appear as a tree: a sprint, and the issues in it beneath. The board's unassigned work is folded in as a row of its own, so nothing on the board is missing from this page. Boards, Sprints and Reports share one board choice, so the board picked in one is the board the others open on.
 
 Each sprint row carries its name, its state, its dates and a line saying what it holds: how many of its issues are done, and how many points have landed. A closed sprint whose figures have not been rebuilt yet says so rather than drawing a bar at zero, which would claim the sprint held nothing.
 

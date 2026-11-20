@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { MouseEvent } from "react";
-import { errMsg, useProfile } from "@agile-suite/core";
+import { errMsg, useProfile, useViewState } from "@agile-suite/core";
+import { useBoardChoice } from "../lib/boardChoice";
 import type { Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
 import { useSyncState } from "../queries/issues";
@@ -40,10 +41,10 @@ export function BoardsView() {
   // A commit in flight is the one thing that holds a move back, and it
   // holds all three of them back: the drag, the menu, and the keys.
   const committing = status === "committing";
-  const [boardId, setBoardId] = useState(0);
-  const [sprintId, setSprintId] = useState("");
-  const [swimlane, setSwimlane] = useState<Swimlane>("none");
-  const [selectedKey, setSelectedKey] = useState("");
+  const [boardId, setBoardId] = useBoardChoice(activeId);
+  const [sprintId, setSprintId] = useViewState(activeId, "boards", "sprintId", "");
+  const [swimlane, setSwimlane] = useViewState<Swimlane>(activeId, "boards", "swimlane", "none");
+  const [selectedKey, setSelectedKey] = useViewState(activeId, "boards", "selectedKey", "");
   const [focusId, setFocusId] = useState("");
   // Which ceremony dialog is open, and the sentence the last one to finish
   // left behind. A completion is irreversible and its result is the one
@@ -64,7 +65,7 @@ export function BoardsView() {
   // the query, so it costs no refetch, but it is declared up here with the
   // rest of the view state because unlike the free-text box below it holds
   // the project's own status and people and has to be cleared on a switch.
-  const [issueFilter, setIssueFilter] = useState<IssueFilter>(NO_FILTER);
+  const [issueFilter, setIssueFilter] = useViewState<IssueFilter>(activeId, "boards", "issueFilter", NO_FILTER);
 
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
@@ -113,7 +114,7 @@ export function BoardsView() {
   // The filter is a reading aid over the drawn board, not a query: it never
   // refetches, so clearing it costs nothing and a filtered board still holds
   // every card the sync pulled.
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useViewState(activeId, "boards", "filter", "");
 
   // Filtered before anything reads it, so the cells, the counts, the
   // keyboard walk, and the drop targets all agree about which cards exist.
