@@ -31,10 +31,16 @@ export function AssignedToMeView() {
   // than nothing, so the grid stays unmounted until both are known.
   //
   // With no active profile there is nothing to wait for: both queries are
-  // disabled, and a disabled query stays pending forever, so returning null
-  // on it would leave the whole pane blank with nothing to explain it. Fall
-  // through to the empty state, which already says what to do next.
-  if (loading || (activeId && (username.isPending || displayName.isPending))) return null;
+  // disabled, and a disabled query stays pending forever, so waiting on it
+  // would leave the loading line up for good. Fall through to the empty
+  // state, which already says what to do next.
+  if (loading || (activeId && (username.isPending || displayName.isPending))) {
+    return (
+      <section className="backlog" aria-label="Assigned to me">
+        <p className="muted backlog-empty">Reading the issues</p>
+      </section>
+    );
+  }
 
   const me = username.data ?? "";
   const myDisplayName = displayName.data ?? "";

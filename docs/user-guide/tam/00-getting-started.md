@@ -14,7 +14,7 @@ A sync goes the other way, pulling what changed in Jira into the cache. Run one 
 
 A profile is one connection to one Jira project, and it is shared with Xray Test Manager: a project set up in either app is already set up in the other.
 
-Open **File → Profiles…**, or press **Manage** next to the profile picker, then fill in the form:
+Until there is a profile, TAM shows a first-run screen in place of the views. Press **Create a profile** there, open **File → Profiles…**, or press **Manage** next to the profile picker, then fill in the form:
 
 - **Profile name**: any name you will recognise, for example `Platform team`.
 - **Jira base URL**: the address of your Jira server, for example `https://jira.example.com`. Type `demo` here for a profile that runs on sample data.

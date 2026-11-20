@@ -15,6 +15,7 @@ import { SprintsView } from "./components/SprintsView";
 import { ReportsView } from "./components/ReportsView";
 import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
+import { FirstRun } from "./components/FirstRun";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
@@ -94,6 +95,9 @@ export default function App() {
   // lives in the shared settings so the menu's tick and the rail agree
   // across restarts; the menu owns the toggle and tells us through an event.
   const [navRail, setNavRail] = useState(false);
+  // Whether the first profile read has answered. Until it has, an empty
+  // list is not yet a new install.
+  const [profilesRead, setProfilesRead] = useState(false);
   // Which version of the onboarding tour this user has already been
   // through. It starts at the current one so a slow settings read cannot
   // flash the tour at somebody who has seen it; the read below lowers it
@@ -112,6 +116,7 @@ export default function App() {
         setHealth(h);
         if (h.ok) {
           void reload().then((s) => {
+            setProfilesRead(true);
             setNavRail(s?.showNavRail ?? false);
             setTourSeenVersion(s?.tourSeenVersion ?? 0);
           });
@@ -165,6 +170,7 @@ export default function App() {
   const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
   const demo = isDemoUrl(activeProfile?.jiraUrl);
   const startupFailed = health !== null && !health.ok;
+  const noProfile = profilesRead && !profileError && profiles.length === 0;
   // The run that just failed, or the one the store remembers from a previous
   // launch. A running sync supersedes both, so the bar reports what is
   // happening now.
@@ -257,7 +263,7 @@ export default function App() {
         </div>
       </header>
 
-      <ViewTabs views={VIEWS} current={view} onSelect={setView} />
+      {!noProfile && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
 
       <div className="app-body">
         {navRail && (
@@ -306,6 +312,10 @@ export default function App() {
               <p>{health.error}</p>
               {health.logPath && <p>Log: {health.logPath}</p>}
             </div>
+          ) : !profilesRead ? (
+            <p className="muted">Reading the profiles</p>
+          ) : noProfile ? (
+            <FirstRun onCreate={() => openModal("profiles")} />
           ) : (
             // No per-view title bar, the way XTM has none: the active tab
             // already names the view and the topbar's profile select already
