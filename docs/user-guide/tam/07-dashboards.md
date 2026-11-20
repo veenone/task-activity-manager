@@ -27,14 +27,16 @@ That is all this does. A Jira dashboard is a page of gadgets, and Data Center of
 ## What a panel shows
 
 - **Issues**, **Points**, **Estimated** and **Logged** for everything the filter matched.
-- **By status**, **By type** and **By assignee**, as rankings. A panel draws the top few rows rather than every status a large filter touches, which would stop it being a ranking.
+- **By status**, **By type** and **By assignee**, as rankings. A panel draws the top six rows rather than every status a large filter touches, which would stop it being a ranking, and says under the table how many rows it left out.
 - When it was last counted. A panel that has never run says **Not counted yet**.
 
 ## Refresh is yours to press
 
 The figures are a snapshot, not a live query. That is deliberate: a dashboard has to say the same thing when Jira is unreachable, and the same thing again when you reopen it next week.
 
-**Refresh** on a panel re-runs that filter against Jira and restamps it. Nothing refreshes on its own.
+**Refresh** on a panel re-runs that filter against Jira and restamps it. The button reads **Refreshing** while it runs. Nothing refreshes on its own.
+
+If TAM cannot read the saved dashboards from its local store, the view shows the error and a **Retry** button instead of the list. It does not say you have no dashboards, because you may still have them.
 
 ## Remove one
 

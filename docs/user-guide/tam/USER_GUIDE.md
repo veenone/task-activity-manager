@@ -515,14 +515,17 @@ gadgets one holds, so TAM cannot turn it into panels here.
 
 Each panel shows **Issues**, **Points**, **Estimated** and **Logged**,
 rankings **By status**, **By type** and **By assignee**, and when it was last
-counted. A panel that has never run says **Not counted yet**.
+counted. A panel that has never run says **Not counted yet**. A ranking draws
+its top six rows and says how many more it left out.
 
 ![Two dashboards, each counting one saved filter](images/dashboards-01-view.png)
 
 The figures are a snapshot, not a live query, so a dashboard says the same
 thing with Jira unreachable and the same thing again a week later. **Refresh**
 re-runs that filter and restamps it; nothing refreshes on its own. **Remove**
-takes the panel off the view and leaves the Jira filter alone.
+takes the panel off the view and leaves the Jira filter alone. A failed read
+of the saved dashboards shows the error and a **Retry** button, not the empty
+list.
 
 ## 14. Rituals
 

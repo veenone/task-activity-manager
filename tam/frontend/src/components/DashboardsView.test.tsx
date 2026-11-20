@@ -145,6 +145,68 @@ describe("DashboardsView", () => {
     expect(await screen.findByText(/No dashboards yet/)).toBeInTheDocument();
   });
 
+  // #527: a failed local read is not an empty list. Saying "No dashboards
+  // yet" sends the reader off to re-add dashboards they still have.
+  it("reports a failed read with a Retry instead of the empty state", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListDashboards).mockRejectedValue(new Error("database is locked"));
+    renderView();
+    expect(await screen.findByText(/database is locked/)).toHaveTextContent(
+      "Could not read the dashboards: database is locked",
+    );
+    expect(screen.queryByText(/No dashboards yet/)).not.toBeInTheDocument();
+    vi.mocked(api.ListDashboards).mockResolvedValue([dashboard()]);
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("region", { name: "My open bugs" })).toHaveTextContent("12");
+  });
+
+  it("says Add dashboard is working while it runs", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CreateDashboard).mockReturnValue(new Promise(() => {}));
+    renderView();
+    await screen.findByRole("option", { name: "Platform this quarter" });
+    await user.selectOptions(screen.getByLabelText("Saved filter"), "10101");
+    await user.click(screen.getByRole("button", { name: "Add dashboard" }));
+    expect(await screen.findByRole("button", { name: "Adding" })).toBeDisabled();
+  });
+
+  it("says Add by id is working while it runs", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.AddDashboardByFilterID).mockReturnValue(new Promise(() => {}));
+    renderView();
+    await screen.findByRole("region", { name: "My open bugs" });
+    await user.type(screen.getByLabelText(/Filter id/), "25475");
+    await user.click(screen.getByRole("button", { name: "Add by id" }));
+    expect(await screen.findByRole("button", { name: "Adding" })).toBeDisabled();
+  });
+
+  it("says Refresh is working on the dashboard being counted", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListDashboards).mockResolvedValue([dashboard(), dashboard({ id: "d2", name: "Platform this quarter" })]);
+    vi.mocked(api.RefreshDashboard).mockReturnValue(new Promise(() => {}));
+    renderView();
+    const panel = await screen.findByRole("region", { name: "My open bugs" });
+    await user.click(within(panel).getByRole("button", { name: "Refresh" }));
+    expect(await within(panel).findByRole("button", { name: "Refreshing" })).toBeDisabled();
+    const other = screen.getByRole("region", { name: "Platform this quarter" });
+    expect(within(other).getByRole("button", { name: "Refresh" })).toBeDisabled();
+  });
+
+  // A ranking that stops at six rows without saying so reads as the whole
+  // count.
+  it("says how many rows a cut-off ranking hides", async () => {
+    const byStatus = ["To Do", "In Progress", "Review", "QA", "Blocked", "Done", "Won't Do", "Duplicate"]
+      .map((name, i) => ({ name, count: 10 - i }));
+    vi.mocked(api.ListDashboards).mockResolvedValue([dashboard({ snapshot: snapshot({ byStatus }) })]);
+    renderView();
+    const panel = await screen.findByRole("region", { name: "My open bugs" });
+    const statuses = within(panel).getByRole("table", { name: /status/i });
+    expect(within(statuses).getByText("2 more not shown")).toBeInTheDocument();
+    expect(within(statuses).queryByText("Duplicate")).not.toBeInTheDocument();
+    const types = within(panel).getByRole("table", { name: /type/i });
+    expect(within(types).queryByText(/more not shown/)).not.toBeInTheDocument();
+  });
+
   // A connection that cannot read filters is not a person who has starred
   // none, and the view must not word it as one.
   it("reports a connection that cannot read saved filters", async () => {
