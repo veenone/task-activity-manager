@@ -150,6 +150,10 @@ JQL run while **Unsaved query** is selected is not stored. **Delete query**
 removes a saved query and its last run, and deleting a profile removes all of
 its saved queries.
 
+Opening a saved query or a Jira filter puts its JQL in the box. If the box
+holds JQL you typed and have not saved, PIE asks before replacing it. Choose
+**Cancel** to keep your JQL and the query that was selected.
+
 ## Follow linked issues across projects
 
 A run also follows the links your results have to issues in other projects,

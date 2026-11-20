@@ -91,3 +91,20 @@ it("says so when the account has starred no filter", async () => {
   const { dialog } = await openDialog();
   expect(await within(dialog).findByText(/You have starred no filters/)).toBeVisible();
 });
+
+it("asks before a filter replaces typed JQL, and keeps it when cancelled", async () => {
+  render(
+    <DialogProvider>
+      <App />
+    </DialogProvider>,
+  );
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("JQL"), "project = MINE");
+  await user.click(screen.getByRole("button", { name: "From a Jira filter" }));
+  await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Client reports, open" }));
+
+  const ask = await screen.findByRole("alertdialog");
+  expect(ask).toHaveTextContent("The JQL you typed is not saved");
+  await user.click(within(ask).getAllByRole("button", { name: "Cancel" }).at(-1)!);
+  expect(screen.getByLabelText("JQL")).toHaveValue("project = MINE");
+});
