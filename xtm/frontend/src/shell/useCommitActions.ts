@@ -18,7 +18,7 @@ export function useCommitActions(s: AppState) {
       setDetailVersion((v) => v + 1);
       reloadPending();
     } catch (e) {
-      console.error("discard:", errMsg(e));
+      setLastCommitResult({ succeeded: [], conflicted: [], failed: [{ testKey: "", error: errMsg(e) }] });
     }
   }
 
@@ -32,7 +32,7 @@ export function useCommitActions(s: AppState) {
       setDetailVersion((v) => v + 1);
       reloadPending();
     } catch (e) {
-      console.error("discard all:", errMsg(e));
+      setLastCommitResult({ succeeded: [], conflicted: [], failed: [{ testKey: "", error: errMsg(e) }] });
     }
   }
 
@@ -157,7 +157,7 @@ export function useCommitActions(s: AppState) {
       setDetailVersion((v) => v + 1);
       reloadPending();
     } catch (e) {
-      console.error("keep remote:", errMsg(e));
+      setLastCommitResult({ succeeded: [], conflicted: [], failed: [{ testKey, error: errMsg(e) }] });
     }
   }
 
@@ -200,7 +200,7 @@ export function useCommitActions(s: AppState) {
       setDetailVersion((v) => v + 1);
       reloadPending();
     } catch (e) {
-      console.error("recreate deleted test:", errMsg(e));
+      setLastCommitResult({ succeeded: [], conflicted: [], failed: [{ testKey, error: errMsg(e) }] });
     }
   }
 
