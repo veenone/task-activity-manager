@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ViewTabs, applyTheme, useConfirm, usePrompt } from "@agile-suite/core";
 import {
   DefaultProfile,
@@ -25,6 +25,7 @@ import { ResultsTable } from "./ResultsTable";
 import { JqlField } from "./JqlField";
 import { KeepOffline } from "./KeepOffline";
 import { RunNotes } from "./RunNotes";
+import { countText, runAtText } from "./runText";
 import { Statistics } from "./Statistics";
 import { TracePage } from "./TracePage";
 import { type Notice, NoticeContext, StatusBar, useRunProgress } from "./StatusBar";
@@ -32,18 +33,6 @@ import { TopBar } from "./TopBar";
 import { useCases } from "./useCases";
 import { useMenu } from "./useMenu";
 import { type View, VIEWS } from "./views";
-
-function countText(res: query.Result, matched: number): string {
-  if (res.truncated) return `Showing the first ${matched} of ${res.total} issues`;
-  return res.total === 1 ? "1 issue" : `${res.total} issues`;
-}
-
-// runAtText gives a stored run's time in the analyst's own time zone.
-function runAtText(iso: string): string {
-  const d = new Date(iso);
-  const two = (n: number) => String(n).padStart(2, "0");
-  return `Last run ${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
-}
 
 // chooseProfile is the first wanted id the list still holds, else its first
 // profile, else none.
@@ -67,6 +56,9 @@ export default function App() {
   const [queries, setQueries] = useState<saved.Query[]>([]);
   // 0 is JQL that has not been saved; its runs are not stored.
   const [queryId, setQueryId] = useState(0);
+  // opening counts saved-query opens and profile switches, so a slow stored
+  // run cannot land under a query or profile picked after it (#544).
+  const opening = useRef(0);
   const [runAt, setRunAt] = useState("");
   const [change, setChange] = useState<{ added: string[]; dropped: string[] } | null>(null);
   const [view, setView] = useState<View>("results");
@@ -117,6 +109,7 @@ export default function App() {
     setChange(null);
     setQueries([]);
     setFields(null);
+    opening.current += 1;
     if (!profileId) return;
     // A slow answer for a profile no longer selected must not land.
     let current = true;
@@ -141,6 +134,7 @@ export default function App() {
   }
 
   async function openQuery(id: number) {
+    const mine = ++opening.current;
     setQueryId(id);
     setError("");
     setChange(null);
@@ -152,9 +146,9 @@ export default function App() {
     setRunAt("");
     try {
       const r = await LastRun(profileId, id);
-      if (r.runAt) showRun(r);
+      if (mine === opening.current && r.runAt) showRun(r);
     } catch (e) {
-      setError(errorText(e));
+      if (mine === opening.current) setError(errorText(e));
     }
   }
 
