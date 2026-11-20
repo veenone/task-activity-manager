@@ -114,6 +114,42 @@ describe("ProfilesDialog", () => {
     expect(props.onDelete).toHaveBeenCalledWith("p2");
   });
 
+  // Deleting a profile also purges its pending-change journal, so the
+  // confirmation counts what is about to be lost (#523).
+  async function confirmText(pendingCount: (id: string) => Promise<number>) {
+    const user = userEvent.setup();
+    const props = setup({ pendingCount });
+    await user.click(screen.getByRole("button", { name: /Beta/ }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const confirm = await screen.findByRole("alertdialog");
+    expect(pendingCount).toHaveBeenCalledWith("p2");
+    return { text: confirm.textContent, props };
+  }
+
+  it("says how many uncommitted changes the delete discards", async () => {
+    const { text } = await confirmText(vi.fn(async () => 3));
+    expect(text).toContain("This removes its token.");
+    expect(text).toContain("Its 3 uncommitted changes will be lost. This removes its token.");
+  });
+
+  it("uses the singular for one uncommitted change", async () => {
+    const { text } = await confirmText(vi.fn(async () => 1));
+    expect(text).toContain("Its 1 uncommitted change will be lost.");
+  });
+
+  it("adds nothing when the profile has no uncommitted changes", async () => {
+    const { text } = await confirmText(vi.fn(async () => 0));
+    expect(text).not.toContain("uncommitted");
+  });
+
+  it("still warns, and still deletes, when the changes cannot be counted", async () => {
+    const user = userEvent.setup();
+    const { text, props } = await confirmText(vi.fn(async () => Promise.reject(new Error("locked"))));
+    expect(text).toContain("Any uncommitted changes it has will be lost.");
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete profile" }));
+    expect(props.onDelete).toHaveBeenCalledWith("p2");
+  });
+
   it("shows a failed callback's error in the dialog", async () => {
     const user = userEvent.setup();
     setup({ onExport: vi.fn(async () => Promise.reject(new Error("disk full"))) });

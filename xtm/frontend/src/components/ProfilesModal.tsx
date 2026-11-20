@@ -1,4 +1,5 @@
 import { ProfilesDialog } from "@agile-suite/core";
+import { ListPendingChanges } from "../api";
 import type { Profile } from "../api";
 import { ProfileForm } from "./ProfileForm";
 
@@ -30,6 +31,7 @@ export function ProfilesModal({ profiles, activeId, defaultProfileId, onClose, o
       activeId={activeId}
       defaultProfileId={defaultProfileId}
       deleteMessage="This removes its stored token and all cached test data. This cannot be undone."
+      pendingCount={async (id) => (await ListPendingChanges(id)).length}
       onSetDefault={onSetDefault}
       onExport={onExport}
       onImport={onImport}

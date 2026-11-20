@@ -25,6 +25,10 @@ interface Props<P> {
   listNote?: ReactNode;
   // What deleting a profile removes, in the app's words.
   deleteMessage: string;
+  // How many uncommitted changes the profile's pending journal holds. The
+  // purge drops the journal, so the delete confirmation leads with the count.
+  // Apps without a journal (PIE) leave it out.
+  pendingCount?: (id: string) => Promise<number>;
   onSetDefault: (id: string) => unknown;
   onExport: (id: string) => unknown;
   // Resolves to the imported profile, or null when the user cancelled.
@@ -45,7 +49,7 @@ interface Props<P> {
 // default is how people edited their live connection by accident, so the
 // start state asks them to pick, and editing the active one carries a caution.
 export function ProfilesDialog<P extends { id: string; name: string; projectKey: string }>({
-  profiles, activeId, defaultProfileId, subtitle, listNote, deleteMessage,
+  profiles, activeId, defaultProfileId, subtitle, listNote, deleteMessage, pendingCount,
   onSetDefault, onExport, onImport, onSaved, onDelete, onClose, renderForm,
 }: Props<P>) {
   const { confirm } = useConfirm();
@@ -89,11 +93,25 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
       if (p) open(p.id);
     });
 
+  // The sentence that goes in front of the delete message. A count that cannot
+  // be read still warns rather than blocking the delete.
+  async function pendingWarning(id: string): Promise<string> {
+    if (!pendingCount) return "";
+    let n: number;
+    try {
+      n = await pendingCount(id);
+    } catch {
+      return "Any uncommitted changes it has will be lost. ";
+    }
+    if (n <= 0) return "";
+    return n === 1 ? "Its 1 uncommitted change will be lost. " : `Its ${n} uncommitted changes will be lost. `;
+  }
+
   const remove = (p: P) =>
     void run(async () => {
       const ok = await confirm({
         title: `Delete profile "${p.name}"?`,
-        message: deleteMessage,
+        message: `${await pendingWarning(p.id)}${deleteMessage}`,
         confirmLabel: "Delete profile",
         danger: true,
       });
