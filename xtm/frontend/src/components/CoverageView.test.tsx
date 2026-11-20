@@ -7,6 +7,7 @@ import { DialogProvider } from "../contexts/DialogContext";
 import {
   CreateCanonicalRequirement,
   DeleteCanonicalRequirement,
+  DeleteCoverageNode,
   SeedDemoCoverageExample,
   SetMemberVersion,
   UpsertCoverageNode,
@@ -79,6 +80,7 @@ vi.mock("../api", async (importOriginal) => ({
   ListVersions: vi.fn(async () => [{ id: "ver1", name: "1.0", status: "stable" }]),
   CreateCanonicalRequirement: vi.fn(async () => "c2"),
   DeleteCanonicalRequirement: vi.fn(async () => {}),
+  DeleteCoverageNode: vi.fn(async () => {}),
   UpsertCoverageNode: vi.fn(async () => {}),
   SetMemberVersion: vi.fn(async () => {}),
   SeedDemoCoverageExample: vi.fn(async () => "c1"),
@@ -153,6 +155,30 @@ describe("CoverageView", () => {
       name: "Padding",
       sortOrder: 1,
     });
+  });
+
+  it("deletes a group only after a confirm that names it and what goes with it", async () => {
+    renderView();
+    await selectCanon();
+    await userEvent.click(screen.getByRole("button", { name: "Coverage" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete group Mechanisms" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent('Delete group "Mechanisms"?');
+    expect(dialog).toHaveTextContent("1 parameter, 2 values, and their test mappings");
+    expect(DeleteCoverageNode).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(DeleteCoverageNode).toHaveBeenCalledWith("p1", "group", "g1"));
+  });
+
+  it("keeps the group when the delete is cancelled", async () => {
+    renderView();
+    await selectCanon();
+    await userEvent.click(screen.getByRole("button", { name: "Coverage" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete group Mechanisms" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getAllByRole("button", { name: "Cancel" })[0]);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(DeleteCoverageNode).not.toHaveBeenCalled();
   });
 
   it("lists the gaps", async () => {

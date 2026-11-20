@@ -61,6 +61,8 @@ With no versions yet, the matrix asks you to create one first.
 
 The headline percentage updates as values gain tests.
 
+To delete a group, click the **×** beside its name. XTM asks first and says how many parameters and values go with it. Confirming also removes their test mappings; your Jira tests stay as they are. Groups live only on this computer, so a deleted group cannot be restored.
+
 ## Find the gaps
 
 The **Gaps (N)** tab lists every required value with no mapped test, by group, parameter, value and kind. When everything is covered it reads "No gaps. Every required value has a test."
