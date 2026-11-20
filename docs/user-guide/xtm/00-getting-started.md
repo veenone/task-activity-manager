@@ -100,7 +100,7 @@ When you have pending changes, a yellow **N pending** button appears in the top 
 
 ### When a commit reports a conflict
 
-A conflict means someone changed the same test in Jira after your last sync. XTM merges the edits that do not overlap and asks you about the rest. For each conflicting field it shows **Theirs (remote)** and **Mine (local)**. Pick one per field, or use **All mine** or **All theirs**, then click **Resolve & re-commit**. **Discard mine** drops your edits for that test instead.
+A conflict means someone changed the same test in Jira after your last sync. XTM merges the edits that do not overlap and asks you about the rest. For each conflicting field it shows **Theirs (remote)** and **Mine (local)**. Pick one per field, or use **All mine** or **All theirs**, then click **Resolve & re-commit**. That commits only this test's changes; pending edits on other tests stay in the list. **Discard mine** drops your edits for that test instead.
 
 If the test was deleted in Jira, choose **Recreate as new** to create a new test from your edits, or **Discard my changes**.
 

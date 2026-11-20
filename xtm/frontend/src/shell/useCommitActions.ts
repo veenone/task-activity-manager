@@ -1,11 +1,20 @@
 import { ResolveConflictOverride, ResolveConflictKeepRemote, ResolveConflictMerge, RecreateDeletedTest, DiscardPendingChange, DiscardAllPendingChanges, CommitPendingChanges, CommitPendingChangesByIDs, errMsg } from "../api";
-import type { CommitResult, ConflictDecision } from "../api";
+import type { CommitResult, ConflictDecision, PendingChange } from "../api";
 import type { AppState } from "./useAppState";
+
+// testPendingIds picks one Test's pending rows: its own key plus every
+// "<testKey>:..." row (steps, custom fields), the same set the backend
+// re-bases when a conflict on that Test is resolved.
+function testPendingIds(changes: PendingChange[], testKey: string): number[] {
+  return changes
+    .filter((c) => c.entityKey === testKey || c.entityKey.startsWith(testKey + ":"))
+    .map((c) => c.id);
+}
 
 // useCommitActions holds what the pending dialog does: discard, commit all
 // or some, and the four ways to resolve a conflict.
 export function useCommitActions(s: AppState) {
-  const { activeId, notice, closeModal, syncStatus, canCommit, beginCommit, endCommit, setSelectedKey, setDetailVersion, setLastCommitResult, reloadPending, refreshProfileData } = s;
+  const { activeId, notice, closeModal, syncStatus, canCommit, beginCommit, endCommit, setSelectedKey, setDetailVersion, setLastCommitResult, reloadPending, refreshProfileData, pendingChanges } = s;
 
   // Called when the user discards a pending change from the modal. The
   // backend reverts test_case to before_val, so the detail panel needs to
@@ -119,8 +128,26 @@ export function useCommitActions(s: AppState) {
     }
   }
 
+  // commitResolvedTest re-commits only the resolved Test's rows, so edits on
+  // other Tests stay in the journal (#519). extra adds rows a merge decision
+  // kept that sit outside the Test's key prefix.
+  async function commitResolvedTest(testKey: string, extra: number[] = []) {
+    const ids = [...new Set([...testPendingIds(pendingChanges, testKey), ...extra])];
+    if (ids.length > 0) {
+      await handleCommitIds(ids);
+      return;
+    }
+    // The resolution settled every row itself; just drop the conflict.
+    setLastCommitResult((prev) =>
+      prev ? { ...prev, conflicted: prev.conflicted.filter((c) => c.testKey !== testKey) } : prev,
+    );
+    refreshProfileData();
+    setDetailVersion((v) => v + 1);
+    reloadPending();
+  }
+
   // resolveConflictOverride re-bases a conflicting Test onto the remote version
-  // (keep mine) and immediately re-commits so the override takes effect.
+  // (keep mine) and immediately re-commits that Test so the override takes effect.
   async function resolveConflictOverride(
     testKey: string,
     remoteVersion: string,
@@ -136,7 +163,7 @@ export function useCommitActions(s: AppState) {
       });
       return;
     }
-    await handleCommit();
+    await commitResolvedTest(testKey);
   }
 
   // resolveConflictKeepRemote discards a conflicting Test's local edits (keep
@@ -179,7 +206,8 @@ export function useCommitActions(s: AppState) {
       });
       return;
     }
-    await handleCommit();
+    const kept = decisions.filter((d) => d.choice === "mine").map((d) => d.pendingId);
+    await commitResolvedTest(testKey, kept);
   }
 
   // resolveConflictRecreate turns a remotely-deleted Test's held edits into a
