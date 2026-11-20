@@ -81,6 +81,28 @@ describe("Cases page", () => {
     await user.type(notes, " Ask the reader team.");
     await user.click(within(page).getByRole("button", { name: "Save notes" }));
     expect(api.SetCaseNotes).toHaveBeenCalledWith("p1", 1, "Seen twice. Ask the reader team.");
+    expect(api.SetCaseNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves typed notes when the analyst moves to another case", async () => {
+    const user = show();
+    const page = await openFirst(user);
+    await user.type(within(page).getByLabelText("Notes"), " Ask the reader team.");
+    await user.click(screen.getByRole("button", { name: /^Z-9/ }));
+    expect(api.SetCaseNotes).toHaveBeenCalledWith("p1", 1, "Seen twice. Ask the reader team.");
+  });
+
+  it("keeps a typed evidence entry and phrases for the case when the analyst comes back to it", async () => {
+    const user = show();
+    let page = await openFirst(user);
+    await user.type(within(page).getByLabelText("Note or issue key"), "Same chip");
+    await user.type(within(page).getByLabelText("Phrases to search, one per line"), "reader reset");
+    await user.click(screen.getByRole("button", { name: /^Z-9/ }));
+    expect(await screen.findByLabelText("Note or issue key")).toHaveValue("");
+
+    page = await openFirst(user);
+    expect(within(page).getByLabelText("Note or issue key")).toHaveValue("Same chip");
+    expect(within(page).getByLabelText("Phrases to search, one per line")).toHaveValue("reader reset");
   });
 
   it("records a verdict and its reason for a project", async () => {

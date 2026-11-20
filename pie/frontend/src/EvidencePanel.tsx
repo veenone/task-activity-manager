@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AddEvidenceIssue, AddEvidenceNote, Evidence, FindEvidence, RemoveEvidence, SetEvidenceState } from "../wailsjs/go/main/App";
 import type { evidence } from "../wailsjs/go/models";
 import { errorText } from "./ProfileForm";
+import { useDraft } from "./useDraft";
 
 const KIND: Record<string, string> = {
   link: "Link",
@@ -33,10 +34,11 @@ export function EvidencePanel({
   onAddProject: (key: string) => void;
 }) {
   const [items, setItems] = useState<evidence.Item[] | null>(null);
-  const [phrases, setPhrases] = useState("");
+  // Typed text outlives a switch to another case or view (#543).
+  const [phrases, setPhrases] = useDraft(`${profileId}/${caseId}/phrases`);
   const [finding, setFinding] = useState(false);
   const [project, setProject] = useState("");
-  const [entry, setEntry] = useState("");
+  const [entry, setEntry] = useDraft(`${profileId}/${caseId}/entry`);
   const [error, setError] = useState("");
   const forProject = projects.includes(project) ? project : (projects[0] ?? "");
 
