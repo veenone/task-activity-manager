@@ -26,6 +26,7 @@ import { BoardsToolbar } from "./BoardsToolbar";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useBoardMoves } from "./useBoardMoves";
 import { useDenial } from "../queries/permissions";
+import { useGuardedCardSelect } from "../lib/unsavedEdit";
 
 // BoardsView is the board: XTM's board head over the board's own columns,
 // the cards in them, and the lines that say what the board is not showing.
@@ -158,10 +159,8 @@ export function BoardsView() {
   const selectedPos = data ? findCard(data, selectedKey) : undefined;
   const selected = data ? cardAtPos(data, selectedPos) : undefined;
 
-  function select(issue: Issue, id: string) {
-    setSelectedKey(issue.key);
-    setFocusId(id);
-  }
+  // Opening another card asks first when the panel holds an unsaved edit (#521).
+  const select = useGuardedCardSelect(selectedKey, setSelectedKey, setFocusId);
 
   // A click on a card is one of three gestures. Control toggles the card's
   // check and shift extends the run from the anchor; neither opens the

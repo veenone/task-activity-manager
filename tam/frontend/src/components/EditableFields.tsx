@@ -10,6 +10,7 @@ import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { PERM_ASSIGN_ISSUES, PERM_EDIT_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
+import { markUnsavedEdit } from "../lib/unsavedEdit";
 
 // The syntax the user picked for one issue's description, keyed by profile,
 // key and field so two issues never share a choice. It is module level and
@@ -178,6 +179,14 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
   }
 
   const changed = EDITABLE_FIELDS.map((f) => f.id).filter((f) => values[f] !== base[f] && !locked(f));
+  // What Save edit would journal is what leaving the panel would lose, so
+  // the shell and the views ask before discarding it (#521). Unmounting
+  // clears the mark: a panel that is gone holds nothing.
+  const unsaved = changed.length > 0;
+  useEffect(() => {
+    markUnsavedEdit(unsaved);
+    return () => markUnsavedEdit(false);
+  }, [unsaved]);
   // Whether anything on this form is refused, which is what the one sentence
   // about administrators is worth saying for. Per field it would repeat, and
   // the project this was found on leaves two of the seven off every screen.

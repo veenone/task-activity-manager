@@ -19,6 +19,7 @@ import { NO_FILTER, isFiltered, queryFields } from "../lib/issueFilter";
 import type { IssueFilter } from "../lib/issueFilter";
 import { PERM_CREATE_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
+import { useGuardedSelect } from "../lib/unsavedEdit";
 
 const SEARCH_DELAY_MS = 250;
 
@@ -83,6 +84,8 @@ export function EpicsView() {
     [filter, search, sprintId, showDone],
   );
   const tree = useEpicTree(activeId, query);
+  // Another row asks first when the panel holds an unsaved edit (#521).
+  const selectIssue = useGuardedSelect(selectedKey, setSelectedKey);
   const sprints = useSprints(activeId);
   // The detail panel's own Sprint field, not the filter bar above: away from
   // a board this is the only sprint list an issue here can be moved through.
@@ -206,7 +209,7 @@ export function EpicsView() {
                   tree={tree.data}
                   subtaskLabel={subtaskType.data}
                   selectedKey={selectedKey}
-                  onSelect={setSelectedKey}
+                  onSelect={selectIssue}
                   expanded={expanded}
                   onExpandedChange={setExpanded}
                   movedKey={movedKey}

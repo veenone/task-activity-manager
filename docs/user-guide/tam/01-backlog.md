@@ -38,7 +38,7 @@ The top of the panel carries the key, the type, the status, the sprint, the repo
 
 Below that are sections you can open and close:
 
-- **Fields** is where editing happens. **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee** and **Epic** are editable; the rest of the panel is read-only. An edit is saved to the cache as you make it and queued for commit, which the panel says in as many words.
+- **Fields** is where editing happens. **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee** and **Epic** are editable; the rest of the panel is read-only. An edit is saved to the cache as you make it and queued for commit, which the panel says in as many words. Until you press **Save edit**, a changed field lives only in the panel, so opening another issue, closing the panel, switching view or switching profile asks before throwing it away.
 - **Comments** lists the issue's comments, with a note saying how old the cached copy is. They are read-only here; add one in Jira.
 - **Links** lists the issue's links and adds one. **Check** confirms the key you typed exists and shows its summary, and **Add** queues the link for the next commit.
 - **Covered by tests** lists the Xray tests that cover this issue, for a project that uses XTM alongside TAM.
