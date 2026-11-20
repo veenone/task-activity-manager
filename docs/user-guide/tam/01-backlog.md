@@ -30,7 +30,7 @@ The page size is a reading preference and survives a profile switch; the filters
 
 ## Read and edit an issue
 
-Click a row and the detail panel opens on the right. Drag its left edge to resize it.
+Click a row and the detail panel opens on the right. Drag its left edge to resize it. The panel stays on that issue when a sort or a page step moves its row off the grid.
 
 ![The detail panel open beside the grid](images/backlog-02-detail.png)
 
