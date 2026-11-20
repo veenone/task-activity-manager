@@ -49,6 +49,7 @@ export { band, dayIndex, labelEvery, linear, niceTicks, spread } from "./lib/cha
 export type { Band } from "./lib/chartScale";
 export { applyTheme } from "./lib/theme";
 export { createQueryClient } from "./lib/queryClient";
+export { useViewState, clearViewState, clearAllViewState } from "./lib/viewState";
 export {
   syncReducer,
   initialSyncState,

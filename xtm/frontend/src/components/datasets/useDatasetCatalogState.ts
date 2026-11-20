@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { SyncDatasetCatalog, errMsg } from "../../api";
 import { useProfile } from "../../contexts/ProfileContext";
 import { useSync } from "../../contexts/SyncContext";
-import { useViewState } from "../../lib/viewState";
+import { useViewState } from "@agile-suite/core";
 import { useDatasetCatalog } from "../../queries/datasets";
 import { keys } from "../../queries/keys";
 

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useFocusWhen } from "@agile-suite/core";
+import { useFocusWhen, useViewState } from "@agile-suite/core";
 import { useProfile } from "../../contexts/ProfileContext";
 import { useNav } from "../../contexts/NavContext";
-import { useViewState } from "../../lib/viewState";
 import { errMsg } from "../../api";
 import type { ExecMemberRun, RollupMember } from "../../api";
 import { keyCompare, cmpStr, applyDir } from "../../sort";

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TestTable } from "./TestTable";
-import { clearViewState } from "../lib/viewState";
+import { clearViewState } from "@agile-suite/core";
 import { CreateSavedView, ExportTests, ListMatchingKeys } from "../api";
 
 // What the mocked queries and selection return; each test sets its own.

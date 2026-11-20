@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
-import { useViewState } from "../lib/viewState";
 import {
   useTraceabilityStats,
   useTraceabilityReqOptions,
@@ -21,7 +20,7 @@ import {
 } from "../api";
 import { SankeyChart } from "./SankeyChart";
 import { RequirementSankey } from "./RequirementSankey";
-import { MultiSelect } from "@agile-suite/core";
+import { MultiSelect, useViewState } from "@agile-suite/core";
 
 interface Props {
   jiraUrl?: string;

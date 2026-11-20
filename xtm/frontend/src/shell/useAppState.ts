@@ -4,7 +4,6 @@ import { Health, SetTourSeenVersion, errMsg, isDemoUrl, demoVariant } from "../a
 import type { HealthInfo, Profile, PendingChange, CommitResult } from "../api";
 import { useCapabilities } from "../features";
 
-import { clearViewState } from "../lib/viewState";
 import { useProfile } from "../contexts/ProfileContext";
 import { useSync } from "../contexts/SyncContext";
 import { useSelection } from "../contexts/SelectionContext";
@@ -18,7 +17,7 @@ import { visibleViews, browseGrouping } from "../views";
 import { usePrompt } from "../components/usePrompt";
 import { useConfirm } from "../components/useConfirm";
 import { useNotice } from "../components/useNotice";
-import { useTour } from "@agile-suite/core";
+import { clearViewState, useTour } from "@agile-suite/core";
 import { TOURS, TOUR_VERSION } from "../tour/steps";
 
 // useAppState gathers what the shell knows: the profile, sync, nav, selection

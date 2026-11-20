@@ -31,9 +31,10 @@ vi.mock("../../contexts/SyncContext", () => ({
     progress: null,
   }),
 }));
-vi.mock("../../lib/viewState", async () => {
+vi.mock("@agile-suite/core", async () => {
   const ReactModule = await import("react");
   return {
+    ...(await vi.importActual<typeof import("@agile-suite/core")>("@agile-suite/core")),
     useViewState: <T,>(_profile: string, _view: string, _field: string, initial: T) =>
       ReactModule.useState(initial),
   };

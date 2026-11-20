@@ -1,4 +1,4 @@
-// frontend/src/lib/viewState.ts
+// frontend/core/src/lib/viewState.ts
 import { useCallback, useState } from "react";
 
 // Module-level store: survives component unmount (so a view restores its state
@@ -64,4 +64,11 @@ export function clearViewState(profileId: string): void {
   for (const key of [...store.keys()]) {
     if (key.startsWith(prefix)) store.delete(key);
   }
+}
+
+// clearAllViewState empties the store for every profile. A test setup calls it
+// between tests, so one test's choices never reach the next one through a
+// store that outlives the render.
+export function clearAllViewState(): void {
+  store.clear();
 }

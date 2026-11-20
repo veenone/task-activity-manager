@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFocusWhen } from "@agile-suite/core";
+import { useFocusWhen, useViewState } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
-import { useViewState } from "../lib/viewState";
 import {
   EditRequirementField,
   DeleteRequirement,

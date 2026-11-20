@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
-import { useViewState } from "../lib/viewState";
+import { useViewState } from "@agile-suite/core";
 import { ExcludePreconditionFromDuplicates, errMsg } from "../api";
 import { usePreconditionDuplicates } from "../queries/duplicates";
 import type {

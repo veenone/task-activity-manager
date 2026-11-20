@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
-import { useViewState } from "../lib/viewState";
+import { useViewState } from "@agile-suite/core";
 import { SyncTestCalls, EventsOn, errMsg } from "../api";
 import type { TestCallLink, SyncProgress } from "../api";
 import { TestDetail } from "./TestDetail";
