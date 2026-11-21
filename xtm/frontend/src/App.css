@@ -141,15 +141,6 @@
 .btn-ghost:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.08);
 }
-.btn-danger {
-  background: var(--danger-solid);
-  border-color: var(--danger-fg);
-  color: var(--on-accent);
-}
-.btn-danger:hover:not(:disabled) {
-  background: var(--danger-solid-hover);
-}
-
 .app-statusbar .sync-info {
   color: var(--text-muted) !important;
 }
@@ -802,13 +793,10 @@
   min-height: 0;
   overflow: auto;
 }
-/* One line, always (#456): the item picker gives way first, so New and
-   Actions keep their place instead of wrapping onto a second row. */
-.board-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+/* core's .board-head draws the row. The Containers head stays one line,
+   always (#456): the item picker gives way first, so New and Actions keep
+   their place instead of wrapping onto a second row. */
+.board-exec-body > .board-head {
   flex-wrap: nowrap;
   min-width: 0;
 }
