@@ -167,7 +167,7 @@ export function DashboardsView() {
           )}
         </select>
         <button type="button" className="btn" onClick={() => add.mutate()} disabled={busy || filterId === ""}>
-          Add dashboard
+          {add.isPending ? "Adding" : "Add dashboard"}
         </button>
         {filters.isError && (
           <span className="error-text">Saved filters could not be read: {errMsg(filters.error)}</span>
@@ -193,7 +193,7 @@ export function DashboardsView() {
           onClick={() => addById.mutate()}
           disabled={busy || typedId.trim() === ""}
         >
-          Add by id
+          {addById.isPending ? "Adding" : "Add by id"}
         </button>
         <span className="muted small">
           For a filter you have not starred. The id is the number in its Jira URL, and Jira supplies the name.
@@ -247,7 +247,12 @@ export function DashboardsView() {
 
       {error && <p className="error-text">{error}</p>}
 
-      {dashboards.isPending ? (
+      {dashboards.isError ? (
+        <p className="error-text" role="alert">
+          Could not read the dashboards: {errMsg(dashboards.error)}{" "}
+          <button type="button" className="btn" onClick={() => void dashboards.refetch()}>Retry</button>
+        </p>
+      ) : dashboards.isPending ? (
         <p className="muted">Reading the dashboards</p>
       ) : list.length === 0 ? (
         <p className="muted">
@@ -260,6 +265,7 @@ export function DashboardsView() {
               key={d.id}
               dashboard={d}
               busy={busy}
+              refreshing={refresh.isPending && refresh.variables === d.id}
               onRefresh={() => refresh.mutate(d.id)}
               onRemove={() => void askRemove(d)}
             />
@@ -270,9 +276,10 @@ export function DashboardsView() {
   );
 }
 
-function DashboardPanel({ dashboard, busy, onRefresh, onRemove }: {
+function DashboardPanel({ dashboard, busy, refreshing, onRefresh, onRemove }: {
   dashboard: Dashboard;
   busy: boolean;
+  refreshing: boolean;
   onRefresh: () => void;
   onRemove: () => void;
 }) {
@@ -282,7 +289,9 @@ function DashboardPanel({ dashboard, busy, onRefresh, onRemove }: {
       <header className="dashboard-head">
         <h3 className="dashboard-title">{dashboard.name}</h3>
         <div className="dashboard-actions">
-          <button type="button" className="btn btn-ghost" onClick={onRefresh} disabled={busy}>Refresh</button>
+          <button type="button" className="btn btn-ghost" onClick={onRefresh} disabled={busy}>
+            {refreshing ? "Refreshing" : "Refresh"}
+          </button>
           <button type="button" className="btn btn-ghost" onClick={onRemove} disabled={busy}>Remove</button>
         </div>
       </header>
@@ -307,9 +316,11 @@ function DashboardPanel({ dashboard, busy, onRefresh, onRemove }: {
 
 // Ranking is one count panel as a table, because that is what it is: two
 // columns a reader compares down, and the one shape a screen reader can
-// read a ranking out of.
+// read a ranking out of. Rows past TOP_ROWS are counted in a footer, so a
+// cut-off ranking is not read as the whole of it.
 function Ranking({ title, rows }: { title: string; rows: DashboardBucket[] }) {
   if (rows.length === 0) return <p className="muted small">{title}: nothing counted.</p>;
+  const hidden = rows.length - TOP_ROWS;
   return (
     <table className="dashboard-ranking" aria-label={title}>
       <caption className="muted small">{title}</caption>
@@ -321,6 +332,11 @@ function Ranking({ title, rows }: { title: string; rows: DashboardBucket[] }) {
           <tr key={r.name}><td>{r.name}</td><td>{r.count}</td></tr>
         ))}
       </tbody>
+      {hidden > 0 && (
+        <tfoot>
+          <tr><td className="muted small" colSpan={2}>{hidden} more not shown</td></tr>
+        </tfoot>
+      )}
     </table>
   );
 }
