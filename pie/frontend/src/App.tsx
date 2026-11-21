@@ -218,9 +218,10 @@ export default function App() {
   const replaceJql = useReplaceJql({ jql, setJql, queries, queryId, openQuery });
   useMenu({
     view: (id: View) => setView(id),
-    profiles: () => setManaging(true),
+    // Each guard matches the disabled state of the button it stands for.
+    profiles: () => !running && setManaging(true),
     fields: () => fields !== null && !running && setEditingFields(true),
-    run: () => profileId !== "" && !running && void run(),
+    run: () => profileId !== "" && !running && jql.trim() !== "" && void run(),
     theme: (t: string) => {
       applyTheme(t);
       setShownTheme(document.documentElement.dataset.theme ?? "light");

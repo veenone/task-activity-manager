@@ -22,6 +22,7 @@ vi.mock("../wailsjs/go/main/App", () => ({
   Fields: vi.fn(),
   ListCases: vi.fn(),
   LastRun: vi.fn(),
+  RunQuery: vi.fn(),
   SetTheme: vi.fn(),
   GetDiagnostics: vi.fn(),
 }));
@@ -64,6 +65,38 @@ it("opens Manage profiles and Jira fields from the File menu", async () => {
   await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
   emit("menu:profiles");
   expect(await screen.findByRole("heading", { name: "Manage Profiles" })).toBeVisible();
+});
+
+it("ignores Run from the menu while the JQL field is empty, as the button does", async () => {
+  show();
+  await screen.findByLabelText("JQL");
+  emit("menu:run");
+  expect(api.RunQuery).not.toHaveBeenCalled();
+});
+
+it("ignores Manage profiles from the menu during a run, as the button does", async () => {
+  let finish: (v: unknown) => void = () => {};
+  vi.mocked(api.RunQuery).mockReturnValue(new Promise((resolve) => (finish = resolve)) as never);
+  const user = show();
+  await user.type(await screen.findByLabelText("JQL"), "category = X");
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  expect(screen.getByRole("button", { name: "Manage profiles" })).toBeDisabled();
+  emit("menu:profiles");
+  expect(screen.queryByRole("heading", { name: "Manage Profiles" })).not.toBeInTheDocument();
+  await act(async () => finish({ result: { total: 0, truncated: false, issues: [] } }));
+});
+
+it("ignores menu shortcuts while a dialog is open", async () => {
+  show();
+  await screen.findByRole("navigation", { name: "Views" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Jira fields" })).toBeEnabled());
+  emit("menu:fields");
+  expect(await screen.findByRole("heading", { name: "Jira fields" })).toBeVisible();
+  emit("menu:view", "links");
+  emit("menu:profiles");
+  expect(screen.getByRole("button", { name: "Results" })).toHaveAttribute("aria-current", "page");
+  expect(screen.queryByRole("heading", { name: "Manage Profiles" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Jira fields" })).toBeVisible();
 });
 
 it("toggles the theme from the top bar and stores the choice", async () => {

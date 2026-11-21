@@ -21,6 +21,11 @@ The menu bar has three menus:
   runtime and the number of profiles, in the same box TAM and XTM use. Paste
   it into a bug report.
 
+A menu item does nothing when the button it stands for would be disabled:
+Run query needs JQL in the field, and Manage profiles and Jira fields wait
+for a run to finish. While a dialog is open the menu items are ignored, so
+close the dialog first.
+
 The moon or sun button at the right of the top bar switches between light and
 dark. PIE remembers the theme you pick, from either place, for the next time
 it starts.
