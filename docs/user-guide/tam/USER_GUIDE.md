@@ -102,6 +102,9 @@ press **Manage** beside the profile picker, and fill in the form.
 **Show token** reveals what you typed. Where you already have a profile for the
 same server, **Reuse token from** saves pasting it again.
 
+Closing the dialog with Escape, a click outside it or the close button asks
+first when the form holds something you have not saved.
+
 The rest are optional:
 
 - **Scope JQL** narrows what syncs, for example `labels = team-a`. Anything the
