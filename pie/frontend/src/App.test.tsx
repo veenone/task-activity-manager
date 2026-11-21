@@ -133,3 +133,10 @@ it("shows a startup failure instead of a form that cannot work", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("open the database: disk full");
   expect(screen.queryByLabelText("JQL")).not.toBeInTheDocument();
 });
+
+it("says so in the Results area when a run matches nothing", async () => {
+  vi.mocked(api.RunQuery).mockResolvedValue({ result: { total: 0, truncated: false, issues: [], sets: [] } } as never);
+  show();
+  await runJql("category = Nothing");
+  expect(await screen.findByText("No issues match this query.")).toBeVisible();
+});

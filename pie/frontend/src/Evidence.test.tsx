@@ -95,3 +95,9 @@ it("keeps evidence added by hand when the analyst says no", async () => {
   expect(api.RemoveEvidence).not.toHaveBeenCalled();
   expect(screen.getByText("Seen by field team")).toBeVisible();
 });
+
+it("says it is reading the evidence until it arrives", async () => {
+  vi.mocked(api.Evidence).mockReturnValue(new Promise(() => {}));
+  show();
+  expect(await screen.findByText("Reading the evidence...")).toBeVisible();
+});

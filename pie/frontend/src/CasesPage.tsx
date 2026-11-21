@@ -96,7 +96,7 @@ export function CasesPage({
             ))}
           </ul>
         </div>
-        {open && (
+        {open ? (
           <CaseDetail
             key={open.id}
             profileId={profileId}
@@ -106,6 +106,8 @@ export function CasesPage({
             onChanged={onChanged}
             onDeleted={() => setOpenId(null)}
           />
+        ) : (
+          <p className="muted">Choose a case to see its projects, verdicts and evidence.</p>
         )}
       </div>
     </>

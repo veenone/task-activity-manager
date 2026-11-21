@@ -107,6 +107,7 @@ export function EvidencePanel({
         </p>
       )}
 
+      {items === null && !error && <p className="muted">Reading the evidence...</p>}
       {items?.length === 0 && <p className="muted">No evidence yet.</p>}
       {groups.map((p) => (
         <div key={p} role="group" aria-label={`Evidence for ${p}`} className="pie-trace-project">

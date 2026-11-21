@@ -200,3 +200,8 @@ describe("project picker", () => {
     expect(api.SaveProjectGroup).toHaveBeenCalledWith("p1", "Two", ["ALPHA", "DELTA"]);
   });
 });
+
+it("asks for a case to be chosen while none is open", () => {
+  show();
+  expect(screen.getByText("Choose a case to see its projects, verdicts and evidence.")).toBeVisible();
+});
