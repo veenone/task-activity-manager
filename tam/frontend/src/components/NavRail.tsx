@@ -35,12 +35,6 @@ export function NavRail({ view, onSelect, onHide }: { view: View; onSelect: (v: 
           {v.label}
         </button>
       ))}
-      <div className="nav-divider" />
-      <div className="nav-section">Suite</div>
-      <button className="nav-item" disabled title="The suite launcher is unavailable in this build">
-        Tests (XTM)
-      </button>
-      <div className="nav-hint">suite launcher unavailable in this build</div>
     </nav>
   );
 }
