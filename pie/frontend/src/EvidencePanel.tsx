@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useConfirm } from "@agile-suite/core";
 import { AddEvidenceIssue, AddEvidenceNote, Evidence, FindEvidence, RemoveEvidence, SetEvidenceState } from "../wailsjs/go/main/App";
 import type { evidence } from "../wailsjs/go/models";
 import { errorText } from "./ProfileForm";
@@ -40,6 +41,7 @@ export function EvidencePanel({
   const [project, setProject] = useState("");
   const [entry, setEntry] = useDraft(`${profileId}/${caseId}/entry`);
   const [error, setError] = useState("");
+  const { confirm } = useConfirm();
   const forProject = projects.includes(project) ? project : (projects[0] ?? "");
 
   useEffect(() => {
@@ -62,6 +64,18 @@ export function EvidencePanel({
       setError(errorText(e));
       return false;
     }
+  }
+
+  // remove asks first, as removing a project from the case does: a note
+  // typed by hand exists nowhere else.
+  async function remove(i: evidence.Item) {
+    const yes = await confirm({
+      title: `Remove ${i.ref}?`,
+      message: "It was added by hand, so Find evidence will not bring it back.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (yes) await change(() => RemoveEvidence(profileId, caseId, i.id));
   }
 
   async function find() {
@@ -123,7 +137,7 @@ export function EvidencePanel({
                     </button>
                   )}
                   {byHand(i.kind) && (
-                    <button type="button" className="btn btn-ghost" aria-label={`Remove ${i.ref}`} onClick={() => void change(() => RemoveEvidence(profileId, caseId, i.id))}>
+                    <button type="button" className="btn btn-ghost" aria-label={`Remove ${i.ref}`} onClick={() => void remove(i)}>
                       Remove
                     </button>
                   )}

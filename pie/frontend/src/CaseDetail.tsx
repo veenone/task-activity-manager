@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useConfirm } from "@agile-suite/core";
-import { AddCaseProjects, GetCase, RemoveCaseProject, SetCaseNotes, SetVerdict } from "../wailsjs/go/main/App";
+import { AddCaseProjects, DeleteCase, GetCase, RemoveCaseProject, SetCaseNotes, SetVerdict } from "../wailsjs/go/main/App";
 import type { cases, query } from "../wailsjs/go/models";
 import { errorText } from "./ProfileForm";
 import { projectLabel, projectNames } from "./linked";
@@ -27,12 +27,14 @@ export function CaseDetail({
   issue,
   result,
   onChanged,
+  onDeleted,
 }: {
   profileId: string;
   id: number;
   issue?: query.Issue;
   result: query.Result | null;
   onChanged: () => void;
+  onDeleted: () => void;
 }) {
   const { confirm } = useConfirm();
   const [detail, setDetail] = useState<cases.Detail | null>(null);
@@ -105,10 +107,33 @@ export function CaseDetail({
     if (yes) await change(() => RemoveCaseProject(profileId, id, key));
   }
 
+  async function deleteCase(key: string) {
+    const yes = await confirm({
+      title: `Delete case ${key}?`,
+      message: "Its verdicts and evidence go with it. Cycles already taken keep their copy.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!yes) return;
+    setError("");
+    try {
+      await DeleteCase(profileId, id);
+      onDeleted();
+      onChanged();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
+
   if (!detail) return error ? <p role="alert" className="error-text">{error}</p> : <p className="muted">Reading the case...</p>;
   return (
     <section className="pie-trace-detail" aria-label={`Case ${detail.key}`}>
-      <h2 className="mono">{detail.key}</h2>
+      <div className="pie-detail-head">
+        <h2 className="mono">{detail.key}</h2>
+        <button type="button" className="btn btn-danger" onClick={() => void deleteCase(detail.key)}>
+          Delete case
+        </button>
+      </div>
       <p>{issue?.summary ?? "This issue is not in the run on screen."}</p>
       <label className="field-label" htmlFor="pie-case-notes">
         Notes

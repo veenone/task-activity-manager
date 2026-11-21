@@ -46,6 +46,10 @@ export function DefaultProfile() {
   return window['go']['main']['App']['DefaultProfile']();
 }
 
+export function DeleteCase(arg1, arg2) {
+  return window['go']['main']['App']['DeleteCase'](arg1, arg2);
+}
+
 export function DeleteCycle(arg1, arg2) {
   return window['go']['main']['App']['DeleteCycle'](arg1, arg2);
 }
