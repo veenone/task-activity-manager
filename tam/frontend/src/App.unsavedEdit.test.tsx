@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient } from "@agile-suite/core";
@@ -24,9 +24,16 @@ vi.mock("./api", async () => {
     GetSyncState: vi.fn(), ListIssues: vi.fn(), GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(),
     ListSprints: vi.fn(), ListOpenSprints: vi.fn(), ListFilterOptions: vi.fn(), GetSubtaskTypeName: vi.fn(),
     ListProjectTypes: vi.fn(), GetProfileSetting: vi.fn(), ListBoards: vi.fn(), ListBoardSprints: vi.fn(),
-    GetEditableFields: vi.fn(), ListEpics: vi.fn(), EventsOn: vi.fn(() => () => {}), ListPendingChanges: vi.fn(),
+    GetEditableFields: vi.fn(), ListEpics: vi.fn(), ListPendingChanges: vi.fn(),
+    EventsOn: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+      menu.handlers[event] = cb;
+      return () => {};
+    }),
   };
 });
+
+// The native menu's handlers, kept so a test can play the part of the menu.
+const menu = vi.hoisted(() => ({ handlers: {} as Record<string, (...args: unknown[]) => void> }));
 
 const issue = (key: string, summary: string): api.Issue => ({
   key, id: key, project: "DEMO", type: "story", summary, status: "To Do",
@@ -135,6 +142,20 @@ describe("the issue panel's unsaved edit", () => {
     await user.click(tab("Boards"));
     await answer(user, "Discard");
     await waitFor(() => expect(tab("Boards")).toHaveAttribute("aria-current", "page"));
+  });
+
+  // A View menu shortcut fires from the native menu even with a dialog up,
+  // and switching under the dialog unmounts whatever it holds (#528).
+  it("ignores the View menu while a dialog is open", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const create = await screen.findByRole("button", { name: "+ New" });
+    await waitFor(() => expect(create).toBeEnabled());
+    await user.click(create);
+    const dialog = await screen.findByRole("dialog");
+    act(() => menu.handlers["menu:view"]("worklog"));
+    expect(dialog).toBeInTheDocument();
+    expect(tab("Backlog")).toHaveAttribute("aria-current", "page");
   });
 
   it("asks before the profile is switched", async () => {

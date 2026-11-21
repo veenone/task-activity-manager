@@ -97,4 +97,4 @@ Changes to other issues in the same commit still go.
 - **Theme** in the top bar switches between light, dark and the system setting.
 - **Help → Diagnostics** shows the database paths, the build and the recent log, which is the first thing to collect when something misbehaves.
 - **Help → Take the tour** walks through the view you are on. **Take the first-run tour** walks through the whole loop: sync, plan, commit.
-- **Ctrl+B** shows or hides the navigation rail.
+- **Ctrl+\\** shows or hides the navigation rail.

@@ -77,22 +77,26 @@ func main() {
 // the menu:view event carries and what the frontend routes on. A gate in
 // frontend/core/src/instruction-gate.test.ts pairs the two lists, as it does
 // for TAM's. The menu is built once and lists every view; the frontend
-// ignores the ones the current profile hides. The first nine take Ctrl+1..9
-// by position.
-var menuViews = []struct{ id, label, accelerator string }{
-	{"browse", "Browse", "1"},
-	{"preconditions", "Preconditions", "2"},
-	{"requirements", "Requirements", "3"},
-	{"duplicates", "Duplicates", "4"},
-	{"gapanalysis", "Gap Analysis", "5"},
-	{"testcalls", "Test Calls", "6"},
-	{"dashboard", "Dashboard", "7"},
-	{"traceability", "Traceability", "8"},
-	{"plans", "Containers", "9"},
-	{"datasets", "Datasets", ""},
-	{"components", "Components", ""},
-	{"coverage", "Coverage", ""},
-	{"misspellings", "Spellcheck", ""},
+// ignores the ones the current profile hides.
+//
+// The items carry no accelerators. Ctrl+1..9 open the Nth tab the profile
+// shows, which only the frontend knows, so it handles those keys itself
+// (shell/useViewShortcuts.ts). Bound here they named fixed views, and on a
+// profile that hides some, Ctrl+2 no longer meant the second tab (#528).
+var menuViews = []struct{ id, label string }{
+	{"browse", "Browse"},
+	{"preconditions", "Preconditions"},
+	{"requirements", "Requirements"},
+	{"duplicates", "Duplicates"},
+	{"gapanalysis", "Gap Analysis"},
+	{"testcalls", "Test Calls"},
+	{"dashboard", "Dashboard"},
+	{"traceability", "Traceability"},
+	{"plans", "Containers"},
+	{"datasets", "Datasets"},
+	{"components", "Components"},
+	{"coverage", "Coverage"},
+	{"misspellings", "Spellcheck"},
 }
 
 // appMenu builds the native menu bar. Most items emit an event the React
@@ -146,17 +150,14 @@ func appMenu(app *App) *menu.Menu {
 
 	view := m.AddSubmenu("View")
 	for _, v := range menuViews {
-		var accel *keys.Accelerator
-		if v.accelerator != "" {
-			accel = keys.CmdOrCtrl(v.accelerator)
-		}
-		view.AddText(v.label, accel, emit("menu:view", v.id))
+		view.AddText(v.label, nil, emit("menu:view", v.id))
 	}
 	view.AddSeparator()
 	// The checkbox owns the rail's state: Wails renders the tick from the
 	// value passed here, so the app reads the stored preference when it builds
-	// the menu and writes it back on every toggle.
-	view.AddCheckbox("Navigation Rail", app.showNavRail(), keys.CmdOrCtrl("b"), func(d *menu.CallbackData) {
+	// the menu and writes it back on every toggle. Ctrl+\ rather than Ctrl+B,
+	// which the editors use for bold (#528).
+	view.AddCheckbox("Navigation Rail", app.showNavRail(), keys.CmdOrCtrl("\\"), func(d *menu.CallbackData) {
 		app.setShowNavRail(d.MenuItem.Checked)
 	})
 
