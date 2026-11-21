@@ -53,7 +53,7 @@ export interface Issue {
   // Jira's own bucket for the status (schema 19): "new", "indeterminate" or
   // "done", the same three keys on every instance where the status name is
   // whatever that instance calls it. Absent or empty when nothing has read
-  // one for this row, and statusClass guesses from the name instead.
+  // one for this row, and core's statusCategory guesses from the name instead.
   statusCategory?: string;
   assignee: string;
   // The Jira username sync, edits, and drafts cache alongside assignee

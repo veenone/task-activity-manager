@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { Menu } from "@agile-suite/core";
 import { Pager } from "../Pager";
 import { SortControl } from "../SortControl";
@@ -125,7 +126,7 @@ export function PreconditionList({ s, a }: { s: PreconditionsState; a: Precondit
                     </div>
                     <div className="precond-item-meta muted">
                       {p.status && (
-                        <span className="status-pill">{p.status}</span>
+                        <JiraStatus status={p.status} />
                       )}
                       {p.testCount} test{p.testCount === 1 ? "" : "s"}
                     </div>

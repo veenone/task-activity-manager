@@ -1,3 +1,4 @@
+import { statusCategory } from "@agile-suite/core";
 import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { Modal } from "./Modal";
@@ -109,7 +110,7 @@ export function BulkTransitionModal({
                   <span className="muted">no readable tests</span>
                 ) : (
                   statusCounts.map(([s, n]) => (
-                    <span key={s} className="status-pill">
+                    <span key={s} className={`chip-status chip-status-${statusCategory(s)}`}>
                       {s}: {n}
                     </span>
                   ))

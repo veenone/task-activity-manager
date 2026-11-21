@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { errMsg } from "../../api";
 import { Pager } from "../Pager";
 import { SortControl } from "../SortControl";
@@ -194,7 +195,7 @@ export function BugListPane({ s, a }: { s: BugsState; a: BugsActions }) {
                       {b.key}
                     </button>
                     <span className="muted">{b.projectKey}</span>
-                    {b.status && <span className="status-pill">{b.status}</span>}
+                    {b.status && <JiraStatus status={b.status} />}
                   </div>
                   <div className="bugs-md-item-summary">
                     {b.summary || "(no summary)"}

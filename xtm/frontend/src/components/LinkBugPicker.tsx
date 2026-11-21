@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { ListBugsWithTests, LinkExistingBugToRun, errMsg } from "../api";
@@ -142,9 +143,7 @@ export function LinkBugPicker({
                     <span className="mono">{b.key}</span>
                     <span className="link-bug-summary">{b.summary}</span>
                     {b.status && (
-                      <span className="status-pill link-bug-status">
-                        {b.status}
-                      </span>
+                      <JiraStatus status={b.status} className="link-bug-status" />
                     )}
                   </button>
                 </li>

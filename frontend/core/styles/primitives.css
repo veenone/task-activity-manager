@@ -1650,6 +1650,21 @@
 .row-summary { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
 .row-summary-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Jira status (JiraStatus.tsx), coloured by status category, in both apps
+   (#539). XTM drew every status in one sky-blue pill, so Done and To Do
+   looked alike. */
+.chip-status {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip-status-todo { background: var(--surface-3); color: var(--text); }
+.chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
+.chip-status-done { background: var(--chip-green-bg); color: var(--chip-green-text); }
+
 /* State badge (StatusBadge.tsx): the one chip that says what state a thing
    is in. The uppercase look is here and not in the string, so the label a
    row also builds its accessible name from stays a word rather than four

@@ -4,7 +4,7 @@ import type { RowPlace } from "@agile-suite/core";
 import type { EpicNode, Issue } from "../api";
 import { TypeChip } from "./TypeChip";
 import { SubtaskToggle } from "./SubtaskToggle";
-import { statusClass } from "../lib/statusClass";
+import { JiraStatus } from "@agile-suite/core";
 import type { Row } from "../lib/epicTreeItems";
 import { ProgressBar } from "@agile-suite/core";
 import { progressText } from "../lib/format";
@@ -124,7 +124,7 @@ export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true,
         <span className="row-summary-text" title={summary}>{summary}</span>
       </span>
       <span className="epic-cell epic-cell-status">
-        <span className={`chip chip-status chip-status-${statusClass(child.status, child.statusCategory)}`} title={child.status}>{child.status}</span>
+        <JiraStatus status={child.status} category={child.statusCategory} />
       </span>
       <span className="epic-cell epic-cell-points">{child.storyPoints ?? "-"}</span>
       {child.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}

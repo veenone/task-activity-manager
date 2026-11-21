@@ -4,7 +4,7 @@ import { RowLead, toPlainText } from "@agile-suite/core";
 import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
-import { statusClass } from "../lib/statusClass";
+import { JiraStatus } from "@agile-suite/core";
 import { hasTime, issueTime, timeBar, timeCell, timeCellTitle, timeUnestimated } from "../lib/issueTime";
 import { ProgressBar } from "@agile-suite/core";
 import { keyColumnWidth } from "../lib/keyColumn";
@@ -179,7 +179,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               <span role="gridcell">
                 {iss.draft
                   ? <span className="chip chip-draft">Draft</span>
-                  : <span className={`chip chip-status chip-status-${statusClass(iss.status, iss.statusCategory)}`} title={iss.status}>{iss.status}</span>}
+                  : <JiraStatus status={iss.status} category={iss.statusCategory} />}
               </span>
               <span role="gridcell" title={iss.assignee || undefined}>{iss.assignee || "-"}</span>
               <span role="gridcell" title={iss.sprintName}>{iss.sprintName || iss.sprintId || "-"}</span>

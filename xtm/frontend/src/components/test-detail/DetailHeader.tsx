@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 
 import type { TestDetailState } from "./useTestDetailState";
 import type { TestDetailActions } from "./useTestDetailActions";
@@ -34,9 +35,7 @@ export function DetailHeader({ s, a, p }: { s: TestDetailState; a: TestDetailAct
             <span className="mono detail-key">{testKey}</span>
           )}
           {test && (
-            <span className="status-pill detail-head-status">
-              {test.status || "(none)"}
-            </span>
+            <JiraStatus status={test.status || "(none)"} className="detail-head-status" />
           )}
         </div>
         <div className="detail-head-actions">

@@ -107,3 +107,13 @@ describe("the health glyph and the theme", () => {
     expect(screen.queryByText(/Theme:/)).toBeNull();
   });
 });
+
+// The bar used the machine locale while every field reads day first, so one
+// window could show 20/11 and 11/20 (#539). It goes through core's helper now.
+describe("StatusBar last synced", () => {
+  it("prints the sync time day first, the way the fields do", () => {
+    const stamp = new Date(2026, 10, 11, 9, 30).toISOString();
+    render(<StatusBar s={state({ syncState: { testCount: 12, lastSyncedAt: stamp } })} />);
+    expect(screen.getByText(/last synced/)).toHaveTextContent("last synced 11/11/2026 09:30");
+  });
+});

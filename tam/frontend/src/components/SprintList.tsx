@@ -11,7 +11,7 @@ import { plural, points } from "../lib/format";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { typeChipLabel } from "../lib/typeChip";
 import { typeColumnWidth } from "../lib/typeColumn";
-import { statusClass } from "../lib/statusClass";
+import { JiraStatus } from "@agile-suite/core";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { TypeChip } from "./TypeChip";
 import { SubtaskToggle } from "./SubtaskToggle";
@@ -290,9 +290,7 @@ export function SprintList({
           {nested && <small className="subtask-assignee">{issue.assignee || UNASSIGNED_LABEL}</small>}
         </span>
         <span className="sprint-cell">
-          <span className={`chip chip-status chip-status-${statusClass(issue.status, issue.statusCategory)}`} title={issue.status}>
-            {issue.status}
-          </span>
+          <JiraStatus status={issue.status} category={issue.statusCategory} />
         </span>
         <span className="sprint-cell epic-cell-points">{issue.storyPoints ?? "-"}</span>
         {issue.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}

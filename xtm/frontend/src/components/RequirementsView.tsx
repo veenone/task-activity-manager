@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFocusWhen, useViewState } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
@@ -502,7 +503,7 @@ export function RequirementsView({ onChanged }: Props) {
               <span className="kind-badge req-kind">{sel.issueType}</span>
               <span className="mono reqs-detail-key">{sel.key}</span>
               <span className="muted reqs-detail-project">{sel.projectKey}</span>
-              {sel.status && <span className="status-pill">{sel.status}</span>}
+              {sel.status && <JiraStatus status={sel.status} />}
               <span
                 className={`cov-badge cov-${sel.coverage.toLowerCase()} reqs-detail-cov`}
               >

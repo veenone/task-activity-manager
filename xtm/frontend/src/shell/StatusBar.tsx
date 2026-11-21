@@ -1,4 +1,4 @@
-import { SyncRibbon } from "@agile-suite/core";
+import { SyncRibbon, formatWhen } from "@agile-suite/core";
 
 import type { SyncProgress } from "../api";
 import type { AppState } from "./useAppState";
@@ -29,9 +29,7 @@ export function StatusBar({ s }: { s: AppState }) {
             <span className="muted sync-info">
               {syncState.testCount.toLocaleString()} tests
               {syncState.lastSyncedAt
-                ? ` · last synced ${new Date(
-                    syncState.lastSyncedAt,
-                  ).toLocaleString()}`
+                ? ` · last synced ${formatWhen(syncState.lastSyncedAt)}`
                 : " · never synced"}
             </span>
           ) : null}
