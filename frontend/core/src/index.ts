@@ -6,6 +6,7 @@ export type { ViewApi } from "./contexts/createViewContext";
 export { ProfileProvider, useProfile } from "./contexts/ProfileContext";
 export type { ProfileBackend, ProfileState } from "./contexts/ProfileContext";
 export { Modal } from "./components/Modal";
+export { DialogBody, DialogFooter, DialogHeader } from "./components/DialogFrame";
 export { AboutDialog } from "./components/about/AboutDialog";
 export { DiagnosticsDialog } from "./components/about/DiagnosticsDialog";
 export { ProfilesDialog } from "./components/profile/ProfilesDialog";

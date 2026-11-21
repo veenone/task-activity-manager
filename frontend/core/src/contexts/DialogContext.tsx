@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { Modal } from "../components/Modal";
+import { DialogBody, DialogFooter, DialogHeader } from "../components/DialogFrame";
 import { announce } from "../components/LiveRegion";
 import type { NoticeOptions } from "../components/useNotice";
 import type { ConfirmOptions } from "../components/useConfirm";
@@ -142,29 +143,17 @@ function NoticeModal({
       labelledBy="notice-title"
       initialFocus={okRef}
     >
-      <div className="pending-head">
-        <h2 id="notice-title">{title}</h2>
-        <button
-          className="btn btn-ghost"
-          onClick={onClose}
-          title="Close"
-          aria-label="Close"
-        >
-          ✕
-        </button>
-      </div>
+      <DialogHeader titleId="notice-title" title={title} onClose={onClose} />
       {message && (
-        <div
-          className={`bulk-body confirm-message${tone === "error" ? " error-text" : ""}`}
-        >
+        <DialogBody className={`confirm-message${tone === "error" ? " error-text" : ""}`}>
           {message}
-        </div>
+        </DialogBody>
       )}
-      <div className="pending-actions">
+      <DialogFooter>
         <button ref={okRef} className="btn btn-primary" onClick={onClose}>
           OK
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }
@@ -190,19 +179,9 @@ function ConfirmModal({
       role="alertdialog"
       labelledBy="confirm-title"
     >
-      <div className="pending-head">
-        <h2 id="confirm-title">{title}</h2>
-        <button
-          className="btn btn-ghost"
-          onClick={onCancel}
-          title="Cancel"
-          aria-label="Cancel"
-        >
-          ✕
-        </button>
-      </div>
-      {message && <div className="bulk-body confirm-message">{message}</div>}
-      <div className="pending-actions">
+      <DialogHeader titleId="confirm-title" title={title} onClose={onCancel} closeLabel="Cancel" />
+      {message && <DialogBody className="confirm-message">{message}</DialogBody>}
+      <DialogFooter>
         <button ref={cancelRef} className="btn" onClick={onCancel}>
           {cancelLabel ?? "Cancel"}
         </button>
@@ -212,7 +191,7 @@ function ConfirmModal({
         >
           {confirmLabel ?? "Delete"}
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }
@@ -238,13 +217,8 @@ function PromptModal({
       className="modal prompt-modal"
       labelledBy="prompt-modal-title"
     >
-      <div className="pending-head">
-        <h2 id="prompt-modal-title">{title}</h2>
-        <button className="btn btn-ghost" onClick={onCancel} title="Cancel" aria-label="Cancel">
-          ✕
-        </button>
-      </div>
-      <div className="bulk-body">
+      <DialogHeader titleId="prompt-modal-title" title={title} onClose={onCancel} closeLabel="Cancel" />
+      <DialogBody>
         <input
           ref={inputRef}
           className="detail-input"
@@ -257,15 +231,15 @@ function PromptModal({
             if (e.key === "Escape") onCancel();
           }}
         />
-      </div>
-      <div className="pending-actions">
+      </DialogBody>
+      <DialogFooter>
         <button className="btn" onClick={onCancel}>
           Cancel
         </button>
         <button className="btn btn-primary" onClick={() => onSubmit(value)}>
           {submitLabel ?? "OK"}
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

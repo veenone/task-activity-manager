@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Modal, errMsg } from "@agile-suite/core";
+import { DialogBody, DialogFooter, DialogHeader, Modal, errMsg } from "@agile-suite/core";
 import type { RitualRootMissing, RitualRootResult } from "../api";
 import {
   ROOT_AFTER_SENTENCE, ROOT_TITLE_EMPTY, rootForbiddenSentence, rootMissingSentence, rootPlacementSentence,
@@ -93,39 +93,41 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
 
   return (
     <Modal onClose={onClose} className="modal ritual-root-modal" labelledBy={titleId} closeOnEsc={!working} closeOnOverlayClick={!working}>
-      <h2 id={titleId}>Rituals root page not found</h2>
-      <p>{rootMissingSentence(missing.pageId)}</p>
-      {editing && (
-        <>
-          <label className="ritual-root-title">
-            Page title
-            <input
-              ref={titleRef}
-              className="detail-input"
-              value={title}
-              disabled={working}
-              spellCheck={false}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !working) {
-                  e.preventDefault();
-                  void run(title, false);
-                }
-              }}
-            />
-          </label>
-          <p className="muted small">{rootPlacementSentence(missing.spaceKey)}</p>
-          <p className="muted small">{ROOT_AFTER_SENTENCE}</p>
-        </>
-      )}
-      {step.kind === "forbidden" && <p className="warn-text" role="status">{rootForbiddenSentence(missing.spaceKey)}</p>}
-      {step.kind === "taken" && (
-        <p className="warn-text" role="status">
-          {step.topLevel ? rootTakenTopSentence(step.title, missing.spaceKey) : rootTakenNestedSentence(step.title, missing.spaceKey)}
-        </p>
-      )}
-      {error && <p className="error-text" role="alert">{error}</p>}
-      <div className="form-actions form-actions-end">
+      <DialogHeader titleId={titleId} title="Rituals root page not found" onClose={onClose} disabled={working} />
+      <DialogBody>
+        <p>{rootMissingSentence(missing.pageId)}</p>
+        {editing && (
+          <>
+            <label className="ritual-root-title">
+              Page title
+              <input
+                ref={titleRef}
+                className="detail-input"
+                value={title}
+                disabled={working}
+                spellCheck={false}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !working) {
+                    e.preventDefault();
+                    void run(title, false);
+                  }
+                }}
+              />
+            </label>
+            <p className="muted small">{rootPlacementSentence(missing.spaceKey)}</p>
+            <p className="muted small">{ROOT_AFTER_SENTENCE}</p>
+          </>
+        )}
+        {step.kind === "forbidden" && <p className="warn-text" role="status">{rootForbiddenSentence(missing.spaceKey)}</p>}
+        {step.kind === "taken" && (
+          <p className="warn-text" role="status">
+            {step.topLevel ? rootTakenTopSentence(step.title, missing.spaceKey) : rootTakenNestedSentence(step.title, missing.spaceKey)}
+          </p>
+        )}
+        {error && <p className="error-text" role="alert">{error}</p>}
+      </DialogBody>
+      <DialogFooter>
         {step.kind === "taken" && (
           <button className="btn" ref={step.topLevel ? undefined : primaryRef} onClick={() => setStep({ kind: "confirm" })}>Back</button>
         )}
@@ -141,7 +143,7 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
         {step.kind === "taken" && step.topLevel && (
           <button className="btn btn-primary" ref={primaryRef} onClick={() => void run(step.title, true)}>Use this page and sync</button>
         )}
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

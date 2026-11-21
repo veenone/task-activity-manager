@@ -152,3 +152,12 @@ describe("RitualRootDialog", () => {
     expect(create).toHaveBeenLastCalledWith("PLAT Rituals", true);
   });
 });
+
+describe("RitualRootDialog frame", () => {
+  it("closes from the close button in its header without creating a page", async () => {
+    const props = renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(props.create).not.toHaveBeenCalled();
+  });
+});
