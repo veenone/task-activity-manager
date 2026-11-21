@@ -6,7 +6,7 @@ import type { CoverageActions } from "./useCoverageActions";
 // and maps tests to a value.
 export function CoverageMatrix({ s, a }: { s: CoverageState; a: CoverageActions }) {
   const { versionId, newGroupName, setNewGroupName, setMapping, model, report, staleByValue } = s;
-  const { addGroup, deleteNode } = a;
+  const { addGroup, deleteGroup } = a;
   return (
     <>
       <div className="cov-matrix">
@@ -23,7 +23,12 @@ export function CoverageMatrix({ s, a }: { s: CoverageState; a: CoverageActions 
                   <span className="cov-group-pct">
                     {g.tested}/{g.total} ({g.percent}%)
                   </span>
-                  <button className="cov-x" title="Delete group" onClick={() => void deleteNode("group", g.groupId)} aria-label="Delete group">
+                  <button
+                    className="cov-x"
+                    title={`Delete group ${g.name}`}
+                    onClick={() => void deleteGroup(g.groupId, g.name)}
+                    aria-label={`Delete group ${g.name}`}
+                  >
                     ×
                   </button>
                 </div>

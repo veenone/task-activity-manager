@@ -155,9 +155,21 @@ export function useCoverageActions(s: CoverageState, p: CoverageViewProps) {
     }
   }
 
-  async function deleteNode(kind: string, id: string) {
+  // deleteGroup asks first: the group, its parameters, values and test mappings
+  // are local and not journalled, so nothing can bring them back.
+  async function deleteGroup(id: string, name: string) {
+    const params = model?.groups.find((g) => g.id === id)?.parameters ?? [];
+    const values = params.reduce((n, p) => n + p.values.length, 0);
+    const ok = await confirm({
+      title: `Delete group "${name}"?`,
+      message:
+        `This deletes its ${plural(params.length, "parameter")}, ${plural(values, "value")}, and their test mappings. ` +
+        "Your Jira tests are untouched. This cannot be undone.",
+      danger: true,
+    });
+    if (!ok) return;
     try {
-      await DeleteCoverageNode(profileId, kind, id);
+      await DeleteCoverageNode(profileId, "group", id);
       await reload();
     } catch (e) {
       setError(errMsg(e));
@@ -179,7 +191,11 @@ export function useCoverageActions(s: CoverageState, p: CoverageViewProps) {
     }
   }
 
-  return { createCanonical, deleteCanonical, importTemplate, exportReport, downloadTemplate, loadDemoExample, loadPkcsReference, addGroup, deleteNode, applyVersionToAll };
+  return { createCanonical, deleteCanonical, importTemplate, exportReport, downloadTemplate, loadDemoExample, loadPkcsReference, addGroup, deleteGroup, applyVersionToAll };
+}
+
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
 export type CoverageActions = ReturnType<typeof useCoverageActions>;
