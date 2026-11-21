@@ -77,6 +77,24 @@ export function CaseDetail({
     }
   }
 
+  // saveNotes stores a changed notes draft. It runs on blur as the Reason input
+  // does, so notes survive a click on another case or view (#543). The case on
+  // screen takes the notes first, which disables Save notes before the click
+  // that caused the blur reaches it; a failed save puts the old notes back.
+  function saveNotes() {
+    if (!detail || notes === detail.notes) return;
+    const before = detail.notes;
+    setDetail({ ...detail, notes } as cases.Detail);
+    void change(async () => {
+      try {
+        await SetCaseNotes(profileId, id, notes);
+      } catch (e) {
+        setDetail((d) => d && ({ ...d, notes: before } as cases.Detail));
+        throw e;
+      }
+    });
+  }
+
   async function remove(key: string) {
     const yes = await confirm({
       title: `Remove ${key} from the case?`,
@@ -95,13 +113,16 @@ export function CaseDetail({
       <label className="field-label" htmlFor="pie-case-notes">
         Notes
       </label>
-      <textarea id="pie-case-notes" className="detail-input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <textarea
+        id="pie-case-notes"
+        className="detail-input"
+        rows={3}
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        onBlur={saveNotes}
+      />
       <div className="form-actions">
-        <button type="button" className="btn" disabled={notes === detail.notes} onClick={() => void change(async () => {
-          await SetCaseNotes(profileId, id, notes);
-          // Only the notes changed; the rest of the case on screen stays as it is.
-          setDetail((d) => d && ({ ...d, notes } as cases.Detail));
-        })}>
+        <button type="button" className="btn" disabled={notes === detail.notes} onClick={saveNotes}>
           Save notes
         </button>
       </div>

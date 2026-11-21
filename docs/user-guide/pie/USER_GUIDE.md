@@ -450,8 +450,9 @@ The **Cases** tab lists your cases, with or without a run on screen. Each one
 shows its summary when the run on screen holds the issue, and how many of its
 projects have a verdict and how many are affected. Choose a case to open it.
 
-A case has notes, which you save with **Save notes**, and a list of projects
-to assess. **Add projects** searches Jira's project list by key or name.
+A case has notes and a list of projects to assess. PIE saves the notes when
+you leave their box, so they are kept if you open another case or tab, and
+**Save notes** saves them on the spot. **Add projects** searches Jira's project list by key or name.
 Tick the projects you want and add them. A project starts at *not assessed*.
 
 For each project, pick a verdict: *not assessed*, *investigating*,
@@ -483,6 +484,8 @@ suggests evidence for other projects:
 Accept or dismiss each suggestion. Running **Find evidence** again adds what
 is new and keeps what you decided about the rest. You can also add a note or
 an issue key by hand for any project on the case, and remove what you added.
+Phrases and a note or key you have typed but not added stay with the case
+when you open another case or tab, until you close PIE.
 Evidence for a project not yet on the case shows a button that adds it.
 
 Evidence helps you decide a verdict but never changes one. Demo has links,
