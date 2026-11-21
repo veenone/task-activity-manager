@@ -74,6 +74,26 @@ func (s *Store) Get(profileID string, id int64) (Detail, error) {
 	return d, rows.Err()
 }
 
+// Delete removes one of the profile's cases with its projects, verdicts and
+// evidence, in one transaction. Cycles keep their own copies of the case.
+func (s *Store) Delete(profileID string, id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	r, err := tx.Exec(`DELETE FROM case_item WHERE profile_id = ? AND id = ?`, profileID, id)
+	if err := oneRow(r, err, errNoCase); err != nil {
+		return err
+	}
+	for _, table := range []string{"case_project", "evidence"} {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE profile_id = ? AND case_id = ?`, profileID, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // SetNotes replaces the case's notes.
 func (s *Store) SetNotes(profileID string, id int64, notes string) error {
 	r, err := s.db.Exec(`UPDATE case_item SET notes = ? WHERE profile_id = ? AND id = ?`, notes, profileID, id)

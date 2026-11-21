@@ -34,6 +34,8 @@ export function Cycles(arg1:string):Promise<Array<cycles.Cycle>>;
 
 export function DefaultProfile():Promise<string>;
 
+export function DeleteCase(arg1:string,arg2:number):Promise<void>;
+
 export function DeleteCycle(arg1:string,arg2:number):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;

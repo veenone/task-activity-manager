@@ -11,6 +11,7 @@ vi.mock("../wailsjs/go/main/App", () => ({
   SetCaseNotes: vi.fn(),
   AddCaseProjects: vi.fn(),
   RemoveCaseProject: vi.fn(),
+  DeleteCase: vi.fn(),
   SetVerdict: vi.fn(),
   JiraProjects: vi.fn(),
   ProjectGroups: vi.fn(),
@@ -137,6 +138,33 @@ describe("Cases page", () => {
     expect(api.RemoveCaseProject).not.toHaveBeenCalled();
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }));
     expect(api.RemoveCaseProject).toHaveBeenCalledWith("p1", 1, "ALPHA");
+  });
+
+  it("deletes a case only after confirming, then closes it and tells the list", async () => {
+    vi.mocked(api.DeleteCase).mockResolvedValue();
+    const onChanged = vi.fn();
+    const user = show(onChanged);
+    const page = await openFirst(user);
+    await user.click(within(page).getByRole("button", { name: "Delete case" }));
+    const ask = await screen.findByRole("alertdialog");
+    expect(ask).toHaveTextContent("Its verdicts and evidence go with it");
+    expect(api.DeleteCase).not.toHaveBeenCalled();
+    await user.click(within(ask).getByRole("button", { name: "Delete" }));
+    expect(api.DeleteCase).toHaveBeenCalledWith("p1", 1);
+    expect(onChanged).toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: "Case A-1" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the case when the analyst says no, and says why a delete failed", async () => {
+    vi.mocked(api.DeleteCase).mockRejectedValue("that case no longer exists");
+    const user = show();
+    const page = await openFirst(user);
+    await user.click(within(page).getByRole("button", { name: "Delete case" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByText("Cancel"));
+    expect(api.DeleteCase).not.toHaveBeenCalled();
+    await user.click(within(page).getByRole("button", { name: "Delete case" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    expect(await within(page).findByRole("alert")).toHaveTextContent("that case no longer exists");
   });
 });
 

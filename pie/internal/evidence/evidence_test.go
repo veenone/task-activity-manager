@@ -238,3 +238,34 @@ func TestEvidenceIsChangedOnlyThroughItsOwnCase(t *testing.T) {
 		t.Fatalf("evidence gone: %+v", got)
 	}
 }
+
+func TestDeletingACaseTakesItsEvidenceAndLeavesOtherCases(t *testing.T) {
+	f, _ := setup(t)
+	if err := f.cs.Open("p1", []string{"A-2"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := f.cs.List("p1")
+	other := list[1].ID
+	_ = f.cs.AddProjects("p1", f.id, []string{"B"})
+	_ = f.ev.AddNote("p1", f.id, "B", "goes")
+	_ = f.ev.AddNote("p1", other, "B", "stays")
+
+	if err := f.cs.Delete("p2", f.id); err == nil {
+		t.Fatal("deleted another profile's case")
+	}
+	if err := f.cs.Delete("p1", f.id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.cs.Get("p1", f.id); err == nil {
+		t.Fatal("the case is still there")
+	}
+	if got, _ := f.ev.List("p1", f.id); len(got) != 0 {
+		t.Fatalf("evidence outlived its case: %+v", got)
+	}
+	if got, _ := f.ev.List("p1", other); len(got) != 1 || got[0].Ref != "stays" {
+		t.Fatalf("the other case's evidence = %+v", got)
+	}
+	if err := f.cs.Delete("p1", f.id); err == nil {
+		t.Fatal("deleting a case twice said nothing")
+	}
+}

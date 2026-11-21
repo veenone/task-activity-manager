@@ -20,6 +20,14 @@ func (a *App) GetCase(profileID string, id int64) (cases.Detail, error) {
 	return a.cases.Get(profileID, id)
 }
 
+// DeleteCase removes a case with its verdicts and evidence.
+func (a *App) DeleteCase(profileID string, id int64) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.cases.Delete(profileID, id)
+}
+
 // SetCaseNotes replaces a case's notes.
 func (a *App) SetCaseNotes(profileID string, id int64, notes string) error {
 	if err := a.requireStore(); err != nil {

@@ -469,8 +469,12 @@ Projects you often assess together can be saved as a group: tick them and
 choose **Save as group...**. Choosing a group in the picker ticks all its
 projects. Deleting a group leaves the cases that used it as they are.
 
-Cases, verdicts and groups stay on this computer until you delete the profile.
-PIE never sets a verdict by itself and writes nothing to Jira.
+**Delete case** removes a case opened by mistake, after asking. Its verdicts
+and evidence go with it, and its key leaves the list above the views. Cycles
+taken before keep their own copy of it.
+
+Cases, verdicts and groups stay on this computer until you delete them or the
+profile. PIE never sets a verdict by itself and writes nothing to Jira.
 
 ### Evidence
 
@@ -487,7 +491,8 @@ suggests evidence for other projects:
 
 Accept or dismiss each suggestion. Running **Find evidence** again adds what
 is new and keeps what you decided about the rest. You can also add a note or
-an issue key by hand for any project on the case, and remove what you added.
+an issue key by hand for any project on the case, and remove what you added;
+PIE asks before it removes one.
 Phrases and a note or key you have typed but not added stay with the case
 when you open another case or tab, until you close PIE.
 Evidence for a project not yet on the case shows a button that adds it.

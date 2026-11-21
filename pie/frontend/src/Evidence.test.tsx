@@ -81,5 +81,17 @@ it("adds a note by hand and removes evidence added by hand", async () => {
   await user.click(screen.getByRole("button", { name: "Add note" }));
   expect(api.AddEvidenceNote).toHaveBeenCalledWith("p1", 9, "ALPHA", "Same chip in the field");
   await user.click(screen.getByRole("button", { name: "Remove Seen by field team" }));
+  expect(api.RemoveEvidence).not.toHaveBeenCalled();
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }));
   expect(api.RemoveEvidence).toHaveBeenCalledWith("p1", 9, 3);
+});
+
+it("keeps evidence added by hand when the analyst says no", async () => {
+  const user = show();
+  await user.click(await screen.findByRole("button", { name: "Remove Seen by field team" }));
+  const ask = await screen.findByRole("alertdialog");
+  expect(ask).toHaveTextContent("Remove Seen by field team?");
+  await user.click(within(ask).getByText("Cancel"));
+  expect(api.RemoveEvidence).not.toHaveBeenCalled();
+  expect(screen.getByText("Seen by field team")).toBeVisible();
 });

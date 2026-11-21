@@ -104,6 +104,7 @@ export function CasesPage({
             issue={issues.get(open.key)}
             result={result}
             onChanged={onChanged}
+            onDeleted={() => setOpenId(null)}
           />
         )}
       </div>
