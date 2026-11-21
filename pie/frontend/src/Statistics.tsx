@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { BarChart } from "./BarChart";
 import { projectLabel, projectNames } from "./linked";
@@ -8,6 +7,7 @@ import { Pager, usePaged } from "./Pager";
 import { useSort } from "./sort";
 import { ProjectInput } from "./ProjectInput";
 import { statistics } from "./stats";
+import { useKept } from "./viewKeep";
 
 const RANGES = [
   { days: 0, label: "All time" },
@@ -29,8 +29,8 @@ export function Card({ value, label }: { value: number | string; label: string }
 // Statistics counts the run on screen. productField is the profile's product
 // base field; without one, product bases are left out rather than shown as 0.
 export function Statistics({ result, productField }: { result: query.Result; productField: string }) {
-  const [chosen, setProject] = useState("");
-  const [withinDays, setWithinDays] = useState(0);
+  const [chosen, setProject] = useKept("stats", "chosen", "");
+  const [withinDays, setWithinDays] = useKept("stats", "withinDays", 0);
   const projects = [...new Set(result.issues.filter((i) => i.matched).map((i) => i.project))].sort();
   // A filter on a project the new run does not hold would zero every number.
   const project = projects.includes(chosen) ? chosen : "";
@@ -49,7 +49,7 @@ export function Statistics({ result, productField }: { result: query.Result; pro
     dated: (f) => f.dated,
     days: (f) => f.medianDays ?? "",
   });
-  const { rows, pager } = usePaged(perProject.sorted);
+  const { rows, pager } = usePaged(perProject.sorted, 0, undefined, "stats");
   // The field is read when a query runs; a run from before it was set has none.
   const bases = productField !== "" && result.issues.some((i) => (i.bases ?? []).length > 0);
 

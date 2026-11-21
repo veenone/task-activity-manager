@@ -109,6 +109,13 @@ list, choose how many rows a page holds, move to the first, previous, next or
 last page, or type a page number. When a filter or a new run leaves fewer
 pages, PIE shows the last page that is left.
 
+Each tab keeps what you set in it while you visit another: the filters,
+search, page and ticked rows in Results, the view and filters in the Project
+map and the Link map, the issue graph as far as you expanded it, and the case
+or cycle left open. A new run keeps them too, where its rows still allow.
+Switching to another profile starts every tab clean, and closing PIE forgets
+them.
+
 If Jira refuses the query, PIE shows Jira's own message and leaves the previous
 results on screen. A query that names a saved filter with `filter = 12345` fails
 as a whole if your account cannot see that filter, even when the filter is only

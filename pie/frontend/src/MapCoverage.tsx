@@ -1,9 +1,10 @@
-import { type CSSProperties, useState } from "react";
+import type { CSSProperties } from "react";
 import type { query } from "../wailsjs/go/models";
 import { coverage, leastCovered, percent } from "./coverage";
 import { projectLabel } from "./linked";
 import { FIX_STATES } from "./mapData";
 import { Pager, usePaged } from "./Pager";
+import { useKept } from "./viewKeep";
 
 type Group = { baseline: string | null; projects: string[] };
 
@@ -26,13 +27,13 @@ export function MapCoverage({
   names: Map<string, string>;
   onOpen: (key: string) => void;
 }) {
-  const [gapsOnly, setGapsOnly] = useState(false);
-  const [sort, setSort] = useState<(typeof SORTS)[number]>("Run order");
+  const [gapsOnly, setGapsOnly] = useKept("map-coverage", "gapsOnly", false);
+  const [sort, setSort] = useKept<(typeof SORTS)[number]>("map-coverage", "sort", "Run order");
   const name = (p: string) => projectLabel(p, names.get(p));
   const grouped = groups.some((g) => g.baseline !== null);
   const { rows: all, columns } = coverage(sets, groups, issues);
   const kept = all.filter((r) => !gapsOnly || r.cells.includes("gap"));
-  const { rows, pager } = usePaged(sort === "Run order" ? kept : leastCovered(kept));
+  const { rows, pager } = usePaged(sort === "Run order" ? kept : leastCovered(kept), 0, undefined, "map-coverage");
   const span = grouped ? 2 : undefined;
 
   return (

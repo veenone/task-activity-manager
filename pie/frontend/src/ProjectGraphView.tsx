@@ -11,6 +11,7 @@ import {
 } from "./linkData";
 import { projectGraph } from "./projectGraph";
 import { ProjectInput } from "./ProjectInput";
+import { useKept } from "./viewKeep";
 
 // G6 is loaded with the view, not with the app.
 const G6Canvas = lazy(() => import("./G6Canvas"));
@@ -39,16 +40,13 @@ export function ProjectGraphView({
   onGrid: (projects: string[]) => void;
 }) {
   const first = useMemo(() => busiest(edges, issues), [edges, issues]);
-  const [history, setHistory] = useState<History>(() => ({
-    keys: [first],
-    at: 0,
-  }));
+  const [history, setHistory] = useKept<History>("links-projects", "history", { keys: [first], at: 0 });
   const [selected, setSelected] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [hidden, setHidden] = useKept<Set<string>>("links-projects", "hidden", new Set());
   // The box keeps what is typed, so clearing it to type 2 does not make 12.
-  const [minText, setMinText] = useState("1");
+  const [minText, setMinText] = useKept("links-projects", "minText", "1");
   const min = Math.max(1, Math.floor(Number(minText)) || 1);
-  const [secondRing, setSecondRing] = useState(false);
+  const [secondRing, setSecondRing] = useKept("links-projects", "secondRing", false);
   const canvas = useRef<CanvasApi>(null);
   const go = (p: string) => {
     setHistory((h) => visit(h, p));

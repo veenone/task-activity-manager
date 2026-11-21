@@ -23,6 +23,7 @@ import {
 import { IssueDetails } from "./IssueDetails";
 import { errorText, isDemo } from "./ProfileForm";
 import { NoticeContext } from "./StatusBar";
+import { useKept } from "./viewKeep";
 
 // G6 is loaded with the view, not with the app, so it costs nothing until
 // someone opens the issue graph.
@@ -64,7 +65,7 @@ export function IssueGraphView({
     [result],
   );
   const [start] = useState(() => busiestIssue(result.issues.filter((i) => !startIn || i.project === startIn)));
-  const [graph, setGraph] = useState<Graph>(() => {
+  const [firstGraph] = useState<Graph>(() => {
     if (!start) return emptyGraph();
     const first = run.get(start)!;
     const near = neighbourKeys(first)
@@ -75,15 +76,17 @@ export function IssueGraphView({
       [first, ...near].map((issue) => ({ issue, inRun: true, fetchedAt: "" })),
     ).graph;
   });
+  // The expanded graph and its history survive a tab switch (#546), one
+  // graph for each project the network can start it in.
+  const kept = `links-issues:${startIn}`;
+  const [graph, setGraph] = useKept<Graph>(kept, "graph", firstGraph);
   // The issue the graph is laid out around (#469). Choosing a node only
   // selects it; Find and Centre here move the centre.
-  const [centre, setCentre] = useState(start);
-  const [history, setHistory] = useState<History>(() =>
-    start ? { keys: [start], at: 0 } : { keys: [], at: -1 },
-  );
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [outside, setOutside] = useState(true);
-  const [finished, setFinished] = useState(true);
+  const [centre, setCentre] = useKept(kept, "centre", start);
+  const [history, setHistory] = useKept<History>(kept, "history", start ? { keys: [start], at: 0 } : { keys: [], at: -1 });
+  const [hidden, setHidden] = useKept<Set<string>>(kept, "hidden", new Set());
+  const [outside, setOutside] = useKept(kept, "outside", true);
+  const [finished, setFinished] = useKept(kept, "finished", true);
   const [find, setFind] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");

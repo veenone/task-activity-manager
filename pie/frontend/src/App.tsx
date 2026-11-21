@@ -34,6 +34,7 @@ import { useCases } from "./useCases";
 import { useMenu } from "./useMenu";
 import { useReplaceJql } from "./useReplaceJql";
 import { type View, VIEWS } from "./views";
+import { useClearOnSwitch, ViewScope } from "./viewKeep";
 
 // chooseProfile is the first wanted id the list still holds, else its first
 // profile, else none.
@@ -68,6 +69,7 @@ export default function App() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const cases = useCases(profileId, setError);
   const progress = useRunProgress(running);
+  useClearOnSwitch(profileId);
   // null until the stored names arrive, so the dialog cannot save blanks over them.
   const [fields, setFields] = useState<saved.Fields | null>(null);
   const [editingFields, setEditingFields] = useState(false);
@@ -245,6 +247,7 @@ export default function App() {
 
   return (
     <NoticeContext.Provider value={setNotice}>
+    <ViewScope.Provider value={profileId}>
     <div className="app">
       <TopBar
         profiles={profiles}
@@ -385,6 +388,7 @@ export default function App() {
         theme={shownTheme}
       />
     </div>
+    </ViewScope.Provider>
     </NoticeContext.Provider>
   );
 }

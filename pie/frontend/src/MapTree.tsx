@@ -1,6 +1,6 @@
-import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { OutOfStep, projectLabel } from "./linked";
+import { useKept } from "./viewKeep";
 
 type Group = { baseline: string | null; projects: string[] };
 
@@ -20,10 +20,10 @@ export function MapTree({
   names: Map<string, string>;
   onOpen: (key: string) => void;
 }) {
-  const [chosen, setChosen] = useState("");
+  const [chosen, setChosen] = useKept("map-tree", "chosen", "");
   // grouped folds a project's issues under one node per status, so a project
   // with hundreds of issues is a few lines until one is opened (#455).
-  const [grouped, setGrouped] = useState(false);
+  const [grouped, setGrouped] = useKept("map-tree", "grouped", false);
   const label = (p: string) => projectLabel(p, names.get(p));
   const lit = new Set(sets.find((s) => s.keys[0] === chosen)?.keys ?? []);
   const keysIn = (p: string) => [...new Set(sets.flatMap((s) => s.keys))].filter((k) => issues.get(k)?.project === p).sort();
