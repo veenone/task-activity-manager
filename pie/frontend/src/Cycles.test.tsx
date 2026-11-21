@@ -108,6 +108,7 @@ it("takes an unpublished cycle again, and deletes it only after confirming", asy
   const user = show();
   vi.mocked(api.RetakeCycle).mockResolvedValue({ ...detail, takenAt: "2026-11-07T11:00:00Z" } as never);
   await user.click(await screen.findByRole("button", { name: "Take again" }));
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Take again" }));
   expect(api.RetakeCycle).toHaveBeenCalledWith("p1", 2);
 
   await user.click(screen.getByRole("button", { name: "Delete" }));
@@ -126,10 +127,45 @@ it("offers neither Take again nor Delete on a published cycle", async () => {
   expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
 });
 
+it("replaces nothing when the analyst says no to Take again", async () => {
+  const user = show();
+  await user.click(await screen.findByRole("button", { name: "Take again" }));
+  const ask = await screen.findByRole("alertdialog");
+  expect(ask).toHaveTextContent("replaces this cycle's copy of the cases and their verdicts");
+  await user.click(within(ask).getByText("Cancel"));
+  expect(api.RetakeCycle).not.toHaveBeenCalled();
+});
+
+it("disables Take again and says so while it runs", async () => {
+  const user = show();
+  let finish: (d: unknown) => void = () => {};
+  vi.mocked(api.RetakeCycle).mockReturnValue(new Promise((r) => (finish = r)) as never);
+  await user.click(await screen.findByRole("button", { name: "Take again" }));
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Take again" }));
+  expect(await screen.findByRole("button", { name: "Taking again..." })).toBeDisabled();
+  finish(detail);
+  expect(await screen.findByRole("button", { name: "Take again" })).toBeEnabled();
+});
+
+it("disables Publish and says so while it runs, so one click sends one call", async () => {
+  const user = show();
+  let finish: (o: unknown) => void = () => {};
+  vi.mocked(api.PublishCycle).mockReturnValue(new Promise((r) => (finish = r)) as never);
+  await user.click(await screen.findByRole("button", { name: "Publish" }));
+  const busy = await screen.findByRole("button", { name: "Publishing..." });
+  expect(busy).toBeDisabled();
+  await user.click(busy);
+  expect(api.PublishCycle).toHaveBeenCalledTimes(1);
+  finish({ title: "Impact report: Week 45", pageId: "50", ask: "" });
+  expect(await screen.findByText("Published as Impact report: Week 45.")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+});
+
 it("keeps the cycle on screen when Take again fails", async () => {
   const user = show();
   vi.mocked(api.RetakeCycle).mockRejectedValue("that cycle is published, so it stays as it was");
   await user.click(await screen.findByRole("button", { name: "Take again" }));
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Take again" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("that cycle is published");
   expect(screen.getByRole("table", { name: "Cases by project" })).toBeVisible();
 });
