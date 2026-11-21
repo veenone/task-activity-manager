@@ -575,9 +575,11 @@ re-syncs straight afterwards.
 
 - **Sync changes** pulls what changed since the last sync. Also **File → Sync**
   or **Ctrl+R**.
-- **Full sync** clears the cached issues and fetches everything. Also
-  **Ctrl+Shift+R**. Use it after changing the scope JQL or the requirement
-  issue type, or when the cache looks wrong.
+- **Full sync** fetches every issue again and drops the ones Jira no longer
+  returns. Also **Ctrl+Shift+R**. It asks before it starts, since it can take
+  a while on a large project. Use it after changing the scope JQL or the
+  requirement issue type, or when the cache looks wrong. If it fails partway,
+  the issues cached before it stay until a full sync finishes.
 
 The status bar shows progress while a sync runs, then the issue count and when
 it finished. A failed sync is reported there too.
