@@ -11,6 +11,13 @@ interface Props<V extends string> {
   onSelect: (id: V) => void;
 }
 
+// focusCurrentViewTab moves focus to the tab of the view on screen. A control
+// that removes itself, such as the nav rail's hide button, calls it so focus
+// lands where the user is instead of dropping to the page body.
+export function focusCurrentViewTab() {
+  document.querySelector<HTMLElement>('.view-tabs-bar [aria-current="page"]')?.focus();
+}
+
 // ViewTabs is the row of view tabs under the topbar, in its own band. The
 // View menu and the optional rail reach the same places; this is the one
 // that is always visible, so it is the one that says where you are.

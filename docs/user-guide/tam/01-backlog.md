@@ -30,7 +30,7 @@ The search, filters, sort, page and open issue stay put while you visit other vi
 
 ## Read and edit an issue
 
-Click a row and the detail panel opens on the right. Drag its left edge to resize it. The panel stays on that issue when a sort or a page step moves its row off the grid.
+Click a row and the detail panel opens on the right. Drag its left edge to resize it. The panel stays on that issue when a sort or a page step moves its row off the grid. Escape closes it, and focus goes back to the row you opened it from.
 
 ![The detail panel open beside the grid](images/backlog-02-detail.png)
 

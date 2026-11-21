@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { FORMAT_LABEL, RichText, detectFormat, errMsg, toPlainText, useNotice } from "@agile-suite/core";
+import { FORMAT_LABEL, RichText, detectFormat, errMsg, toPlainText, useNotice, usePanelFocus } from "@agile-suite/core";
 import type { RichFormat } from "@agile-suite/core";
 import { BrowserOpenURL } from "../api";
 import type { Issue, IssueComment, IssueDetail, Link, SprintOption } from "../api";
@@ -142,6 +142,8 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const subtaskType = useSubtaskType(profileId);
   // Close asks first when the fields hold an unsaved edit (#521).
   const discardGuard = useDiscardGuard();
+  // Escape closes the way ✕ does, and focus returns to the opening row (#529).
+  const panelRef = usePanelFocus<HTMLElement>(() => discardGuard(onClose), issue.key);
   const createDenied = useDenial(profileId)(PERM_CREATE_ISSUES, issue.key);
   // The sprint whose additions this issue is held to. A card on a kanban
   // board, or one in the sprint's backlog, is in none and sees the board's
@@ -217,7 +219,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
     (subtaskType.data ?? "") !== "";
 
   return (
-    <aside className="detail-panel" style={{ width }} aria-labelledby="detail-title">
+    <aside ref={panelRef} className="detail-panel" style={{ width }} aria-labelledby="detail-title">
       <div className="detail-resizer" role="presentation" onMouseDown={startResize} title="Drag to resize" />
       {/* The dark instrument bar XTM's detail sidebar carries: the key and
           its status on the left, the actions on the right. */}

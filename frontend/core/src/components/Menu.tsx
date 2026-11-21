@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 export interface MenuItem {
   key: string;
@@ -28,24 +28,64 @@ interface Props {
   triggerLabel?: string;
 }
 
+const ENABLED_ITEM = '[role="menuitem"]:not(:disabled)';
+
 // Menu is a dark, bar-native dropdown: a trigger button that reveals a panel of
 // actions anchored beneath it. Closes on outside click or Escape. Used to
 // collapse the topbar's scattered buttons into grouped menus.
+//
+// The keys follow the ARIA menu button pattern: opening moves focus to the
+// first enabled item, Up and Down wrap through the enabled items, Home and End
+// jump to the ends, and Escape, Tab or a pick closes the menu with focus back
+// on the trigger.
 export function Menu({ label, items, title, align = "left", triggerClassName, triggerTabIndex, triggerLabel }: Props) {
   const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+
+  const enabledItems = () =>
+    Array.from(panel.current?.querySelectorAll<HTMLButtonElement>(ENABLED_ITEM) ?? []);
 
   useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // The panel itself takes focus when every item is disabled, so Escape
+    // still reaches its handler.
+    if (open) (panel.current?.querySelector<HTMLElement>(ENABLED_ITEM) ?? panel.current)?.focus();
   }, [open]);
+
+  function close() {
+    setOpen(false);
+    trigger.current?.focus();
+  }
+
+  function onPanelKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape" || e.key === "Tab") {
+      // Escape stops here so a detail panel or dialog around the menu stays
+      // open; Tab goes on to move focus past the trigger.
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      close();
+      return;
+    }
+    const list = enabledItems();
+    const at = list.indexOf(document.activeElement as HTMLButtonElement);
+    const next: Record<string, number> = {
+      ArrowDown: (at + 1) % list.length,
+      ArrowUp: (at - 1 + list.length) % list.length,
+      Home: 0,
+      End: list.length - 1,
+    };
+    if (list.length > 0 && e.key in next) {
+      e.preventDefault();
+      list[next[e.key]].focus();
+    }
+  }
 
   return (
     <div className="menu">
       <button
+        ref={trigger}
         className={triggerClassName ?? "topbar-btn"}
         onClick={() => setOpen((o) => !o)}
         title={title}
@@ -63,7 +103,7 @@ export function Menu({ label, items, title, align = "left", triggerClassName, tr
         <>
           {/* A pointer shortcut only: Escape closes the menu from the keyboard. */}
           <div className="menu-backdrop" role="presentation" onClick={() => setOpen(false)} />
-          <div className={`menu-panel menu-panel-${align}`} role="menu">
+          <div ref={panel} className={`menu-panel menu-panel-${align}`} role="menu" tabIndex={-1} onKeyDown={onPanelKey}>
             {items.map((it) =>
               it.divider ? (
                 <div key={it.key} className="menu-divider" />
@@ -74,8 +114,9 @@ export function Menu({ label, items, title, align = "left", triggerClassName, tr
                   role="menuitem"
                   disabled={it.disabled}
                   title={it.title}
+                  tabIndex={-1}
                   onClick={() => {
-                    setOpen(false);
+                    close();
                     it.onClick?.();
                   }}
                 >
