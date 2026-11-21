@@ -196,3 +196,13 @@ it("offers no issues for a project seen only at the far end of a link", async ()
     screen.getByRole("button", { name: "Show its issues" }),
   ).toBeDisabled();
 });
+
+it("re-centres on a linked project chosen from the details, so a keyboard can follow the links", async () => {
+  const { user } = show();
+  const details = await screen.findByRole("complementary", { name: "Project A" });
+  const linked = within(details).getByRole("button", { name: "Centre on C" });
+  linked.focus();
+  await user.keyboard("{Enter}");
+  expect(screen.getByText("Centred on C")).toBeVisible();
+  expect(screen.getByRole("complementary", { name: "Project C" })).toBeVisible();
+});

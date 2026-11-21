@@ -91,3 +91,14 @@ it("closes only the suggestion list on Escape, not the dialog", async () => {
   expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   expect(onClose).not.toHaveBeenCalled();
 });
+
+it("puts its error at the top as an alert, above the same footer the Jira fields dialog has", async () => {
+  vi.mocked(api.AddDescendants).mockRejectedValue("DELTA is already a descendant of AURA");
+  const { user } = show([base]);
+  const group = screen.getByRole("group", { name: /BASE/ });
+  await user.type(within(group).getByRole("combobox"), "DELTA");
+  await user.click(within(group).getByRole("button", { name: "Add" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Done" }).parentElement).toHaveClass("form-actions", "form-actions-end");
+});

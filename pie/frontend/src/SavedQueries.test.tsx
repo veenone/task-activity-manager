@@ -204,6 +204,18 @@ it("keeps a saved query's links for offline when asked, and only for a saved que
   expect(await screen.findByRole("checkbox", { name: "Keep links for offline" })).toBeChecked();
 });
 
+it("says so when the saved queries cannot be read back after keeping links offline", async () => {
+  vi.mocked(api.LastRun).mockResolvedValue({ result: rows("A-1"), runAt: weekly.runAt, added: null, dropped: null } as never);
+  vi.mocked(api.SetKeepOffline).mockResolvedValue();
+  const user = show();
+  await screen.findByRole("option", { name: "Weekly" });
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  const box = await screen.findByRole("checkbox", { name: "Keep links for offline" });
+  vi.mocked(api.ListQueries).mockRejectedValue("the database is locked");
+  await user.click(box);
+  expect(await screen.findByRole("alert")).toHaveTextContent("the database is locked");
+});
+
 it("asks before a saved query replaces typed JQL, and keeps both when cancelled", async () => {
   const user = show();
   await screen.findByRole("option", { name: "Weekly" });

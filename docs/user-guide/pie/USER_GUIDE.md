@@ -355,6 +355,8 @@ all three views.
     step through the projects you centred on.
   - Choosing a project shows on the right how many of its issues are in the
     run, its links out and in, and every project it links to by type.
+    Choose one of those linked projects to centre on it, with the mouse or
+    the keyboard.
     **Show its issues** opens **Issues** at that project's busiest issue, and
     **Open in Grid** shows the grid for it and the projects it links to.
   - **Relationships** hides a link type and counts each one. **Two rings**

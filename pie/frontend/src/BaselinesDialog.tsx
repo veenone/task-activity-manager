@@ -76,6 +76,11 @@ export function BaselinesDialog({
           Mark the Jira projects that are product baselines and put the projects derived from each under it. A project sits under one
           baseline at most. The Project map groups its columns this way.
         </p>
+        {error && (
+          <p role="alert" className="error-text">
+            {error}
+          </p>
+        )}
         <form
           className="pie-baseline-add"
           onSubmit={(e) => {
@@ -146,12 +151,7 @@ export function BaselinesDialog({
             </form>
           </fieldset>
         ))}
-        {error && (
-          <p role="alert" className="error-text">
-            {error}
-          </p>
-        )}
-        <div className="form-actions">
+        <div className="form-actions form-actions-end">
           <button type="button" className="btn btn-primary" onClick={onClose}>
             Done
           </button>

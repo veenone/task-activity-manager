@@ -312,7 +312,7 @@ export default function App() {
                     queryId={queryId}
                     on={!!queries.find((q) => q.id === queryId)?.keepOffline}
                     disabled={running}
-                    onChanged={() => void ListQueries(profileId).then(setQueries)}
+                    onChanged={() => ListQueries(profileId).then(setQueries)}
                     onError={setError}
                   />
                 </>

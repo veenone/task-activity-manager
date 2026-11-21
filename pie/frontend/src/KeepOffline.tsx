@@ -15,7 +15,8 @@ export function KeepOffline({
   queryId: number;
   on: boolean;
   disabled: boolean;
-  onChanged: () => void;
+  // onChanged reloads the saved queries; a failed reload is reported too.
+  onChanged: () => Promise<unknown>;
   onError: (message: string) => void;
 }) {
   return (
@@ -25,7 +26,9 @@ export function KeepOffline({
         checked={on}
         disabled={disabled}
         onChange={(e) => {
-          SetKeepOffline(profileId, queryId, e.target.checked).then(onChanged, (err) => onError(errorText(err)));
+          SetKeepOffline(profileId, queryId, e.target.checked)
+            .then(onChanged)
+            .catch((err) => onError(errorText(err)));
         }}
       />
       Keep links for offline

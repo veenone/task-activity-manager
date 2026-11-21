@@ -155,15 +155,7 @@ export function ResultsTable({
           </label>
         )}
         {selected.length > 0 && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              void onOpenCases(selected).then((done) => done && setPicked(new Set()));
-            }}
-          >
-            {`Open ${selected.length} as cases`}
-          </button>
+          <OpenCasesButton count={selected.length} onOpen={() => onOpenCases(selected).then((done) => done && setPicked(new Set()))} />
         )}
         <span className="muted" role="status">
           {shown.length < issues.length ? `Showing ${shown.length} of ${issues.length} issues` : ""}
@@ -226,5 +218,24 @@ export function ResultsTable({
       </div>
       <Pager label="Results" {...pager} />
     </>
+  );
+}
+
+// OpenCasesButton stays disabled while the cases are being opened, so a
+// second click cannot send the same keys again.
+function OpenCasesButton({ count, onOpen }: { count: number; onOpen: () => Promise<unknown> }) {
+  const [opening, setOpening] = useState(false);
+  return (
+    <button
+      type="button"
+      className="btn btn-primary"
+      disabled={opening}
+      onClick={() => {
+        setOpening(true);
+        void onOpen().finally(() => setOpening(false));
+      }}
+    >
+      {`Open ${count} as cases`}
+    </button>
   );
 }

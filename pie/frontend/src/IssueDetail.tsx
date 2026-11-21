@@ -9,8 +9,10 @@ import { projectLabel } from "./linked";
 export function IssueDetail({ issue, onClose }: { issue: query.Issue; onClose: () => void }) {
   const close = useFocusWhen<HTMLButtonElement>(issue.key);
   useEffect(() => {
+    // An Escape meant for a dialog open over the panel is the dialog's.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      const inDialog = e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"]');
+      if (e.key === "Escape" && !inDialog) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
