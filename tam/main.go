@@ -118,8 +118,10 @@ func appMenu(app *App) *menu.Menu {
 	view.AddSeparator()
 	// The checkbox owns the rail's state: Wails renders the tick from the
 	// value passed here, so the app reads the stored preference when it builds
-	// the menu and writes it back on every toggle.
-	view.AddCheckbox("Navigation Rail", app.showNavRail(), keys.CmdOrCtrl("b"), func(d *menu.CallbackData) {
+	// the menu and writes it back on every toggle. Ctrl+\ rather than Ctrl+B:
+	// a menu accelerator fires before the webview sees the key, so Ctrl+B
+	// toggled the rail on every bold in the ritual editor (#528).
+	view.AddCheckbox("Navigation Rail", app.showNavRail(), keys.CmdOrCtrl("\\"), func(d *menu.CallbackData) {
 		app.setShowNavRail(d.MenuItem.Checked)
 	})
 

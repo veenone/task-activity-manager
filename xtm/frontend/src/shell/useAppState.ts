@@ -325,6 +325,13 @@ export function useAppState() {
     [caps, showCoverage],
   );
 
+  // A profile switch can hide the view on screen. MainView already falls
+  // back to Browse's content for it, so the tab has to follow, or no tab is
+  // marked current (#528).
+  useEffect(() => {
+    if (shownViews.length > 0 && !shownViews.some((v) => v.id === view)) setView(shownViews[0].id);
+  }, [shownViews, view, setView]);
+
   // A sync is in flight when the main Sync is running (syncing) OR any partial
   // per-view refresh is emitting progress. Both a full pull and a partial sync
   // write to the store keyed by the active profile, so switching profiles while

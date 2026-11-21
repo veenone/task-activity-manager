@@ -14,7 +14,7 @@ export function NavRail({ s }: { s: AppState }) {
             <button
               type="button"
               className="btn btn-ghost nav-rail-hide"
-              title="Hide the navigation rail (View menu, Ctrl+B)"
+              title="Hide the navigation rail (View menu, Ctrl+\)"
               aria-label="Hide the navigation rail"
               onClick={() => {
                 setNavRail(false);

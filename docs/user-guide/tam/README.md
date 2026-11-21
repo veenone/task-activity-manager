@@ -31,7 +31,9 @@ Each view has a tab in the band under the top bar. The **View** menu lists the s
 | Ctrl+4 | Epics | Ctrl+9 | Rituals |
 | Ctrl+5 | Boards | | |
 
-**Ctrl+B** shows or hides the navigation rail down the left side, which lists the same views. The rail is off by default and its state is remembered.
+The shortcuts do nothing while a dialog is open.
+
+**Ctrl+\\** shows or hides the navigation rail down the left side, which lists the same views. The rail is off by default and its state is remembered.
 
 ## One thing to know before anything else
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LiveRegion, SyncRibbon, ViewTabs, clearViewState, useProfile, useTour, errMsg } from "@agile-suite/core";
+import { LiveRegion, SyncRibbon, ViewTabs, clearViewState, isModalOpen, useProfile, useTour, errMsg } from "@agile-suite/core";
 import { Health, EventsOn, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
@@ -167,9 +167,10 @@ export default function App() {
     const offSettings = EventsOn("menu:settings", () => openModal("settings"));
     // The View menu is TAM's primary navigation. It sends the view id the
     // menu was built with, which is why menuViews in main.go has to stay in
-    // step with VIEWS in nav.ts.
+    // step with VIEWS in nav.ts. Its accelerators fire with a dialog open,
+    // so the switch waits until none is (#528).
     const offView = EventsOn("menu:view", (id: string) => {
-      if (VIEWS.some((v) => v.id === id)) switchView(id as View);
+      if (!isModalOpen() && VIEWS.some((v) => v.id === id)) switchView(id as View);
     });
     const offRail = EventsOn("menu:nav-rail", (visible: boolean) => setNavRail(visible));
     const offSync = EventsOn("menu:sync", () => void runSync(false));
