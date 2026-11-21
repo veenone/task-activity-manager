@@ -290,11 +290,11 @@ describe("PendingChangesModal", () => {
     expect(within(card).getByText("Conflict")).toBeInTheDocument();
     const table = within(card).getByRole("table");
     const bodyRows = within(table).getAllByRole("row").slice(1);
-    expect(within(bodyRows[0]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Story points", "5", "8", "13"]);
+    expect(within(bodyRows[0]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Story points", "5", "8", "13 (changed)"]);
     expect(within(bodyRows[1]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Labels", "checkout, promo", "checkout, promo, q3", "checkout, promo"]);
     // A held board write reads as the move it is. Without a label of its
     // own the row printed the journal's raw field name, "statusId".
-    expect(within(bodyRows[2]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Status", "To Do", "In Progress", "Done"]);
+    expect(within(bodyRows[2]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Status", "To Do", "In Progress", "Done (changed)"]);
     expect(within(dialog).getByRole("button", { name: "Commit (0)" })).toBeDisabled();
 
     await user.click(within(card).getByRole("button", { name: "Override" }));

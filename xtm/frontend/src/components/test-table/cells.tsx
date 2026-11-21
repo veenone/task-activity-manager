@@ -18,7 +18,7 @@ export function renderCell(
       return (
         <td key="key" className="mono" style={style}>
           {hasPending && (
-            <span className="row-dirty-dot" title="Pending edits">
+            <span className="row-dirty-dot" role="img" aria-label="Pending edits" title="Pending edits">
               ●
             </span>
           )}

@@ -61,7 +61,11 @@ export function ConflictCard({ profileId, conflict, disabled }: Props) {
               <td>{fieldLabel(f.field)}</td>
               <td>{f.base || "(none)"}</td>
               <td className="b">{f.mine || "(none)"}</td>
-              <td className={f.remote !== f.base ? "danger-text" : ""}>{f.remote || "(none)"}</td>
+              <td className={f.remote !== f.base ? "danger-text" : ""}>
+                {f.remote || "(none)"}
+                {/* Colour alone does not say which value moved (#537). */}
+                {f.remote !== f.base && <span className="small"> (changed)</span>}
+              </td>
             </tr>
           ))}
         </tbody>
