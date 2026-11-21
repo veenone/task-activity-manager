@@ -76,6 +76,23 @@ beforeEach(() => {
 });
 
 describe("AssignedToMeView", () => {
+  // #526: the view used to draw nothing at all until it knew who "me" was.
+  it("says it is reading while it works out the connected user", async () => {
+    vi.mocked(api.GetProfileSetting).mockReturnValue(new Promise(() => {}));
+    renderView();
+    expect(await screen.findByText("Reading the issues")).toBeInTheDocument();
+  });
+
+  it("says it is reading while the first page of issues loads", async () => {
+    vi.mocked(api.GetProfileSetting).mockImplementation((_id, key) =>
+      Promise.resolve(key === "jira_username" ? "rahmad" : ""),
+    );
+    vi.mocked(api.ListIssues).mockReturnValue(new Promise(() => {}));
+    renderView();
+    const view = await screen.findByRole("region", { name: "Assigned to me" });
+    expect(await within(view).findByText("Reading the issues")).toBeInTheDocument();
+  });
+
   it("names the connected user in the header and lists only their issues", async () => {
     vi.mocked(api.GetProfileSetting).mockImplementation((_id, key) =>
       Promise.resolve(key === "jira_username" ? "rahmad" : key === "jira_display_name" ? "R. Anand" : ""),

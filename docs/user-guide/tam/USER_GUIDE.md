@@ -84,6 +84,8 @@ on up-to-date Windows 10 and 11. If the window is blank on first launch,
 install the Evergreen WebView2 runtime from Microsoft and start TAM again.
 
 On first launch there is no profile, so the first thing to do is make one.
+Until you do, TAM shows a first-run screen in place of the views, and its
+**Create a profile** button opens Manage Profiles.
 
 ## 2. Connecting to Jira (profiles)
 

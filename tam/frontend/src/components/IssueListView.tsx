@@ -235,6 +235,10 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
         <div className="backlog-grid">
           {issues.isError ? (
             <p className="error-text" data-testid="issues-error">Could not load issues: {issues.error.message}</p>
+          ) : issues.isPending && activeId !== "" ? (
+            // Without a profile the query is disabled and pending for good,
+            // so the line is only drawn for a read that is under way.
+            <p className="muted backlog-empty">Reading the issues</p>
           ) : total === 0 && !issues.isPending ? (
             <p className="muted backlog-empty">
               {filtered ? "No issues match this filter." : emptyNote}
