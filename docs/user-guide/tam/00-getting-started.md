@@ -41,7 +41,7 @@ Demo mode is a safe place to learn the loop: syncing, editing, dragging cards, c
 Press **Sync** at the right of the top bar and choose:
 
 - **Sync changes** pulls what changed since the last sync. This is the everyday one, and it is also **File → Sync** or **Ctrl+R**.
-- **Full sync** clears the cached issues and fetches everything. Use it after changing the scope JQL or the requirement issue type, or when the cache looks wrong. It is **Ctrl+Shift+R**.
+- **Full sync** fetches every issue again and drops the ones Jira no longer returns. It asks first, and if it fails partway the issues cached before it stay. Use it after changing the scope JQL or the requirement issue type, or when the cache looks wrong. It is **Ctrl+Shift+R**.
 
 The status bar at the bottom shows progress while it runs, then the issue count and when it last finished. A count like `38 of 2,943 issues` means the scope JQL, or an issue type TAM does not sync, keeps the rest out.
 

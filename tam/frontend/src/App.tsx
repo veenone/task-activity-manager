@@ -24,6 +24,7 @@ import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { useSync } from "./contexts/SyncContext";
+import { useFullSync } from "./contexts/useFullSync";
 import { useSyncState } from "./queries/issues";
 import { usePendingChanges } from "./queries/pending";
 import { formatWhen } from "./lib/format";
@@ -92,6 +93,7 @@ export default function App() {
   const switchProfile = useGuarded(setActiveId);
   const { isOpen, openModal, closeModal } = useModal();
   const { progress, syncError, canSync, canSwitchProfile, runSync, runRefresh } = useSync();
+  const runFullSync = useFullSync(runSync, canSync);
   const syncState = useSyncState(activeId);
   const pending = usePendingChanges(activeId);
   const pendingCount = pending.data?.length ?? 0;
@@ -169,7 +171,7 @@ export default function App() {
     });
     const offRail = EventsOn("menu:nav-rail", (visible: boolean) => setNavRail(visible));
     const offSync = EventsOn("menu:sync", () => void runSync(false));
-    const offFullSync = EventsOn("menu:full-sync", () => void runSync(true));
+    const offFullSync = EventsOn("menu:full-sync", () => void runFullSync());
     return () => {
       offProfiles();
       offAbout();
@@ -180,7 +182,7 @@ export default function App() {
       offSync();
       offFullSync();
     };
-  }, [openModal, switchView, runSync]);
+  }, [openModal, switchView, runSync, runFullSync]);
 
   const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
   const demo = isDemoUrl(activeProfile?.jiraUrl);
@@ -249,7 +251,7 @@ export default function App() {
             triggerClassName="topbar-btn topbar-btn-primary"
             items={[
               { key: "sync", label: "Sync changes", onClick: () => void runSync(false), disabled: !canSync },
-              { key: "full", label: "Full sync", title: "Clears the cached issues and fetches everything", onClick: () => void runSync(true), disabled: !canSync },
+              { key: "full", label: "Full sync", title: "Fetches every issue again and drops the ones Jira no longer returns", onClick: () => void runFullSync(), disabled: !canSync },
             ]}
           />
           </span>
