@@ -12,7 +12,7 @@ export function FilterBar({ s, a, p }: { s: TestTableState; a: TestTableActions;
   const { onSync, syncing } = p;
   return (
     <>
-      <div className="filters">
+      <div className="filter-bar">
         <input
           data-tour="search"
           className="search"

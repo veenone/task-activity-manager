@@ -210,7 +210,8 @@ describe("the filter bar", () => {
     // fields. In a centred flex row that margin is counted in the item's
     // outer size, so the search box and the sprint select rode 6px above
     // the chips and the buttons beside them.
-    expect(valueOf(declarationsOf(appCss, ".filter-bar .detail-input"), "margin-bottom")).toBe("0");
+    // The bar is core's since #541, shared with XTM.
+    expect(valueOf(declarationsOf(primitivesCss, ".filter-bar .detail-input"), "margin-bottom")).toBe("0");
   });
 
   it("lets the search field give way before the bar wraps", () => {
@@ -229,7 +230,7 @@ describe("the filter bar", () => {
   });
 
   it("keeps its rows apart once it does wrap", () => {
-    const bar = declarationsOf(appCss, ".filter-bar");
+    const bar = declarationsOf(primitivesCss, ".filter-bar");
     expect(valueOf(bar, "row-gap")).toMatch(/^\d+px$/);
   });
 });
