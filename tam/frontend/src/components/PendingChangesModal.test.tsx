@@ -102,7 +102,8 @@ describe("PendingChangesModal", () => {
     // XTM's treatment: what goes away is struck through, what arrives is marked.
     expect(within(rowsOfCard[0]).getByText("Medium")).toHaveClass("pending-before");
     expect(within(rowsOfCard[0]).getByText("High")).toHaveClass("pending-after");
-    expect(within(dialog).getByRole("button", { name: "Commit (2)" })).toBeEnabled();
+    // The title and the Commit button both count changes (#542).
+    expect(within(dialog).getByRole("button", { name: "Commit (3)" })).toBeEnabled();
   });
 
   // Issue #52: an edit journalled for a field Jira will not take is named
@@ -154,7 +155,7 @@ describe("PendingChangesModal", () => {
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
     expect(await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501).")).toBeInTheDocument();
     expect(await within(dialog).findByText("Nothing pending. Edit an issue or create one and it shows up here.")).toBeInTheDocument();
@@ -174,7 +175,7 @@ describe("PendingChangesModal", () => {
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
     expect(
       await within(dialog).findByText(
@@ -192,7 +193,7 @@ describe("PendingChangesModal", () => {
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
     expect(within(dialog).queryByText(/was created without/)).not.toBeInTheDocument();
   });
@@ -206,7 +207,7 @@ describe("PendingChangesModal", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Last commit: nothing pushed, 2 failed.")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-409: PUT failed: 400 priority is invalid")).toBeInTheDocument();
     expect(within(dialog).getByText("TAM-NEW-1: Severity is required")).toBeInTheDocument();
@@ -228,11 +229,11 @@ describe("PendingChangesModal", () => {
       });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501).");
     expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
 
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Commit again to retry the failures.")).toBeInTheDocument();
   });
 
@@ -282,7 +283,7 @@ describe("PendingChangesModal", () => {
     vi.mocked(api.ResolveConflictKeepRemote).mockResolvedValue();
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (6)" }));
     expect(await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501), 1 held back.")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-412 changed in Jira since you edited it. Resolve it below, then commit again.")).toBeInTheDocument();
 
@@ -300,7 +301,7 @@ describe("PendingChangesModal", () => {
     await user.click(within(card).getByRole("button", { name: "Override" }));
     await waitFor(() => expect(api.ResolveConflictOverride).toHaveBeenCalledWith("p1", "PLAT-412", "2026-09-06T11:00:00Z"));
     await waitFor(() => expect(within(dialog).queryByText("Conflict")).not.toBeInTheDocument());
-    expect(await within(dialog).findByRole("button", { name: "Commit (1)" })).toBeEnabled();
+    expect(await within(dialog).findByRole("button", { name: "Commit (3)" })).toBeEnabled();
   });
 
   it("keep remote drops the edits", async () => {
@@ -382,7 +383,7 @@ describe("PendingChangesModal", () => {
     expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 15", "TAM-NEW-1", "PLAT-409"]);
     expect(within(cards[0]).getByText("Draft sprint")).toBeInTheDocument();
     expect(within(cards[0]).getByText("New sprint on PLAT Scrum, 2026-09-16 to 2026-09-30")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Commit (3)" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Commit (4)" })).toBeEnabled();
     await user.click(within(cards[0]).getByRole("button", { name: "Discard Sprint 15" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
   });
@@ -417,7 +418,7 @@ describe("PendingChangesModal", () => {
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 40));
     await user.click(within(cards[1]).getByRole("button", { name: "Discard the change to Sprint 12" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 42));
-    await user.click(within(dialog).getByRole("button", { name: "Commit (3)" }));
+    await user.click(within(dialog).getByRole("button", { name: "Commit (4)" }));
     expect(await within(dialog).findByText("Last commit: 1 sprint change pushed (Sprint 12 completed, 45 unfinished cards moved to Sprint 13).")).toBeInTheDocument();
   });
 
@@ -428,22 +429,22 @@ describe("PendingChangesModal", () => {
     const groups = groupPending(rows);
 
     it("counts every group when nothing is known to be refused", () => {
-      expect(countPushable(groups, new Set(), new Set())).toBe(2);
+      expect(countPushable(rows, groups, new Set(), new Set())).toBe(3);
     });
 
     it("leaves out an issue carrying a row Jira will refuse", () => {
-      expect(countPushable(groups, new Set(), new Set(["PLAT-409"]))).toBe(1);
+      expect(countPushable(rows, groups, new Set(), new Set(["PLAT-409"]))).toBe(1);
     });
 
     it("still counts an issue nothing is known about", () => {
       // The refusal set only ever holds issues whose screen TAM has read.
       // An issue missing from it is unknown, not known to be fine, and an
       // unknown issue may well push, so it stays in the number.
-      expect(countPushable(groups, new Set(), new Set(["OTHER-1"]))).toBe(2);
+      expect(countPushable(rows, groups, new Set(), new Set(["OTHER-1"]))).toBe(3);
     });
 
     it("does not count a conflicted issue twice out", () => {
-      expect(countPushable(groups, new Set(["PLAT-409"]), new Set(["PLAT-409"]))).toBe(1);
+      expect(countPushable(rows, groups, new Set(["PLAT-409"]), new Set(["PLAT-409"]))).toBe(1);
     });
 
     it("leaves a sprint or board alone when an issue shares its key", () => {
@@ -453,7 +454,7 @@ describe("PendingChangesModal", () => {
         { id: 9, entityType: "sprint_start", entityKey: "12", field: "start", beforeVal: "", baseVersion: "", createdAt: "",
           afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", startDate: "2026-09-14T09:00:00.000+0000", endDate: "2026-09-28T09:00:00.000+0000" }) },
       ];
-      expect(countPushable(groupPending(sprintRows), new Set(), new Set(["12"]))).toBe(1);
+      expect(countPushable(sprintRows, groupPending(sprintRows), new Set(), new Set(["12"]))).toBe(1);
     });
   });
 
@@ -512,7 +513,7 @@ describe("PendingChangesModal", () => {
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 20));
     await user.click(within(cards[0]).getByRole("button", { name: "Discard the change to Sprint 13" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 21));
-    await user.click(within(dialog).getByRole("button", { name: "Commit (4)" }));
+    await user.click(within(dialog).getByRole("button", { name: "Commit (5)" }));
     expect(await within(dialog).findByText("Last commit: 1 sprint change pushed (Sprint 12b edited).")).toBeInTheDocument();
   });
 
@@ -545,7 +546,7 @@ describe("PendingChangesModal", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Last commit: 1 sprint created (Sprint 15 is sprint 100), 1 failed, 1 waiting.")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-409 waits for TAM-NEW-1, which Jira refused.")).toBeInTheDocument();
     const card = within(pendingTable(dialog)).getByRole("rowgroup", { name: "PLAT-409" });
@@ -563,7 +564,7 @@ describe("PendingChangesModal", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Commit again once what they wait for is in Jira.")).toBeInTheDocument();
     expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
   });
@@ -604,7 +605,7 @@ describe("PendingChangesModal board moves", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Last commit: 2 cards moved (PLAT-412 to In Progress, PLAT-412 before PLAT-409).")).toBeInTheDocument();
   });
 
@@ -620,7 +621,7 @@ describe("PendingChangesModal board moves", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(
       await within(dialog).findByText("Last commit: 1 card moved (PLAT-412 to In Progress), 1 already in place."),
     ).toBeInTheDocument();
@@ -638,7 +639,7 @@ describe("PendingChangesModal board moves", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText(/cannot reach In Progress/)).toBeInTheDocument();
     expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
 
@@ -658,7 +659,7 @@ describe("PendingChangesModal board moves", () => {
     });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
-    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText(/Jira said no/)).toBeInTheDocument();
 
     // lastCommit stands until the next Commit, so the row going is the only

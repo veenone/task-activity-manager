@@ -171,7 +171,7 @@ When there is uncommitted work, a **N pending** button appears in the top bar.
    rows of their own.
 2. **Discard** on a row throws that one change away. Jira is not touched.
 3. **Discard all** reverts everything, after a confirmation.
-4. **Commit (N)** sends what can be sent. The number is what Commit will push.
+4. **Commit (N)** sends what can be sent. The number counts the changes Commit will push, as the dialog title does.
 
 ![The Pending changes dialog over the board, holding one status move](images/getting-started-01-pending.png)
 

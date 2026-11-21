@@ -215,6 +215,11 @@ function groupKind(entityType: string): PendingGroup["kind"] {
   return "issue";
 }
 
+// pendingGroupId is the id of the group a journal row folds into.
+export function pendingGroupId(row: PendingChange): string {
+  return `${groupKind(row.entityType)}:${row.entityKey}`;
+}
+
 // groupPending folds the journal (newest first) into one group per key and
 // kind: draft boards first and draft sprints next, in the order Commit
 // creates them, then the
@@ -224,7 +229,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
   const byKey = new Map<string, PendingGroup>();
   for (const row of rows) {
     const kind = groupKind(row.entityType);
-    const id = `${kind}:${row.entityKey}`;
+    const id = pendingGroupId(row);
     let g = byKey.get(id);
     if (!g) {
       g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], worklogs: [], attachments: [], moves: [] };
