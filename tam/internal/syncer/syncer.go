@@ -99,9 +99,10 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository) *Engine {
 }
 
 // Sync pulls the profile's issues. An incremental sync (full=false) asks
-// the backend for issues updated since the last sync; a full sync clears
-// the profile's rows inside the first page's transaction and pulls
-// everything. The sync's start time becomes the new last_synced so an
+// the backend for issues updated since the last sync; a full sync pulls
+// everything and, once every page has landed, drops the rows no page wrote
+// (FinishFullSync), so one that fails partway keeps the previous cache
+// (#534). The sync's start time becomes the new last_synced so an
 // issue updated during the sync is picked up next time.
 func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL string, full bool, onProgress func(Progress)) (Summary, error) {
 	emit := func(p Progress) {
@@ -183,7 +184,7 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 		// an Improvement before #70, and afterwards a row Jira answered with
 		// no issuetype field at all. Either one has a key, a summary and work
 		// behind it, and the grid draws both (#100).
-		if err := e.repo.UpsertPage(ctx, profileID, page, start, full && pages == 0); err != nil {
+		if err := e.repo.UpsertPage(ctx, profileID, page, start, false); err != nil {
 			return e.fail(ctx, profileID, state, pages, sum, err, emit)
 		}
 		pages++
@@ -198,6 +199,9 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 
 	next := issuerepo.SyncState{LastSynced: start.Format(time.RFC3339), LastFull: state.LastFull}
 	if full {
+		if err := e.repo.FinishFullSync(ctx, profileID, start); err != nil {
+			return e.fail(ctx, profileID, state, pages, sum, err, emit)
+		}
 		next.LastFull = next.LastSynced
 	}
 	if err := e.repo.SetSyncState(ctx, profileID, next); err != nil {
