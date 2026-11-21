@@ -542,7 +542,8 @@ published cycle before it counts every case as new. Below the changes is the
 cycle's own grid of cases against projects.
 
 Until a cycle is published, **Take again** replaces its copy with the cases as
-they are now, and **Delete** removes it.
+they are now, and **Delete** removes it. Both ask first, because neither can be
+undone.
 
 ### Publishing to Confluence
 

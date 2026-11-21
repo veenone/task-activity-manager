@@ -130,6 +130,7 @@ function CycleDetail({
   const [d, setD] = useState<cycles.Detail | null>(null);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  const [busy, setBusy] = useState<"" | "publish" | "retake">("");
   const { confirm } = useConfirm();
 
   useEffect(() => {
@@ -144,11 +145,20 @@ function CycleDetail({
   }, [profileId, id]);
 
   const retake = async () => {
+    const yes = await confirm({
+      title: "Take this cycle again?",
+      message: "This replaces this cycle's copy of the cases and their verdicts with how they stand now.",
+      confirmLabel: "Take again",
+    });
+    if (!yes) return;
+    setBusy("retake");
     try {
       setError("");
       setD(await RetakeCycle(profileId, id));
     } catch (e) {
       setError(errorText(e));
+    } finally {
+      setBusy("");
     }
   };
 
@@ -157,6 +167,7 @@ function CycleDetail({
   const publish = async () => {
     setError("");
     setDone("");
+    setBusy("publish");
     try {
       let out = await PublishCycle(profileId, id, false);
       if (out.ask) {
@@ -168,6 +179,8 @@ function CycleDetail({
       onPublished();
     } catch (e) {
       setError(errorText(e));
+    } finally {
+      setBusy("");
     }
   };
 
@@ -183,13 +196,13 @@ function CycleDetail({
       <div className="pie-filters">
         <h2 id="pie-cycle-heading">{d.name}</h2>
         <ExportButton name={`pie-cycle-${d.name}`} sheets={() => cycleSheets(d, (p) => projectLabel(p, names.get(p)))} />
-        <button type="button" className="btn btn-primary" onClick={() => void publish()}>
-          {d.publishedAt ? "Publish again" : "Publish"}
+        <button type="button" className="btn btn-primary" disabled={busy !== ""} onClick={() => void publish()}>
+          {busy === "publish" ? "Publishing..." : d.publishedAt ? "Publish again" : "Publish"}
         </button>
         {!d.publishedAt && (
           <>
-            <button type="button" className="btn" onClick={() => void retake()}>
-              Take again
+            <button type="button" className="btn" disabled={busy !== ""} onClick={() => void retake()}>
+              {busy === "retake" ? "Taking again..." : "Take again"}
             </button>
             <button type="button" className="btn btn-danger" onClick={() => onDelete(d)}>
               Delete
