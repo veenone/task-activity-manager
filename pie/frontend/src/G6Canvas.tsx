@@ -162,6 +162,15 @@ export default function G6Canvas({
   // The latest handler, so the graph made once still calls the current one.
   const pick = useRef(onSelect);
   pick.current = onSelect;
+  // The colours come from tokens read at draw time, so a theme switch has to
+  // draw again; the boxes stay where they are.
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme);
+  useEffect(() => {
+    const root = document.documentElement;
+    const watch = new MutationObserver(() => setTheme(root.dataset.theme));
+    watch.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => watch.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!box.current) return;
@@ -226,7 +235,7 @@ export default function G6Canvas({
       .catch((e: unknown) => {
         if (graph.current === g) setFailed(e instanceof Error ? e.message : String(e));
       });
-  }, [nodes, edges, combos, focus, layout, follow]);
+  }, [nodes, edges, combos, focus, layout, follow, theme]);
 
   useImperativeHandle(apiRef, () => ({
     fit: () => void graph.current?.fitView({ when: "always" }, { duration: 400 }),

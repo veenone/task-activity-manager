@@ -1,12 +1,12 @@
 import { StrictMode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import G6Canvas, { type CanvasNode } from "./G6Canvas";
 
 // jsdom has no canvas, so G6's Graph is a recorder of what it was asked.
 const failNext = vi.hoisted(() => [] as string[]);
 const made = vi.hoisted(
-  () => [] as { calls: string[]; options: Record<string, unknown> }[],
+  () => [] as { calls: string[]; fills: string[]; options: Record<string, unknown> }[],
 );
 vi.mock("@antv/g6", () => ({
   NodeEvent: { CLICK: "node:click" },
@@ -17,8 +17,12 @@ vi.mock("@antv/g6", () => ({
       this.options = options;
       made.push(this);
     }
+    fills: string[] = [];
     on() {}
-    setData() {}
+    // The first node's fill, as G6 was handed it.
+    setData(d: { nodes: { style: { fill: string } }[] }) {
+      this.fills.push(d.nodes[0]?.style.fill);
+    }
     setLayout(l: { type: string }) {
       this.calls.push(`layout:${l.type}`);
     }
@@ -222,4 +226,22 @@ it("keeps the camera still on a new focus when told not to follow it", async () 
   rerender(<G6Canvas nodes={nodes} edges={none} focus="B-1" follow={false} onSelect={() => {}} label="Graph" />);
   await settle();
   expect(g.calls).toEqual(["draw"]);
+});
+
+it("redraws in the new theme's colours when the theme switches", async () => {
+  const root = document.documentElement;
+  root.style.setProperty("--surface", "white");
+  root.dataset.theme = "light";
+  render(<G6Canvas nodes={nodes} edges={none} focus={null} onSelect={() => {}} label="Graph" />);
+  await settle();
+  const g = made[0];
+  expect(g.fills[g.fills.length - 1]).toBe("white");
+  g.calls.length = 0;
+  root.style.setProperty("--surface", "black");
+  root.dataset.theme = "dark";
+  // The same boxes in place, in the dark theme's fill.
+  await waitFor(() => expect(g.calls).toEqual(["draw"]));
+  expect(g.fills[g.fills.length - 1]).toBe("black");
+  root.style.removeProperty("--surface");
+  delete root.dataset.theme;
 });
