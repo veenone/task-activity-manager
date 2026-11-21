@@ -1387,6 +1387,55 @@
   background: var(--warn-soft);
 }
 
+/* ===== Pager (#542) ===== */
+/* The controls only. A band, a border or a margin belongs to where the pager
+   sits, so each caller adds its own. */
+.pager {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: var(--fs-sm);
+}
+.pager-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Square, evenly sized step buttons: first / previous / next / last read as
+   one control group rather than four words of different lengths. */
+.pager-step {
+  min-width: 28px;
+  padding: 4px 6px;
+  text-align: center;
+}
+.pager-page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 4px;
+}
+.pager-page-input {
+  width: 52px;
+  padding: 3px 6px;
+  text-align: center;
+  margin-bottom: 0;
+}
+.pager-size {
+  width: auto;
+  padding: 3px 6px;
+  margin-bottom: 0;
+}
+.pager-range {
+  margin-left: auto;
+}
+/* A narrow side panel: the range takes a line of its own under the controls. */
+.pager-compact .pager-range {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
 /* ===== Board toolbar, mirrored from XTM's App.css ===== */
 /* Only the board itself scrolls, in both directions: its column strip is
    wider than the pane and its cells are taller. The toolbar above it and

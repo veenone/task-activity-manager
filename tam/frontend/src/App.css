@@ -269,17 +269,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* On the panel's dark head the link reads light, not accent-blue. */
 .detail-head .issue-key-link { color: var(--chrome-text); }
 .detail-head .issue-key-link:hover { color: var(--chrome-text-strong); }
-/* Pinned to the floor of the card, the way the reference's is, so the page
-   controls are in the same place whatever the row count. */
-.pager { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-top: 1px solid var(--border); background: var(--surface-2); flex-wrap: wrap; }
-.pager-buttons { display: flex; align-items: center; gap: 4px; }
-/* Square, evenly sized step buttons: first / previous / next / last read as
-   one control group rather than four words of different lengths. */
-.pager-step { min-width: 28px; padding: 4px 6px; text-align: center; }
-.pager-page { display: flex; align-items: center; gap: 6px; margin: 0 4px; }
-.pager-page-input { width: 52px; padding: 3px 6px; text-align: center; margin-bottom: 0; }
-.pager-size { width: 104px; padding: 3px 6px; margin-bottom: 0; }
-.pager-range { margin-left: auto; }
+/* The pager is core's. Here it is pinned to the floor of the card, the way
+   the reference's is, so the page controls are in the same place whatever
+   the row count. */
+.backlog-grid > .pager { padding: 7px 10px; border-top: 1px solid var(--border); background: var(--surface-2); }
 
 /* Detail panel */
 /* The detail sidebar, mirrored from XTM's (references/xtm-detail-sidebar.png):

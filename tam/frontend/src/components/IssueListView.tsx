@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { errMsg, useProfile, useViewState } from "@agile-suite/core";
+import { Pager, errMsg, useProfile, useViewState } from "@agile-suite/core";
 import { ExportBacklog, GRID_COLUMNS } from "../api";
 import type { Issue, IssueQuery, Profile, Settings, SortColumn } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
@@ -25,10 +25,8 @@ const PAGE_SIZES = [25, 50, 100, 250];
 const SEARCH_DELAY_MS = 250;
 
 interface IssueListViewProps {
-  // Namespaces this instance's DOM ids (the pager's label/input pairs), so
-  // two mounted tabs never collide on the same id. It also keys this view's
-  // filter, sort, page and selection in the view-state store, so each tab
-  // gets them back when it is shown again (#524).
+  // Keys this view's filter, sort, page and selection in the view-state
+  // store, so each tab gets them back when it is shown again (#524).
   viewId: string;
   label: string;
   // Merged under the component's own filter state, so baseQuery only fills
@@ -62,14 +60,6 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
   // Stored under no profile, so a profile switch, which clears the
   // profile's own view state, leaves it alone (see the reset below).
   const [pageSize, setPageSize] = useViewState("", viewId, "pageSize", PAGE_SIZES[0]);
-  // What the user has typed into the page box, or null when they are not
-  // editing it. The box cannot simply be bound to page + 1: clearing it would
-  // snap the field straight back to "1", so typing "23" over it produced
-  // "123". null and "" have to be different states for that reason. null
-  // shows the real page, "" shows an empty box the user is mid-way through
-  // typing into, and page stays where it was until a whole valid number
-  // lands.
-  const [pageDraft, setPageDraft] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useViewState(activeId, viewId, "selectedKey", "");
   // "" is the store's rank order, the right default for a backlog. A column
   // is sorted ascending, then descending, then back to rank, so the default
@@ -144,17 +134,7 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
   const [held, setHeld] = useState<Issue | undefined>(undefined);
   if (inRows && inRows !== held) setHeld(inRows);
   const selected = inRows ?? (held?.key === selectedKey ? held : undefined);
-  const first = total === 0 ? 0 : page * pageSize + 1;
-  const last = Math.min(total, (page + 1) * pageSize);
-  const lastPage = Math.max(0, Math.ceil(total / pageSize) - 1);
   const filtered = search !== "" || sprintId !== "" || isFiltered(filter);
-
-  // goToPage is every way of moving pages that is not the text box, so the
-  // box's draft never survives a step button and show a stale number.
-  function goToPage(n: number) {
-    setPage(Math.min(lastPage, Math.max(0, n)));
-    setPageDraft(null);
-  }
 
   // Every filter change goes back to the first page, and it does so in the
   // same event as the filter itself so no render ever pairs a new filter with
@@ -251,54 +231,19 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
           ) : (
             <IssueTable key={activeId} issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={selectIssue} sort={sort} desc={desc} onSort={toggleSort} />
           )}
-          <div className="pager">
-            <label className="sr-only" htmlFor={`pager-size-${viewId}`}>Issue groups per page</label>
-            <select
-              id={`pager-size-${viewId}`}
-              className="detail-input pager-size"
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                goToPage(0);
-              }}
-            >
-              {PAGE_SIZES.map((n) => (
-                <option key={n} value={n}>{`${n} groups / page`}</option>
-              ))}
-            </select>
-            <span className="pager-buttons">
-              <button type="button" className="btn pager-step" aria-label="First page" title="First page" disabled={page === 0} onClick={() => goToPage(0)}>«</button>
-              <button type="button" className="btn pager-step" aria-label="Previous page" title="Previous page" disabled={page === 0} onClick={() => goToPage(page - 1)}>‹</button>
-              <span className="pager-page">
-                <label className="muted small" htmlFor={`pager-page-${viewId}`}>Page</label>
-                {/* Typing a page number is the only way to cross a long
-                    backlog in one move; the step buttons cover the rest. */}
-                <input
-                  id={`pager-page-${viewId}`}
-                  type="number"
-                  className="detail-input pager-page-input"
-                  min={1}
-                  max={lastPage + 1}
-                  value={pageDraft ?? page + 1}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setPageDraft(raw);
-                    // An empty or out-of-range box is a half-typed number,
-                    // not a request to jump to the edge of the backlog.
-                    const n = Number(raw);
-                    if (raw !== "" && Number.isFinite(n) && n >= 1 && n <= lastPage + 1) {
-                      setPage(n - 1);
-                    }
-                  }}
-                  onBlur={() => setPageDraft(null)}
-                />
-                <span className="muted small">{`of ${(lastPage + 1).toLocaleString()}`}</span>
-              </span>
-              <button type="button" className="btn pager-step" aria-label="Next page" title="Next page" disabled={page >= lastPage} onClick={() => goToPage(page + 1)}>›</button>
-              <button type="button" className="btn pager-step" aria-label="Last page" title="Last page" disabled={page >= lastPage} onClick={() => goToPage(lastPage)}>»</button>
-            </span>
-            <span className="muted small pager-range">{`${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()}`}</span>
-          </div>
+          <Pager
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPage={setPage}
+            onPageSize={(n) => {
+              setPageSize(n);
+              setPage(0);
+            }}
+            pageSizeOptions={PAGE_SIZES}
+            sizeName="Issue groups per page"
+            sizeLabel={(n) => `${n} groups / page`}
+          />
         </div>
         {selected && (
           <IssueDetailPanel

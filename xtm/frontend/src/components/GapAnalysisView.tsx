@@ -12,7 +12,7 @@ import {
 } from "../api";
 import type { GapResult, GapTest } from "../api";
 import { useNotice } from "./useNotice";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { fileToBase64 } from "../files";
 
 interface Props {

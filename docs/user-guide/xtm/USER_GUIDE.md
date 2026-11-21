@@ -634,7 +634,9 @@ The grid lists tests with sortable columns. Above it sits the toolbar:
 - **Columns** — show, hide, and reorder columns (the layout is remembered).
 
 Pagination controls sit at the bottom: rows-per-page, first/prev/next/last, and
-a jump-to-page box. A dirty-dot marks rows with uncommitted edits.
+a jump-to-page box that goes to a page as soon as you type a valid number. Every
+paged list in XTM, and TAM's backlog, uses this same pager. A dirty-dot marks
+rows with uncommitted edits.
 
 ![Figure 6: Test grid and toolbar](images/06-test-grid.png)
 *Figure 6 — The test grid with the search box, status filter, Saved views,

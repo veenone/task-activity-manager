@@ -7,7 +7,7 @@ import type {
   PreconditionDuplicateGroup,
   PreconditionDuplicateMember,
 } from "../api";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { Modal } from "./Modal";
 
 type Filter = "all" | "identical" | "differ";

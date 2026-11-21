@@ -1,6 +1,6 @@
 import { JiraStatus } from "@agile-suite/core";
 import { errMsg } from "../../api";
-import { Pager } from "../Pager";
+import { Pager } from "@agile-suite/core";
 import { SortControl } from "../SortControl";
 import type { BugsState } from "./useBugsState";
 import type { BugsActions } from "./useBugsActions";

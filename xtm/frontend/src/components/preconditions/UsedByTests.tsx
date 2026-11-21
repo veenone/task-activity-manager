@@ -1,4 +1,4 @@
-import { Pager } from "../Pager";
+import { Pager } from "@agile-suite/core";
 import type { PreconditionsState } from "./usePreconditionsState";
 import type { PreconditionsActions } from "./usePreconditionsActions";
 
