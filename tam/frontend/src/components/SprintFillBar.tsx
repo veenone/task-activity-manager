@@ -45,7 +45,7 @@ export function SprintFillBar({ count, sprints, busy, denied = "", onFill, onCle
   const ready = target === BACKLOG || !!chosen;
 
   return (
-    <div className="board-selection-bar" role="group" aria-label="Checked cards">
+    <div className="bulk-toolbar" role="group" aria-label="Checked cards">
       <span className="bulk-count">{plural(count, "card", "cards")} selected</span>
       <label className="board-picker">
         <span>Move to</span>
@@ -76,7 +76,7 @@ export function SprintFillBar({ count, sprints, busy, denied = "", onFill, onCle
       >
         {`Move ${plural(count, "card", "cards")}`}
       </button>
-      <button type="button" className="btn board-selection-clear" onClick={onClear}>Clear</button>
+      <button type="button" className="btn" onClick={onClear}>Clear</button>
     </div>
   );
 }
