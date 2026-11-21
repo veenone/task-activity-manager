@@ -17,7 +17,7 @@ describe("rules core already owns", () => {
 
   // XTM kept its own .btn-danger and .board-head, so a change to core's
   // version never reached XTM and the two apps drew them differently (#542).
-  it.each([".btn-danger", ".btn-danger:hover:not(:disabled)", ".board-head"])("does not redefine %s", (selector) => {
+  it.each([".btn-danger", ".btn-danger:hover:not(:disabled)", ".board-head", ".bulk-toolbar"])("does not redefine %s", (selector) => {
     expect(selectors).not.toContain(selector);
   });
 });

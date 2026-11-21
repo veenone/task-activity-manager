@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Sprint } from "../api";
 import { SprintFillBar } from "./SprintFillBar";
+import { BoardSelectionBar } from "./BoardSelectionBar";
 
 const SPRINTS: Sprint[] = [
   { id: 12, boardId: 1, name: "Sprint 12", state: "active", startDate: "", endDate: "", goal: "" },
@@ -62,5 +63,16 @@ describe("SprintFillBar", () => {
     expect(move).toBeDisabled();
     await user.click(move);
     expect(onFill).not.toHaveBeenCalled();
+  });
+
+  // TAM's selection bars and XTM's bulk toolbar are one core rule, so the
+  // two apps draw a selection the same way (#542).
+  it("draws as the shared bulk toolbar, the board's bar too", () => {
+    renderBar();
+    render(
+      <BoardSelectionBar count={2} sprints={SPRINTS} sprintId="12" busy={false} onMove={vi.fn()} onClear={vi.fn()} />,
+    );
+    expect(screen.getByRole("group", { name: "Checked cards" }).className).toBe("bulk-toolbar");
+    expect(screen.getByRole("group", { name: "Selected cards" }).className).toBe("bulk-toolbar");
   });
 });
