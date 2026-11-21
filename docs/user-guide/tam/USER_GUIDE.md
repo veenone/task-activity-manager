@@ -232,7 +232,8 @@ parents and everything beneath them.
 
 Select a row and the detail panel opens on the right; its left edge drags to
 resize. The head carries the key, type, status, sprint, reporter and updated
-date, with the time tracking figures and bar under them.
+date, with the time tracking figures and bar under them. Escape closes the
+panel and puts focus back on the row you opened it from.
 
 | Section | What it does |
 | --- | --- |

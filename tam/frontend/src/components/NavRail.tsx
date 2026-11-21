@@ -1,3 +1,4 @@
+import { focusCurrentViewTab } from "@agile-suite/core";
 import { SetNavRailVisible } from "../api";
 import { VIEWS } from "../nav";
 import type { View } from "../nav";
@@ -16,6 +17,9 @@ export function NavRail({ view, onSelect, onHide }: { view: View; onSelect: (v: 
           aria-label="Hide the navigation rail"
           onClick={() => {
             onHide();
+            // This button goes with the rail, so focus moves to the tab
+            // of the view on screen instead of dropping to the body.
+            focusCurrentViewTab();
             // Persisting through the bound method rebuilds the native
             // menu, so the View menu's tick follows a rail hidden from
             // here rather than going stale.

@@ -1,3 +1,4 @@
+import { usePanelFocus } from "@agile-suite/core";
 import { DetailHeader } from "./test-detail/DetailHeader";
 import { FieldsSection } from "./test-detail/FieldsSection";
 import { ReviewSection } from "./test-detail/ReviewSection";
@@ -22,9 +23,11 @@ export function TestDetail(p: TestDetailProps) {
   useTestDetailLoad(s, p);
   const a = useTestDetailActions(s, p);
   const { width, execType, test, panelLoading } = s;
+  // Escape closes the panel, and focus returns to the row that opened it.
+  const panelRef = usePanelFocus<HTMLElement>(p.onClose, p.testKey);
 
   return (
-    <aside className="detail" style={{ width }}>
+    <aside ref={panelRef} className="detail" style={{ width }}>
       <DetailHeader s={s} a={a} p={p} />
 
       {test && !panelLoading && (

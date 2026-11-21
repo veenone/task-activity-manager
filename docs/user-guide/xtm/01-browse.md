@@ -50,7 +50,7 @@ Click **Columns** to choose which columns the grid shows and in what order. Tick
 
    ![The detail panel for QA-4998](images/browse-06-detail.png)
 
-   The header shows the key, the status and two buttons: **Clone** copies the test, and **✕** closes the panel. Clicking the key opens the test in Jira in your browser.
+   The header shows the key, the status and two buttons: **Clone** copies the test, and **✕** closes the panel. Escape closes it too and puts focus back on the row you opened it from. Clicking the key opens the test in Jira in your browser.
 
 2. Edit any field in place: Summary, Priority, Labels, Components, Execution type or Folder. To change the status, pick a transition from **Move to…**. There is no Save button. XTM saves the change locally when you leave the field.
 

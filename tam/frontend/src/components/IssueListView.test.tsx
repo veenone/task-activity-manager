@@ -263,6 +263,22 @@ describe("IssueListView's detail panel", () => {
     await waitFor(() => expect(panelKey()).toHaveAccessibleName("PLAT-413"));
   });
 
+  // No key closed the panel, and closing it from inside dropped focus to the
+  // page body (#529).
+  it("closes on Escape and gives focus back to the row that opened it", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const opener = await screen.findByRole("row", { name: /PLAT-412/ });
+    opener.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(panelKey()).toHaveAccessibleName("PLAT-412"));
+    await user.click(within(panelKey()).getByRole("button", { name: /Fields/ }));
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("complementary", { name: /PLAT-/ })).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole("row", { name: /PLAT-412/ }));
+  });
+
   it("stays on the selected issue after paging away from it", async () => {
     vi.mocked(api.ListIssues).mockImplementation(async (_p, q) =>
       q.offset === 0 ? { issues: [row("PLAT-412", "Apply promo")], total: 30 } : { issues: [row("PLAT-440", "Later")], total: 30 },
