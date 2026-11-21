@@ -41,13 +41,14 @@ export function ProfilesModal({ onClose }: { onClose: () => void }) {
         await reload();
       }}
       onClose={onClose}
-      renderForm={({ profile, onSaved, onCancel, extraActions }) => (
+      renderForm={({ profile, onSaved, onCancel, extraActions, onDirtyChange }) => (
         <ProfileForm
           profile={profile}
           profiles={profiles}
           onSaved={onSaved}
           onCancel={onCancel}
           extraActions={extraActions}
+          onDirtyChange={onDirtyChange}
         />
       )}
     />

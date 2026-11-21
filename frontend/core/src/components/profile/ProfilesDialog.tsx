@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import { Modal } from "../Modal";
 import { useConfirm } from "../useConfirm";
+import { useProfileCloseGuard } from "./useProfileCloseGuard";
 import { errMsg } from "../../lib/errMsg";
 
 // What an app's ProfileForm is handed: the profile to edit (none when
@@ -12,6 +13,9 @@ export interface ProfileFormSlot<P> {
   onSaved: (p: P) => void;
   onCancel?: () => void;
   extraActions?: ReactNode;
+  // For the form to say whether it holds unsaved input, so closing the
+  // dialog over it asks first.
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 interface Props<P> {
@@ -56,6 +60,9 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
   const [selectedId, setSelectedId] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  // Escape, a click outside and the close button all ask first when the open
+  // form holds input that closing would drop (#542).
+  const guard = useProfileCloseGuard(onClose);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
   const editingActive = !creating && selected !== null && selected.id === activeId;
@@ -119,7 +126,7 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
     });
 
   return (
-    <Modal onClose={onClose} className="modal profiles-modal" labelledBy="profiles-modal-title">
+    <Modal onClose={() => void guard.requestClose()} className="modal profiles-modal" labelledBy="profiles-modal-title">
       <div className="profiles-modal-head">
         <div className="profiles-modal-head-text">
           <h2 id="profiles-modal-title">Manage Profiles</h2>
@@ -129,7 +136,7 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
               : `Editing here won't switch your active connection.${subtitle ? ` ${subtitle}` : ""}`}
           </span>
         </div>
-        <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
+        <button className="btn btn-ghost" onClick={() => void guard.requestClose()} title="Close" aria-label="Close">
           ✕
         </button>
       </div>
@@ -195,7 +202,14 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
                 <span className="profiles-mode-kicker profiles-mode-kicker-new">New profile</span>
               </div>
               <div className="profiles-mode-title">Add a connection</div>
-              {renderForm({ onSaved: saved, onCancel: () => setCreating(false) })}
+              {renderForm({
+                onSaved: saved,
+                onCancel: () => {
+                  setCreating(false);
+                  guard.resetDirty();
+                },
+                onDirtyChange: guard.onDirtyChange,
+              })}
             </>
           ) : selected ? (
             <>
@@ -222,6 +236,7 @@ export function ProfilesDialog<P extends { id: string; name: string; projectKey:
                 {renderForm({
                   profile: selected,
                   onSaved: saved,
+                  onDirtyChange: guard.onDirtyChange,
                   extraActions: (
                     <>
                       <button className="btn" onClick={() => void run(() => onExport(selected.id))}

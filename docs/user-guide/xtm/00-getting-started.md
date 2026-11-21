@@ -115,7 +115,7 @@ Open **⚙ Manage → Manage Profiles…** to see every profile you have created
 - The star sets the profile XTM opens on launch.
 - **Import from file…** loads a profile someone exported.
 
-Changing a profile's URL or project key clears its local cache, and XTM warns you before it does. Editing a profile here does not switch your active connection. To switch, use the profile list next to the XTM name in the top bar.
+Changing a profile's URL or project key clears its local cache, and XTM warns you before it does. Closing the dialog with Escape, a click outside it or the close button asks first when the form holds something you have not saved. Editing a profile here does not switch your active connection. To switch, use the profile list next to the XTM name in the top bar.
 
 ![The Manage Profiles dialog](images/getting-started-14-profiles.png)
 

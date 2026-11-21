@@ -21,6 +21,7 @@ import { SyncHistoryModal } from "../components/SyncHistoryModal";
 import { ImportTestsModal } from "../components/ImportTestsModal";
 import { LabelsModal } from "../components/labels-admin/LabelsModal";
 import { AboutModal } from "../components/AboutModal";
+import { useProfileCloseGuard } from "@agile-suite/core";
 import type { AppState } from "./useAppState";
 import type { AppActions } from "./useAppActions";
 
@@ -29,25 +30,22 @@ import type { AppActions } from "./useAppActions";
 export function DialogHost({ s, a }: { s: AppState; a: AppActions }) {
   const { profiles, activeId, defaultProfileId, setDefaultFor, isOpen, openModal, closeModal, syncStatus, view, setSelectedKey, selectedSet, startTour, editingProfile, setEditingProfile, lastCommitResult, pendingChanges, folders, reloadPending, refreshProfileData } = s;
   const { afterMutation, exportProfile, importProfile, deleteProfile, handleCreated, handleDiscard, handleDiscardAll, handleCommit, handleCommitIds, resolveConflictOverride, resolveConflictKeepRemote, resolveConflictMerge, resolveConflictRecreate, closePendingModal } = a;
+  const closeForm = () => {
+    closeModal();
+    setEditingProfile(null);
+  };
+  // Escape and a click outside ask before dropping a typed URL or token (#542).
+  const formGuard = useProfileCloseGuard(closeForm);
   return (
     <>
       {isOpen("form") && (
-        <Modal
-          onClose={() => {
-            closeModal();
-            setEditingProfile(null);
-          }}
-          className="modal"
-          label="Profile"
-        >
+        <Modal onClose={() => void formGuard.requestClose()} className="modal" label="Profile">
           <ProfileForm
             profile={editingProfile ?? undefined}
             profiles={profiles}
             onCreated={handleCreated}
-            onCancel={() => {
-              closeModal();
-              setEditingProfile(null);
-            }}
+            onCancel={closeForm}
+            onDirtyChange={formGuard.onDirtyChange}
           />
         </Modal>
       )}
