@@ -10,8 +10,8 @@ export function DetailHeader({ s, a }: { s: PreconditionsState; a: Preconditions
   if (!selectedPre) return null;
   return (
     <>
-      <div className="precond-detail-head">
-        <div className="precond-detail-id">
+      <div className="detail-head">
+        <div className="detail-head-id">
           {!editing && (
             <button
               type="button"
@@ -26,7 +26,7 @@ export function DetailHeader({ s, a }: { s: PreconditionsState; a: Preconditions
           {canLinkToJira ? (
             <button
               type="button"
-              className="mono precond-detail-key precond-key-link"
+              className="mono detail-key detail-key-link"
               onClick={openInJira}
               title="Open this precondition in Jira (browser)"
             >
@@ -36,7 +36,7 @@ export function DetailHeader({ s, a }: { s: PreconditionsState; a: Preconditions
               </span>
             </button>
           ) : (
-            <span className="mono precond-detail-key">
+            <span className="mono detail-key">
               {selectedPre.key}
             </span>
           )}
@@ -49,7 +49,7 @@ export function DetailHeader({ s, a }: { s: PreconditionsState; a: Preconditions
             </span>
           )}
         </div>
-        <div className="precond-detail-actions">
+        <div className="detail-head-actions">
           {editing ? (
             <>
               <button

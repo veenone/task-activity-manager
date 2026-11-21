@@ -67,7 +67,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    min-height: 0 at every level: a flex child defaults to min-height auto and
    refuses to shrink below its content, so one missing declaration anywhere in
    the chain lets the table push the pager off the bottom of the window. */
-.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: var(--page-gutter); overflow: hidden; }
 .small { font-size: var(--fs-xs); }
 
 /* The line a gated view shows when the token lacks a permission (#533). */
@@ -102,13 +102,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
    height and a row gap (issue #65 item 1). row-gap is written out because a
    wrapped bar is the case it exists for and `gap: 12px` alone left the two
    rows reading as two bars. */
-.filter-bar { flex: none; display: flex; align-items: center; column-gap: 12px; row-gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-/* .detail-input carries margin-bottom: 12px for the detail panel's stacked
-   fields. A centred flex row counts that margin in the item's outer size, so
-   the search box and the sprint select rode 6px above the chips and the
-   buttons next to them. The .edit-form rule below cancels it for the same
-   reason; the bar needed its own. */
-.filter-bar .detail-input { margin-bottom: 0; }
 /* A floor, not a ceiling. `height: 30px` left 16px of content box for a line
    box that wants 18.2px, and the text is what gave way: the descenders were
    cut off (#323). min-height lines the row up without ever being the reason
@@ -301,20 +294,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    sits over the seam rather than beside it, so the two panes stay flush. */
 .detail-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; margin-left: -3px; cursor: col-resize; z-index: var(--z-float); }
 .detail-resizer:hover { background: var(--accent); opacity: 0.35; }
-.detail-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-}
-.detail-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.detail-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.detail-key { font-size: var(--fs-md); font-weight: 600; color: var(--chrome-text); }
+/* The detail bar (.detail-head and its parts) is core's, shared with XTM (#541). */
 /* The status reads as a chip on the bar rather than as a row in the grid,
    which is what makes the key and its state one statement. */
 .detail-head-status {
@@ -332,15 +312,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .detail-close:hover:not(:disabled) { background: var(--chrome-hover); color: var(--chrome-text-strong); }
 .detail-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
 .detail-summary { font-size: var(--fs-lg); margin: 0 0 12px; }
-/* The label/value grid XTM uses for the read-only facts above the editor. */
-/* align-items: start, not center: a value that wraps to two lines (a sprint
-   called "Sprint 12 - Checkout polish", a long path) used to sit centred
-   against its label and read as though it belonged to neither row. */
-.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: start; margin-bottom: 4px; font-size: var(--fs-sm); }
-.detail-fields dt { color: var(--text-muted); padding-top: 1px; }
-/* The value wraps rather than clipping: the panel is resizeable and these
-   are facts a reader needs whole, so the column gives way, not the text. */
-.detail-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* The label/value grid (.detail-fields) is core's too (#541). */
 /* The Sprint field's select and its "no sprints yet" sentence stack rather
    than crowd the same line, on a profile whose boards have not been synced. */
 .sprint-field { display: flex; flex-direction: column; gap: 4px; }

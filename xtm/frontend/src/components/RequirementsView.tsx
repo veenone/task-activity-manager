@@ -499,17 +499,15 @@ export function RequirementsView({ onChanged }: Props) {
           <p className="muted">Select a requirement to see its coverage.</p>
         ) : (
           <>
-            <div className="reqs-detail-head">
-              <span className="kind-badge req-kind">{sel.issueType}</span>
-              <span className="mono reqs-detail-key">{sel.key}</span>
-              <span className="muted reqs-detail-project">{sel.projectKey}</span>
-              {sel.status && <JiraStatus status={sel.status} />}
-              <span
-                className={`cov-badge cov-${sel.coverage.toLowerCase()} reqs-detail-cov`}
-              >
-                {COVERAGE_LABEL[sel.coverage]}
-              </span>
-              <div className="precond-detail-actions">
+            <div className="detail-head">
+              <div className="detail-head-id">
+                <span className="kind-badge req-kind">{sel.issueType}</span>
+                <span className="mono detail-key">{sel.key}</span>
+                <span className="muted reqs-detail-project">{sel.projectKey}</span>
+                {sel.status && <JiraStatus status={sel.status} />}
+                <span className={`cov-badge cov-${sel.coverage.toLowerCase()}`}>{COVERAGE_LABEL[sel.coverage]}</span>
+              </div>
+              <div className="detail-head-actions">
                 {editing ? (
                   <>
                     <button
@@ -647,7 +645,7 @@ export function RequirementsView({ onChanged }: Props) {
                 via the summary caret to give the tests list more room. */}
             {!editing && detailsOpen && (
               <>
-                <dl className="detail-meta">
+                <dl className="detail-fields">
                   {sel.priority && (
                     <>
                       <dt>Priority</dt>

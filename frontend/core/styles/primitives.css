@@ -206,6 +206,40 @@
   box-shadow: var(--modal-shadow);
 }
 
+/* Detail panels and filter bars in both apps (#541). XTM's test,
+   requirement and precondition details had three headers, and its field
+   grid was centre-aligned and did not wrap where TAM's was top-aligned and
+   wrapped. Every detail now opens with this bar and lists its short facts
+   in this grid. */
+.detail-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+.detail-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.detail-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.detail-key { font-size: var(--fs-md); font-weight: 600; color: var(--chrome-text); }
+/* align-items: start, not center: a value that wraps to two lines used to
+   sit centred against its label and read as though it belonged to neither
+   row. The value wraps rather than clipping, because panels resize. */
+.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: start; margin-bottom: 4px; font-size: var(--fs-sm); }
+.detail-fields dt { color: var(--text-muted); padding-top: 1px; }
+.detail-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* The filter bar sits in the page margin above the list it narrows, in both
+   apps (#541); XTM's used to be a full-width band. Its controls share a
+   centre line and a row gap, so a wrapped bar still reads as one strip. */
+.filter-bar { flex: none; display: flex; align-items: center; column-gap: 12px; row-gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+/* .detail-input carries margin-bottom for stacked fields; in a centred row
+   that margin lifted the box above its neighbours. */
+.filter-bar .detail-input { margin-bottom: 0; }
+
 /* Editable fields in the detail panel */
 .field-label {
   font-size: var(--fs-sm);
