@@ -23,7 +23,7 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 
 ## Switching views
 
-Each view has a tab in the band under the top bar. You can also use the **View** menu in the menu bar, where the first nine views have the shortcuts Ctrl+1 to Ctrl+9:
+Each view has a tab in the band under the top bar, and the **View** menu in the menu bar lists every view. Ctrl+1 to Ctrl+9 open the first nine tabs, counted from the left, so the numbers follow the tabs your profile shows. With every view showing they are:
 
 | Shortcut | View | Shortcut | View |
 |---|---|---|---|
@@ -33,6 +33,8 @@ Each view has a tab in the band under the top bar. You can also use the **View**
 | Ctrl+4 | Duplicates | Ctrl+9 | Containers |
 | Ctrl+5 | Gap Analysis | | |
 
-Datasets, Components, Coverage and Spellcheck are in the View menu without a shortcut. Preconditions, Requirements, Datasets and Components only appear when the profile's backend supports them. Coverage only appears after you turn it on from the **More** menu.
+Preconditions, Requirements, Datasets and Components only appear when the profile's backend supports them. Coverage only appears after you turn it on from the **More** menu. If you switch to a profile that doesn't show the view you were on, XTM opens Browse. The shortcuts and the View menu do nothing while a dialog is open.
+
+**Ctrl+\\** shows or hides the navigation rail.
 
 The screenshots in these guides come from a demo profile, so the keys start with `QA-` and the data is generated. See [Demo mode](00-getting-started.md#try-xtm-without-jira-demo-mode).

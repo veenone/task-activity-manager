@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
@@ -9,7 +9,8 @@ import { SyncProvider } from "./contexts/SyncContext";
 import { SelectionProvider } from "./contexts/SelectionContext";
 import { NavProvider } from "./contexts/NavContext";
 import { ModalProvider } from "./contexts/ModalContext";
-import { Health, ListProfiles, SyncProfile, SyncProfileFull } from "./api";
+import { GetCapabilities, Health, ListProfiles, SyncProfile, SyncProfileFull } from "./api";
+import { defaultCapabilities, invalidateCapabilities } from "./features";
 
 // The native menu talks to the frontend through EventsOn; the tests keep the
 // handlers so they can play the part of the menu.
@@ -54,6 +55,8 @@ vi.mock("./api", async (importOriginal) => ({
 
 vi.mock("./components/TestTable", () => ({ TestTable: () => <div>test table</div> }));
 vi.mock("./components/Dashboard", () => ({ Dashboard: () => <div>dashboard view</div> }));
+vi.mock("./components/PreconditionsView", () => ({ PreconditionsView: () => <div>preconditions view</div> }));
+vi.mock("./components/RequirementsView", () => ({ RequirementsView: () => <div>requirements view</div> }));
 vi.mock("./components/PendingChangesModal", () => ({
   PendingChangesModal: ({ changes }: { changes: unknown[] }) => (
     <div role="dialog">{changes.length} changes to review</div>
@@ -87,6 +90,17 @@ describe("App shell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // clearAllMocks keeps an implementation a test set; these two are the
+    // ones a test here replaces for its whole run. Capabilities are also
+    // cached per profile, outside any mock.
+    invalidateCapabilities("p1");
+    invalidateCapabilities("p2");
+    mock(GetCapabilities).mockImplementation(async () => {
+      throw new Error("use defaults");
+    });
+    mock(ListProfiles).mockImplementation(async () => [
+      { id: "p1", name: "Alpha", projectKey: "AL", jiraUrl: "https://jira.example.com" },
+    ]);
   });
 
   it("shows the backend error when startup fails", async () => {
@@ -164,6 +178,49 @@ describe("App shell", () => {
     expect(screen.getByText("test table")).toBeInTheDocument();
     const tabs = within(screen.getByRole("navigation", { name: "Views" }));
     expect(tabs.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-current", "page");
+  });
+
+  // Ctrl+1..9 count the tabs this profile shows, so a hidden view does not
+  // leave the numbers pointing past the tab they used to name (#528).
+  it("opens the Nth visible tab on Ctrl+N", async () => {
+    mock(GetCapabilities).mockResolvedValue({ ...defaultCapabilities, supportsPreconditionObjects: false });
+    renderApp();
+    const tabs = within(await screen.findByRole("navigation", { name: "Views" }));
+    await waitFor(() => expect(tabs.queryByRole("button", { name: "Preconditions" })).toBeNull());
+    fireEvent.keyDown(window, { key: "2", ctrlKey: true });
+    expect(tabs.getByRole("button", { name: "Requirements" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("does not switch views from a shortcut or the View menu while a dialog is open", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    expect(await screen.findByText("test table")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /More/ }));
+    await user.click(screen.getByRole("menuitem", { name: /Full resync/ }));
+    await screen.findByRole("button", { name: "Continue" });
+    fireEvent.keyDown(window, { key: "7", ctrlKey: true });
+    act(() => menu.handlers["menu:view"]("dashboard"));
+    expect(screen.queryByText("dashboard view")).not.toBeInTheDocument();
+    expect(screen.getByText("test table")).toBeInTheDocument();
+  });
+
+  it("falls back to a visible view when a profile switch hides the current one", async () => {
+    const user = userEvent.setup();
+    mock(ListProfiles).mockResolvedValue([
+      { id: "p1", name: "Alpha", projectKey: "AL", jiraUrl: "https://jira.example.com" },
+      { id: "p2", name: "Kiwi", projectKey: "KW", jiraUrl: "https://kiwi.example.com" },
+    ]);
+    mock(GetCapabilities).mockImplementation(async (id: string) =>
+      id === "p2" ? { ...defaultCapabilities, supportsPreconditionObjects: false } : defaultCapabilities,
+    );
+    renderApp();
+    const tabs = within(await screen.findByRole("navigation", { name: "Views" }));
+    await user.click(await tabs.findByRole("button", { name: "Preconditions" }));
+    expect(await screen.findByText("preconditions view")).toBeInTheDocument();
+    await user.selectOptions(screen.getByTitle("Switch active profile"), "p2");
+    await waitFor(() => expect(tabs.queryByRole("button", { name: "Preconditions" })).toBeNull());
+    await waitFor(() => expect(tabs.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-current", "page"));
+    expect(screen.getByText("test table")).toBeInTheDocument();
   });
 
   // The dot is a shape the stylesheet draws; a glyph inside it showed as a

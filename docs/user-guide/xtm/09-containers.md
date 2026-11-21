@@ -1,6 +1,6 @@
 # Containers
 
-Containers are the Xray issues that group tests: Test Sets, Test Plans and Test Executions. This view lets you pick one, see its tests and their results, create and rename containers, record run results, import JUnit reports, and work with the bugs found during testing. Open it with the **Containers** tab or Ctrl+9.
+Containers are the Xray issues that group tests: Test Sets, Test Plans and Test Executions. This view lets you pick one, see its tests and their results, create and rename containers, record run results, import JUnit reports, and work with the bugs found during testing. Open it with the **Containers** tab, or Ctrl+9 when every view is showing.
 
 ![The Containers view](images/containers-01-view.png)
 
