@@ -234,3 +234,44 @@ describe("IssueListView's status and assignee filters", () => {
     expect(lastQuery()?.offset).toBe(0);
   });
 });
+
+describe("IssueListView's detail panel", () => {
+  const row = (key: string, summary: string): api.Issue => ({
+    key, id: key, project: "PLAT", type: "story", summary, status: "To Do",
+    assignee: "", reporter: "", priority: "", labels: [], sprintId: "", sprintName: "", parentKey: "",
+    storyPoints: null, rank: "", created: "", updated: "",
+  });
+  const panelKey = () => screen.getByRole("complementary", { name: /PLAT-/ });
+
+  // Sorting and paging move the open issue off the page the grid holds. The
+  // panel used to look the selection up in that page and closed (#525).
+  it("stays on the selected issue after a sort moves it off the page", async () => {
+    vi.mocked(api.ListIssues).mockImplementation(async (_p, q) =>
+      q.sort === "" ? { issues: [row("PLAT-412", "Apply promo")], total: 2 } : { issues: [row("PLAT-413", "Refund flow")], total: 2 },
+    );
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("row", { name: /PLAT-412/ }));
+    await waitFor(() => expect(panelKey()).toHaveAccessibleName("PLAT-412"));
+
+    await user.click(screen.getByRole("button", { name: "Sort by Key" }));
+    await screen.findByRole("row", { name: /PLAT-413/ });
+    expect(panelKey()).toHaveAccessibleName("PLAT-412");
+
+    // Picking a row on the new page still moves the panel to it.
+    await user.click(screen.getByRole("row", { name: /PLAT-413/ }));
+    await waitFor(() => expect(panelKey()).toHaveAccessibleName("PLAT-413"));
+  });
+
+  it("stays on the selected issue after paging away from it", async () => {
+    vi.mocked(api.ListIssues).mockImplementation(async (_p, q) =>
+      q.offset === 0 ? { issues: [row("PLAT-412", "Apply promo")], total: 30 } : { issues: [row("PLAT-440", "Later")], total: 30 },
+    );
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("row", { name: /PLAT-412/ }));
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByRole("row", { name: /PLAT-440/ });
+    expect(panelKey()).toHaveAccessibleName("PLAT-412");
+  });
+});

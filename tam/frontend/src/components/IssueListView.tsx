@@ -130,7 +130,15 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
 
   const total = issues.data?.total ?? 0;
   const rows = issues.data?.issues ?? [];
-  const selected = rows.find((r) => r.key === selectedKey);
+  // The panel is keyed on the selection, not on the page: a sort or a page
+  // step moves the open issue off the rows the grid holds, and the panel
+  // stays on the last row it saw for that key until the issue comes back
+  // into view (#525). The row is captured during render, like the profile
+  // reset above, so no commit shows the panel closed.
+  const inRows = rows.find((r) => r.key === selectedKey);
+  const [held, setHeld] = useState<Issue | undefined>(undefined);
+  if (inRows && inRows !== held) setHeld(inRows);
+  const selected = inRows ?? (held?.key === selectedKey ? held : undefined);
   const first = total === 0 ? 0 : page * pageSize + 1;
   const last = Math.min(total, (page + 1) * pageSize);
   const lastPage = Math.max(0, Math.ceil(total / pageSize) - 1);
