@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 
 import { Menu } from "../Menu";
 import { RunBar, RunBadge } from "./RunCells";
@@ -64,7 +65,7 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
             </button>
           </h2>
         )}
-        {selectedContainer.status && <span className="status-pill">{selectedContainer.status}</span>}
+        {selectedContainer.status && <JiraStatus status={selectedContainer.status} />}
         <span className="container-card-count">
           {(board?.rows.length ?? 0).toLocaleString()} test
           {(board?.rows.length ?? 0) === 1 ? "" : "s"}
@@ -140,7 +141,7 @@ export function ContainerCard({ s, a, p }: { s: ContainerState; a: ContainerActi
                     {b.key}
                   </button>
                   <span className="container-bug-summary">{b.summary}</span>
-                  {b.status && <span className="status-pill container-bug-status">{b.status}</span>}
+                  {b.status && <JiraStatus status={b.status} className="container-bug-status" />}
                 </li>
               ))}
             </ul>

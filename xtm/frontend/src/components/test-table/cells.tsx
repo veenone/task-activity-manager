@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import type { CSSProperties } from "react";
 import { formatDate } from "../../dates";
 import type { TestCase } from "../../api";
@@ -43,7 +44,7 @@ export function renderCell(
       return (
         <td key="status" style={style}>
           {t.status ? (
-            <span className="status-pill">{t.status}</span>
+            <JiraStatus status={t.status} />
           ) : (
             <span className="muted">(none)</span>
           )}

@@ -151,10 +151,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-type-alt-teal { background: var(--chip-teal-bg); color: var(--chip-teal-text); }
 .chip-type-alt-pink { background: var(--chip-pink-bg); color: var(--chip-pink-text); }
 .chip-type-alt-orange { background: var(--chip-orange-bg); color: var(--chip-orange-text); }
-.chip-status { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 6px; border-radius: 3px; }
-.chip-status-todo { background: var(--surface-3); color: var(--text); }
-.chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
-.chip-status-done { background: var(--chip-green-bg); color: var(--chip-green-text); }
 
 /* Both views are a fixed toolbar over a body that takes the rest. */
 .backlog { flex: 1; min-height: 0; display: flex; flex-direction: column; }

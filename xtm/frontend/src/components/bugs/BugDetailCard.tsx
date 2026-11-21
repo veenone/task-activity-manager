@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { formatDateTime } from "../../dates";
 import { Markdown } from "../Markdown";
 import type { BugsState } from "./useBugsState";
@@ -22,7 +23,7 @@ export function BugDetailCard({ s }: { s: BugsState }) {
           ) : (
             <span className="mono bugs-md-detail-key">{sel.key}</span>
           )}
-          {sel.status && <span className="status-pill">{sel.status}</span>}
+          {sel.status && <JiraStatus status={sel.status} />}
         </div>
         <div className="bugs-md-summary-row">
           <button

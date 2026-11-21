@@ -38,16 +38,14 @@ describe("formatWhen", () => {
   it("is empty for an empty stamp", () => {
     expect(formatWhen("", now)).toBe("");
   });
+  // Core owns the wording since #539, so TAM and XTM print one date shape.
   it("says today with the time for a same-day stamp", () => {
-    const stamp = new Date("2026-09-05T10:42:00Z").toISOString();
-    const expected = new Date(stamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    expect(formatWhen(stamp, now)).toBe(`today ${expected}`);
+    const stamp = new Date(2026, 8, 5, 10, 42).toISOString();
+    expect(formatWhen(stamp, new Date(2026, 8, 5, 14, 0))).toBe("today 10:42");
   });
-  it("shows the date and time otherwise", () => {
-    const stamp = "2026-09-01T08:00:00Z";
-    const d = new Date(stamp);
-    const expected = `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    expect(formatWhen(stamp, now)).toBe(expected);
+  it("shows the day-first date and time otherwise", () => {
+    const stamp = new Date(2026, 8, 1, 8, 0).toISOString();
+    expect(formatWhen(stamp, new Date(2026, 8, 5, 14, 0))).toBe("01/09/2026 08:00");
   });
   it("returns the raw text for something that is not a date", () => {
     expect(formatWhen("never", now)).toBe("never");

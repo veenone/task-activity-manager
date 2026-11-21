@@ -2,7 +2,7 @@ import type { KeyboardEvent } from "react";
 import { ProgressBar } from "@agile-suite/core";
 import type { LoggedWork, WorklogRow } from "../api";
 import { workDuration } from "../lib/format";
-import { statusClass } from "../lib/statusClass";
+import { JiraStatus } from "@agile-suite/core";
 import { cellEntries, dayLabel, dayState, dayTotals, isWeekend, seconds } from "../lib/worklogWeek";
 import { TypeChip } from "./TypeChip";
 
@@ -73,7 +73,7 @@ export function WorklogGrid({ days, today, rows, entries, target, selected, onSe
             <span className="mono worklog-key">{issue.key}</span>
             {issue.type && <TypeChip type={issue.type} />}
             {issue.status && (
-              <span className={`chip chip-status chip-status-${statusClass(issue.status, issue.statusCategory)}`}>{issue.status}</span>
+              <JiraStatus status={issue.status} category={issue.statusCategory} />
             )}
           </span>
           <span className="worklog-summary" title={issue.summary}>{issue.summary}</span>

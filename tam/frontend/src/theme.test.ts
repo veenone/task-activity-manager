@@ -129,7 +129,9 @@ describe.each([
   ["dark", dark],
 ])("%s theme", (_theme, table) => {
   it.each(FILLED)("%s reads at 4.5 to 1 or better against its own fill", (selector) => {
-    const declarations = declarationsOf(app, selector);
+    // The Jira status chip moved to core in #539.
+    const declarations = declarationsOf(`${app}
+${primitivesCss}`, selector);
     const fill = valueOf(declarations, "background") ?? valueOf(declarations, "background-color");
     expect(fill).toBeDefined();
     const text = valueOf(declarations, "color") ?? "var(--text)";

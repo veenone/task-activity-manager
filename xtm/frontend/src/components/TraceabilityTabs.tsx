@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import {
@@ -357,7 +358,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                         {b.key}
                       </button>
                       <span className="muted">{b.projectKey}</span>
-                      {b.status && <span className="status-pill">{b.status}</span>}
+                      {b.status && <JiraStatus status={b.status} />}
                       <span className="crossproject-bug-summary">
                         {b.summary || "(no summary)"}
                       </span>

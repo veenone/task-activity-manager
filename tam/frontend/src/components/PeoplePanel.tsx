@@ -4,7 +4,7 @@ import type { ReportPerson, ReportPersonCard, ReportSection } from "../api";
 import { points, workDuration } from "../lib/format";
 import { BAR_HEADING, PEOPLE_TIME, personBar, personKey, timeCells } from "../lib/reportPeople";
 import type { TimeColumn } from "../lib/reportPeople";
-import { statusClass } from "../lib/statusClass";
+import { JiraStatus } from "@agile-suite/core";
 import { ReportNotes } from "./ReportNotes";
 
 // PeoplePanel is the People tab (#287): the section the outputs carry, drawn
@@ -101,9 +101,7 @@ function CardRow({ card: c, id, time }: { card: ReportPersonCard; id?: string; t
         <span className="people-card-key">{c.key}</span> <span className="people-card-summary">{c.summary}</span>
       </td>
       <td className="people-num">
-        <span className={`chip chip-status chip-status-${statusClass(c.status, c.statusCategory)}`} title={c.status}>
-          {c.status}
-        </span>
+        <JiraStatus status={c.status} category={c.statusCategory} />
       </td>
       <td className="people-num">{c.points === null ? "" : points(c.points)}</td>
       {timeCells(c, time).map((v, i) => <td className="people-num" key={time[i].label}>{v}</td>)}

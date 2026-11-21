@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { ChangeTestType, errMsg } from "../../api";
 import { LabelsField } from "../LabelsField";
 import { ComponentsField } from "../ComponentsField";
@@ -42,7 +43,7 @@ export function FieldsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAc
         </dt>
         <dd>
           <div className="status-row">
-            <span className="status-pill">{test.status || "(none)"}</span>
+            <JiraStatus status={test.status || "(none)"} />
             {caps.supportsWorkflowTransitions ? (
               // Xray: the existing workflow-transition picker, unchanged.
               !readOnly &&

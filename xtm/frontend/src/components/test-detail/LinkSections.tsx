@@ -1,3 +1,4 @@
+import { JiraStatus } from "@agile-suite/core";
 import { MultiAddSelect } from "../MultiAddSelect";
 import { PreconditionRow, ContainerSection, DirtyDot } from "./rows";
 import type { TestDetailState } from "./useTestDetailState";
@@ -169,9 +170,7 @@ export function RequirementsSection({ s, a, p }: { s: TestDetailState; a: TestDe
                   <span className="muted req-link-project">{rq.projectKey}</span>
                   <span className="req-link-summary">{rq.summary}</span>
                   {rq.status && (
-                    <span className="status-pill req-link-status">
-                      {rq.status}
-                    </span>
+                    <JiraStatus status={rq.status} className="req-link-status" />
                   )}
                   {!readOnly && (
                     <button
@@ -242,7 +241,7 @@ export function BugsSection({ s }: { s: TestDetailState }) {
               <span className="muted req-link-project">{b.projectKey}</span>
               <span className="req-link-summary">{b.summary}</span>
               {b.status && (
-                <span className="status-pill req-link-status">{b.status}</span>
+                <JiraStatus status={b.status} className="req-link-status" />
               )}
             </li>
           ))}
