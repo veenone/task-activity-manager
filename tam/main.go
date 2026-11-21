@@ -41,6 +41,9 @@ func main() {
 		Title:  "Task Activity Manager",
 		Width:  1280,
 		Height: 800,
+		// Below this the top bar's controls crowd each other. The view
+		// tabs scroll at any width (#531).
+		MinWidth: 960,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
