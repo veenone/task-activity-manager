@@ -25,6 +25,10 @@ The moon or sun button at the right of the top bar switches between light and
 dark. PIE remembers the theme you pick, from either place, for the next time
 it starts.
 
+The window can't be made narrower than 1024 pixels or shorter than 640.
+In a window narrower than 1280 pixels, the Link map's side panes get narrower
+so the graph keeps its room.
+
 ## The status bar
 
 The bar along the bottom of the window shows the profile in use, how many
