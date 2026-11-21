@@ -137,7 +137,7 @@ nobody minds you breaking.
 
 | Part | What is in it |
 | --- | --- |
-| Top bar | The app name, the DEMO chip, the profile picker, **Manage**, the pending count, **Refresh**, **Sync**, **Theme** and **Help**. |
+| Top bar | The app name, the DEMO chip, the profile picker, **Manage**, the pending count, **Refresh**, **More** and **Sync**. **More** holds Full sync, the tours, Diagnostics, About and the theme. |
 | Tab band | The eight views. |
 | Navigation rail | An optional list of the same views down the left, toggled with **Ctrl+B**. |
 | Main area | The active view. |
@@ -571,15 +571,14 @@ re-syncs straight afterwards.
 
 ## 15. Syncing
 
-**Sync** at the right of the top bar offers:
+**Sync** at the right of the top bar pulls what changed since the last sync in
+one click. Also **File → Sync** or **Ctrl+R**.
 
-- **Sync changes** pulls what changed since the last sync. Also **File → Sync**
-  or **Ctrl+R**.
-- **Full sync** fetches every issue again and drops the ones Jira no longer
-  returns. Also **Ctrl+Shift+R**. It asks before it starts, since it can take
-  a while on a large project. Use it after changing the scope JQL or the
-  requirement issue type, or when the cache looks wrong. If it fails partway,
-  the issues cached before it stay until a full sync finishes.
+**More → Full sync** fetches every issue again and drops the ones Jira no
+longer returns. Also **Ctrl+Shift+R**. It asks before it starts, since it can
+take a while on a large project. Use it after changing the scope JQL or the
+requirement issue type, or when the cache looks wrong. If it fails partway,
+the issues cached before it stay until a full sync finishes.
 
 The status bar shows progress while a sync runs, then the issue count and when
 it finished. A failed sync is reported there too.
@@ -606,7 +605,8 @@ permissions. Column limits and creating a board are not covered.
 **File → Settings…** holds the **Report export folder**, where spreadsheets and
 decks are written.
 
-**Theme** in the top bar switches between light, dark and the system setting.
+**More** in the top bar switches the theme between light, dark and the system
+setting.
 **Ctrl+B** shows or hides the navigation rail. Both are remembered.
 
 **Manage**, beside the profile picker, edits, exports and deletes profiles.
@@ -614,7 +614,7 @@ Deleting a profile also discards its pending changes; when it has any, the
 confirmation says how many will be lost.
 Switching profiles is blocked while a sync or a commit is running.
 
-**Help → Take the tour** walks through the view you are on; **Take the
+**More → Take the tour** walks through the view you are on; **Take the
 first-run tour** walks through the whole loop.
 
 ## 17. Diagnostics and troubleshooting
