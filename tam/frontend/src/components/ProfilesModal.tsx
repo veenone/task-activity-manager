@@ -1,5 +1,5 @@
 import { ProfilesDialog, useNotice, useProfile } from "@agile-suite/core";
-import { DeleteProfile, ExportProfile, ImportProfile } from "../api";
+import { DeleteProfile, ExportProfile, ImportProfile, ListPendingChanges } from "../api";
 import type { Profile, Settings } from "../api";
 import { ProfileForm } from "./ProfileForm";
 
@@ -19,6 +19,7 @@ export function ProfilesModal({ onClose }: { onClose: () => void }) {
       subtitle="The list is shared with Xray Test Manager."
       listNote="Kiwi TCMS profiles from Xray Test Manager are not listed here; TAM talks to Jira only."
       deleteMessage="This removes the profile from Xray Test Manager too, along with its stored token and every issue TAM cached for it. This cannot be undone."
+      pendingCount={async (id) => (await ListPendingChanges(id)).length}
       onSetDefault={setDefault}
       onExport={async (id) => {
         const path = await ExportProfile(id);

@@ -601,6 +601,8 @@ decks are written.
 **Ctrl+B** shows or hides the navigation rail. Both are remembered.
 
 **Manage**, beside the profile picker, edits, exports and deletes profiles.
+Deleting a profile also discards its pending changes; when it has any, the
+confirmation says how many will be lost.
 Switching profiles is blocked while a sync or a commit is running.
 
 **Help → Take the tour** walks through the view you are on; **Take the

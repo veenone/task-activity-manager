@@ -427,6 +427,10 @@ Manager, never in the local database or logs.*
 The PAT field has a **show/hide** toggle so you can reveal what you typed while
 pasting or checking it.
 
+Deleting a profile from **Manage Profiles** removes its token and everything
+cached for it, including changes you have not committed yet. When there are
+any, the confirmation says how many will be lost.
+
 ![Figure 48: PAT show/hide toggle](images/48-pat-toggle.png)
 *Figure 48 — The Personal Access Token field with its show/hide toggle.*
 

@@ -19,6 +19,7 @@ vi.mock("../api", async () => {
     DeleteProfile: vi.fn(),
     ExportProfile: vi.fn(),
     ImportProfile: vi.fn(),
+    ListPendingChanges: vi.fn(),
     TestConnection: vi.fn(),
     TestProfileConnection: vi.fn(),
     GetSettings: vi.fn(),
@@ -53,6 +54,7 @@ beforeEach(() => {
   vi.mocked(api.UpdateProfile).mockResolvedValue(acme);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
   vi.mocked(api.SetProfileSetting).mockResolvedValue();
+  vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
 });
 
 // The provider loads nothing by itself; App does the first load on mount.
@@ -220,6 +222,19 @@ describe("ProfilesModal", () => {
     expect(dialog).toHaveTextContent("Xray Test Manager");
     await userEvent.click(within(dialog).getByRole("button", { name: "Delete profile" }));
     await waitFor(() => expect(api.DeleteProfile).toHaveBeenCalledWith("p1"));
+  });
+
+  it("counts the profile's uncommitted changes in the delete confirmation", async () => {
+    vi.mocked(api.ListProfiles).mockResolvedValue([acme]);
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(
+      [{ id: 1 }, { id: 2 }] as Awaited<ReturnType<typeof api.ListPendingChanges>>,
+    );
+    renderModal();
+    await userEvent.click(await screen.findByText("Acme Platform"));
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("alertdialog", { name: /Delete profile/ });
+    expect(api.ListPendingChanges).toHaveBeenCalledWith("p1");
+    expect(dialog).toHaveTextContent("Its 2 uncommitted changes will be lost.");
   });
 
   it("opens an imported profile so a token can be entered", async () => {
