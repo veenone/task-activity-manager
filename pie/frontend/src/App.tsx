@@ -32,6 +32,7 @@ import { type Notice, NoticeContext, StatusBar, useRunProgress } from "./StatusB
 import { TopBar } from "./TopBar";
 import { useCases } from "./useCases";
 import { useMenu } from "./useMenu";
+import { useReplaceJql } from "./useReplaceJql";
 import { type View, VIEWS } from "./views";
 
 // chooseProfile is the first wanted id the list still holds, else its first
@@ -214,7 +215,7 @@ export default function App() {
     }
   }
 
-
+  const replaceJql = useReplaceJql({ jql, setJql, queries, queryId, openQuery });
   useMenu({
     view: (id: View) => setView(id),
     profiles: () => setManaging(true),
@@ -280,7 +281,7 @@ export default function App() {
                 className="detail-input"
                 value={queryId}
                 disabled={running}
-                onChange={(e) => void openQuery(Number(e.target.value))}
+                onChange={(e) => void replaceJql.openSaved(Number(e.target.value))}
               >
                 <option value={0}>Unsaved query</option>
                 {queries.map((q) => (
@@ -315,11 +316,7 @@ export default function App() {
               <JiraFilterPicker
                 profileId={profileId}
                 disabled={running}
-                onPick={(id) => {
-                  // A filter reference follows the filter as its owner edits it.
-                  setJql(`filter = ${id}`);
-                  void openQuery(0);
-                }}
+                onPick={(id) => void replaceJql.pickFilter(id)}
               />
             </div>
             <JqlField jql={jql} onChange={setJql} open={jqlOpen} onOpenChange={setJqlOpen} />

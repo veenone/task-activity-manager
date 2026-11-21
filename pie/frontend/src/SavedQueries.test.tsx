@@ -97,6 +97,7 @@ it("drops the rows on screen when a saved query's run cannot be read", async () 
   await screen.findByRole("cell", { name: "A-1" });
 
   await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Replace" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("read the stored run");
   expect(screen.queryByRole("cell", { name: "A-1" })).not.toBeInTheDocument();
 });
@@ -201,4 +202,44 @@ it("keeps a saved query's links for offline when asked, and only for a saved que
   await user.click(box);
   expect(api.SetKeepOffline).toHaveBeenCalledWith("p1", 7, true);
   expect(await screen.findByRole("checkbox", { name: "Keep links for offline" })).toBeChecked();
+});
+
+it("asks before a saved query replaces typed JQL, and keeps both when cancelled", async () => {
+  const user = show();
+  await screen.findByRole("option", { name: "Weekly" });
+  await user.type(screen.getByLabelText("JQL"), "project = MINE");
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+
+  const ask = await screen.findByRole("alertdialog");
+  expect(ask).toHaveTextContent("The JQL you typed is not saved");
+  await user.click(within(ask).getAllByRole("button", { name: "Cancel" }).at(-1)!);
+  expect(screen.getByLabelText("JQL")).toHaveValue("project = MINE");
+  expect(screen.getByLabelText("Saved query")).toHaveValue("0");
+  expect(api.LastRun).not.toHaveBeenCalled();
+});
+
+it("replaces typed JQL with the saved query once the analyst agrees", async () => {
+  vi.mocked(api.LastRun).mockResolvedValue({ result: rows("A-1"), runAt: weekly.runAt, added: null, dropped: null } as never);
+  const user = show();
+  await screen.findByRole("option", { name: "Weekly" });
+  await user.type(screen.getByLabelText("JQL"), "project = MINE");
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Replace" }));
+
+  expect(await screen.findByRole("cell", { name: "A-1" })).toBeVisible();
+  expect(screen.getByLabelText("JQL")).toHaveValue("category = X");
+});
+
+it("opens another saved query without asking while the JQL matches the open one", async () => {
+  const daily = { id: 8, name: "Daily", jql: "category = Y", runAt: "" };
+  vi.mocked(api.ListQueries).mockResolvedValue([weekly, daily] as never);
+  vi.mocked(api.LastRun).mockResolvedValue({ result: rows(), runAt: "", added: null, dropped: null } as never);
+  const user = show();
+  await screen.findByRole("option", { name: "Daily" });
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Daily");
+
+  expect(screen.getByLabelText("JQL")).toHaveValue("category = Y");
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(api.LastRun).toHaveBeenLastCalledWith("p1", 8);
 });
