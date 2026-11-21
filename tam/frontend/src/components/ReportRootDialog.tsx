@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Modal, errMsg } from "@agile-suite/core";
+import { DialogBody, DialogFooter, DialogHeader, Modal, errMsg } from "@agile-suite/core";
 import type { RitualRoot } from "../api";
 
 interface Props {
@@ -62,34 +62,36 @@ export function ReportRootDialog({ spaceKey, suggestedTitle, create, onChosen, o
 
   return (
     <Modal onClose={onClose} className="modal" labelledBy={titleId} closeOnEsc={!working} closeOnOverlayClick={!working}>
-      <h2 id={titleId}>Choose a reports root page</h2>
-      <label htmlFor={fieldId}>Page title</label>
-      <input
-        id={fieldId}
-        className="detail-input"
-        value={title}
-        disabled={working}
-        spellCheck={false}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <p className="muted small">
-        The page is created at the top of {spaceKey}, and every sprint report published from TAM becomes a page
-        under it. It is made now; saving the profile is what keeps it as the reports root.
-      </p>
-      {step.kind === "forbidden" && (
-        <p className="warn-text" role="status">
-          This token may not create pages in {spaceKey}. Ask for permission there, or name a space you can write in.
+      <DialogHeader titleId={titleId} title="Choose a reports root page" onClose={onClose} disabled={working} />
+      <DialogBody>
+        <label htmlFor={fieldId}>Page title</label>
+        <input
+          id={fieldId}
+          className="detail-input"
+          value={title}
+          disabled={working}
+          spellCheck={false}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <p className="muted small">
+          The page is created at the top of {spaceKey}, and every sprint report published from TAM becomes a page
+          under it. It is made now; saving the profile is what keeps it as the reports root.
         </p>
-      )}
-      {step.kind === "taken" && (
-        <p className="warn-text" role="status">
-          {step.topLevel
-            ? `A page titled "${title.trim()}" is already at the top of ${spaceKey}. You can use that page as the reports root.`
-            : `A page titled "${title.trim()}" is already in ${spaceKey}, below another page. Give the root a different title.`}
-        </p>
-      )}
-      {error && <p className="error-text" role="alert">{error}</p>}
-      <div className="form-actions form-actions-end">
+        {step.kind === "forbidden" && (
+          <p className="warn-text" role="status">
+            This token may not create pages in {spaceKey}. Ask for permission there, or name a space you can write in.
+          </p>
+        )}
+        {step.kind === "taken" && (
+          <p className="warn-text" role="status">
+            {step.topLevel
+              ? `A page titled "${title.trim()}" is already at the top of ${spaceKey}. You can use that page as the reports root.`
+              : `A page titled "${title.trim()}" is already in ${spaceKey}, below another page. Give the root a different title.`}
+          </p>
+        )}
+        {error && <p className="error-text" role="alert">{error}</p>}
+      </DialogBody>
+      <DialogFooter>
         {step.kind === "taken" && (
           <button type="button" className="btn" onClick={() => setStep({ kind: "confirm" })}>Back</button>
         )}
@@ -107,7 +109,7 @@ export function ReportRootDialog({ spaceKey, suggestedTitle, create, onChosen, o
             {working ? "Working..." : "Create page"}
           </button>
         )}
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

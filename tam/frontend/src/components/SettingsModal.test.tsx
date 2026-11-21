@@ -94,3 +94,14 @@ describe("SettingsModal", () => {
     expect(await projectKeyCheck()).not.toBeChecked();
   });
 });
+
+describe("SettingsModal frame", () => {
+  it("closes from the close button in its header, like every other dialog", async () => {
+    const onClose = vi.fn();
+    render(<SettingsModal onClose={onClose} />);
+    await screen.findByLabelText(/Report export folder/);
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(bindings.SetReportExportDirectory).not.toHaveBeenCalled();
+  });
+});

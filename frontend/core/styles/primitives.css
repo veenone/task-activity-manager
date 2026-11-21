@@ -279,11 +279,16 @@
 .pending-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-3);
+}
+/* One footer arrangement in both apps (#538): buttons grouped at the right,
+   and a leading status or count line, when a dialog has one, at the left. */
+.pending-actions > :first-child:not(button):not(:only-child) {
+  margin-right: auto;
 }
 
 /* In-app prompt (replaces window.prompt, unsupported in WebView2) */

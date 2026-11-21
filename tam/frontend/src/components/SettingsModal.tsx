@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { Modal, errMsg } from "@agile-suite/core";
+import { DialogBody, DialogFooter, DialogHeader, Modal, errMsg } from "@agile-suite/core";
 import {
   ChooseReportExportDirectory,
   GetSettings,
@@ -70,44 +70,46 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal onClose={onClose} className="modal" labelledBy={titleId}>
-      <h2 id={titleId}>Settings</h2>
-      <label htmlFor={fieldId}>Report export folder</label>
-      <input
-        id={fieldId}
-        className="detail-input"
-        value={dir}
-        disabled={!loaded || saving}
-        spellCheck={false}
-        placeholder="The app data folder"
-        onChange={(e) => setDir(e.target.value)}
-      />
-      <span className="field-hint">
-        Where the Save dialog opens when you export a sprint report as a spreadsheet or a deck.
-        Leave it blank for the app data folder, and you can still save anywhere from the dialog itself.
-      </span>
-      <label className="check-row" htmlFor={checkId}>
+      <DialogHeader titleId={titleId} title="Settings" onClose={onClose} disabled={saving} />
+      <DialogBody>
+        <label htmlFor={fieldId}>Report export folder</label>
         <input
-          id={checkId}
-          type="checkbox"
-          checked={checkKey}
+          id={fieldId}
+          className="detail-input"
+          value={dir}
           disabled={!loaded || saving}
-          onChange={(e) => setCheckKey(e.target.checked)}
+          spellCheck={false}
+          placeholder="The app data folder"
+          onChange={(e) => setDir(e.target.value)}
         />
-        Check the project key against Jira's usual shape
-      </label>
-      <span className="field-hint">
-        A profile's project key has to start with a letter and use only letters, digits and underscores,
-        which is the shape Jira documents and catches most typos. Turn it off if your Jira accepts keys
-        in another shape: the key is then taken as typed, and Jira accepts or refuses it.
-      </span>
-      {error && <p className="error-text" role="alert">{error}</p>}
-      <div className="form-actions form-actions-end">
+        <span className="field-hint">
+          Where the Save dialog opens when you export a sprint report as a spreadsheet or a deck.
+          Leave it blank for the app data folder, and you can still save anywhere from the dialog itself.
+        </span>
+        <label className="check-row" htmlFor={checkId}>
+          <input
+            id={checkId}
+            type="checkbox"
+            checked={checkKey}
+            disabled={!loaded || saving}
+            onChange={(e) => setCheckKey(e.target.checked)}
+          />
+          Check the project key against Jira's usual shape
+        </label>
+        <span className="field-hint">
+          A profile's project key has to start with a letter and use only letters, digits and underscores,
+          which is the shape Jira documents and catches most typos. Turn it off if your Jira accepts keys
+          in another shape: the key is then taken as typed, and Jira accepts or refuses it.
+        </span>
+        {error && <p className="error-text" role="alert">{error}</p>}
+      </DialogBody>
+      <DialogFooter>
         <button type="button" className="btn" onClick={() => void browse()} disabled={saving}>Browse...</button>
         <button type="button" className="btn" onClick={onClose} disabled={saving}>Cancel</button>
         <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={!loaded || saving}>
           {saving ? "Saving..." : "Save"}
         </button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }
