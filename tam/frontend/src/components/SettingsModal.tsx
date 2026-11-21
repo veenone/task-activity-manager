@@ -105,7 +105,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         <button type="button" className="btn" onClick={() => void browse()} disabled={saving}>Browse...</button>
         <button type="button" className="btn" onClick={onClose} disabled={saving}>Cancel</button>
         <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={!loaded || saving}>
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving…" : "Save"}
         </button>
       </div>
     </Modal>

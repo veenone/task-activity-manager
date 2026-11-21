@@ -58,6 +58,13 @@ describe("ReportRootDialog", () => {
     expect(props.onChosen).not.toHaveBeenCalled();
   });
 
+  it("labels the button with an ellipsis character while the page is being made", async () => {
+    renderDialog({ create: vi.fn(() => new Promise<RitualRoot>(() => {})) });
+    const button = screen.getByRole("button", { name: "Create page" });
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveTextContent(/^Working…$/));
+  });
+
   it("says why when the create failed, and stays open", async () => {
     const props = renderDialog({ create: vi.fn(async () => { throw new Error("403 Forbidden"); }) });
     await userEvent.click(screen.getByRole("button", { name: "Create page" }));

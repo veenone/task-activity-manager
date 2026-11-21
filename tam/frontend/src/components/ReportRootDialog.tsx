@@ -104,7 +104,7 @@ export function ReportRootDialog({ spaceKey, suggestedTitle, create, onChosen, o
             disabled={step.kind === "forbidden"}
             aria-disabled={working || undefined}
           >
-            {working ? "Working..." : "Create page"}
+            {working ? "Working…" : "Create page"}
           </button>
         )}
       </div>
