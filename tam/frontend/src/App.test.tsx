@@ -277,7 +277,6 @@ describe("App shell", () => {
     renderApp();
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent("Not synced yet"));
     await userEvent.click(screen.getByRole("button", { name: "Sync" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent(/60 issues, last synced today/));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
   });
@@ -322,7 +321,6 @@ describe("App shell", () => {
     renderApp();
     await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Sync" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
     const refresh = await screen.findByRole("button", { name: "Refresh" });
     await waitFor(() => expect(refresh).toBeDisabled());
     await userEvent.click(refresh);
@@ -372,10 +370,10 @@ describe("App shell", () => {
     expect(bar).not.toHaveTextContent("profiles.db");
   });
 
-  it("opens Diagnostics from the Help menu, beside About", async () => {
+  it("opens Diagnostics from the More menu, beside About", async () => {
     const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole("button", { name: "Help" }));
+    await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(screen.getByRole("menuitem", { name: "Diagnostics" }));
     const dialog = await screen.findByRole("dialog", { name: "Diagnostics" });
     expect(within(dialog).getByText("C:/tam.log")).toBeInTheDocument();
