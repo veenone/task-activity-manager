@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useConfirm } from "@agile-suite/core";
 import { fieldLabel } from "../api";
 import type { PendingChange } from "../api";
 import type { PendingGroup } from "../queries/pending";
@@ -25,6 +26,9 @@ interface Line {
   after: ReactNode;
   notes?: ReactNode[];
   discardLabel: string;
+  // lost names what a discard throws away when it is a whole draft rather
+  // than one field, so the row asks first (#535). Undefined discards at once.
+  lost?: string;
 }
 
 const note = (text: string, className = "muted small") => <p key={text} className={className}>{text}</p>;
@@ -35,6 +39,14 @@ const note = (text: string, className = "muted small") => <p key={text} classNam
 // Before struck through, After marked, and the row's Discard.
 export function PendingGroupRows({ group: g, project, heldReasons, unpushableIds, busy, onDiscard }: Props) {
   const { name, chips, lines } = describe(g, project, heldReasons, unpushableIds);
+  const { confirm } = useConfirm();
+  async function discard(l: Line) {
+    if (l.lost) {
+      const ok = await confirm({ title: `Discard ${name}?`, message: `${l.lost} exists only here, so this cannot be undone.`, confirmLabel: "Discard", danger: true });
+      if (!ok) return;
+    }
+    onDiscard(l.row);
+  }
   return (
     <tbody aria-label={name}>
       {lines.map((l, i) => (
@@ -52,7 +64,7 @@ export function PendingGroupRows({ group: g, project, heldReasons, unpushableIds
             {l.notes}
           </td>
           <td className="pending-row-actions">
-            <button type="button" className="btn" disabled={busy} aria-label={l.discardLabel} onClick={() => onDiscard(l.row)}>
+            <button type="button" className="btn" disabled={busy} aria-label={l.discardLabel} onClick={() => void discard(l)}>
               Discard
             </button>
           </td>
@@ -76,7 +88,7 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
       chips: <span className="chip chip-draft">Draft board</span>,
       lines: [{
         row: g.boardRow, field: "New board", before: "", after: boardDraftLine(g.board),
-        notes: [note("Commit creates its filter and the board in Jira before anything else.")], discardLabel: `Discard ${name}`,
+        notes: [note("Commit creates its filter and the board in Jira before anything else.")], discardLabel: `Discard ${name}`, lost: "This draft board",
       }],
     };
   }
@@ -88,7 +100,7 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
       lines: [{
         row: g.sprintRow, field: "New sprint", before: "", after: sprintDraftLine(g.sprint),
         notes: [note("Commit creates it in Jira first, then moves its cards into it. Discarding it puts those cards back.")],
-        discardLabel: `Discard ${name}`,
+        discardLabel: `Discard ${name}`, lost: "This draft sprint",
       }, ...sprintLines(g.sprintChanges, name)],
     };
   }
@@ -116,7 +128,7 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
           note("Commit creates it in Jira and swaps the temporary key for the real one."),
           ...held,
         ],
-        discardLabel: `Discard ${g.key}`,
+        discardLabel: `Discard ${g.key}`, lost: `"${g.draft.summary}" and every field typed into it`,
       }],
     };
   }

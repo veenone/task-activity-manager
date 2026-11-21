@@ -1643,6 +1643,10 @@ The **pending badge** in the top bar shows the count. Click it to review:
 individual ones (or **Discard all** to revert everything), jump to the affected
 test, **Commit** everything, or commit a selected subset.*
 
+Discarding a row that creates something (a new test, bug, precondition,
+container or folder) asks first, because nothing else holds a copy of what you
+typed. Discarding a field edit happens at once.
+
 On **Commit**, the app pushes changes to Jira grouped by test. Results are
 reported per test:
 
