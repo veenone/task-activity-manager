@@ -231,7 +231,7 @@ parents and everything beneath them.
 ### Reading and editing an issue
 
 Select a row and the detail panel opens on the right; its left edge drags to
-resize. The head carries the key, type, status, sprint, reporter and updated
+resize. The head carries the key, type, status, sprint, parent, reporter and updated
 date, with the time tracking figures and bar under them. Escape closes the
 panel and puts focus back on the row you opened it from.
 
@@ -239,7 +239,7 @@ panel and puts focus back on the row you opened it from.
 | --- | --- |
 | **Fields** | **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee** and **Epic** are editable. Everything else in the panel is read-only. |
 | **Comments** | Lists the issue's comments, with a note saying how old the cached copy is. |
-| **Links** | Lists the issue's links and adds one. **Check** confirms the key exists and shows its summary; **Add** queues the link. |
+| **Links** | Lists the issue's links and adds one. A linked key opens that issue in the panel, or offers Jira when TAM has not synced it. **Check** confirms the key exists and shows its summary; **Add** queues the link. |
 | **Covered by tests** | The Xray tests covering this issue, for a project that uses XTM alongside TAM. |
 | **Work log** | What has been logged, and a form to log time, when the work started, and a comment. |
 | **Done agreement** | The team's definition of done from the ritual pages, readable while the issue is. |

@@ -343,6 +343,9 @@ export const ListIssues = (profileId: string, q: IssueQuery): Promise<IssuePage>
   App.ListIssues(profileId, issuerepo.IssueQuery.createFrom(q)) as Promise<IssuePage>;
 export const GetIssueDetail: (profileId: string, key: string) => Promise<IssueDetail> =
   App.GetIssueDetail;
+// One cached row by key, or null when the sync never stored it (#530).
+export const GetCachedIssue = (profileId: string, key: string): Promise<Issue | null> =>
+  App.GetCachedIssue(profileId, key) as Promise<Issue | null>;
 export const ListLinkedTests: (profileId: string, key: string) => Promise<LinkedTest[]> =
   App.ListLinkedTests;
 export const ListSprints: (profileId: string) => Promise<SprintRef[]> = App.ListSprints;
