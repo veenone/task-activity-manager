@@ -197,7 +197,7 @@ export function verdictLabel(verdict?: string): string {
 
 export function DirtyDot() {
   return (
-    <span className="dirty-dot" title="Pending edit">
+    <span className="dirty-dot" role="img" aria-label="Pending edit" title="Pending edit">
       ●
     </span>
   );

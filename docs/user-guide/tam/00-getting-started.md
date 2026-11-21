@@ -84,7 +84,7 @@ After a commit, a banner reports what happened: what went, what failed, and what
 
 ### When Jira has moved on
 
-If somebody changed an issue in Jira after you edited it here, Commit holds that issue back rather than overwriting their work, and shows a card with three columns: **Base** is the value when you edited, **Mine** is your edit, **Remote** is Jira now.
+If somebody changed an issue in Jira after you edited it here, Commit holds that issue back rather than overwriting their work, and shows a card with three columns: **Base** is the value when you edited, **Mine** is your edit, **Remote** is Jira now, and a Remote value that differs from Base reads "(changed)".
 
 - **Override** pushes your value over theirs.
 - **Keep remote** drops your edit, including a move of that card.

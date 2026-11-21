@@ -113,14 +113,14 @@ export function PendingChangesModal({
         {hasResult && (
           <div className="commit-result">
             {lastResult!.succeeded.length > 0 && (
-              <p className="ok-text">
-                ✓ Committed {lastResult!.succeeded.length}{" "}
+              <p className="ok-text" role="status">
+                <span aria-hidden="true">✓</span> Committed {lastResult!.succeeded.length}{" "}
                 {lastResult!.succeeded.length === 1 ? "test" : "tests"} to Jira.
               </p>
             )}
             {lastResult!.conflicted.length > 0 && (
               <div className="conflict-text">
-                <p>
+                <p role="alert">
                   <strong>
                     Conflict{lastResult!.conflicted.length === 1 ? "" : "s"} (
                     {lastResult!.conflicted.length})
@@ -329,7 +329,7 @@ export function PendingChangesModal({
               </div>
             )}
             {lastResult!.failed.length > 0 && (
-              <div className="error-text">
+              <div className="error-text" role="alert">
                 <p>
                   Failed ({lastResult!.failed.length}). These changes remain
                   in pending:
