@@ -154,3 +154,24 @@ func TestRefreshDetailsIsRefusedWhileTheProfileIsBusy(t *testing.T) {
 		t.Errorf("ReadDetail = ok %v, err %v, want a refused refresh to have cleared nothing", ok, err)
 	}
 }
+
+// The detail panel opens a linked or parent issue in place, so it asks the
+// cache for one row by key, and a key the sync never stored is an answer of
+// its own rather than an error (#530).
+func TestGetCachedIssueAnswersTheRowOrNothing(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	other := newTestProfile(t, a)
+	seedCachedDetail(t, a, p.ID, time.Now())
+
+	got, err := a.GetCachedIssue(p.ID, "PLAT-412")
+	if err != nil || got == nil || got.Summary != "Promo code" {
+		t.Fatalf("GetCachedIssue(PLAT-412) = %+v, %v, want the cached row", got, err)
+	}
+	if got, err := a.GetCachedIssue(p.ID, "PLAT-999"); err != nil || got != nil {
+		t.Errorf("GetCachedIssue(PLAT-999) = %+v, %v, want nil and no error", got, err)
+	}
+	if got, err := a.GetCachedIssue(other.ID, "PLAT-412"); err != nil || got != nil {
+		t.Errorf("another profile's GetCachedIssue = %+v, %v, want nil", got, err)
+	}
+}

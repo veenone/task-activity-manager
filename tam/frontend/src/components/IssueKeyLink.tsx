@@ -47,3 +47,20 @@ export function IssueKeyLink({ jiraUrl, issueKey, className, children }: Props) 
     </button>
   );
 }
+
+// InPanelKey is a key the detail panel opens in place rather than in the
+// browser: a linked issue or the parent (#530). It is no way out to Jira, so
+// it carries no ↗, and it works on a demo profile, which has no Jira.
+export function InPanelKey({ issueKey, onOpen, className }: { issueKey: string; onOpen: (key: string) => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      className={`issue-key-link${className ? ` ${className}` : ""}`}
+      aria-label={`Open ${issueKey}`}
+      title={`Open ${issueKey} in this panel`}
+      onClick={() => onOpen(issueKey)}
+    >
+      {issueKey}
+    </button>
+  );
+}

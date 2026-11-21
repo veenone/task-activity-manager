@@ -34,13 +34,13 @@ Click a row and the detail panel opens on the right. Drag its left edge to resiz
 
 ![The detail panel open beside the grid](images/backlog-02-detail.png)
 
-The top of the panel carries the key, the type, the status, the sprint, the reporter and the updated date, with the time tracking figures under them: estimated, logged and remaining, with a bar. An issue Jira does not track time on says so rather than showing zeros.
+The top of the panel carries the key, the type, the status, the sprint, the parent when there is one, the reporter and the updated date, with the time tracking figures under them: estimated, logged and remaining, with a bar. An issue Jira does not track time on says so rather than showing zeros. Click the parent's key to open the parent in the panel.
 
 Below that are sections you can open and close:
 
 - **Fields** is where editing happens. **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee** and **Epic** are editable; the rest of the panel is read-only. An edit is saved to the cache as you make it and queued for commit, which the panel says in as many words. Until you press **Save edit**, a changed field lives only in the panel, so opening another issue, closing the panel, switching view or switching profile asks before throwing it away.
 - **Comments** lists the issue's comments, with a note saying how old the cached copy is. They are read-only here; add one in Jira.
-- **Links** lists the issue's links and adds one. **Check** confirms the key you typed exists and shows its summary, and **Add** queues the link for the next commit.
+- **Links** lists the issue's links and adds one. Click a linked key to open that issue in the panel; a key TAM has not synced says so and offers to open it in Jira. **Check** confirms the key you typed exists and shows its summary, and **Add** queues the link for the next commit.
 - **Covered by tests** lists the Xray tests that cover this issue, for a project that uses XTM alongside TAM.
 - **Work log** lists what has been logged and adds an entry: time spent, when the work started, and a comment. Started opens on the current date and time; change it to log work done earlier, such as yesterday.
 - **Done agreement** shows the team's definition of done from the [Rituals](08-rituals.md) pages, so it is readable while the issue is.

@@ -10,7 +10,7 @@ import { formatWhen } from "../lib/format";
 import { TimeTracking } from "./TimeTracking";
 import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
-import { IssueKeyLink, browseUrl } from "./IssueKeyLink";
+import { InPanelKey, IssueKeyLink, browseUrl } from "./IssueKeyLink";
 import { NewIssueModal } from "./NewIssueModal";
 import { useSubtaskType } from "../queries/people";
 import { EditableFields, descriptionFormat } from "./EditableFields";
@@ -24,6 +24,7 @@ import { useDoneAgreement } from "../queries/doneAgreement";
 import { PERM_CREATE_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
 import { useDiscardGuard } from "../lib/unsavedEdit";
+import { useLinkedIssue } from "../lib/linkedIssue";
 
 // Section is one collapsible block of the panel. XTM's detail sidebar stacks
 // its sections under uppercase headings rather than hiding them behind tabs,
@@ -122,11 +123,22 @@ interface Props {
   onClose: () => void;
 }
 
-// IssueDetailPanel shows one issue beside the grid. The grid row's fields
+// IssueDetailPanel shows the selected issue, or a linked or parent issue
+// opened from it (#530) until the caller selects another row.
+export function IssueDetailPanel(props: Props) {
+  const linked = useLinkedIssue(props.profileId, props.issue, props.jiraUrl);
+  // Only an opened issue gets a key of its own, so nothing typed or expanded
+  // on the selection carries over to it. The selection itself keeps the
+  // caller's keying, as it did before.
+  const key = linked.shown === props.issue ? undefined : linked.shown.key;
+  return <IssuePanel key={key} {...props} issue={linked.shown} onOpenIssue={linked.open} />;
+}
+
+// IssuePanel shows one issue beside the grid. The grid row's fields
 // render at once, the description among them since the sync caches it on the
 // row; the links, comments and linked tests load through the backend's
 // detail cache, which is a round trip per issue and stays one.
-export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote, boardId, onClose }: Props) {
+function IssuePanel({ profileId, issue, jiraUrl, sprints, emptyNote, boardId, onClose, onOpenIssue }: Props & { onOpenIssue: (key: string) => Promise<void> }) {
   // Fields open, everything else closed: the panel starts on what a reader
   // came for and lets them reach the rest without leaving the column.
   const [open, setOpen] = useState<Record<string, boolean>>({ fields: true });
@@ -144,6 +156,9 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const discardGuard = useDiscardGuard();
   // Escape closes the way ✕ does, and focus returns to the opening row (#529).
   const panelRef = usePanelFocus<HTMLElement>(() => discardGuard(onClose), issue.key);
+  // A linked or parent key opens in this panel, after the same unsaved-edit
+  // question a close asks.
+  const openInPanel = (key: string) => discardGuard(() => void onOpenIssue(key));
   const createDenied = useDenial(profileId)(PERM_CREATE_ISSUES, issue.key);
   // The sprint whose additions this issue is held to. A card on a kanban
   // board, or one in the sprint's backlog, is in none and sees the board's
@@ -265,6 +280,12 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
             ? <SprintField profileId={profileId} issue={issue} sprints={sprints} busy={busy} emptyNote={emptyNote} />
             : issue.sprintName || "-"}
         </dd>
+        {issue.parentKey && (
+          <>
+            <dt>Parent</dt>
+            <dd><InPanelKey issueKey={issue.parentKey} onOpen={openInPanel} /></dd>
+          </>
+        )}
         <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
         <dt>Reporter</dt><dd>{issue.reporter || "-"}</dd>
       </dl>
@@ -368,6 +389,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
           ) : (
             <LinkGroups
               links={detail.data.links}
+              onOpen={openInPanel}
               discarding={discardLink.isPending}
               onDiscard={(id) =>
                 discardLink.mutate(
@@ -555,7 +577,7 @@ function CommentCard({ comment, descFormat, projectKey, onOpenLink, onIssueKey }
 
 // LinkGroups lists links grouped by type, then direction, in the order the
 // store returns them, and marks a link still pending a Commit.
-function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard: (id: number) => void; discarding: boolean }) {
+function LinkGroups({ links, onDiscard, onOpen, discarding }: { links: Link[]; onDiscard: (id: number) => void; onOpen: (key: string) => void; discarding: boolean }) {
   const groups = new Map<string, Link[]>();
   for (const l of links) {
     const k = `${l.type} (${l.direction})`;
@@ -569,7 +591,7 @@ function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard
           <ul className="linked-list">
             {items.map((l) => (
               <li key={`${l.type}-${l.direction}-${l.key}`} className="linked-row">
-                <span className="accent-text linked-key">{l.key}</span>
+                <InPanelKey issueKey={l.key} onOpen={onOpen} className="linked-key" />
                 <span>{toPlainText(l.summary, "summary")}</span>
                 <span className="muted small">{l.issueType}</span>
                 {l.pending && (
