@@ -26,6 +26,7 @@ import { StartSprintModal } from "./StartSprintModal";
 import { useSprintSelection } from "./useSprintSelection";
 import { PERM_MANAGE_SPRINTS, PERM_SCHEDULE_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
+import { useGuardedSelect } from "../lib/unsavedEdit";
 
 // SprintsView is the board's sprints as a list rather than as a picker: every
 // sprint the board has, the work in each one, and every action a sprint has,
@@ -84,6 +85,8 @@ export function SprintsView() {
   }
 
   const boards = useBoards(activeId);
+  // Another row asks first when the panel holds an unsaved edit (#521).
+  const selectIssue = useGuardedSelect(selectedKey, setSelectedKey);
   // Only a scrum board has sprints at all, so a kanban board is not offered
   // here rather than offered and then explained.
   const scrumBoards = (boards.data ?? []).filter((b) => b.type === "scrum");
@@ -339,7 +342,7 @@ export function SprintsView() {
         details={shown}
         drawn={drawn}
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={selectIssue}
         checked={selection.checked}
         onCheck={selection.check}
         onExtend={selection.extendTo}

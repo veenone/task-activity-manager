@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Menu, LiveRegion, SyncRibbon, ViewTabs, clearViewState, useProfile, useTour, errMsg } from "@agile-suite/core";
-import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
+import { Health, EventsOn, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
 import { WorklogView } from "./components/WorklogView";
 import { TOURS, TOUR_VERSION, shouldOfferTour } from "./tour/steps";
 import type { View } from "./nav";
 import { useModal } from "./modals";
+import { useGuarded } from "./lib/unsavedEdit";
 import { BacklogView } from "./components/BacklogView";
 import { AssignedToMeView } from "./components/AssignedToMeView";
 import { EpicsView } from "./components/EpicsView";
@@ -16,6 +17,7 @@ import { ReportsView } from "./components/ReportsView";
 import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
 import { FirstRun } from "./components/FirstRun";
+import { NavRail } from "./components/NavRail";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
@@ -84,6 +86,10 @@ export default function App() {
     error: profileError,
   } = useProfile<Profile, Settings>();
   const { view, setView } = useView();
+  // A view or profile switch unmounts the issue panel, so both ask first
+  // when it holds an unsaved edit (#521).
+  const switchView = useGuarded(setView);
+  const switchProfile = useGuarded(setActiveId);
   const { isOpen, openModal, closeModal } = useModal();
   const { progress, syncError, canSync, canSwitchProfile, runSync, runRefresh } = useSync();
   const syncState = useSyncState(activeId);
@@ -159,7 +165,7 @@ export default function App() {
     // menu was built with, which is why menuViews in main.go has to stay in
     // step with VIEWS in nav.ts.
     const offView = EventsOn("menu:view", (id: string) => {
-      if (VIEWS.some((v) => v.id === id)) setView(id as View);
+      if (VIEWS.some((v) => v.id === id)) switchView(id as View);
     });
     const offRail = EventsOn("menu:nav-rail", (visible: boolean) => setNavRail(visible));
     const offSync = EventsOn("menu:sync", () => void runSync(false));
@@ -174,7 +180,7 @@ export default function App() {
       offSync();
       offFullSync();
     };
-  }, [openModal, setView, runSync]);
+  }, [openModal, switchView, runSync]);
 
   const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
   const demo = isDemoUrl(activeProfile?.jiraUrl);
@@ -198,7 +204,7 @@ export default function App() {
             data-tour="profile"
             className="profile-select"
             value={activeId}
-            onChange={(e) => setActiveId(e.target.value)}
+            onChange={(e) => switchProfile(e.target.value)}
             disabled={!canSwitchProfile}
           >
             {profiles.map((p) => (
@@ -272,47 +278,10 @@ export default function App() {
         </div>
       </header>
 
-      {!noProfile && <ViewTabs views={VIEWS} current={view} onSelect={setView} />}
+      {!noProfile && <ViewTabs views={VIEWS} current={view} onSelect={switchView} />}
 
       <div className="app-body">
-        {navRail && (
-          <nav className="nav-rail" aria-label="Navigation rail">
-            <div className="nav-rail-head">
-              <span className="nav-section">Views</span>
-              <button
-                type="button"
-                className="btn btn-ghost nav-rail-hide"
-                title="Hide the navigation rail (View menu, Ctrl+B)"
-                aria-label="Hide the navigation rail"
-                onClick={() => {
-                  setNavRail(false);
-                  // Persisting through the bound method rebuilds the native
-                  // menu, so the View menu's tick follows a rail hidden from
-                  // here rather than going stale.
-                  void SetNavRailVisible(false).catch(() => {});
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            {VIEWS.map((v) => (
-              <button
-                key={v.id}
-                className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
-                aria-current={v.id === view ? "page" : undefined}
-                onClick={() => setView(v.id)}
-              >
-                {v.label}
-              </button>
-            ))}
-            <div className="nav-divider" />
-            <div className="nav-section">Suite</div>
-            <button className="nav-item" disabled title="The suite launcher is unavailable in this build">
-              Tests (XTM)
-            </button>
-            <div className="nav-hint">suite launcher unavailable in this build</div>
-          </nav>
-        )}
+        {navRail && <NavRail view={view} onSelect={switchView} onHide={() => setNavRail(false)} />}
 
         <main className="main">
           {startupFailed ? (

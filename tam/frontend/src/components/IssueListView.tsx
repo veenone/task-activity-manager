@@ -16,6 +16,7 @@ import { NO_FILTER, isFiltered, queryFields } from "../lib/issueFilter";
 import type { IssueFilter } from "../lib/issueFilter";
 import { PERM_CREATE_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
+import { useGuardedSelect } from "../lib/unsavedEdit";
 
 // The page sizes the pager offers. 25 stays the default so the first render
 // is unchanged; the larger steps are for planning, where paging 25 at a time
@@ -129,6 +130,8 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
   const openSprints = useOpenSprints(activeId);
   const subtaskType = useSubtaskType(activeId);
   const { isOpen, openModal, closeModal } = useModal();
+  // Another row asks first when the panel holds an unsaved edit (#521).
+  const selectIssue = useGuardedSelect(selectedKey, setSelectedKey);
 
   const total = issues.data?.total ?? 0;
   const rows = issues.data?.issues ?? [];
@@ -246,7 +249,7 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
               {filtered ? "No issues match this filter." : emptyNote}
             </p>
           ) : (
-            <IssueTable key={activeId} issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={setSelectedKey} sort={sort} desc={desc} onSort={toggleSort} />
+            <IssueTable key={activeId} issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={selectIssue} sort={sort} desc={desc} onSort={toggleSort} />
           )}
           <div className="pager">
             <label className="sr-only" htmlFor={`pager-size-${viewId}`}>Issue groups per page</label>

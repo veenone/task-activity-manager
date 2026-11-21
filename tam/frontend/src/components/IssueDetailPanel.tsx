@@ -23,6 +23,7 @@ import { DoneAgreementSection, agreementProgressLine } from "./DoneAgreementSect
 import { useDoneAgreement } from "../queries/doneAgreement";
 import { PERM_CREATE_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
+import { useDiscardGuard } from "../lib/unsavedEdit";
 
 // Section is one collapsible block of the panel. XTM's detail sidebar stacks
 // its sections under uppercase headings rather than hiding them behind tabs,
@@ -139,6 +140,8 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const { status } = useSync();
   const busy = status !== "idle";
   const subtaskType = useSubtaskType(profileId);
+  // Close asks first when the fields hold an unsaved edit (#521).
+  const discardGuard = useDiscardGuard();
   const createDenied = useDenial(profileId)(PERM_CREATE_ISSUES, issue.key);
   // The sprint whose additions this issue is held to. A card on a kanban
   // board, or one in the sprint's backlog, is in none and sees the board's
@@ -231,7 +234,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
         </div>
         <div className="detail-head-actions">
           <TypeChip type={issue.type} subtaskLabel={subtaskType.data} />
-          <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close" title="Close">✕</button>
+          <button type="button" className="btn btn-ghost detail-close" onClick={() => discardGuard(onClose)} aria-label="Close" title="Close">✕</button>
         </div>
       </div>
 
