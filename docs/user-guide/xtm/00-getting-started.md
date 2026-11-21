@@ -155,5 +155,6 @@ The dark theme applies to the whole window:
 - **Sync failed.** A red ribbon across the status bar names what Jira answered
   and what to change: the token, the Jira URL and project key, or nothing at
   all when Jira itself failed. Open **More → Sync history** for the run and
-  **More → Diagnostics** for the log.
+  **More → Diagnostics** for the log. The ribbon stays until a sync finishes,
+  across a restart too.
 - **You cannot switch profiles.** A sync is running. Wait for it to finish.
