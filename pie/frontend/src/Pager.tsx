@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useKeptIf } from "./viewKeep";
 
 const SIZES = [25, 50, 100];
 
@@ -13,10 +14,11 @@ export interface Paging {
 
 // usePaged cuts items into pages. A page that a filter or a new run took away
 // falls back to the last one left, so the list never shows empty by mistake.
-// start is the index of a row the first page shown must hold.
-export function usePaged<T>(items: T[], start = 0, sizes = SIZES): { rows: T[]; pager: Paging } {
-  const [pageSize, setPageSize] = useState(sizes[0]);
-  const [page, setPage] = useState(() => Math.floor(start / sizes[0]));
+// start is the index of a row the first page shown must hold. A list given a
+// keep name holds its page and size across a tab switch (#546).
+export function usePaged<T>(items: T[], start = 0, sizes = SIZES, keep?: string): { rows: T[]; pager: Paging } {
+  const [pageSize, setPageSize] = useKeptIf(keep, "pageSize", sizes[0]);
+  const [page, setPage] = useKeptIf(keep, "page", Math.floor(start / sizes[0]));
   const at = Math.min(page, Math.max(0, Math.ceil(items.length / pageSize) - 1));
   return {
     rows: items.slice(at * pageSize, (at + 1) * pageSize),

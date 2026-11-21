@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useMemo, useRef } from "react";
 import type { cases, query } from "../wailsjs/go/models";
 import {
   baselineEdges,
@@ -17,6 +17,7 @@ import type {
   CanvasEdge,
   CanvasNode,
 } from "./G6Canvas";
+import { useKept } from "./viewKeep";
 
 const G6Canvas = lazy(() => import("./G6Canvas"));
 
@@ -37,16 +38,16 @@ export function BaselineView({
   baselines: cases.Baseline[];
   onOpen: (key: string) => void;
 }) {
-  const [chosen, setChosen] = useState("");
-  const [version, setVersion] = useState("");
-  const [compareWith, setCompareWith] = useState("");
-  const [scope, setScope] = useState<Scope>("both");
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [analysis, setAnalysis] = useState<Analysis>("blockers");
-  const [onlyLinkedOut, setOnlyLinkedOut] = useState(true);
-  const [finished, setFinished] = useState(false);
-  const [opened, setOpened] = useState<Set<string>>(new Set());
-  const [selected, setSelected] = useState<string | null>(null);
+  const [chosen, setChosen] = useKept("map-baseline", "chosen", "");
+  const [version, setVersion] = useKept("map-baseline", "version", "");
+  const [compareWith, setCompareWith] = useKept("map-baseline", "compareWith", "");
+  const [scope, setScope] = useKept<Scope>("map-baseline", "scope", "both");
+  const [hidden, setHidden] = useKept<Set<string>>("map-baseline", "hidden", new Set());
+  const [analysis, setAnalysis] = useKept<Analysis>("map-baseline", "analysis", "blockers");
+  const [onlyLinkedOut, setOnlyLinkedOut] = useKept("map-baseline", "onlyLinkedOut", true);
+  const [finished, setFinished] = useKept("map-baseline", "finished", false);
+  const [opened, setOpened] = useKept<Set<string>>("map-baseline", "opened", new Set());
+  const [selected, setSelected] = useKept<string | null>("map-baseline", "selected", null);
   const canvas = useRef<CanvasApi>(null);
 
   const base = baselines.find((b) => b.key === chosen) ?? baselines[0];

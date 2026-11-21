@@ -13,6 +13,7 @@ import { MapTree } from "./MapTree";
 import { MapCoverage } from "./MapCoverage";
 import { ProjectInput } from "./ProjectInput";
 import { Card } from "./Statistics";
+import { useKept } from "./viewKeep";
 
 const VIEWS = ["Flow", "Tree", "Baseline", "Coverage"] as const;
 const NO_FILTER: MapFilter = { baseline: "", project: "", key: "" };
@@ -21,11 +22,11 @@ const NO_FILTER: MapFilter = { baseline: "", project: "", key: "" };
 // status that moved in one project and not in another shows in one row. The
 // project columns follow the analyst's baselines when there are any.
 export function ProjectMap({ profileId, result, onOpen }: { profileId: string; result: query.Result; onOpen: (key: string) => void }) {
-  const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
-  const [filter, setFilter] = useState<MapFilter>(NO_FILTER);
+  const [onlyOutOfStep, setOnlyOutOfStep] = useKept("map", "onlyOutOfStep", false);
+  const [filter, setFilter] = useKept<MapFilter>("map", "filter", NO_FILTER);
   // clears remounts the project box, so Clear filters also empties text that named no project.
   const [clears, setClears] = useState(0);
-  const [view, setView] = useState<(typeof VIEWS)[number]>("Flow");
+  const [view, setView] = useKept<(typeof VIEWS)[number]>("map", "view", "Flow");
   const [baselines, setBaselines] = useState<cases.Baseline[]>([]);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");

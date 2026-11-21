@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { StatusBadge } from "@agile-suite/core";
 import type { query } from "../wailsjs/go/models";
 import { OutOfStep, ageText, allProjects, byKey, projectLabel, projectNames, tone } from "./linked";
@@ -6,6 +5,7 @@ import { ExportButton } from "./ExportButton";
 import { setSheet } from "./exportSheets";
 import { ProjectInput } from "./ProjectInput";
 import { Pager, usePaged } from "./Pager";
+import { useKept } from "./viewKeep";
 
 // A set rarely spans many projects, so its groups page in smaller steps.
 const GROUP_SIZES = [5, 10, 25];
@@ -21,9 +21,9 @@ export function TracePage({
   focus: string | null;
   onFocus: (key: string) => void;
 }) {
-  const [project, setProject] = useState("");
-  const [onlyOutOfStep, setOnlyOutOfStep] = useState(false);
-  const [keyText, setKeyText] = useState("");
+  const [project, setProject] = useKept("trace", "project", "");
+  const [onlyOutOfStep, setOnlyOutOfStep] = useKept("trace", "onlyOutOfStep", false);
+  const [keyText, setKeyText] = useKept("trace", "keyText", "");
   const keyHit = (s: query.Set) => s.keys.some((k) => k.toLowerCase().includes(keyText.trim().toLowerCase()));
   const issues = byKey(result);
   const names = projectNames(result);

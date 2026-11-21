@@ -8,12 +8,13 @@ import { ExportButton } from "./ExportButton";
 import { cycleSheets } from "./exportSheets";
 import { projectLabel, projectNames } from "./linked";
 import { Card } from "./Statistics";
+import { useKept } from "./viewKeep";
 
 // CyclesPage lists the profile's reporting cycles and shows one: what changed
 // since the last published cycle, then its own copy of the cases.
 export function CyclesPage({ profileId, result }: { profileId: string; result: query.Result | null }) {
   const [list, setList] = useState<cycles.Cycle[] | null>(null);
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openId, setOpenId] = useKept<number | null>("cycles", "openId", null);
   const [error, setError] = useState("");
   const { prompt } = usePrompt();
   const { confirm } = useConfirm();
@@ -29,16 +30,16 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
         if (mine !== asked.current) return;
         setError("");
         setList(next);
-        setOpenId(select ?? next[0]?.id ?? null);
+        // The cycle left open stays open while the list still holds it (#546).
+        setOpenId((cur) => select ?? (next.some((c) => c.id === cur) ? cur : (next[0]?.id ?? null)));
       } catch (e) {
         if (mine === asked.current) setError(errorText(e));
       }
     },
-    [profileId],
+    [profileId, setOpenId],
   );
   useEffect(() => {
     setList(null);
-    setOpenId(null);
     void reload();
   }, [reload]);
 

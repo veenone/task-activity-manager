@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { cases, query } from "../wailsjs/go/models";
 import { CaseDetail } from "./CaseDetail";
 import { CaseGrid as ReadGrid } from "../wailsjs/go/main/App";
@@ -6,6 +5,7 @@ import { CaseGrid } from "./CaseGrid";
 import { ExportButton } from "./ExportButton";
 import { caseSheet } from "./exportSheets";
 import { projectLabel, projectNames } from "./linked";
+import { useKept } from "./viewKeep";
 
 // CasesPage lists the profile's cases and opens one. It works with no run on
 // screen; a run, when there is one, supplies each case's summary.
@@ -20,8 +20,8 @@ export function CasesPage({
   result: query.Result | null;
   onChanged: () => void;
 }) {
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [grid, setGrid] = useState(false);
+  const [openId, setOpenId] = useKept<number | null>("cases", "openId", null);
+  const [grid, setGrid] = useKept("cases", "grid", false);
   const issues = new Map(result?.issues.map((i) => [i.key, i]));
   const open = list.find((c) => c.id === openId);
 

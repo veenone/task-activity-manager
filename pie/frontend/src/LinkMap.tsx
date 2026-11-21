@@ -11,6 +11,7 @@ import { ProjectGraphView } from "./ProjectGraphView";
 import { byKey, projectLabel, projectNames } from "./linked";
 import { byCell, type Edge, edges as edgesOf, projectOf } from "./linkData";
 import { compare } from "./sort";
+import { useKept } from "./viewKeep";
 
 const LINK_VIEWS = ["Grid", "Flow", "Network"] as const;
 
@@ -31,11 +32,11 @@ export function LinkMap({
   // belongs to (0 for none) and when it ran.
   refresh: { profileId: string; queryId: number; runAt: string; onResult: (r: query.Result) => void };
 }) {
-  const [view, setView] = useState<(typeof LINK_VIEWS)[number]>("Grid");
+  const [view, setView] = useKept<(typeof LINK_VIEWS)[number]>("links", "view", "Grid");
   // The Network draws projects, or issues with G6 (#464).
-  const [level, setLevel] = useState<"Projects" | "Issues">("Projects");
+  const [level, setLevel] = useKept<"Projects" | "Issues">("links", "level", "Projects");
   // The project the issue graph starts in, when the project network sent it.
-  const [issuesIn, setIssuesIn] = useState("");
+  const [issuesIn, setIssuesIn] = useKept("links", "issuesIn", "");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   // onScreen is the run on screen, or null once the map is gone. A refresh whose
@@ -48,12 +49,12 @@ export function LinkMap({
     },
     [],
   );
-  const [off, setOff] = useState<Set<string>>(new Set());
-  const [inside, setInside] = useState(false);
-  const [keyText, setKeyText] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
-  const [bothEnds, setBothEnds] = useState(true);
-  const [chosen, setChosen] = useState<{ from: string; to: string } | null>(null);
+  const [off, setOff] = useKept<Set<string>>("links", "off", new Set());
+  const [inside, setInside] = useKept("links", "inside", false);
+  const [keyText, setKeyText] = useKept("links", "keyText", "");
+  const [picked, setPicked] = useKept<string[]>("links", "picked", []);
+  const [bothEnds, setBothEnds] = useKept("links", "bothEnds", true);
+  const [chosen, setChosen] = useKept<{ from: string; to: string } | null>("links", "chosen", null);
   // Everything below reads the run once per change of run or filter. A large
   // run has thousands of links, and scanning them for every cell on every
   // render is what made the map slow (#431).
@@ -78,7 +79,7 @@ export function LinkMap({
   }, [edges, issues, inside, bothEnds, picked, keyText]);
   // The grid's rows and columns, and its export, in the order chosen from
   // its corner: by project key or by name, either way round (#454).
-  const [order, setOrder] = useState<{ by: "key" | "name"; desc: boolean }>({ by: "key", desc: false });
+  const [order, setOrder] = useKept<{ by: "key" | "name"; desc: boolean }>("links", "order", { by: "key", desc: false });
   const projects = [...found].sort((a, b) => (order.desc ? -1 : 1) * compare(order.by === "key" ? a : label(a), order.by === "key" ? b : label(b)));
   const orderBy = (by: "key" | "name") => setOrder({ by, desc: order.by === by && !order.desc });
   const everyProject = useMemo(

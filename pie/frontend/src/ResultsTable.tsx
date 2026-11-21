@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { IssueDetail } from "./IssueDetail";
 import { projectLabel } from "./linked";
@@ -7,6 +6,7 @@ import { ExportButton } from "./ExportButton";
 import { resultsSheet } from "./exportSheets";
 import { Pager, usePaged } from "./Pager";
 import { useSort } from "./sort";
+import { useKept } from "./viewKeep";
 
 type Field = "project" | "status" | "priority" | "clientVisibility";
 const FILTERS: { field: Field; label: string }[] = [
@@ -33,11 +33,11 @@ export function ResultsTable({
   // selection stays so the analyst can try again.
   onOpenCases: (keys: string[]) => Promise<boolean>;
 }) {
-  const [chosen, setChosen] = useState<Record<Field, string>>({ project: "", status: "", priority: "", clientVisibility: "" });
-  const [withCase, setWithCase] = useState<CaseFilter>("");
-  const [search, setSearch] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [chosen, setChosen] = useKept<Record<Field, string>>("results", "chosen", { project: "", status: "", priority: "", clientVisibility: "" });
+  const [withCase, setWithCase] = useKept<CaseFilter>("results", "withCase", "");
+  const [search, setSearch] = useKept("results", "search", "");
+  const [picked, setPicked] = useKept<Set<string>>("results", "picked", new Set());
+  const [openKey, setOpenKey] = useKept<string | null>("results", "openKey", null);
   const values = (f: Field) => [...new Set(issues.map((i) => i[f]))].filter(Boolean).sort();
   // A value the run no longer holds would hide every row, so it reads as All.
   const active = (f: Field) => (values(f).includes(chosen[f]) ? chosen[f] : "");
@@ -67,7 +67,7 @@ export function ResultsTable({
     },
   );
   const visibility = values("clientVisibility").length > 0;
-  const { rows, pager } = usePaged(shown);
+  const { rows, pager } = usePaged(shown, 0, undefined, "results");
   const open = shown.find((i) => i.key === openKey);
   // Only rows still shown count, so a filter cannot open a case out of sight.
   const selected = shown.filter((i) => picked.has(i.key)).map((i) => i.key);
