@@ -50,5 +50,6 @@ The three lists at the top left limit every chart to part of the project:
 ## Troubleshooting
 
 - **"No tests cached yet."** Run a sync.
-- **"No tests match these filters."** Clear one or more filters.
+- **"No tests match the current filter."** Clear one or more filters.
+- **An error with Retry.** The statistics could not be computed. The filters stay on screen, so you can change one and press **Retry**.
 - **No execution panels.** Sync the executions from [Containers](09-containers.md).

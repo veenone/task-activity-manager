@@ -142,6 +142,7 @@ export function WorklogView() {
             days={days}
             today={today}
             rows={shown}
+            filtered={rows.length > 0}
             entries={entries}
             target={target}
             selected={cell}

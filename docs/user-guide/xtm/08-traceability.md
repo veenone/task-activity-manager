@@ -31,7 +31,7 @@ Click **Requirement**, **Execution** or **Sub-task** in the bar at the top left.
 
    ![Cross-project runs and their bugs](images/traceability-05-cross-project.png)
 
-**✕ Clear** resets the filters.
+**✕ Clear** resets the filters. If a flow cannot be built, its error appears under the filters with a **Retry** button.
 
 ## Follow requirements
 

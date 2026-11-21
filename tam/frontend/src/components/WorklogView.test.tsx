@@ -168,6 +168,17 @@ describe("WorklogView", () => {
     expect(screen.getByRole("button", { name: cellName("PLAT-398", "2026-11-17", "2h logged") })).toHaveFocus();
   });
 
+  // The empty line used to say nothing was assigned or logged, which a filter
+  // that hides every row does not mean (#532).
+  it("says the filter matched nothing when it hides every row", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("OPS-88");
+    await user.type(screen.getByRole("searchbox", { name: "Filter issues" }), "no-such-issue");
+    expect(await screen.findByText("No issues match the current filter.")).toBeInTheDocument();
+    expect(screen.queryByText(/No open issue is assigned to you/)).not.toBeInTheDocument();
+  });
+
   it("says why when the week cannot be read", async () => {
     vi.mocked(api.WorklogWeek).mockRejectedValue(new Error("TAM does not know your Jira user yet. Sync once or test the connection"));
     renderView();

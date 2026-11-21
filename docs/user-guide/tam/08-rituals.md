@@ -8,7 +8,7 @@ It needs the **Confluence Rituals** settings on the profile. Without them the vi
 
 ## What a sprint has
 
-Pick a **Board** and a **Sprint**, and the documents appear:
+Pick a **Board** and a **Sprint**, and the documents appear. A board with no sprints yet says so, since rituals belong to a sprint. A sprint has:
 
 | Page | What it holds |
 |---|---|

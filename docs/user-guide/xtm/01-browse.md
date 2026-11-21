@@ -34,6 +34,8 @@ The row above the grid filters what it shows:
 
 To keep a combination of filters, click **Save view** and give it a name. **Saved views…** brings it back, and **✕** next to an active view deletes it.
 
+When the filters, saved exec type included, hide every test, the grid says **No tests match the current filter.** If the tests cannot be loaded, the grid shows the error with a **Retry** button instead, and the filters stay where they are.
+
 Click a column header (Key, Summary, Status, Updated) to sort. The pager at the bottom moves between pages and sets the number of rows per page.
 
 ### Choose the grid columns

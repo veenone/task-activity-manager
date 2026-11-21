@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
-import { useViewState } from "@agile-suite/core";
+import { EmptyState, LoadError, useViewState } from "@agile-suite/core";
 import {
   ListFolders,
   ListComponents,
@@ -84,16 +84,6 @@ export function Dashboard({ onOpenDuplicates }: Props) {
     }
   }
 
-  if (loading && !stats) {
-    return <div className="dashboard muted" data-tour="dashboard-body">Loading…</div>;
-  }
-  if (error) {
-    return <div className="dashboard error-text" data-tour="dashboard-body">{error}</div>;
-  }
-  if (!stats) {
-    return null;
-  }
-
   const filterBar = (
     <div className="dashboard-filters" data-tour="dashboard-tools">
       <select
@@ -151,15 +141,29 @@ export function Dashboard({ onOpenDuplicates }: Props) {
     </div>
   );
 
+  // The error keeps the filter bar, since a filter may be what failed (#532).
+  if (error) {
+    return (
+      <div className="dashboard" data-tour="dashboard-body">
+        {filterBar}
+        <LoadError message={error} onRetry={() => void statsQuery.refetch()} />
+      </div>
+    );
+  }
+  if (loading && !stats) {
+    return <div className="dashboard muted" data-tour="dashboard-body">Loading…</div>;
+  }
+  if (!stats) {
+    return null;
+  }
+
   if (stats.total === 0) {
     return (
       <div className="dashboard" data-tour="dashboard-body">
         {filterBar}
-        <p className="muted">
-          {hasFilter
-            ? "No tests match these filters."
-            : "No tests cached yet. Run a sync to fill in the dashboard."}
-        </p>
+        <EmptyState filtered={hasFilter} noun="tests">
+          No tests cached yet. Run a sync to fill in the dashboard.
+        </EmptyState>
       </div>
     );
   }

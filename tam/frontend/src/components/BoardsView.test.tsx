@@ -754,6 +754,17 @@ describe("BoardsView states", () => {
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   });
 
+  // A filter that hides every card is the filter's doing, not an empty
+  // sprint (#532).
+  it("says the filter matched nothing when it hides every card", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText(KEYS.key);
+    await user.type(screen.getByRole("searchbox", { name: "Filter cards" }), "no-such-card");
+    expect(await screen.findByText("No cards match the current filter.")).toBeInTheDocument();
+    expect(screen.queryByText("No cards in this sprint")).not.toBeInTheDocument();
+  });
+
   it("shows the plain empty state when the sprint holds nothing", async () => {
     vi.mocked(api.GetBoard).mockResolvedValue(board({ columns: COLUMNS, lanes: [] }));
     renderView();

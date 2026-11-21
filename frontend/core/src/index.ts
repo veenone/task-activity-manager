@@ -31,6 +31,7 @@ export type { RowPlace } from "./components/RowLead";
 export { StatusBadge } from "./components/StatusBadge";
 export type { BadgeTone } from "./components/StatusBadge";
 export { ProgressBar } from "./components/ProgressBar";
+export { EmptyState, LoadError, filteredEmpty } from "./components/EmptyState";
 export { SyncRibbon } from "./components/SyncRibbon";
 export type { BarTone } from "./components/ProgressBar";
 export { useNotice } from "./components/useNotice";

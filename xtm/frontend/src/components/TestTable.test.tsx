@@ -12,6 +12,9 @@ const h = vi.hoisted(() => ({
   selectedSet: new Set<string>(),
   selectAllMatching: (() => {}) as (keys: string[]) => void,
   promptAnswer: null as string | null,
+  error: null as Error | null,
+  refetch: vi.fn(),
+  testTypes: false,
 }));
 
 vi.mock("../api", () => ({
@@ -52,13 +55,13 @@ vi.mock("../contexts/SelectionContext", () => ({
 
 vi.mock("../features", () => ({
   REVIEW_ENABLED: false,
-  useCapabilities: () => ({ supportsTestTypes: false }),
+  useCapabilities: () => ({ supportsTestTypes: h.testTypes }),
 }));
 
 vi.mock("../queries/tests", () => ({
   useTests: (_p: string, q: Record<string, unknown>) => {
     h.queries.push(q);
-    return { data: h.page, isFetching: false, error: null };
+    return { data: h.page, isFetching: false, error: h.error, refetch: h.refetch };
   },
 }));
 
@@ -198,5 +201,38 @@ describe("TestTable grid", () => {
     await user.click(screen.getByRole("button", { name: "Columns" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("checkbox", { name: "Labels" }));
     expect(screen.queryByRole("columnheader", { name: "Labels" })).not.toBeInTheDocument();
+  });
+});
+
+// Empty and error states (#532): a filter that hides everything says so,
+// even one the toolbar does not draw, and a failed load never sits next to
+// an empty-state line.
+describe("TestTable empty and error states", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearViewState("p1");
+    h.page = { tests: [], total: 0 };
+    h.queries = [];
+    h.error = null;
+    h.testTypes = false;
+  });
+
+  it("blames the exec-type filter, not a missing sync, when it hides every test", async () => {
+    const user = userEvent.setup();
+    h.testTypes = true;
+    render(<TestTable folderId="" containerKey="" component="" pendingByTestKey={new Map()} />);
+    await user.selectOptions(screen.getByTitle("Filter by execution type (Xray Test Type)"), "Manual");
+    expect(screen.getByText("No tests match the current filter.")).toBeInTheDocument();
+    expect(screen.queryByText(/No tests yet/)).not.toBeInTheDocument();
+  });
+
+  it("shows a load failure with Retry and no empty-state line", async () => {
+    h.error = new Error("database is locked");
+    render(<TestTable folderId="" containerKey="" component="" pendingByTestKey={new Map()} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("database is locked");
+    expect(screen.queryByText(/No tests yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/match the current filter/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(h.refetch).toHaveBeenCalledTimes(1);
   });
 });
