@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogProvider } from "@agile-suite/core";
 import type { query } from "../wailsjs/go/models";
@@ -64,6 +64,21 @@ describe("ResultsTable cases", () => {
     await user.click(screen.getByRole("checkbox", { name: "Select A-2" }));
     await user.click(screen.getByRole("button", { name: "Open 1 as cases" }));
     expect(screen.getByRole("checkbox", { name: "Select A-2" })).toBeChecked();
+  });
+
+  it("disables Open as cases while the cases are being opened", async () => {
+    const user = userEvent.setup();
+    let finish: (ok: boolean) => void = () => {};
+    const onOpenCases = vi.fn(() => new Promise<boolean>((r) => (finish = r)));
+    render(<ResultsTable issues={issues} caseKeys={new Set()} onOpenCases={onOpenCases} />);
+    await user.click(screen.getByRole("checkbox", { name: "Select A-1" }));
+    const open = screen.getByRole("button", { name: "Open 1 as cases" });
+    await user.click(open);
+    expect(open).toBeDisabled();
+    await user.click(open);
+    expect(onOpenCases).toHaveBeenCalledTimes(1);
+    finish(false);
+    await waitFor(() => expect(open).toBeEnabled());
   });
 
   it("selects every row on the page from the header", async () => {

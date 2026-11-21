@@ -77,3 +77,14 @@ it("waits for the stored names before the dialog can open", async () => {
   show();
   expect(await screen.findByRole("button", { name: "Jira fields" })).toBeDisabled();
 });
+
+it("puts Jira's refusal at the top of the dialog as an alert, above a right-aligned footer", async () => {
+  vi.mocked(api.SetFields).mockRejectedValue('Jira has no custom field named "Impact"');
+  const user = show();
+  const dialog = await fill(user);
+  const alert = await within(dialog).findByRole("alert");
+  expect(alert).toHaveTextContent('no custom field named "Impact"');
+  const first = within(dialog).getByLabelText("Product base");
+  expect(alert.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(dialog).getByRole("button", { name: "Save" }).parentElement).toHaveClass("form-actions", "form-actions-end");
+});

@@ -246,8 +246,10 @@ export function ProjectGraphView({
         <h4>Linked projects</h4>
         <dl className="pie-graph-facts" aria-label="Linked projects">
           {around.map((n) => [
-            <dt key={`${n.project}-t`} className="mono">
-              {n.project}
+            <dt key={`${n.project}-t`}>
+              <button type="button" className="btn btn-ghost mono" aria-label={`Centre on ${n.project}`} onClick={() => go(n.project)}>
+                {n.project}
+              </button>
             </dt>,
             <dd key={`${n.project}-d`}>
               {n.types

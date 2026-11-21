@@ -1,8 +1,9 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { query } from "../wailsjs/go/models";
 import { ResultsTable } from "./ResultsTable";
+import { IssueDetail } from "./IssueDetail";
 
 function issue(key: string, visibility: string, impact = "") {
   return {
@@ -53,4 +54,23 @@ it("opens an issue's details with its client impact, and closes on Escape", asyn
   expect(screen.getByRole("complementary", { name: "A-2 details" })).toHaveTextContent("No client impact recorded");
   await user.click(screen.getByRole("button", { name: "Close details" }));
   expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+});
+
+it("leaves the details open when Escape is pressed inside a dialog", async () => {
+  const user = userEvent.setup();
+  const onClose = vi.fn();
+  render(
+    <>
+      <IssueDetail issue={issues[0]} onClose={onClose} />
+      <div role="dialog" aria-label="Another dialog">
+        <input aria-label="Inside" />
+      </div>
+    </>,
+  );
+  await user.click(screen.getByLabelText("Inside"));
+  await user.keyboard("{Escape}");
+  expect(onClose).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("heading", { name: "A-1" }));
+  await user.keyboard("{Escape}");
+  expect(onClose).toHaveBeenCalledTimes(1);
 });
