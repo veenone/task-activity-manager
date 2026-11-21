@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import type { DatasetCatalogTestSummary } from "../../api";
-import { Pager } from "../Pager";
+import { Pager } from "@agile-suite/core";
 import { DatasetCatalogDetail } from "./DatasetCatalogDetail";
 import type { ContainerNavigationTarget } from "../../contexts/NavContext";
 import type { DatasetCatalogState } from "./useDatasetCatalogState";

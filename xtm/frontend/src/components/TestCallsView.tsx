@@ -4,7 +4,7 @@ import { useViewState } from "@agile-suite/core";
 import { SyncTestCalls, EventsOn, errMsg } from "../api";
 import type { TestCallLink, SyncProgress } from "../api";
 import { TestDetail } from "./TestDetail";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { useTestCallLinks } from "../queries/testCalls";
 
 interface Props {

@@ -54,7 +54,6 @@ export function useTestTableState(p: TestTableProps) {
   const [desc, setDesc] = useViewState(profileId, "browse", "desc", true);
   const [offset, setOffset] = useViewState(profileId, "browse", "offset", 0);
   const [pageSize, setPageSize] = useViewState(profileId, "browse", "pageSize", DEFAULT_PAGE_SIZE);
-  const [pageInput, setPageInput] = useState("");
 
   // The browse grid's page comes from the query cache (audit A3, Phase 2),
   // refreshed by invalidateProfileData on a mutation.
@@ -224,8 +223,6 @@ export function useTestTableState(p: TestTableProps) {
     }
   }
 
-  const from = page.total === 0 ? 0 : offset + 1;
-  const to = Math.min(offset + pageSize, page.total);
   const totalPages = Math.max(1, Math.ceil(page.total / pageSize));
   const currentPage = Math.floor(offset / pageSize) + 1;
 
@@ -234,14 +231,6 @@ export function useTestTableState(p: TestTableProps) {
   function goToPage(n: number) {
     const clamped = Math.min(Math.max(1, n), totalPages);
     setOffset((clamped - 1) * pageSize);
-  }
-
-  // commitPageInput parses the jump-to-page box and navigates. Invalid input is
-  // ignored; the box is then cleared so it shows the live page again.
-  function commitPageInput() {
-    const n = parseInt(pageInput, 10);
-    if (!Number.isNaN(n)) goToPage(n);
-    setPageInput("");
   }
 
   const pageKeys = page.tests.map((t) => t.key);
@@ -259,7 +248,7 @@ export function useTestTableState(p: TestTableProps) {
     page.total > pageKeys.length &&
     selectedSet.size < page.total;
 
-  return { profileId, selectedKey, selectedSet, onSelect, onToggleSelect, onToggleSelectPage, onSelectAllMatching, prompt, notice, search, setSearch, debouncedSearch, setDebouncedSearch, status, setStatus, execType, setExecType, review, setReview, sortBy, setSortBy, desc, setDesc, offset, setOffset, pageSize, setPageSize, pageInput, setPageInput, focusedIndex, setFocusedIndex, error, setError, selectingAll, setSelectingAll, selectAllError, setSelectAllError, savedViews, setSavedViews, activeView, setActiveView, statusOptions, setStatusOptions, columns, setColumns, showColumns, setShowColumns, caps, q, testsQuery, page, loading, listError, callerKeys, scrollRef, pendingFocusRef, visibleColumns, rowVirtualizer, selectedIndex, tabbableIndex, gridMinWidth, from, to, totalPages, currentPage, pageKeys, allOnPageSelected, someOnPageSelected, canSelectAllMatching, focusRowByIndex, moveFocus, toggleColumn, moveColumn, toggleSort, goToPage, commitPageInput };
+  return { profileId, selectedKey, selectedSet, onSelect, onToggleSelect, onToggleSelectPage, onSelectAllMatching, prompt, notice, search, setSearch, debouncedSearch, setDebouncedSearch, status, setStatus, execType, setExecType, review, setReview, sortBy, setSortBy, desc, setDesc, offset, setOffset, pageSize, setPageSize, focusedIndex, setFocusedIndex, error, setError, selectingAll, setSelectingAll, selectAllError, setSelectAllError, savedViews, setSavedViews, activeView, setActiveView, statusOptions, setStatusOptions, columns, setColumns, showColumns, setShowColumns, caps, q, testsQuery, page, loading, listError, callerKeys, scrollRef, pendingFocusRef, visibleColumns, rowVirtualizer, selectedIndex, tabbableIndex, gridMinWidth, totalPages, currentPage, pageKeys, allOnPageSelected, someOnPageSelected, canSelectAllMatching, focusRowByIndex, moveFocus, toggleColumn, moveColumn, toggleSort, goToPage };
 }
 
 export type TestTableState = ReturnType<typeof useTestTableState>;

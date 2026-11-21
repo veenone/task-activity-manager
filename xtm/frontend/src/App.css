@@ -754,8 +754,7 @@
 .board-head,
 .container-filter-bar,
 .container-card,
-.board-bulk,
-.board-pager {
+.board-bulk {
   flex: 0 0 auto;
 }
 /* Lay the status pills on the same row as the exec-type / environment filter
@@ -1868,14 +1867,6 @@ button.defect-chip-key:hover {
   overflow: hidden;
   font-size: var(--fs-md);
 }
-.board-pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 12px;
-  font-size: var(--fs-md);
-}
 .board-table th,
 .board-table td {
   text-align: left;
@@ -2077,44 +2068,8 @@ button.defect-chip-key:hover {
   background: var(--surface);
   border-top: 1px solid var(--border);
 }
-.table-footer .count {
-  margin-left: auto;
-}
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.page-size {
-  padding: 4px 6px;
-  font-size: var(--fs-sm);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-}
-.page-btn {
-  min-width: 30px;
-  padding: 4px 8px;
-}
-.page-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.page-jump {
-  width: 48px;
-  padding: 3px 5px;
-  font: inherit;
-  font-size: var(--fs-sm);
-  text-align: center;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
+.table-footer > .pager {
+  flex: 1;
 }
 
 .table-scroll {
@@ -4037,30 +3992,6 @@ tr.row-checked:hover {
   margin-top: 3px;
 }
 
-/* Container board page-size selector + range (FR-13.7). */
-.board-pagesize {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-direction: row;
-}
-.board-pagesize select {
-  padding: 5px 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-.board-pager-range {
-  flex: 1;
-  text-align: center;
-}
-.board-pager-nav {
-  display: flex;
-  gap: 6px;
-}
-
 /* Sync history table — expandable detail rows + paging (FR-1.7). */
 .synchist-num {
   text-align: right;
@@ -4773,26 +4704,6 @@ tr.row-checked:hover {
 .req-kind-bug { background: color-mix(in srgb, var(--danger-solid) 16%, transparent); color: var(--danger-fg); }
 .req-kind-task { background: color-mix(in srgb, var(--cyan-fg) 16%, transparent); color: var(--cyan-fg); }
 
-/* Pager manual "go to page" input (#4). */
-.pager-goto {
-  width: 54px;
-  padding: 3px 6px;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-/* Icon-only Prev / Next: a compact square button showing just the chevron, so
-   the pager nav stays narrow (shared by every pager across the app). */
-.pager-arrow {
-  min-width: 30px;
-  padding: 4px 8px;
-  font-size: var(--fs-lg);
-  line-height: 1;
-  text-align: center;
-}
-
 /* Requirement Sankey filter dropdown (#3). */
 .sankey-filter { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
 .sankey-filter select {
@@ -4802,51 +4713,6 @@ tr.row-checked:hover {
   border-radius: 4px;
   background: var(--surface);
   color: var(--text);
-}
-
-/* Compact pager for narrow side panels (requirement / precondition lists, #2). */
-/* Compact pager for narrow side panels (requirement / precondition lists): a
-   wrapping row that keeps the rows-per-page selector on the same line as the
-   Prev / Go / Next controls, with the range summary wrapping onto its own line
-   below. Mirrors the bugs-panel pager so the two read the same. */
-.pager-compact {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  /* Left-align (override the base .board-pager centering) so the controls read
-     the same in a narrow list column and in a wide panel like Gap Analysis,
-     instead of floating in the middle of the wider container. */
-  justify-content: flex-start;
-  gap: 6px 10px;
-  flex: 0 0 auto;
-}
-.pager-compact .board-pagesize {
-  justify-content: flex-start;
-}
-.pager-compact .board-pager-nav {
-  order: 2;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-.pager-compact .board-pager-range {
-  order: 3;
-  flex: 1 1 100%;
-  text-align: left;
-}
-
-/* Make enabled pager nav buttons visually distinct from disabled ones.
-   Without this the Prev/Go/Next buttons look identically grey in narrow panels. */
-.board-pager-nav .btn:not(:disabled) {
-  border-color: var(--accent, var(--info-fg));
-  color: var(--accent, var(--info-fg));
-  cursor: pointer;
-}
-.board-pager-nav .btn:not(:disabled):hover {
-  background: color-mix(in srgb, var(--accent, var(--info-fg)) 10%, var(--surface));
-}
-.board-pager-nav .btn:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 /* Dashboard per-view refresh (#7). */
@@ -5620,22 +5486,6 @@ tr.row-checked:hover {
 }
 .bugs-md-filter-row .filter-pill-row {
   margin-bottom: 0;
-}
-/* Pager wrapper: override compact vertical stack to a wrapping row. */
-.bugs-md-pager .pager.pager-compact {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-}
-/* Put the Prev / # / Go / Next nav right next to the rows-per-page selector and
-   let the range text wrap below, so the pager reads "rows per page  < nav >". */
-.bugs-md-pager .board-pager-nav {
-  order: 2;
-}
-.bugs-md-pager .board-pager-range {
-  order: 3;
-  flex-basis: 100%;
 }
 .bugs-md-test-link-filter {
   font-size: var(--fs-sm);

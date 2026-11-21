@@ -1,5 +1,5 @@
 import { Menu } from "@agile-suite/core";
-import { Pager } from "../Pager";
+import { Pager } from "@agile-suite/core";
 import { SortControl } from "../SortControl";
 import type { PreconditionsState } from "./usePreconditionsState";
 import type { PreconditionsActions } from "./usePreconditionsActions";

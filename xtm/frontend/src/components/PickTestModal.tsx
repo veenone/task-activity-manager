@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { ListTests, SearchTestsCrossProject, errMsg } from "../api";
 import { ProjectSidebar } from "./ProjectSidebar";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { Modal } from "./Modal";
 
 interface Props {

@@ -8,6 +8,7 @@ export type { ProfileBackend, ProfileState } from "./contexts/ProfileContext";
 export { Modal } from "./components/Modal";
 export { AboutDialog } from "./components/about/AboutDialog";
 export { DiagnosticsDialog } from "./components/about/DiagnosticsDialog";
+export { Pager } from "./components/Pager";
 export { ProfilesDialog } from "./components/profile/ProfilesDialog";
 export { useProfileCloseGuard } from "./components/profile/useProfileCloseGuard";
 export type { ProfileFormSlot } from "./components/profile/ProfilesDialog";

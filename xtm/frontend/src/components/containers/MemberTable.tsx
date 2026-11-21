@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { Pager } from "@agile-suite/core";
 import { PAGE_SIZE_OPTIONS } from "./constants";
 import { ExecRunCells, DefectsCell, RemarksCell } from "./RunCells";
 import { ParameterizedRunIndicator, ParameterizedRunRows } from "./ParameterizedRunRows";
@@ -36,7 +37,6 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
     memberRuns,
     kindLabel,
     allRows,
-    boardTotalPages,
     safePage,
     pageRows,
   } = s;
@@ -318,37 +318,17 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
       </div>
 
       {board && allRows.length > 0 && (
-        <div className="board-pager">
-          <label className="board-pagesize">
-            <span className="muted">Rows per page</span>
-            <select
-              className="app-select"
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setBoardPage(0);
-              }}
-            >
-              {PAGE_SIZE_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="muted board-pager-range">
-            {(safePage * pageSize + 1).toLocaleString()}–{Math.min((safePage + 1) * pageSize, allRows.length).toLocaleString()} of {allRows.length.toLocaleString()} · page {safePage + 1} of{" "}
-            {boardTotalPages}
-          </span>
-          <span className="board-pager-nav">
-            <button className="btn" disabled={safePage === 0} onClick={() => setBoardPage((p) => Math.max(0, p - 1))}>
-              ‹ Prev
-            </button>
-            <button className="btn" disabled={safePage >= boardTotalPages - 1} onClick={() => setBoardPage((p) => Math.min(boardTotalPages - 1, p + 1))}>
-              Next ›
-            </button>
-          </span>
-        </div>
+        <Pager
+          page={safePage}
+          pageSize={pageSize}
+          total={allRows.length}
+          onPage={setBoardPage}
+          onPageSize={(n) => {
+            setPageSize(n);
+            setBoardPage(0);
+          }}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+        />
       )}
     </>
   );

@@ -15,7 +15,7 @@ import {
   errMsg,
 } from "../../api";
 import type { ComponentInput, ProjectComponent } from "../../api";
-import { Pager } from "../Pager";
+import { Pager } from "@agile-suite/core";
 import { SortControl } from "../SortControl";
 import { BulkCreateComponentsModal } from "./BulkCreateComponentsModal";
 import { ComponentFormModal } from "./ComponentFormModal";
