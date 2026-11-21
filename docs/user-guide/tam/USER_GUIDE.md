@@ -306,7 +306,8 @@ other issues you logged time on in the week shown. A cell adds Jira's entries
 to the pending ones, and a dot marks a cell with a pending entry.
 
 Each workday header measures the day against the **Day target**, 8 hours by
-default and kept per profile. A day that reached it reads `8h, complete`. A
+default and kept per profile. It takes 0.5 to 24 hours and says so when
+you leave a value outside that. A day that reached it reads `8h, complete`. A
 past day that did not reads `2h 30m short` or `nothing logged`. Today and the
 days ahead read as a running total, `2h of 8h`. Weekends have no target.
 
