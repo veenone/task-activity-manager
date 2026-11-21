@@ -2,7 +2,7 @@
 
 The Reports view is what a sprint review starts with: how much the team committed to, what arrived and left during the sprint, what was finished, and what came behind it. The figures are rebuilt from Jira's own history rather than read from a chart endpoint, so they can be explained line by line.
 
-Pick a **Board** and a **Sprint**. A board defaults to its most recently closed sprint, which is the report you want the morning after a sprint ends, or to the active one when nothing has closed yet.
+Pick a **Board** and a **Sprint**. A board defaults to its most recently closed sprint, which is the report you want the morning after a sprint ends, or to the active one when nothing has closed yet. The board is the same one Boards and Sprints show, so **Open Boards** lands on the board you were reporting on.
 
 ![A closed sprint's report, with its figures and burndowns](images/reports-01-sprint.png)
 

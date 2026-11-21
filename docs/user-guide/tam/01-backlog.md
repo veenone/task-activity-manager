@@ -26,7 +26,7 @@ Subtasks stay under their parent rather than scattering through the list, and th
 
 The pager under the grid carries the page size (25, 50, 100 or 250 groups), first, previous, next and last, and a page box you can type into. A parent and its subtasks count as one group, so a page of 25 holds 25 families rather than 25 rows.
 
-The page size is a reading preference and survives a profile switch; the filters do not.
+The search, filters, sort, page and open issue stay put while you visit other views, and come back as you left them. A profile switch clears them. The page size is a reading preference and survives the switch.
 
 ## Read and edit an issue
 

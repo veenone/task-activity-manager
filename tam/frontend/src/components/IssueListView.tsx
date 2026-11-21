@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { errMsg, useProfile } from "@agile-suite/core";
+import { errMsg, useProfile, useViewState } from "@agile-suite/core";
 import { ExportBacklog, GRID_COLUMNS } from "../api";
 import type { Issue, IssueQuery, Profile, Settings, SortColumn } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
@@ -25,9 +25,9 @@ const SEARCH_DELAY_MS = 250;
 
 interface IssueListViewProps {
   // Namespaces this instance's DOM ids (the pager's label/input pairs), so
-  // two mounted tabs never collide on the same id. Filter, sort and page
-  // state need no namespacing of their own: each tab is its own component
-  // instance, so its useState is already private to it.
+  // two mounted tabs never collide on the same id. It also keys this view's
+  // filter, sort, page and selection in the view-state store, so each tab
+  // gets them back when it is shown again (#524).
   viewId: string;
   label: string;
   // Merged under the component's own filter state, so baseQuery only fills
@@ -45,20 +45,22 @@ interface IssueListViewProps {
 
 // IssueListView is the issue grid with its filter bar and pager, generic over
 // whatever a tab (Backlog, Assigned to me, ...) narrows the query with. Filter
-// and page state live here and reset in the same render the profile changes
-// in. Selection is kept here too, so the detail panel can sit beside the
-// table.
+// and page state live in the view-state store, so they outlast the tab, and
+// reset in the render the profile changes in. Selection is kept here too,
+// so the detail panel can sit beside the table.
 export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote, onPage }: IssueListViewProps) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const createDenied = useDenial(activeId)(PERM_CREATE_ISSUES);
-  const [text, setText] = useState("");
+  const [text, setText] = useViewState(activeId, viewId, "text", "");
   // Type, status and assignee are one object because IssueFilters sets them
   // as one, which is also what makes a profile switch one reset rather than
   // three that could drift apart.
-  const [filter, setFilter] = useState<IssueFilter>(NO_FILTER);
-  const [sprintId, setSprintId] = useState("");
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+  const [filter, setFilter] = useViewState<IssueFilter>(activeId, viewId, "filter", NO_FILTER);
+  const [sprintId, setSprintId] = useViewState(activeId, viewId, "sprintId", "");
+  const [page, setPage] = useViewState(activeId, viewId, "page", 0);
+  // Stored under no profile, so a profile switch, which clears the
+  // profile's own view state, leaves it alone (see the reset below).
+  const [pageSize, setPageSize] = useViewState("", viewId, "pageSize", PAGE_SIZES[0]);
   // What the user has typed into the page box, or null when they are not
   // editing it. The box cannot simply be bound to page + 1: clearing it would
   // snap the field straight back to "1", so typing "23" over it produced
@@ -67,12 +69,12 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
   // typing into, and page stays where it was until a whole valid number
   // lands.
   const [pageDraft, setPageDraft] = useState<string | null>(null);
-  const [selectedKey, setSelectedKey] = useState("");
+  const [selectedKey, setSelectedKey] = useViewState(activeId, viewId, "selectedKey", "");
   // "" is the store's rank order, the right default for a backlog. A column
   // is sorted ascending, then descending, then back to rank, so the default
   // is always one more click away rather than unreachable.
-  const [sort, setSort] = useState<SortColumn | "">("");
-  const [desc, setDesc] = useState(false);
+  const [sort, setSort] = useViewState<SortColumn | "">(activeId, viewId, "sort", "");
+  const [desc, setDesc] = useViewState(activeId, viewId, "desc", false);
 
   // The filters belong to the profile they were set for, so a switch clears
   // them during the render that first sees the new id. An effect would be one

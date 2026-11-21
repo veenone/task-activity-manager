@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useViewState, clearViewState } from "./viewState";
+import { useViewState, clearViewState, clearAllViewState } from "./viewState";
 
 describe("useViewState", () => {
   it("restores a field when the same view is revisited", () => {
@@ -49,5 +49,21 @@ describe("useViewState", () => {
     expect(result.current[0]).toBe("PC-1");
     rerender({ profileId: "p2" });
     expect(result.current[0]).toBe("PC-9");
+  });
+
+  it("forgets every profile's values when the whole store is cleared", () => {
+    const { result, rerender } = renderHook(
+      ({ profileId }) => useViewState(profileId, "boards", "board", 0),
+      { initialProps: { profileId: "p1" } },
+    );
+    act(() => result.current[1](7));
+    rerender({ profileId: "p2" });
+    act(() => result.current[1](9));
+
+    clearAllViewState();
+    const p1 = renderHook(() => useViewState("p1", "boards", "board", 0));
+    const p2 = renderHook(() => useViewState("p2", "boards", "board", 0));
+    expect(p1.result.current[0]).toBe(0);
+    expect(p2.result.current[0]).toBe(0);
   });
 });

@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PreconditionsView } from "./PreconditionsView";
-import { clearViewState } from "../lib/viewState";
+import { clearViewState } from "@agile-suite/core";
 import { BulkAssociatePreconditions, DeletePrecondition, EditPreconditionField } from "../api";
 
 // PreconditionsView pulls in two queries, three dialog hooks and several modal

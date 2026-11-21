@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../../contexts/ProfileContext";
 import { useSync } from "../../contexts/SyncContext";
 import { usePreconditions, usePreconditionTests } from "../../queries/preconditions";
-import { useViewState } from "../../lib/viewState";
+import { useViewState } from "@agile-suite/core";
 import { BrowserOpenURL, isDemoUrl, errMsg } from "../../api";
 import type { PreconditionUsage } from "../../api";
 import { useConfirm } from "../useConfirm";

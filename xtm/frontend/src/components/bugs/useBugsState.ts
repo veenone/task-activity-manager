@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../../contexts/ProfileContext";
-import { useViewState } from "../../lib/viewState";
+import { useViewState } from "@agile-suite/core";
 import { BrowserOpenURL, GetTestRunHistory, GetBugDetail, isDemoUrl } from "../../api";
 import type { BugWithTests, TestRunEntry, Container, BugDetail } from "../../api";
 import { usePrompt } from "../usePrompt";

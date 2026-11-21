@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSelection } from "../../contexts/SelectionContext";
 import { useProfile } from "../../contexts/ProfileContext";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useViewState } from "../../lib/viewState";
+import { useViewState } from "@agile-suite/core";
 import { ListStatuses, ListSavedViews, errMsg } from "../../api";
 import { usePrompt } from "../usePrompt";
 import { useNotice } from "../useNotice";

@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContainersView } from "./ContainersView";
 import type { Capabilities } from "../api";
-import { clearViewState } from "../lib/viewState";
+import { clearViewState } from "@agile-suite/core";
 import { BulkEditContainers } from "../api";
 import { NavProvider, useNav } from "../contexts/NavContext";
 import * as confirmModule from "./useConfirm";

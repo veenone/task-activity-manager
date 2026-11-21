@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, LiveRegion, SyncRibbon, ViewTabs, useProfile, useTour, errMsg } from "@agile-suite/core";
+import { Menu, LiveRegion, SyncRibbon, ViewTabs, clearViewState, useProfile, useTour, errMsg } from "@agile-suite/core";
 import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
@@ -126,6 +126,15 @@ export default function App() {
         setHealth({ ok: false, error: errMsg(e), dbPath: "", sharedPath: "", logPath: "" }),
       );
   }, [reload]);
+
+  // A profile switch drops the old profile's view state, the way XTM's
+  // does, so returning to it starts every view clean. The views mounted at
+  // the time reset themselves; this reaches the ones that were not (#524).
+  const viewStateFor = useRef(activeId);
+  useEffect(() => {
+    if (viewStateFor.current && viewStateFor.current !== activeId) clearViewState(viewStateFor.current);
+    viewStateFor.current = activeId;
+  }, [activeId]);
 
   // The first-run tour starts itself once the profile has synced, which is
   // the first moment there is anything to be shown around. offeredTour

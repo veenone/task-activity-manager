@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { announce, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
+import { announce, errMsg, useConfirm, useNotice, useProfile, useViewState } from "@agile-suite/core";
+import { useBoardChoice } from "../lib/boardChoice";
 import type { Issue, Profile, Settings, SprintDetail } from "../api";
 import { UNASSIGNED_SPRINT_STATE } from "../api";
 import { useBoard, useBoards, useJournalSprintMoves } from "../queries/boards";
@@ -37,10 +38,10 @@ export function SprintsView() {
   const { notice } = useNotice();
   const denial = useDenial(activeId);
   const sprintsDenied = denial(PERM_MANAGE_SPRINTS);
-  const [boardId, setBoardId] = useState(0);
-  const [showClosed, setShowClosed] = useState(false);
-  const [issueFilter, setIssueFilter] = useState<IssueFilter>(NO_FILTER);
-  const [selectedKey, setSelectedKey] = useState("");
+  const [boardId, setBoardId] = useBoardChoice(activeId);
+  const [showClosed, setShowClosed] = useViewState(activeId, "sprints", "showClosed", false);
+  const [issueFilter, setIssueFilter] = useViewState<IssueFilter>(activeId, "sprints", "issueFilter", NO_FILTER);
+  const [selectedKey, setSelectedKey] = useViewState(activeId, "sprints", "selectedKey", "");
   const [collapsedIssues, setCollapsedIssues] = useState(new Set<string>());
   // The sentence the last sprint write left behind. The dialog that made it
   // closes on success, so the banner is where the outcome is read.
