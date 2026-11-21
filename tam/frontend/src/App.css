@@ -49,13 +49,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .nav-rail-hide { padding: 2px 6px; line-height: 1; font-size: var(--fs-xs); color: var(--text-muted); }
 .nav-rail-hide:hover:not(:disabled) { color: var(--text); }
 .nav-item:hover:not(:disabled) { background: var(--row-hover); }
-.nav-item:disabled { color: var(--text-muted); cursor: default; }
 /* Active-item fill matches XTM's .view-tab-active token treatment (solid
    accent, white text) so the rail's selection state reads like XTM's tabs. */
 .nav-item-active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
-.nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
 .nav-section { padding: 0 14px 4px; font-size: var(--fs-xs); color: var(--text-muted); }
-.nav-hint { padding: 0 14px; font-size: var(--fs-2xs); color: var(--text-muted); }
 
 /* The window never scrolls as a whole: the shell is one flex chain from .app
    down, and only the tree, the table body, and the detail panel scroll, each
