@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ProgressBar, useProfile } from "@agile-suite/core";
-import { DEFAULT_DAY_HOURS } from "../api";
+import { DEFAULT_DAY_HOURS, MAX_DAY_HOURS, MIN_DAY_HOURS } from "../api";
 import type { Profile, Settings } from "../api";
 import { useDayHours, useSetDayHours, useWorklogWeek } from "../queries/worklogWeek";
 import { plural, workDuration } from "../lib/format";
@@ -31,6 +31,9 @@ export function WorklogView() {
   // What is being typed into Day target, until the field is left. The stored
   // value is written once then, not on every keystroke.
   const [typedHours, setTypedHours] = useState<string | null>(null);
+  // Whether the last value left in Day target was refused, which keeps the
+  // stored target and says why until the field is typed in again.
+  const [targetRefused, setTargetRefused] = useState(false);
   const days = useMemo(() => weekOf(anchor), [anchor]);
   const week = useWorklogWeek(activeId, days[0], days[6]);
   const behind = useWorklogWeek(activeId, addDays(today, -LOOKBACK_DAYS), addDays(today, -1));
@@ -83,19 +86,31 @@ export function WorklogView() {
           <input
             className="detail-input"
             type="number"
-            min={0.5}
-            max={24}
+            min={MIN_DAY_HOURS}
+            max={MAX_DAY_HOURS}
             step={0.5}
             value={typedHours ?? String(hours)}
-            onChange={(e) => setTypedHours(e.target.value)}
+            aria-invalid={targetRefused || undefined}
+            onChange={(e) => {
+              setTypedHours(e.target.value);
+              setTargetRefused(false);
+            }}
             onBlur={() => {
+              if (typedHours === null) return;
               const n = Number(typedHours);
-              if (typedHours !== null && n > 0 && n <= 24 && n !== hours) setHours.mutate(n);
+              const fits = typedHours.trim() !== "" && n >= MIN_DAY_HOURS && n <= MAX_DAY_HOURS;
+              if (fits && n !== hours) setHours.mutate(n);
+              setTargetRefused(!fits);
               setTypedHours(null);
             }}
           />
           <span className="muted">h</span>
         </label>
+        {targetRefused && (
+          <span className="error-text" role="alert">
+            {`The day target has to be between ${MIN_DAY_HOURS} and ${MAX_DAY_HOURS} hours.`}
+          </span>
+        )}
         <span className="worklog-meter">
           <span className="muted">Week</span>
           <ProgressBar

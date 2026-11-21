@@ -21,7 +21,7 @@ Only your own time is shown. Entries other people logged on the same issues are 
 
 Saturday and Sunday have no target. They show a total only when something was logged.
 
-**Day target.** The number of hours you mean to log on a workday, 8 by default. It is kept per profile. The week total in the filter bar is measured against five times this.
+**Day target.** The number of hours you mean to log on a workday, 8 by default. It is kept per profile. It takes 0.5 to 24 hours; a value outside that is refused with a line saying so, and the target stays what it was. The week total in the filter bar is measured against five times this.
 
 **Moving around.** The arrows either side of the dates step a week at a time, and **This week** comes back to today. With a cell focused, the arrow keys move between cells and Enter opens the form.
 

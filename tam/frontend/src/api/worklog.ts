@@ -28,6 +28,9 @@ export interface WorklogWeekView {
 // the reader means to log on a workday. Unset reads as DEFAULT_DAY_HOURS.
 export const SETTING_WORKLOG_DAY_HOURS = "worklog_day_hours";
 export const DEFAULT_DAY_HOURS = 8;
+// MIN_DAY_HOURS and MAX_DAY_HOURS bound the day target the Worklog view takes.
+export const MIN_DAY_HOURS = 0.5;
+export const MAX_DAY_HOURS = 24;
 
 // WorklogWeek is the reader's own time for the days fromDay to toDay
 // ("2026-11-16"): Jira's entries and the pending ones, with the issues to
