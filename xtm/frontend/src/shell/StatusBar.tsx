@@ -9,14 +9,17 @@ import type { AppState } from "./useAppState";
 // in #330: both apps read the same bar and both held the state already.
 export function StatusBar({ s }: { s: AppState }) {
   const { progress, syncError, syncState, health, theme } = s;
+  // This session's failure, or else the one the store kept from before a
+  // restart, as TAM's bar does (#542). A finished sync clears the stored one.
+  const lastError = syncError || syncState?.lastError || "";
   // A running sync supersedes the last one's failure, so the bar reports what
   // is happening now. This mirrors the branch below because the ribbon colours
   // the whole bar, which only the footer can do (#313).
-  const failed = !!syncError && !(progress && !progress.done);
+  const failed = !!lastError && !(progress && !progress.done);
   return (
     <footer className={failed ? "app-statusbar statusbar-failed" : "app-statusbar"}>
       {failed ? (
-        <SyncRibbon message={syncError} />
+        <SyncRibbon message={lastError} />
       ) : (
         <>
           {/* The dot is colour and colour alone is not a reading, so the words

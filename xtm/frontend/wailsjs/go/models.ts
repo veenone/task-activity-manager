@@ -4166,6 +4166,7 @@ export namespace testrepo {
 	    profileId: string;
 	    lastSyncedAt: string;
 	    testCount: number;
+	    lastError: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SyncState(source);
@@ -4176,6 +4177,7 @@ export namespace testrepo {
 	        this.profileId = source["profileId"];
 	        this.lastSyncedAt = source["lastSyncedAt"];
 	        this.testCount = source["testCount"];
+	        this.lastError = source["lastError"];
 	    }
 	}
 	export class TestBug {

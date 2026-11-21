@@ -245,6 +245,9 @@ type SyncState struct {
 	ProfileID    string `json:"profileId"`
 	LastSyncedAt string `json:"lastSyncedAt"`
 	TestCount    int    `json:"testCount"`
+	// LastError is the last sync's failure as it was shown, "" once a sync
+	// finishes. It is kept so a restart still shows it.
+	LastError string `json:"lastError"`
 }
 
 // Statistics is a per-profile rollup of the local Test cache for the dashboard
@@ -2051,7 +2054,7 @@ func (r *Repository) GetTest(profileID, key string) (TestCase, error) {
 
 // SetSyncState records that a profile finished syncing now. The test count
 // is derived from the current row count so the state stays accurate after
-// both full and incremental syncs.
+// both full and incremental syncs. A finished sync clears the last failure.
 func (r *Repository) SetSyncState(profileID string) error {
 	var count int
 	if err := r.db.QueryRow(
@@ -2060,10 +2063,11 @@ func (r *Repository) SetSyncState(profileID string) error {
 		return fmt.Errorf("count tests for sync state: %w", err)
 	}
 	_, err := r.db.Exec(
-		`INSERT INTO sync_state (profile_id, last_synced_at, test_count) VALUES (?, ?, ?)
+		`INSERT INTO sync_state (profile_id, last_synced_at, test_count, last_error) VALUES (?, ?, ?, '')
 		 ON CONFLICT(profile_id) DO UPDATE SET
 		   last_synced_at = excluded.last_synced_at,
-		   test_count     = excluded.test_count`,
+		   test_count     = excluded.test_count,
+		   last_error     = ''`,
 		profileID, time.Now().UTC().Format(time.RFC3339), count)
 	if err != nil {
 		return fmt.Errorf("set sync state: %w", err)
@@ -2079,9 +2083,9 @@ func (r *Repository) GetSyncState(profileID string) (SyncState, error) {
 		last sql.NullString
 	)
 	err := r.db.QueryRow(
-		`SELECT profile_id, last_synced_at, test_count FROM sync_state WHERE profile_id = ?`,
+		`SELECT profile_id, last_synced_at, test_count, last_error FROM sync_state WHERE profile_id = ?`,
 		profileID,
-	).Scan(&s.ProfileID, &last, &s.TestCount)
+	).Scan(&s.ProfileID, &last, &s.TestCount, &s.LastError)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SyncState{ProfileID: profileID}, nil
 	}

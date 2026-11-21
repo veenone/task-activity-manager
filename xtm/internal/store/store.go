@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 57
+const schemaVersion = 58
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS sync_state (
 	profile_id     TEXT PRIMARY KEY,
 	last_synced_at TEXT,
-	test_count     INTEGER NOT NULL DEFAULT 0
+	test_count     INTEGER NOT NULL DEFAULT 0,
+	last_error     TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS test_folder (
@@ -1535,6 +1536,15 @@ func applyMigrations(db *sql.DB) error {
 	if current < 57 {
 		if _, err := db.Exec(runStepResultSchema); err != nil {
 			return fmt.Errorf("v57 create run step result cache: %w", err)
+		}
+	}
+	// v58: the last sync's failure, kept so the status bar can still show it
+	// after a restart (#542). Fresh installs have it from the CREATE above.
+	if current < 58 {
+		if _, err := db.Exec(
+			`ALTER TABLE sync_state ADD COLUMN last_error TEXT NOT NULL DEFAULT ''`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v58 add sync_state.last_error: %w", err)
 		}
 	}
 	return nil
