@@ -6,7 +6,7 @@ Only your own time is shown. Entries other people logged on the same issues are 
 
 ## The grid
 
-**Rows.** The first group, **Assigned to me**, is every issue assigned to you that is not done. Under it, **Also logged in these days** lists any other issue you logged time on in the week shown: one that is finished, or one that belongs to someone else. The filter box narrows the rows by key or summary.
+**Rows.** The first group, **Assigned to me**, is every issue assigned to you that is not done. Under it, **Also logged in these days** lists any other issue you logged time on in the week shown: one that is finished, or one that belongs to someone else. The filter box narrows the rows by key or summary. If the filter hides every row, the grid says **No issues match the current filter.**
 
 **Cells.** A cell shows the time you logged, adding Jira's entries to the ones still pending. A dot marks a cell with a pending entry. An empty cell shows `+`.
 

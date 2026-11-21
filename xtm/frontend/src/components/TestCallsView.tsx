@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
-import { useViewState } from "@agile-suite/core";
+import { LoadError, useViewState } from "@agile-suite/core";
 import { SyncTestCalls, EventsOn, errMsg } from "../api";
 import type { TestCallLink, SyncProgress } from "../api";
 import { TestDetail } from "./TestDetail";
@@ -194,12 +194,10 @@ export function TestCallsView({ onChanged }: Props) {
   if (loading && links.length === 0) {
     return <div className="dashboard muted">Loading call relationships…</div>;
   }
-  if (listError) {
-    return <div className="dashboard error-text">{listError}</div>;
-  }
 
-  return (
-    <div className="testcalls" data-tour="testcalls-body">
+  // The toolbar stays on a load error: its Sync may be what fixes it (#532).
+  const toolbar = (
+    <>
       <div className="dup-toolbar">
         <button
           className="btn btn-primary"
@@ -225,6 +223,21 @@ export function TestCallsView({ onChanged }: Props) {
       </div>
 
       {syncError && <div className="error-text dup-error">{syncError}</div>}
+    </>
+  );
+
+  if (listError) {
+    return (
+      <div className="testcalls" data-tour="testcalls-body">
+        {toolbar}
+        <LoadError message={listError} onRetry={() => void linksQuery.refetch()} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="testcalls" data-tour="testcalls-body">
+      {toolbar}
 
       <div className="dup-tiles">
         <div className="dup-tile t-grp">

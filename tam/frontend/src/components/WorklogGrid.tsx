@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from "react";
-import { ProgressBar } from "@agile-suite/core";
+import { ProgressBar, filteredEmpty } from "@agile-suite/core";
 import type { LoggedWork, WorklogRow } from "../api";
 import { workDuration } from "../lib/format";
 import { JiraStatus } from "@agile-suite/core";
@@ -15,6 +15,8 @@ interface Props {
   days: string[];
   today: string;
   rows: WorklogRow[];
+  // filtered says the text filter hid every row the week has.
+  filtered: boolean;
   // entries is everything the reader logged in the days shown, on every
   // issue. The column totals count all of it, whatever the filter hides.
   entries: LoggedWork[];
@@ -34,7 +36,7 @@ const STEP: Record<string, [number, number]> = {
 // WorklogGrid is the week: issues down the side, days across the top, and
 // the reader's own time where they meet. Each cell of an issue TAM holds is
 // a button that opens the form for that issue and day.
-export function WorklogGrid({ days, today, rows, entries, target, selected, onSelect }: Props) {
+export function WorklogGrid({ days, today, rows, filtered, entries, target, selected, onSelect }: Props) {
   const totals = dayTotals(entries);
   const mine = rows.filter((r) => r.assigned);
   const others = rows.filter((r) => !r.assigned);
@@ -153,7 +155,9 @@ export function WorklogGrid({ days, today, rows, entries, target, selected, onSe
             {rows.length === 0 && (
               <tr>
                 <td colSpan={days.length + 2} className="muted worklog-empty">
-                  No open issue is assigned to you, and nothing was logged in these days.
+                  {filtered
+                    ? filteredEmpty("issues")
+                    : "No open issue is assigned to you, and nothing was logged in these days."}
                 </td>
               </tr>
             )}

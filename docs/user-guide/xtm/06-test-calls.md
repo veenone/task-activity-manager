@@ -49,3 +49,4 @@ To add a call, open a test in [Browse](01-browse.md#edit-steps) and click **+ Ca
 ## Troubleshooting
 
 - **"No call-test relationships yet."** No test in the cache calls another. Add a **+ Call test** step to a test, commit it, then click **↻ Sync**.
+- **An error with Retry.** The call links could not be read. The toolbar stays, so **↻ Sync** and **Retry** are both still there.

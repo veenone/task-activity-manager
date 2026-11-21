@@ -1,3 +1,4 @@
+import { EmptyState, LoadError } from "@agile-suite/core";
 import { colStyle, SELECT_STYLE, COL_LABEL, COL_SORT } from "./columns";
 import { renderCell, SortHeader } from "./cells";
 import type { TestTableProps, TestTableState } from "./useTestTableState";
@@ -6,15 +7,17 @@ import type { TestTableActions } from "./useTestTableActions";
 // Grid is the error line, the select-all-matching banner, and the virtualized
 // table with its sortable header and keyboard row focus.
 export function Grid({ s, a, p }: { s: TestTableState; a: TestTableActions; p: TestTableProps }) {
-  const { selectedKey, selectedSet, onSelect, onToggleSelect, onToggleSelectPage, debouncedSearch, status, review, sortBy, desc, setFocusedIndex, error, selectingAll, selectAllError, page, loading, listError, callerKeys, scrollRef, visibleColumns, rowVirtualizer, tabbableIndex, gridMinWidth, pageKeys, allOnPageSelected, someOnPageSelected, canSelectAllMatching, moveFocus, toggleSort } = s;
+  const { selectedKey, selectedSet, onSelect, onToggleSelect, onToggleSelectPage, debouncedSearch, status, execType, review, sortBy, desc, setFocusedIndex, error, selectingAll, selectAllError, page, loading, listError, testsQuery, callerKeys, scrollRef, visibleColumns, rowVirtualizer, tabbableIndex, gridMinWidth, pageKeys, allOnPageSelected, someOnPageSelected, canSelectAllMatching, moveFocus, toggleSort } = s;
   const { selectAllMatching } = a;
   const { folderId, containerKey, component, pendingByTestKey } = p;
   return (
     <>
       {/* A live load failure (listError) always wins over a stale imperative
           save/delete-view error, so a real fetch error is never masked. */}
-      {(listError || error) && (
-        <div className="error-text table-error">{listError || error}</div>
+      {listError ? (
+        <LoadError className="table-error" message={listError} onRetry={() => void testsQuery.refetch()} />
+      ) : (
+        error && <div className="error-text table-error">{error}</div>
       )}
 
       {canSelectAllMatching && (
@@ -143,18 +146,25 @@ export function Grid({ s, a, p }: { s: TestTableState; a: TestTableActions; p: T
             })}
           </tbody>
         </table>
-        {!loading && page.tests.length === 0 && (
-          <div className="grid-empty muted">
-            {page.total === 0 &&
-            debouncedSearch === "" &&
-            status.trim() === "" &&
-            folderId === "" &&
-            containerKey === "" &&
-            component === "" &&
-            review === ""
-              ? "No tests yet. Run a sync to pull them from Jira."
-              : "No tests match the current filter."}
-          </div>
+        {/* A failed load says nothing about whether there are tests, so the
+            empty line waits for one that worked (#532). */}
+        {!loading && !listError && page.tests.length === 0 && (
+          <EmptyState
+            className="grid-empty"
+            noun="tests"
+            filtered={
+              page.total > 0 ||
+              debouncedSearch !== "" ||
+              status.trim() !== "" ||
+              execType !== "" ||
+              folderId !== "" ||
+              containerKey !== "" ||
+              component !== "" ||
+              review !== ""
+            }
+          >
+            No tests yet. Run a sync to pull them from Jira.
+          </EmptyState>
         )}
       </div>
     </>

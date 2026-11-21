@@ -21,7 +21,7 @@ import {
 } from "../api";
 import { SankeyChart } from "./SankeyChart";
 import { RequirementSankey } from "./RequirementSankey";
-import { MultiSelect, useViewState } from "@agile-suite/core";
+import { LoadError, MultiSelect, useViewState } from "@agile-suite/core";
 
 interface Props {
   jiraUrl?: string;
@@ -174,7 +174,11 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
   }
 
   if (statsErr) {
-    return <div className="dashboard error-text" data-tour="traceability-body">{statsErr}</div>;
+    return (
+      <div className="dashboard" data-tour="traceability-body">
+        <LoadError message={statsErr} onRetry={() => void statsQuery.refetch()} />
+      </div>
+    );
   }
   if (!stats) {
     return <div className="dashboard muted" data-tour="traceability-body">Loading…</div>;
@@ -249,9 +253,11 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
             )}
           </div>
           {reqSankeyErr ? (
-            <p className="error-text sankey-empty">
-              Couldn&apos;t build the requirement traceability flow: {reqSankeyErr}
-            </p>
+            <LoadError
+              className="sankey-empty"
+              message={`Couldn't build the requirement traceability flow: ${reqSankeyErr}`}
+              onRetry={() => void reqSankeyQuery.refetch()}
+            />
           ) : stats.byCoverage.length === 0 ? (
             <p className="muted sankey-empty">
               No requirement coverage yet. Add a requirement source (Requirements
@@ -321,9 +327,11 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
             </div>
           </div>
           {sankeyErr ? (
-            <p className="error-text sankey-empty">
-              Couldn&apos;t build the traceability flow: {sankeyErr}
-            </p>
+            <LoadError
+              className="sankey-empty"
+              message={`Couldn't build the traceability flow: ${sankeyErr}`}
+              onRetry={() => void sankeyQuery.refetch()}
+            />
           ) : (
             <SankeyChart
               data={sankey ?? { nodes: [], links: [] }}
@@ -417,9 +425,11 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
             missing, run a sync first.
           </p>
           {subSankeyErr ? (
-            <p className="error-text sankey-empty">
-              Couldn&apos;t build the sub-task traceability flow: {subSankeyErr}
-            </p>
+            <LoadError
+              className="sankey-empty"
+              message={`Couldn't build the sub-task traceability flow: ${subSankeyErr}`}
+              onRetry={() => void subSankeyQuery.refetch()}
+            />
           ) : (
             <SankeyChart
               data={subSankey ?? { nodes: [], links: [] }}

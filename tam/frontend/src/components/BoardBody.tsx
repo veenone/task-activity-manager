@@ -1,5 +1,6 @@
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { EmptyState } from "@agile-suite/core";
 import type { Board, BoardView, Issue, Sprint, Swimlane } from "../api";
 import { BoardGrid } from "./BoardGrid";
 import { BoardNotes } from "./BoardNotes";
@@ -101,7 +102,10 @@ export function BoardBody({
     );
   }
 
-  const cards = data.lanes.reduce((sum, lane) => sum + lane.count, 0);
+  const count = (board: BoardView | undefined) => (board?.lanes ?? []).reduce((sum, lane) => sum + lane.count, 0);
+  const cards = count(data);
+  // The query's own board still has cards when the filter hid them all.
+  const filteredOut = cards === 0 && count(view.data) > 0;
   // The cache is all the empty state knows about: a key with no cached row
   // may be in another project, or simply not synced yet, and saying which
   // would be a guess.
@@ -112,11 +116,11 @@ export function BoardBody({
   return (
     <>
       {cards === 0 ? (
-        <p className="muted">
+        <EmptyState filtered={filteredOut} noun="cards">
           {data.notSynced > 0
             ? `${nothingSynced} ${data.notSynced} ${data.notSynced === 1 ? "card is" : "cards are"} on it but not in this cache.`
             : nothing}
-        </p>
+        </EmptyState>
       ) : (
         <>
           {/* Nothing else on screen says the moves exist, and the grid

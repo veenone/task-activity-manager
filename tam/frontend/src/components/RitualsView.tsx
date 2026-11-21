@@ -12,7 +12,7 @@ import { isBoardAgreement, navItems, navKey, selectedKey } from "../lib/ritualNa
 import { RitualDocList } from "./RitualDocList";
 import {
   ADD_BOARD_AGREEMENT, ADD_SPRINT_AGREEMENT, AGREEMENT_ADDED, CLOSED_EMPTY_SENTENCE, DONE_AGREEMENT, GONE_SENTENCE,
-  NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, UNCONFIGURED_SENTENCE, conflictSentence, pendingLine,
+  NO_SCRUM_BOARD_SENTENCE, NO_SPRINTS_SENTENCE, RITUAL_LABEL, UNCONFIGURED_SENTENCE, conflictSentence, pendingLine,
   rootDoneSentence, rootMissingSentence, syncSummary,
 } from "../lib/ritualText";
 import { useModal } from "../modals";
@@ -43,6 +43,9 @@ export function RitualsView() {
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [boardId, setBoardId] = useState(0);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  // The board whose sprint list has loaded, so an empty list reads as "no
+  // sprints" only once it is an answer rather than the reset before one.
+  const [sprintsFor, setSprintsFor] = useState(0);
   const [sprintId, setSprintId] = useState(0);
   const [docs, setDocs] = useState<RitualDocument[] | null>(null);
   // A nav key (sprint id and ritual type), because the board's done agreement
@@ -103,13 +106,13 @@ export function RitualsView() {
 
   useEffect(() => {
     let live = true;
-    setSprints([]); setSprintId(0); setLastSync("");
+    setSprints([]); setSprintsFor(0); setSprintId(0); setLastSync("");
     if (!boardId) return;
     ListBoardSprints(activeId, boardId).then((list) => {
       if (!live) return;
       // A draft sprint gets no ritual pages until Commit creates it.
       const held = list.filter((s) => !s.draft);
-      setSprints(held);
+      setSprints(held); setSprintsFor(boardId);
       setSprintId(held.find((s) => s.state === "active")?.id ?? held[0]?.id ?? 0);
     }).catch((e) => { if (live) setError(errMsg(e)); });
     LastRitualSync(activeId, boardId).then((at) => { if (live) setLastSync(at); }).catch(() => {});
@@ -386,7 +389,8 @@ export function RitualsView() {
       )}
 
       {docs === null ? (
-        sprintId ? <p className="muted" role="status">Loading this sprint's rituals</p> : null
+        sprintId ? <p className="muted" role="status">Loading this sprint's rituals</p>
+          : boardId && sprintsFor === boardId ? <p className="muted">{NO_SPRINTS_SENTENCE}</p> : null
       ) : docs.length === 0 ? (
         <p className="muted">{sprint?.state === "closed" ? CLOSED_EMPTY_SENTENCE : "This sprint has no ritual pages yet."}</p>
       ) : (

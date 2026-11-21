@@ -36,6 +36,7 @@ export type { StatusCategory } from "./components/JiraStatus";
 export { formatDate, formatDateTime, formatWhen, parseJiraDate } from "./lib/dates";
 export type { BadgeTone } from "./components/StatusBadge";
 export { ProgressBar } from "./components/ProgressBar";
+export { EmptyState, LoadError, filteredEmpty } from "./components/EmptyState";
 export { SyncRibbon } from "./components/SyncRibbon";
 export type { BarTone } from "./components/ProgressBar";
 export { useNotice } from "./components/useNotice";

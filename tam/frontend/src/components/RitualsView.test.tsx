@@ -176,6 +176,14 @@ describe("RitualsView", () => {
     expect(await screen.findByText(CLOSED_EMPTY_SENTENCE)).toBeInTheDocument();
   });
 
+  // A scrum board whose sprints are all drafts, or none yet, used to render
+  // nothing under the toolbar (#532).
+  it("says when the board has no sprints", async () => {
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([]);
+    renderView();
+    expect(await screen.findByText("This board has no sprints yet, so there are no ritual pages to show.")).toBeInTheDocument();
+  });
+
   it("says when there is no scrum board", async () => {
     vi.mocked(api.ListBoards).mockResolvedValue([{ id: 2, name: "Kanban", type: "kanban" }] as api.Board[]);
     renderView();
