@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Menu, LiveRegion, SyncRibbon, ViewTabs, clearViewState, useProfile, useTour, errMsg } from "@agile-suite/core";
-import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
+import { Health, EventsOn, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
 import { WorklogView } from "./components/WorklogView";
@@ -17,6 +17,7 @@ import { ReportsView } from "./components/ReportsView";
 import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
 import { FirstRun } from "./components/FirstRun";
+import { NavRail } from "./components/NavRail";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
@@ -280,44 +281,7 @@ export default function App() {
       {!noProfile && <ViewTabs views={VIEWS} current={view} onSelect={switchView} />}
 
       <div className="app-body">
-        {navRail && (
-          <nav className="nav-rail" aria-label="Navigation rail">
-            <div className="nav-rail-head">
-              <span className="nav-section">Views</span>
-              <button
-                type="button"
-                className="btn btn-ghost nav-rail-hide"
-                title="Hide the navigation rail (View menu, Ctrl+B)"
-                aria-label="Hide the navigation rail"
-                onClick={() => {
-                  setNavRail(false);
-                  // Persisting through the bound method rebuilds the native
-                  // menu, so the View menu's tick follows a rail hidden from
-                  // here rather than going stale.
-                  void SetNavRailVisible(false).catch(() => {});
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            {VIEWS.map((v) => (
-              <button
-                key={v.id}
-                className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
-                aria-current={v.id === view ? "page" : undefined}
-                onClick={() => switchView(v.id)}
-              >
-                {v.label}
-              </button>
-            ))}
-            <div className="nav-divider" />
-            <div className="nav-section">Suite</div>
-            <button className="nav-item" disabled title="The suite launcher is unavailable in this build">
-              Tests (XTM)
-            </button>
-            <div className="nav-hint">suite launcher unavailable in this build</div>
-          </nav>
-        )}
+        {navRail && <NavRail view={view} onSelect={switchView} onHide={() => setNavRail(false)} />}
 
         <main className="main">
           {startupFailed ? (
