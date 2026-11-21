@@ -384,6 +384,7 @@ describe("PendingChangesModal", () => {
     expect(within(cards[0]).getByText("New sprint on PLAT Scrum, 2026-09-16 to 2026-09-30")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Commit (3)" })).toBeEnabled();
     await user.click(within(cards[0]).getByRole("button", { name: "Discard Sprint 15" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Discard" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
   });
 
@@ -533,6 +534,7 @@ describe("PendingChangesModal", () => {
     expect(cells(within(cards[0]).getByRole("row"))[0]).toBe("New board");
     expect(cards[0]).toHaveTextContent("Scrum board on the filter Checkout filter: project = PLAT");
     await user.click(within(cards[0]).getByRole("button", { name: "Discard Checkout" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Discard" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 30));
   });
 

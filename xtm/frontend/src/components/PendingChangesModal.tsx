@@ -7,6 +7,7 @@ import type {
 import { useConfirm } from "./useConfirm";
 import { Modal } from "./Modal";
 import { formatComponentsValue } from "../lib/components";
+import { discardAsksFirst } from "../lib/pendingDiscard";
 
 interface Props {
   changes: PendingChange[];
@@ -70,6 +71,21 @@ export function PendingChangesModal({
       danger: true,
     });
     if (ok) onDiscardAll();
+  }
+
+  // discardRow asks first only for a row that creates something: that row is
+  // the whole draft, and nothing else holds a copy of it (#535).
+  async function discardRow(c: PendingChange, field: string, after: string) {
+    if (discardAsksFirst(c.entityType)) {
+      const ok = await confirm({
+        title: `Discard this ${field}?`,
+        message: `"${after || c.entityKey}" exists only in this list, so discarding it cannot be undone.`,
+        confirmLabel: "Discard",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    onDiscard(c.id);
   }
 
   const hasResult =
@@ -408,13 +424,15 @@ export function PendingChangesModal({
                           onClick={() => commitItem(c)}
                           disabled={committing}
                           title="Commit just this item to Jira"
+                          aria-label={`Commit ${field} on ${parentKey}`}
                         >
                           Commit
                         </button>
                         <button
                           className="btn"
-                          onClick={() => onDiscard(c.id)}
+                          onClick={() => void discardRow(c, field, after)}
                           disabled={committing}
+                          aria-label={`Discard ${field} on ${parentKey}`}
                         >
                           Discard
                         </button>

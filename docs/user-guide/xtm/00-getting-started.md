@@ -90,7 +90,7 @@ When you have pending changes, a yellow **N pending** button appears in the top 
 
 2. Choose what to send:
    - **Commit** on a row sends just that change.
-   - **Discard** on a row throws that change away locally. Jira is not touched.
+   - **Discard** on a row throws that change away locally. Jira is not touched. A new test, bug, precondition, container or folder asks first, because discarding it loses everything typed into it.
    - **Commit N changes** at the bottom sends everything.
    - **Discard all** reverts every pending change. XTM asks you to confirm first, because this cannot be undone.
 

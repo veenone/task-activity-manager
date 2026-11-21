@@ -169,7 +169,9 @@ When there is uncommitted work, a **N pending** button appears in the top bar.
    each shows the field, the value before and the value after. A drafted
    sprint, a moved card and a sprint waiting to be completed each appear as
    rows of their own.
-2. **Discard** on a row throws that one change away. Jira is not touched.
+2. **Discard** on a row throws that one change away. Jira is not touched. A
+   draft issue, sprint or board asks first, because discarding it loses
+   everything typed into it.
 3. **Discard all** reverts everything, after a confirmation.
 4. **Commit (N)** sends what can be sent. The number is what Commit will push.
 
