@@ -534,7 +534,7 @@ button.pie-cov-key:focus-visible {
   flex: none;
   flex-direction: column;
   gap: 10px;
-  width: 250px;
+  width: clamp(200px, 19.6vw, 250px);
   margin: 0;
   padding: 10px 12px;
   overflow: auto;
@@ -1127,7 +1127,10 @@ button.pie-cov-key:focus-visible {
   background: var(--border-strong);
 }
 
-/* The Link map's issue graph (#464): options, the G6 canvas, the details. */
+/* The Link map's issue graph (#464): options, the G6 canvas, the details.
+   The side panes and the Link map rail shrink with the window down to a
+   floor, so the canvas between them keeps its room (#552); layout.test.ts
+   checks the sum at main.go's MinWidth. */
 .pie-graph {
   display: flex;
   flex: 1;
@@ -1139,7 +1142,7 @@ button.pie-cov-key:focus-visible {
   flex: none;
   flex-direction: column;
   gap: 6px;
-  width: 220px;
+  width: clamp(180px, 17.2vw, 220px);
   overflow-y: auto;
 }
 .pie-graph-side h4,
@@ -1201,7 +1204,7 @@ button.pie-cov-key:focus-visible {
   flex: none;
   flex-direction: column;
   gap: 6px;
-  width: 280px;
+  width: clamp(220px, 22vw, 280px);
   overflow-y: auto;
 }
 .pie-graph-details h3 {

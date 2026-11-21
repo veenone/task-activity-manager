@@ -17,6 +17,10 @@ func main() {
 		Title:  "Project Issue Explorer",
 		Width:  1280,
 		Height: 800,
+		// Below this the Link map's side panes squeeze the graph canvas (#552);
+		// App.css narrows them under 1280px and layout.test.ts checks the sum.
+		MinWidth:  1024,
+		MinHeight: 640,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
