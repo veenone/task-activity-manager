@@ -210,3 +210,9 @@ it("says why a publish failed", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("no Confluence token yet");
   expect(screen.getByRole("button", { name: "Take again" })).toBeVisible();
 });
+
+it("says it is reading the cycles until they arrive", async () => {
+  vi.mocked(api.Cycles).mockReturnValue(new Promise(() => {}));
+  show();
+  expect(await screen.findByText("Reading the cycles...")).toBeVisible();
+});

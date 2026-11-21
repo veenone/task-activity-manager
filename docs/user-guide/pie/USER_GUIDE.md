@@ -86,7 +86,8 @@ see every project again. Text that names no
 project applies no filter, and the box says "No project matches".
 
 Paste JQL into the box and choose **Run**. The table shows each issue's key,
-project, type, summary, status, priority and last update.
+project, type, summary, status, priority and last update. A run that matches
+nothing says so in place of the table.
 
 The JQL box folds away. When you open a saved query it folds, and the query
 shows on one line beside **JQL**. Click that line to edit it. **Run** works
@@ -457,7 +458,8 @@ Deleting the profile deletes its cases.
 
 The **Cases** tab lists your cases, with or without a run on screen. Each one
 shows its summary when the run on screen holds the issue, and how many of its
-projects have a verdict and how many are affected. Choose a case to open it.
+projects have a verdict and how many are affected. Choose a case to open it;
+until you do, the right side asks you to.
 
 A case has notes and a list of projects to assess. PIE saves the notes when
 you leave their box, so they are kept if you open another case or tab, and

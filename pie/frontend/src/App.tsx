@@ -352,6 +352,7 @@ export default function App() {
         {result && view === "results" && matched.length > 0 && (
           <ResultsTable issues={matched} caseKeys={cases.keys} onOpenCases={cases.open} />
         )}
+        {result && view === "results" && matched.length === 0 && <p className="muted">No issues match this query.</p>}
       </main>
 
       {editingFields && fields && (

@@ -80,6 +80,7 @@ export function CyclesPage({ profileId, result }: { profileId: string; result: q
             {error}
           </p>
         )}
+        {list === null && !error && <p className="muted">Reading the cycles...</p>}
         {list?.length === 0 && <p className="muted">No cycles yet. A new cycle keeps a copy of every case and its verdicts.</p>}
         <ul className="pie-set-list" aria-label="Cycles">
           {(list ?? []).map((c) => (
