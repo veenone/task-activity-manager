@@ -1779,17 +1779,21 @@
 .pending-footer-buttons { margin-left: auto; display: flex; gap: 8px; }
 
 /* ViewTabs: the view tab row in its own band under the topbar, tabs centred,
-   on the topbar's dark ground so the two read as one header. */
+   on the topbar's dark ground so the two read as one header. The row centres
+   itself with auto margins rather than justify-content, so a row wider than
+   the window overflows to the right, where the bar scrolls, and the first
+   tabs stay reachable (#531). */
 .view-tabs-bar {
   flex: none;
   display: flex;
-  justify-content: center;
   padding: 6px 14px;
   background: var(--chrome-bg);
   border-bottom: 1px solid var(--chrome-border);
   overflow-x: auto;
 }
 .view-tabs {
+  flex: none;
+  margin-inline: auto;
   display: flex;
   gap: 2px;
   background: var(--chrome-raised);
