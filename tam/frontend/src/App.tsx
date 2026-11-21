@@ -18,6 +18,7 @@ import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
 import { FirstRun } from "./components/FirstRun";
 import { NavRail } from "./components/NavRail";
+import { PermissionNote } from "./components/PermissionNote";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
@@ -284,6 +285,7 @@ export default function App() {
         {navRail && <NavRail view={view} onSelect={switchView} onHide={() => setNavRail(false)} />}
 
         <main className="main">
+          {!startupFailed && !noProfile && current.gated && <PermissionNote profileId={activeId} />}
           {startupFailed ? (
             <div className="startup-error" role="alert">
               <h2>The local store could not be opened</h2>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PermissionView } from "../api";
-import { denial, projectOf } from "./permissions";
+import { denial, deniedSummary, projectOf } from "./permissions";
 
 const view: PermissionView = {
   project: "PLAT",
@@ -37,5 +37,16 @@ describe("denial", () => {
 
   it("falls back to the key when Jira's name for it is missing", () => {
     expect(denial({ ...view, names: {} }, "MANAGE_SPRINTS_PERMISSION")).toContain('"MANAGE_SPRINTS_PERMISSION"');
+  });
+});
+
+describe("deniedSummary", () => {
+  it("lists every permission Jira denied, in every project, by name", () => {
+    expect(deniedSummary(view)).toEqual(['"Manage Sprints" in PLAT', '"Edit Issues" in OPS']);
+  });
+
+  it("is empty when nothing is denied or nothing is known", () => {
+    expect(deniedSummary(undefined)).toEqual([]);
+    expect(deniedSummary({ ...view, byProject: { PLAT: { EDIT_ISSUES: true } } })).toEqual([]);
   });
 });
