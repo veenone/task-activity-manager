@@ -38,10 +38,9 @@ Demo mode is a safe place to learn the loop: syncing, editing, dragging cards, c
 
 ## Sync the project
 
-Press **Sync** at the right of the top bar and choose:
+Press **Sync** at the right of the top bar to pull what changed since the last sync. This is the everyday one, and it is also **File → Sync** or **Ctrl+R**.
 
-- **Sync changes** pulls what changed since the last sync. This is the everyday one, and it is also **File → Sync** or **Ctrl+R**.
-- **Full sync** clears the cached issues and fetches everything. Use it after changing the scope JQL or the requirement issue type, or when the cache looks wrong. It is **Ctrl+Shift+R**.
+**More → Full sync** clears the cached issues and fetches everything. Use it after changing the scope JQL or the requirement issue type, or when the cache looks wrong. It is **Ctrl+Shift+R**.
 
 The status bar at the bottom shows progress while it runs, then the issue count and when it last finished. A count like `38 of 2,943 issues` means the scope JQL, or an issue type TAM does not sync, keeps the rest out.
 
@@ -94,7 +93,7 @@ Changes to other issues in the same commit still go.
 ## Settings and housekeeping
 
 - **File → Settings…** holds the **Report export folder**, where spreadsheets and decks are written.
-- **Theme** in the top bar switches between light, dark and the system setting.
+- **More** in the top bar switches the theme between light, dark and the system setting.
 - **Help → Diagnostics** shows the database paths, the build and the recent log, which is the first thing to collect when something misbehaves.
-- **Help → Take the tour** walks through the view you are on. **Take the first-run tour** walks through the whole loop: sync, plan, commit.
+- **More → Take the tour** walks through the view you are on. **Take the first-run tour** walks through the whole loop: sync, plan, commit.
 - **Ctrl+B** shows or hides the navigation rail.
