@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogProvider } from "@agile-suite/core";
 import App from "./App";
@@ -66,6 +66,26 @@ it("opens a saved query's last run without asking Jira", async () => {
   expect(screen.getByLabelText("JQL")).toHaveValue("category = X");
   expect(screen.getByText(/^Last run 2026-11-06 \d\d:\d\d$/)).toBeVisible();
   expect(api.RunQuery).not.toHaveBeenCalled();
+});
+
+it("drops a saved query's run that arrives after another query was opened", async () => {
+  const daily = { id: 8, name: "Daily", jql: "category = Y", runAt: "2026-11-07T12:00:00Z" };
+  vi.mocked(api.ListQueries).mockResolvedValue([weekly, daily] as never);
+  let answerWeekly: (run: unknown) => void = () => {};
+  vi.mocked(api.LastRun).mockImplementation(((_profile: string, id: number) =>
+    id === weekly.id
+      ? new Promise((resolve) => (answerWeekly = resolve))
+      : Promise.resolve({ result: rows("B-1"), runAt: daily.runAt, added: null, dropped: null })) as never);
+  const user = show();
+  await screen.findByRole("option", { name: "Daily" });
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Weekly");
+  await user.selectOptions(screen.getByLabelText("Saved query"), "Daily");
+  await screen.findByRole("cell", { name: "B-1" });
+
+  await act(async () => answerWeekly({ result: rows("A-1"), runAt: weekly.runAt, added: null, dropped: null }));
+  expect(screen.getByRole("cell", { name: "B-1" })).toBeVisible();
+  expect(screen.queryByRole("cell", { name: "A-1" })).not.toBeInTheDocument();
+  expect(screen.getByText(/^Last run 2026-11-07 \d\d:\d\d$/)).toBeVisible();
 });
 
 it("drops the rows on screen when a saved query's run cannot be read", async () => {
