@@ -1,9 +1,8 @@
 // jsdom applies no stylesheet, so these read App.css as text.
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
+import rawCss from "./App.css?raw";
 
-const appCss = readFileSync(path.resolve(__dirname, "App.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const appCss = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
 
 // The selector of every rule in the sheet, as written.
 const selectors = [...appCss.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
