@@ -9,6 +9,7 @@ export { Modal } from "./components/Modal";
 export { AboutDialog } from "./components/about/AboutDialog";
 export { DiagnosticsDialog } from "./components/about/DiagnosticsDialog";
 export { ProfilesDialog } from "./components/profile/ProfilesDialog";
+export { useProfileCloseGuard } from "./components/profile/useProfileCloseGuard";
 export type { ProfileFormSlot } from "./components/profile/ProfilesDialog";
 export { jiraUrlError, normalizeJiraUrl, projectKeyError } from "./components/profile/profileValidation";
 export { useProfileForm } from "./components/profile/form/useProfileForm";
