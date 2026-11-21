@@ -1,16 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { EmptyState, LoadError, useViewState } from "@agile-suite/core";
-import {
-  ListFolders,
-  ListComponents,
-  ListStatuses,
-  ExportDashboard,
-  errMsg,
-} from "../api";
+import { ExportDashboard, errMsg } from "../api";
 import type { Bucket } from "../api";
-import { testrepo } from "../../wailsjs/go/models";
 import { DuplicatesCard } from "./DuplicatesCard";
+import { useFilterLists } from "./dashboard/useFilterLists";
 import { useStatistics } from "../queries/statistics";
 
 interface Props {
@@ -33,35 +27,15 @@ export function Dashboard({ onOpenDuplicates }: Props) {
   const [folder, setFolder] = useViewState(profileId, "dashboard", "folder", "");
   const [component, setComponent] = useViewState(profileId, "dashboard", "component", "");
   const [status, setStatus] = useViewState(profileId, "dashboard", "status", "");
-  const [folderOptions, setFolderOptions] = useState<testrepo.Folder[]>([]);
-  const [componentOptions, setComponentOptions] = useState<Bucket[]>([]);
-  const [statusOptions, setStatusOptions] = useState<string[]>([]);
+  // The option lists load when the profile changes. Selections are preserved
+  // via useViewState (keyed by profileId) so no explicit reset is needed here.
+  const {
+    folders: folderOptions,
+    components: componentOptions,
+    statuses: statusOptions,
+    loadError: listError,
+  } = useFilterLists(profileId);
   const hasFilter = folder !== "" || component !== "" || status !== "";
-
-  // Load option lists when the profile changes. Selections are preserved via
-  // useViewState (keyed by profileId) so no explicit reset is needed here.
-  useEffect(() => {
-    if (!profileId) return;
-    let cancelled = false;
-    ListFolders(profileId)
-      .then((f) => {
-        if (!cancelled) setFolderOptions(f ?? []);
-      })
-      .catch((e) => console.error("list folders:", errMsg(e)));
-    ListComponents(profileId)
-      .then((c) => {
-        if (!cancelled) setComponentOptions(c ?? []);
-      })
-      .catch((e) => console.error("list components:", errMsg(e)));
-    ListStatuses(profileId)
-      .then((s) => {
-        if (!cancelled) setStatusOptions(s ?? []);
-      })
-      .catch((e) => console.error("list statuses:", errMsg(e)));
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId]);
 
   const statsQuery = useStatistics(profileId, folder, component, status);
   const stats = statsQuery.data ?? null;
@@ -138,6 +112,7 @@ export function Dashboard({ onOpenDuplicates }: Props) {
           Clear
         </button>
       )}
+      {listError && <span className="error-text" role="alert">{listError}</span>}
     </div>
   );
 
