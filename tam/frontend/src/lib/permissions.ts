@@ -22,3 +22,16 @@ export function denial(view: PermissionView | undefined, perm: string, issueKey?
   if (have !== false) return "";
   return `Your Jira account does not have the "${view.names?.[perm] ?? perm}" permission in ${project}.`;
 }
+
+// deniedSummary names every permission Jira has said the token lacks, one
+// entry per project, in the order the sync stored them. A disabled control
+// cannot take focus, so its title never reaches a keyboard or screen-reader
+// user; this list is the same reason in text a view can show once.
+export function deniedSummary(view: PermissionView | undefined): string[] {
+  if (!view) return [];
+  return Object.entries(view.byProject ?? {}).flatMap(([project, perms]) =>
+    Object.entries(perms)
+      .filter(([, have]) => have === false)
+      .map(([perm]) => `"${view.names?.[perm] ?? perm}" in ${project}`),
+  );
+}

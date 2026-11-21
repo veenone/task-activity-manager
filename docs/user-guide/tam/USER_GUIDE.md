@@ -585,7 +585,9 @@ once, and neither does a report rebuild or a ritual sync.
 
 A sync also asks Jira what your token may do in the project. An action you
 lack the Jira permission for is disabled, and hovering it names the
-permission: Manage Sprints for the sprint actions, Schedule Issues for ranking
+permission. When any is missing, the views with gated actions also list the
+missing permissions in a line of text at the top, so the reason is readable
+without a mouse. The permissions are Manage Sprints for the sprint actions, Schedule Issues for ranking
 and sprint moves, Create Issues for new issues and import, Edit Issues for
 field edits, Transition Issues for column moves, Assign Issues for the
 assignee, Link Issues, Work On Issues for logging work, and Create

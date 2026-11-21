@@ -51,7 +51,7 @@ When a sync fails, the whole bar turns into a red ribbon saying what Jira answer
 
 ### What your account may do
 
-A sync also asks Jira what your token is allowed to do in the project. An action you do not have the Jira permission for is disabled, and hovering it names the permission to ask a Jira administrator for:
+A sync also asks Jira what your token is allowed to do in the project. An action you do not have the Jira permission for is disabled, and hovering it names the permission to ask a Jira administrator for. When any permission is missing, the Backlog, Assigned to me, Worklog, Epics, Boards and Sprints views also say so in a line of text at the top, listing each missing permission and its project, so the reason is readable without a mouse:
 
 | Jira permission | What it controls in TAM |
 |---|---|
