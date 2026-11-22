@@ -89,7 +89,7 @@ func (e *Engine) commitDatasets(ctx context.Context, profileID string, rows []te
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: reason})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,
 				Error:   "Jira saved the dataset but local cleanup failed: " + err.Error(),

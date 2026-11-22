@@ -168,6 +168,12 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		return result, err
 	}
 	changes = filterChangesByID(changes, only)
+	e.commitRun = newCommitTracker(e.commitProgress, changes)
+	defer func() {
+		e.commitRun.finish()
+		e.commitRun = nil
+	}()
+	e.commitRun.send()
 
 	// Create new Preconditions first (FR-13.5) so any pending association that
 	// references a temporary precondition key is rewritten to the real key
@@ -396,6 +402,7 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 testLoop:
 	for _, testKey := range order {
 		testChanges := byTest[testKey]
+		e.commitRun.begin(testKey, testChanges)
 
 		// skippedIDs holds this Test's pending rows that were capability-skipped
 		// (folder move / precondition association on a backend that lacks them):
@@ -438,7 +445,7 @@ testLoop:
 				}
 				// Drop edits that someone else already made identically.
 				if len(scan.dropIDs) > 0 {
-					_ = e.repo.CommitPendingChanges(profileID, scan.dropIDs)
+					_ = e.clearPending(profileID, scan.dropIDs)
 					testChanges = filterOutIDs(testChanges, scan.dropIDs)
 				}
 				if len(scan.conflicts) > 0 {
@@ -880,7 +887,7 @@ testLoop:
 			ids = append(ids, c.ID)
 		}
 		if len(ids) > 0 {
-			if err := e.repo.CommitPendingChanges(profileID, ids); err != nil {
+			if err := e.clearPending(profileID, ids); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{
 					TestKey: testKey,
 					Error:   "Jira accepted update but local cleanup failed: " + err.Error(),
@@ -910,12 +917,15 @@ testLoop:
 	// are supported on both backends and run unconditionally (container rename is
 	// gated inside commitMemberships). Comments post as issue comments, so they
 	// need the same issue-backed write surface as reviews.
+	e.commitRun.beginPass(membershipRows)
 	e.commitMemberships(ctx, profileID, membershipRows, caps, &result)
+	e.commitRun.beginPass(deferredIterationRows)
 	if caps.SupportsParameterizedRunWrites {
 		e.commitDeferredJUnitIterations(ctx, profileID, deferredIterationRows, &result)
 	} else {
 		e.skipRows(deferredIterationRows, skipReasonIterationWrites, &result)
 	}
+	e.commitRun.beginPass(preconditionEditRows, preconditionDeleteRows)
 	if caps.SupportsPreconditionObjects {
 		e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
 		e.commitPreconditionDeletes(ctx, profileID, preconditionDeleteRows, &result)
@@ -923,27 +933,33 @@ testLoop:
 		e.skipRows(preconditionEditRows, skipReasonPreconditions, &result)
 		e.skipRows(preconditionDeleteRows, skipReasonPreconditions, &result)
 	}
+	e.commitRun.beginPass(folderRows)
 	if caps.SupportsFolders {
 		e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
 	} else {
 		e.skipRows(folderRows, skipReasonFolders, &result)
 	}
+	e.commitRun.beginPass(reviewRows)
 	if issueBackedWrites(caps) {
 		e.commitReviews(ctx, profileID, reviewRows, &result)
 	} else {
 		e.skipRows(reviewRows, skipReasonReviews, &result)
 	}
+	e.commitRun.beginPass(commentRows)
 	if issueBackedWrites(caps) {
 		e.commitComments(ctx, profileID, commentRows, &result)
 	} else {
 		e.skipRows(commentRows, skipReasonComments, &result)
 	}
+	e.commitRun.beginPass(runRows)
 	e.commitRuns(ctx, profileID, runRows, &result)
+	e.commitRun.beginPass(iterationRows)
 	if caps.SupportsParameterizedRunWrites {
 		e.commitIterations(ctx, profileID, iterationRows, caps, &result)
 	} else {
 		e.skipRows(iterationRows, skipReasonIterationWrites, &result)
 	}
+	e.commitRun.beginPass(runStepRows)
 	if caps.SupportsRunStepResults {
 		e.commitRunSteps(ctx, profileID, runStepRows, &result)
 	} else {
@@ -952,6 +968,7 @@ testLoop:
 	// Run-level defect links + remarks are Xray raven-specific (RND_P_4TFINT_05-296),
 	// gated behind issueBackedWrites like reviews/comments: Xray runs them, a
 	// settable-status backend (Kiwi) skips them.
+	e.commitRun.beginPass(runDefectRows, runCommentRows)
 	if issueBackedWrites(caps) {
 		e.commitRunDefects(ctx, profileID, runDefectRows, &result)
 		e.commitRunComments(ctx, profileID, runCommentRows, &result)
@@ -959,6 +976,7 @@ testLoop:
 		e.skipRows(runDefectRows, skipReasonRunDefects, &result)
 		e.skipRows(runCommentRows, skipReasonRunComments, &result)
 	}
+	e.commitRun.beginPass(requirementRows, requirementEditRows, requirementDeleteRows, requirementCreateRows, reqReqLinkRows)
 	if requirementWritesSupported(caps) {
 		e.commitRequirements(ctx, profileID, requirementRows, &result)
 		e.commitRequirementEdits(ctx, profileID, requirementEditRows, &result)
@@ -974,6 +992,7 @@ testLoop:
 	// Datasets go last of the test-keyed buckets: a dataset queued against a
 	// test created in this same commit needs the rename to have happened, and
 	// that is done by the create pass far above.
+	e.commitRun.beginPass(datasetRows)
 	if caps.SupportsDatasetWrites {
 		e.commitDatasets(ctx, profileID, datasetRows, &result)
 	} else {
@@ -992,6 +1011,7 @@ testLoop:
 	// for a setting that already exists instead of fixing the connection.
 	// commitBugCreates itself reports the real reason and fails the rows
 	// (not skips them) without attempting a create.
+	e.commitRun.beginPass(bugCreateRows)
 	if caps.SupportsBugCreation || e.bugBackend != nil || e.bugBackendErr != nil {
 		e.commitBugCreates(ctx, profileID, bugCreateRows, &result)
 	} else {
@@ -1081,7 +1101,7 @@ func (e *Engine) commitRuns(ctx context.Context, profileID string, rows []testre
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "set run status: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "the backend accepted the result but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1158,7 +1178,7 @@ func (e *Engine) commitRunDefects(ctx context.Context, profileID string, rows []
 			continue
 		}
 
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "Xray accepted the defect update but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1196,7 +1216,7 @@ func (e *Engine) commitRunComments(ctx context.Context, profileID string, rows [
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "set run comment: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "Xray accepted the comment but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1247,7 +1267,7 @@ func (e *Engine) commitRequirements(ctx context.Context, profileID string, rows 
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "update requirement links: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "Jira updated links but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1280,7 +1300,7 @@ func (e *Engine) commitRequirementEdits(ctx context.Context, profileID string, r
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "update requirement: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, ids); err != nil {
+		if err := e.clearPending(profileID, ids); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira accepted requirement update but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1297,7 +1317,7 @@ func (e *Engine) commitRequirementDeletes(ctx context.Context, profileID string,
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "delete requirement: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira deleted requirement but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1437,7 +1457,7 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 			})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira created the bug but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1475,7 +1495,7 @@ func (e *Engine) commitRequirementCreates(ctx context.Context, profileID string,
 			}
 			key = realKey
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira created the requirement but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1499,7 +1519,7 @@ func (e *Engine) commitComments(ctx context.Context, profileID string, rows []te
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "post comment: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted the comment but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1524,7 +1544,7 @@ func (e *Engine) commitReviews(ctx context.Context, profileID string, rows []tes
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "post review: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted the review but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1660,7 +1680,7 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 		if key != c.EntityKey {
 			toClear = append(toClear, e.stepPendingRowIDs(profileID, key)...)
 		}
-		if err := e.repo.CommitPendingChanges(profileID, toClear); err != nil {
+		if err := e.clearPending(profileID, toClear); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira created test but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1760,7 +1780,7 @@ func (e *Engine) commitFolderCreates(ctx context.Context, profileID, projectKey 
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "folder: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted folder change but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1837,7 +1857,7 @@ func (e *Engine) commitFolders(ctx context.Context, profileID, projectKey string
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "folder: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted folder change but local cleanup failed: " + err.Error()})
 			continue
 		}
@@ -1888,7 +1908,7 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 				_ = err
 			}
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,
 				Error:   "Jira created precondition but local cleanup failed: " + err.Error(),
@@ -1970,7 +1990,7 @@ func (e *Engine) commitPreconditionEdits(ctx context.Context, profileID string, 
 			})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, ids); err != nil {
+		if err := e.clearPending(profileID, ids); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: key,
 				Error:   "Jira accepted precondition update but local cleanup failed: " + err.Error(),
@@ -1993,7 +2013,7 @@ func (e *Engine) commitPreconditionDeletes(ctx context.Context, profileID string
 			})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,
 				Error:   "Jira deleted precondition but local cleanup failed: " + err.Error(),
@@ -2021,7 +2041,7 @@ func (e *Engine) commitContainerCreates(ctx context.Context, profileID string, c
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: err.Error()})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: key,
 				Error:   "Jira created container but local cleanup failed: " + err.Error(),
@@ -2089,7 +2109,7 @@ func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows [
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: err.Error()})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: key,
 				Error:   "Jira accepted allocation but local cleanup failed: " + err.Error(),
@@ -2396,7 +2416,7 @@ func (e *Engine) commitReqReqLinks(ctx context.Context, profileID string, rows [
 			result.Failed = append(result.Failed, FailedCommit{TestKey: fromKey, Error: "update req links: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: fromKey, Error: "Jira updated req links but local cleanup failed: " + err.Error()})
 			continue
 		}

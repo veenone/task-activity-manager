@@ -76,7 +76,7 @@ func (e *Engine) commitRunSteps(ctx context.Context, profileID string, rows []te
 				continue
 			}
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{change.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{change.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "the backend accepted the step result but local cleanup failed: " + err.Error()})
 			continue
 		}

@@ -120,6 +120,19 @@ type Engine struct {
 	// these for Test Executions that include the profile's tests. Empty means
 	// cross-project execution discovery is skipped entirely.
 	crossProjectSources []string
+	// commitProgress receives one event per step of a commit run; nil when
+	// the caller does not watch. commitRun is that run's counter, set for
+	// the length of one commitChanges call.
+	commitProgress func(Progress)
+	commitRun      *commitTracker
+}
+
+// WithCommitProgress reports a commit's progress to fn: Fetched counts the
+// pending rows dealt with so far (pushed, failed, conflicted or skipped) out
+// of Total, the rows the commit set out to push, and Stage names the key being
+// pushed.
+func WithCommitProgress(fn func(Progress)) Option {
+	return func(e *Engine) { e.commitProgress = fn }
 }
 
 // Option configures an Engine at construction.

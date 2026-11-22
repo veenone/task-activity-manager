@@ -52,7 +52,7 @@ func (e *Engine) commitDeferredJUnitIterations(ctx context.Context, profileID st
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "set imported dataset iteration result: " + sanitizeError(err.Error())})
 			continue
 		}
-		if err := e.repo.CommitPendingChanges(profileID, []int64{change.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{change.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "backend accepted the imported dataset result but local cleanup failed: " + err.Error()})
 			continue
 		}

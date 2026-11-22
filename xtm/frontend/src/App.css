@@ -3264,6 +3264,14 @@ tr.row-selected td:first-child {
 .commit-result p {
   margin: 2px 0;
 }
+/* The bar a running commit shows above the result area (#602). */
+.commit-progress {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.commit-progress-text {
+  margin: 4px 0 0;
+}
 .conflict-text {
   color: var(--warn-text);
   background: var(--warn-bg);

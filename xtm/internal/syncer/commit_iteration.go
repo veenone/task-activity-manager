@@ -81,7 +81,7 @@ func (e *Engine) commitIterations(ctx context.Context, profileID string, rows []
 			}
 		}
 
-		if err := e.repo.CommitPendingChanges(profileID, []int64{change.ID}); err != nil {
+		if err := e.clearPending(profileID, []int64{change.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: identity.testKey, Error: "backend accepted the parameterized result but local cleanup failed: " + err.Error()})
 			continue
 		}

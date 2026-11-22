@@ -2381,6 +2381,7 @@ func (a *App) ListAuditEntries(profileID string, limit int) ([]testrepo.AuditEnt
 // discard them.
 func (a *App) CommitPendingChanges(profileID string) (out syncer.CommitResult, err error) {
 	defer recoverToError("CommitPendingChanges", &err)
+	defer a.closeCommitProgress()
 	empty := syncer.CommitResult{
 		Succeeded:  []string{},
 		Conflicted: []syncer.Conflict{},
@@ -2403,8 +2404,26 @@ func (a *App) CommitPendingChanges(profileID string) (out syncer.CommitResult, e
 	}
 	b := newBackend(p.Backend, p.JiraURL, token, p.CACert, p.AllowUntrustedTLS)
 	b.SetRequirementLinkType(s.RequirementLinkType)
-	engine := syncer.New(b, a.repo, a.bugRoutingOptions(profileID, b)...)
+	engine := syncer.New(b, a.repo, a.commitOptions(profileID, b)...)
 	return engine.CommitChanges(a.ctx, profileID, p.ProjectKey)
+}
+
+// commitProgressEvent carries a commit's progress to the pending changes
+// dialog. It is its own channel so a commit does not drive the footer sync bar.
+const commitProgressEvent = "commit:progress"
+
+// commitOptions is the engine setup for a commit: bug routing plus progress
+// forwarded to the frontend.
+func (a *App) commitOptions(profileID string, b backend.Backend) []syncer.Option {
+	return append(a.bugRoutingOptions(profileID, b), syncer.WithCommitProgress(func(p syncer.Progress) {
+		runtime.EventsEmit(a.ctx, commitProgressEvent, p)
+	}))
+}
+
+// closeCommitProgress tells the dialog the commit is over, on every return
+// path, so the bar never stays up after an early error.
+func (a *App) closeCommitProgress() {
+	runtime.EventsEmit(a.ctx, commitProgressEvent, syncer.Progress{Done: true})
 }
 
 // CommitPendingChangesByIDs pushes only the selected pending changes to Jira
@@ -2413,6 +2432,7 @@ func (a *App) CommitPendingChanges(profileID string) (out syncer.CommitResult, e
 // edits against an advanced remote version.
 func (a *App) CommitPendingChangesByIDs(profileID string, changeIDs []int64) (out syncer.CommitResult, err error) {
 	defer recoverToError("CommitPendingChangesByIDs", &err)
+	defer a.closeCommitProgress()
 	empty := syncer.CommitResult{
 		Succeeded:  []string{},
 		Conflicted: []syncer.Conflict{},
@@ -2438,7 +2458,7 @@ func (a *App) CommitPendingChangesByIDs(profileID string, changeIDs []int64) (ou
 	}
 	b := newBackend(p.Backend, p.JiraURL, token, p.CACert, p.AllowUntrustedTLS)
 	b.SetRequirementLinkType(s.RequirementLinkType)
-	engine := syncer.New(b, a.repo, a.bugRoutingOptions(profileID, b)...)
+	engine := syncer.New(b, a.repo, a.commitOptions(profileID, b)...)
 	return engine.CommitChangesForIDs(a.ctx, profileID, p.ProjectKey, changeIDs)
 }
 
