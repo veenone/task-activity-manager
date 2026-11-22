@@ -4,13 +4,12 @@
 **Audience:** analysts who follow an issue across many Jira Data Center
 projects.
 
-Project Issue Explorer (PIE) is a desktop app for people who look across Jira
-projects rather than inside one. You give it a JQL filter and it lists what
-matches, whichever projects those issues are in. PIE only reads from Jira. It
-does not change anything there. The one place it writes is Confluence, when
-you publish a cycle.
+Project Issue Explorer (PIE) is a desktop app for people whose work spans
+several Jira projects. You give it a JQL filter and it lists what matches,
+whichever projects those issues are in. PIE reads from Jira and never writes
+to it. The one place it writes is Confluence, when you publish a cycle.
 
-## The menu bar and the theme
+## Menu bar and theme
 
 The menu bar has three menus:
 - **File** has Manage profiles, Jira fields, Run query (Ctrl+R) and Quit (Ctrl+Q).
@@ -34,7 +33,7 @@ The window can't be made narrower than 1024 pixels or shorter than 640.
 In a window narrower than 1280 pixels, the Link map's side panes get narrower
 so the graph keeps its room.
 
-## The status bar
+## Status bar
 
 The bar along the bottom of the window shows the profile in use, how many
 issues the last run returned, when a saved query last ran, and the theme. While
@@ -191,8 +190,8 @@ your query matched. The two other pages show the sets:
   its set in Trace, where the set list opens on the page that holds it.
 
 A set is **out of step** when at least one of its issues is finished in Jira
-(its status is in Jira's done category) and at least one is not. That is the
-case PIE is for: a fix made in one project but not in another. A Rejected
+(its status is in Jira's done category) and at least one is not. PIE is built
+to find these sets, where a fix was made in one project but not in another. A Rejected
 issue counts as finished, so a Rejected clone beside an open one is out of
 step. A set is **in step** when its issues agree: all finished, or all still
 open. Both pages can show only the sets that are out of step.
@@ -211,7 +210,7 @@ The counts above the map always describe the whole run.
 
 Above the map, PIE counts the sets out of step, the issues in them that are
 still open, the issues in linked sets and the baselines. **Flow**, **Tree** and **Coverage**
-show the same sets three ways, and **Baseline** shows one baseline and what links to it:
+show the same sets three ways, and **Baseline** shows one baseline and what links to it.
 
 Both Flow diagrams work the same way. Boxes stand in layers from left to
 right, and a line joins two boxes for the issues or links that pass through
@@ -276,8 +275,6 @@ both, its width and number giving the count.
     sets first.
   - With no baselines set there are no gaps, and the matrix lists each set's
     issues by project.
-
-In every view, choosing a key opens its set in Trace.
 
 Following links stops when a run reaches 5,000 issues in all, and PIE says so.
 If Jira refuses one of the searches for linked issues, PIE shows Jira's
