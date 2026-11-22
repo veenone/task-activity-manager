@@ -1,6 +1,6 @@
 # agile-suite
 
-Desktop tools for Jira Data Center that share one code spine:
+Desktop tools for Jira Data Center that share one codebase:
 
 - **Xray Test Manager** (`xtm/`): manage Xray test cases at scale. See
   `xtm/README.md`.
@@ -39,7 +39,7 @@ npm run typecheck --workspaces --if-present   # every workspace's type check
 TAM's Help > About > Licences lists every Go module and production npm package
 the binary bundles, read from `tam/frontend/src/assets/third-party.json`.
 `node scripts/third-party-notices.mjs` writes that file from `tam/go.mod` and
-the installed npm tree, so run it from the repo root after `npm install`
+the installed npm tree. Run it from the repo root after `npm install`
 whenever a dependency of TAM changes, and commit the result.
 `frontend/core/src/instruction-gate.notices.test.ts` fails until you do.
 
@@ -55,12 +55,14 @@ three in step and is gone with them. A clone from that era still carries the
 fan-out in `git remote -v`; `git remote set-url --push origin
 git@github.com:veenone/task-activity-manager.git` clears it.
 
-Releases are tagged per app: `xtm/vX.Y.Z` for XTM (see `xtm/README.md`) and
-`tam/vX.Y.Z` for TAM, and `pie/vX.Y.Z` for Project Issue Explorer. The tag's prefix is what tells
-`.github/workflows/release.yml` which app to build, and
+Releases are tagged per app: `xtm/vX.Y.Z` for XTM (see `xtm/README.md`),
+`tam/vX.Y.Z` for TAM, and `pie/vX.Y.Z` for Project Issue Explorer. The tag's
+prefix tells `.github/workflows/release.yml` which app to build.
 `scripts/release-app.ps1 -App <app> -Version X.Y.Z` is the same build run
-locally. Each app's user guide is a folder of its own, one file for each View menu
-entry plus a printable `USER_GUIDE.md` and the screenshots they share:
-[`docs/user-guide/xtm`](docs/user-guide/xtm/README.md),
-[`docs/user-guide/tam`](docs/user-guide/tam/README.md) and
-[`docs/user-guide/pie`](docs/user-guide/pie/USER_GUIDE.md), which is a single file for now.
+locally.
+
+XTM and TAM each keep their user guide in a folder of its own, with one file
+for each View menu entry, a printable `USER_GUIDE.md`, and the screenshots they
+share: [`docs/user-guide/xtm`](docs/user-guide/xtm/README.md) and
+[`docs/user-guide/tam`](docs/user-guide/tam/README.md). PIE's guide is a single
+file for now: [`docs/user-guide/pie`](docs/user-guide/pie/USER_GUIDE.md).
