@@ -1,4 +1,4 @@
-# Task Activity Manager — User Guide
+# Task Activity Manager User Guide
 
 **Version:** 1.1.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** scrum
 masters, product owners, and anyone planning work in Jira Data Center.
@@ -384,7 +384,7 @@ sprint. By keyboard:
 | **Shift** with an arrow | Extend the selection |
 | **Context menu** or **Shift+F10** | The card's own menu: move to a column, to a sprint, or to the backlog |
 
-A move the board cannot make is refused out loud, and nothing moves while a
+When the board cannot make a move, it says so, and nothing moves while a
 commit is running.
 
 Selecting cards raises a bar with the count, a destination picker and
@@ -418,7 +418,7 @@ On a scrum board the toolbar grows the ceremony that fits the sprint:
 - **Complete sprint** appears for an active one, listing the cards that are not
   in the last column and saying where they will go.
 
-All three are queued, not sent. The unfinished list in the Complete dialog is a
+All three are queued. The unfinished list in the Complete dialog is a
 preview built from the cache; Commit reads Jira again and moves whatever is
 unfinished then. Where the board is not drawing every card, the dialog says how
 many it cannot name. Completing a sprint with other changes pending asks you to
@@ -468,7 +468,7 @@ sprint, or to the active one when none has closed.
 
 The summary names the sprint and gives the figures: committed, added, removed,
 completed and carried over, with the completion rate. Under it is the method
-line, because the numbers mean nothing without it:
+line, which says how the numbers were counted:
 
 > Done means the board's last column. TAM uses Jira history, so its totals can
 > differ from Jira's own, and a removed card counts only once it comes back.
@@ -518,7 +518,7 @@ resolve, or one your account cannot see, is reported beside the box and adds
 nothing.
 
 **Jira dashboard** lists the dashboards your account can see, and **Open in
-Jira** opens the chosen one in your browser. That is all it does. A Jira
+Jira** opens the chosen one in your browser. TAM does nothing else with it. A Jira
 dashboard is a page of gadgets and Data Center offers no way to read which
 gadgets one holds, so TAM cannot turn it into panels here.
 
@@ -529,7 +529,7 @@ its top six rows and says how many more it left out.
 
 ![Two dashboards, each counting one saved filter](images/dashboards-01-view.png)
 
-The figures are a snapshot, not a live query, so a dashboard says the same
+The figures are a snapshot from the last count, so a dashboard says the same
 thing with Jira unreachable and the same thing again a week later. **Refresh**
 re-runs that filter and restamps it; nothing refreshes on its own. **Remove**
 takes the panel off the view and leaves the Jira filter alone. A failed read
@@ -558,8 +558,8 @@ are reading stays open.
 The editor has headings, bullet and numbered lists, tables and links. A
 Confluence macro the editor cannot safely change, such as a Jira issue list, is
 shown as it renders and kept exactly as it is. On the Standup page, **Add
-today's entry** adds a dated heading under the daily log, and refuses politely
-when today already has one.
+today's entry** adds a dated heading under the daily log, and refuses with a
+message saying why when today already has one.
 
 What you type is local. **Sync rituals** is the one control here that talks to
 a server: it creates the pages a sprint lacks, sends your edits, brings back

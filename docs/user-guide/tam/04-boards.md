@@ -10,12 +10,12 @@ The bar above the board carries:
 
 - **Board**: the boards this project has.
 - **Filter**: narrows the cards to a key, an assignee or a type. The board keeps its columns; only the cards thin out.
-
-Under the pickers is the same **Type**, **Status** and **Assignee** row the [Backlog](01-backlog.md#find-issues) has, for narrowing without having to guess a substring. It works alongside the Filter box rather than instead of it: both have to match. Like the box, it thins the cards and leaves every column and lane standing.
-
-When the filters hide every card, the board says **No cards match the current filter.** rather than calling the sprint empty.
 - **Sprint**: on a scrum board, which sprint's cards to draw. A board with no open sprint says so.
 - **Swimlanes**: **None**, **Assignee** or **Epic**, which splits the board into horizontal lanes.
+
+Under the pickers is the same **Type**, **Status** and **Assignee** row the [Backlog](01-backlog.md#find-issues) has, for narrowing without having to guess a substring. It works alongside the Filter box, and a card has to match both. Like the box, it thins the cards and leaves every column and lane standing.
+
+When the filters hide every card, the board says **No cards match the current filter.** rather than calling the sprint empty.
 
 **Refresh** re-reads the board from Jira. It takes the same lock a sync does.
 
@@ -31,7 +31,7 @@ When the filters hide every card, the board says **No cards match the current fi
 - **Shift** with an arrow extends the selection as you move.
 - **Context menu** or **Shift+F10** opens the card's own menu, which lists **Move to <column>** for each column, each open sprint, and **Move to the backlog**.
 
-A move the board cannot make is refused out loud rather than silently ignored, and nothing can be moved while a commit is running.
+When the board cannot make a move, it says so, and nothing can be moved while a commit is running.
 
 ### Moving several at once
 
@@ -43,7 +43,7 @@ The selection follows what the board is drawing: a card that a refresh or a filt
 
 Under each column name is its work-in-progress limit, for example `4 of 6, from Jira` or `3, minimum 2, set in TAM`. A column over its limit, or under its minimum, says so and is marked.
 
-The attribution matters:
+Each limit names where it comes from:
 
 - **from Jira** is the board's own configuration. TAM prints it and never changes it.
 - **set in TAM** is a limit this team set here, for a column Jira does not limit. Press the limit to set or clear one.
@@ -64,7 +64,7 @@ On a scrum board, the toolbar grows the ceremony that fits the sprint you are lo
 - **Start sprint** appears for a future sprint. The dialog offers a name, a goal and dates, suggesting them from the board's history where it can.
 - **Complete sprint** appears for an active one. The dialog lists the cards that are not in the last column, says where they will go (a future sprint or the backlog), and names the column that decides it.
 
-All three are queued, not sent. Nothing reaches Jira until Commit, which is also what makes it safe to complete a sprint, look at the result and discard it.
+All three are queued. Nothing reaches Jira until Commit, which is also what makes it safe to complete a sprint, look at the result and discard it.
 
 The list of unfinished cards in the Complete dialog is a preview built from the cache. Commit reads Jira again and moves whatever is unfinished then, so the two can differ if somebody closed a card in the meantime. Where the board is not drawing every card, the dialog says how many it cannot name.
 
