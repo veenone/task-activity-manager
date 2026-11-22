@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { query } from "../wailsjs/go/models";
 import { IssueDetail } from "./IssueDetail";
 import { projectLabel } from "./linked";
