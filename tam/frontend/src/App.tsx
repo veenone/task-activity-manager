@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, LiveRegion, SyncRibbon, ViewTabs, clearViewState, useProfile, useTour, errMsg } from "@agile-suite/core";
+import { LiveRegion, SyncRibbon, ViewTabs, clearViewState, useProfile, useTour, errMsg } from "@agile-suite/core";
 import { Health, EventsOn, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
@@ -19,6 +19,7 @@ import { RitualsView } from "./components/RitualsView";
 import { FirstRun } from "./components/FirstRun";
 import { NavRail } from "./components/NavRail";
 import { PermissionNote } from "./components/PermissionNote";
+import { TopBarActions } from "./components/TopBarActions";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
@@ -219,66 +220,19 @@ export default function App() {
           </select>
           <button className="topbar-btn" onClick={() => openModal("profiles")}>Manage</button>
         </div>
-        <div className="topbar-zone topbar-right">
-          {pendingCount > 0 && (
-            <button
-              type="button"
-              className="btn-pending"
-              onClick={() => openModal("pending")}
-              title="Show uncommitted changes"
-            >
-              <span className="pending-dot" aria-hidden="true" />
-              {`${pendingCount} pending`}
-            </button>
-          )}
-          {/* Refresh is for the whole window, not for one section: it drops
-              the cached issue details and reads the active view again, which
-              is how a profile whose details never expire asks Jira for them.
-              It takes the same lock a sync does, so it is offered on exactly
-              the same terms. */}
-          <button
-            type="button"
-            className="topbar-btn"
-            onClick={() => void runRefresh()}
-            disabled={!canSync}
-            title="Read this view again and fetch the issue details afresh"
-          >
-            Refresh
-          </button>
-          <span data-tour="sync">
-          <Menu
-            label="Sync"
-            align="right"
-            triggerClassName="topbar-btn topbar-btn-primary"
-            items={[
-              { key: "sync", label: "Sync changes", onClick: () => void runSync(false), disabled: !canSync },
-              { key: "full", label: "Full sync", title: "Fetches every issue again and drops the ones Jira no longer returns", onClick: () => void runFullSync(), disabled: !canSync },
-            ]}
-          />
-          </span>
-          <Menu
-            label="Theme"
-            align="right"
-            items={["light", "dark", "system"].map((t) => ({
-              key: t,
-              label: t[0].toUpperCase() + t.slice(1),
-              checked: theme === t,
-              onClick: () => void setTheme(t),
-            }))}
-          />
-          <span data-tour="help">
-          <Menu
-            label="Help"
-            align="right"
-            items={[
-              { key: "tour", label: "Take the tour", title: "A short walk through this view", onClick: () => startTour(view) },
-              { key: "start", label: "Take the first-run tour", title: "Sync, plan, commit: the loop TAM is built around", onClick: () => startTour("start", () => setView("backlog")) },
-              { key: "diagnostics", label: "Diagnostics", title: "Paths, build and the recent log", onClick: () => openModal("diagnostics") },
-              { key: "about", label: "About", onClick: () => openModal("about") },
-            ]}
-          />
-          </span>
-        </div>
+        <TopBarActions
+          pendingCount={pendingCount}
+          canSync={canSync}
+          theme={theme}
+          onPending={() => openModal("pending")}
+          onRefresh={() => void runRefresh()}
+          onSync={(full) => void (full ? runFullSync() : runSync(false))}
+          onTheme={(t) => void setTheme(t)}
+          onTour={() => startTour(view)}
+          onFirstRunTour={() => startTour("start", () => setView("backlog"))}
+          onDiagnostics={() => openModal("diagnostics")}
+          onAbout={() => openModal("about")}
+        />
       </header>
 
       {!noProfile && <ViewTabs views={VIEWS} current={view} onSelect={switchView} />}

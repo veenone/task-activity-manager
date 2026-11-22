@@ -41,7 +41,7 @@ const START_STEPS: TourStep[] = [
     id: "views",
     target: "views",
     title: "The views",
-    body: "Each area of TAM has its own tab here. Every one has a short tour of its own, in the Help menu while you are on it.",
+    body: "Each area of TAM has its own tab here. Every one has a short tour of its own, in the More menu while you are on it.",
     side: "bottom",
   },
   {
