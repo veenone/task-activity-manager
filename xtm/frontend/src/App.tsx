@@ -6,6 +6,7 @@ import { LiveRegion } from "./components/LiveRegion";
 import "./App.css";
 import { useAppState } from "./shell/useAppState";
 import { useAppActions } from "./shell/useAppActions";
+import { useViewShortcuts } from "./shell/useViewShortcuts";
 import { TopBar } from "./shell/TopBar";
 import { BulkToolbar } from "./shell/BulkToolbar";
 import { NavRail } from "./shell/NavRail";
@@ -36,12 +37,9 @@ function App() {
     "menu:about": () => openModal("about"),
   };
   // The View menu sends the id of the view it was built with. Go builds it
-  // once with every view, so the ones this profile hides are ignored here.
-  const selectFromMenu = useRef<(id: string) => void>(() => {});
-  selectFromMenu.current = (id) => {
-    const v = shownViews.find((sv) => sv.id === id);
-    if (v) setView(v.id);
-  };
+  // once with every view, so the ones this profile hides are ignored, and
+  // Ctrl+1..9 are handled here rather than as menu accelerators.
+  const selectFromMenu = useViewShortcuts(shownViews, setView);
   useEffect(() => {
     const unsubs = Object.keys(menuActions.current).map((event) =>
       EventsOn(event, () => menuActions.current[event]?.()),
@@ -51,10 +49,10 @@ function App() {
     // the frontend last had.
     unsubs.push(
       EventsOn("menu:nav-rail", (visible: boolean) => setNavRail(visible)),
-      EventsOn("menu:view", (id: string) => selectFromMenu.current(id)),
+      EventsOn("menu:view", (id: string) => selectFromMenu(id)),
     );
     return () => unsubs.forEach((u) => u && u());
-  }, [setNavRail]);
+  }, [setNavRail, selectFromMenu]);
 
   if (!health) {
     return <div className="centered muted">Loading…</div>;

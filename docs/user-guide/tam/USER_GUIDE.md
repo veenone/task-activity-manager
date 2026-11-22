@@ -139,7 +139,7 @@ nobody minds you breaking.
 | --- | --- |
 | Top bar | The app name, the DEMO chip, the profile picker, **Manage**, the pending count, **Refresh**, **More** and **Sync**. **More** holds Full sync, the tours, Diagnostics, About and the theme. |
 | Tab band | The eight views. |
-| Navigation rail | An optional list of the same views down the left, toggled with **Ctrl+B**. |
+| Navigation rail | An optional list of the same views down the left, toggled with **Ctrl+\\**. |
 | Main area | The active view. |
 | Status bar | Whether the local store is ready, the cached issue count, when the last sync finished, and sync progress while one runs. A failed sync takes the whole bar as a red ribbon. |
 
@@ -148,7 +148,7 @@ The native menu bar carries the same things:
 | Menu | Items |
 | --- | --- |
 | **File** | Profiles…, Settings…, Sync (**Ctrl+R**), Full Sync (**Ctrl+Shift+R**), Quit (**Ctrl+Q**) |
-| **View** | The nine views (**Ctrl+1** to **Ctrl+9**), and Navigation Rail (**Ctrl+B**) |
+| **View** | The nine views (**Ctrl+1** to **Ctrl+9**, ignored while a dialog is open), and Navigation Rail (**Ctrl+\\**) |
 | **Help** | Diagnostics…, About |
 
 The views, in menu order: Backlog, Assigned to me, Worklog, Epics, Boards, Sprints,
@@ -607,7 +607,7 @@ decks are written.
 
 **More** in the top bar switches the theme between light, dark and the system
 setting.
-**Ctrl+B** shows or hides the navigation rail. Both are remembered.
+**Ctrl+\\** shows or hides the navigation rail. Both are remembered.
 
 **Manage**, beside the profile picker, edits, exports and deletes profiles.
 Deleting a profile also discards its pending changes; when it has any, the

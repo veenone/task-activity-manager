@@ -189,8 +189,10 @@ describe('instruction gate', () => {
     ['xtm/main.go', 'xtm/frontend/src/views.ts'],
     ['pie/menu.go', 'pie/frontend/src/views.ts'],
   ])('the View menu in %s and the view tabs in %s name the same views, in the same order', (goFile, viewsFile) => {
-    const go = read(goFile).split('var menuViews')[1] ?? '';
-    const menu = [...go.matchAll(/\{"(\w+)", "([^"]+)", "(\w*)"\}/g)].map(([, id, label]) => `${id}:${label}`);
+    // XTM's entries carry no accelerator since #528, so the third field is
+    // optional; the match stops at the end of the var for that reason.
+    const go = (read(goFile).split('var menuViews')[1] ?? '').split('\n}')[0];
+    const menu = [...go.matchAll(/\{"(\w+)", "([^"]+)"(?:, "\w*")?\}/g)].map(([, id, label]) => `${id}:${label}`);
     const tabs = [...read(viewsFile).matchAll(/id: "(\w+)",\s*label: "([^"]+)"/g)].map(([, id, label]) => `${id}:${label}`);
     expect(tabs.length, `read no views out of ${viewsFile}`).toBeGreaterThan(0);
     expect(menu, 'the View menu and the tabs have drifted').toEqual(tabs);
