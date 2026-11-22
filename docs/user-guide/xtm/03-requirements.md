@@ -1,6 +1,6 @@
 # Requirements
 
-The Requirements view answers one question for each requirement: is it covered by tests, and did those tests pass? It lists the requirements pulled from your requirement sources with a coverage badge on each, and shows the covering tests and their latest results. Open it with the **Requirements** tab or Ctrl+3.
+The Requirements view shows, for each requirement, whether tests cover it and whether those tests passed. It lists the requirements pulled from your requirement sources with a coverage badge on each, and shows the covering tests and their latest results. Open it with the **Requirements** tab or Ctrl+3.
 
 The tab only appears when the profile's backend supports requirement objects.
 
