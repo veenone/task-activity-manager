@@ -351,10 +351,12 @@ export function RequirementsView({ onChanged }: Props) {
           {/* Data actions. The create button keeps the label it was renamed
               to; the rest sit behind one trigger, because four full-width
               labels on one row wrapped this narrow panel into two rows of
-              equal-weight buttons with no primary among them (#325). */}
-          <div className="reqs-list-toolbar">
+              equal-weight buttons with no primary among them (#325). The row is
+              Preconditions' toolbar, set right, which is also what leaves the
+              right-aligned menu room to open inside the panel (#591). */}
+          <div className="precond-list-toolbar">
             <button
-              className="btn btn-primary"
+              className="btn btn-primary precond-new"
               onClick={() => setShowCreateReq(true)}
               title="Create a new requirement here. It's pushed to Jira when you commit"
             >
@@ -363,7 +365,7 @@ export function RequirementsView({ onChanged }: Props) {
             <Menu
               label="⋯"
               triggerLabel="More actions"
-              triggerClassName="btn reqs-sources-btn"
+              triggerClassName="btn precond-new"
               align="right"
               items={[
                 {

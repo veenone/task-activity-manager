@@ -21,3 +21,24 @@ describe("rules core already owns", () => {
     expect(selectors).not.toContain(selector);
   });
 });
+
+// Requirements drew its New and More actions buttons in a left-aligned row of
+// its own, so the right-aligned menu opened past the panel's left edge and was
+// cut in half. Preconditions' toolbar is the reference both panels share (#591).
+describe("the Requirements toolbar", () => {
+  const src = (file: string) => fs.readFileSync(path.join(__dirname, "components", file), "utf8");
+  const requirements = src("RequirementsView.tsx");
+  const preconditions = src(path.join("preconditions", "PreconditionList.tsx"));
+
+  it("uses the Preconditions toolbar and button classes", () => {
+    for (const cls of ['className="precond-list-toolbar"', 'className="btn btn-primary precond-new"', 'triggerClassName="btn precond-new"']) {
+      expect(preconditions).toContain(cls);
+      expect(requirements).toContain(cls);
+    }
+  });
+
+  it("keeps no toolbar rules of its own", () => {
+    expect(selectors).not.toContain(".reqs-list-toolbar");
+    expect(selectors).not.toContain(".reqs-sources-btn");
+  });
+});
