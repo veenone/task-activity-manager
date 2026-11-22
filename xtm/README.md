@@ -1,20 +1,20 @@
 # Xray Test Manager
 
-A lightweight **Windows and macOS** desktop application for managing **Xray test
-cases in Jira Data Center** at scale — built for QA teams whose projects hold
-10,000+ test cases and have outgrown the Jira browser UI.
+A Windows and macOS desktop application for managing Xray test cases in Jira
+Data Center. It is for QA teams whose projects hold 10,000+ test cases and have
+outgrown the Jira browser UI.
 
 ## Why
 
-The Jira/Xray web interface becomes slow and cumbersome with very large test
-suites — navigation, filtering, and especially bulk edits. Xray Test Manager
-synchronises test data into a fast local store and gives testers a dedicated,
-bulk-first interface, writing changes back to Jira on commit.
+With very large test suites the Jira/Xray web interface gets slow to navigate
+and filter, and slowest at bulk edits. Xray Test Manager syncs test data into a
+local store, gives testers an interface built around bulk edits, and writes
+changes back to Jira on commit.
 
 ## Status
 
-✅ **1.10.0 released.** The app is feature-complete for
-Xray on Jira DC and in daily use. Sync, fast browse/search/filter/sort, saved
+1.10.0 is released. It has every planned feature for Xray on Jira DC and is in
+daily use. Sync, fast browse/search/filter/sort, saved
 views, configurable columns, local field/step/custom-field editing with
 on-commit sync and conflict resolution, workflow transitions, all bulk
 operations, Test Sets / Plans / Executions, Test Repository folders,
@@ -23,27 +23,28 @@ calls, misspellings, a statistics dashboard with traceability Sankeys, Gap
 Analysis, CSV/XLSX import and export, a pytest scaffold generator, diagnostics,
 sync history, light/dark themes, and profile management.
 
-🔌 **Live Xray/Jira REST is wired.** Every call in `internal/jira/` has a real
+Live Xray/Jira REST is wired. Every call in `internal/jira/` has a real
 implementation behind the demo short-circuit. Instance-specific shapes (link
 types and direction, custom-field names and value shapes, mandatory create
 fields) are marked `NOTE(xtm)` where they still want verification against
-another instance. The app remains fully usable in demo mode.
+another instance. Every feature also works in demo mode.
 
-🔀 **More than one backend.** Since 1.9.0 the local store is a neutral hub
-rather than an Xray-only cache. **Kiwi TCMS** is supported alongside Xray, each
-backend advertises what it can do, and a **migration bridge** moves a dataset
-from one connection to another with a capability-gap pre-flight.
+Since 1.9.0 the local store holds data for more than one backend, where it used
+to be an Xray-only cache. Kiwi TCMS is supported alongside Xray, and each
+backend advertises what it can do. A migration bridge moves a dataset from one
+connection to another, after a pre-flight check that lists what the target
+backend cannot hold.
 
 See [CHANGELOG.md](CHANGELOG.md) for what has shipped and what is pending
 release.
 
 ## Stack
 
-- **Go** + **Wails v2** + **React / TypeScript**
-- **SQLite** local store (pure-Go `modernc.org/sqlite` — no cgo)
+- Go, Wails v2, React and TypeScript
+- SQLite local store (pure-Go `modernc.org/sqlite`, no cgo)
 - **Windows:** a single `.exe`; only WebView2 is required (built into Windows 11)
 - **macOS:** a universal `.app` (Apple Silicon + Intel); uses the built-in WKWebView
-- Secrets in the OS-native store — Windows Credential Manager / macOS Keychain
+- Secrets in the OS-native store: Windows Credential Manager or macOS Keychain
 - Targets **Jira DC 8.14+** and **Xray Server / DC 8.4.0**
 
 ## Development
@@ -64,7 +65,7 @@ Releases ship Windows and macOS artifacts plus checksums:
 
 | Artifact | Use |
 | --- | --- |
-| `xray-test-manager-<ver>-windows-amd64.exe` | Windows portable — run directly, no install |
+| `xray-test-manager-<ver>-windows-amd64.exe` | Windows portable; run it directly, no install |
 | `xray-test-manager-<ver>-windows-amd64-installer.exe` | Windows Inno Setup installer (Start-menu entry, uninstaller) |
 | `xray-test-manager-<ver>-macos-universal.zip` | macOS universal `.app` (Apple Silicon + Intel) |
 | `xray-test-manager-<ver>-user-guide.zip` | User guide (markdown + screenshots) |
@@ -75,8 +76,8 @@ Releases ship Windows and macOS artifacts plus checksums:
 > `xattr -dr com.apple.quarantine xray-test-manager.app` to clear the quarantine flag.
 >
 > **Signing & notarization (optional):** the `release-macos` job code-signs and
-> notarizes the `.app` automatically **when these repo secrets are set** — without
-> them it just publishes the unsigned build. Set `MACOS_CERTIFICATE_P12` (base64 of
+> notarizes the `.app` automatically when these repo secrets are set. Without
+> them it publishes the unsigned build. Set `MACOS_CERTIFICATE_P12` (base64 of
 > a *Developer ID Application* `.p12`), `MACOS_CERTIFICATE_PASSWORD`,
 > `MACOS_SIGNING_IDENTITY`, and for notarization `MACOS_NOTARY_APPLE_ID`,
 > `MACOS_NOTARY_TEAM_ID`, and `MACOS_NOTARY_PASSWORD` (an app-specific password).
@@ -93,8 +94,8 @@ serves every app here and takes the app as a parameter:
 ./scripts/release-app.ps1 -App xtm -Version 0.2.0 -NoInstaller
 ```
 
-The version is the single source of truth in `wails.json` (`info.productVersion`);
-the script stamps it and Wails bakes it into the installer and the exe metadata.
+The version is set in one place, `wails.json` (`info.productVersion`).
+The script stamps it and Wails bakes it into the installer and the exe metadata.
 
 **Cut a GitHub release**: push an `xtm/v*` tag and CI (`.github/workflows/release.yml`
 at the repository root) runs two jobs: `release-windows` (on `windows-latest`)
@@ -112,18 +113,17 @@ git push origin xtm/v1.10.0
 
 ## Demo mode
 
-No Jira instance handy? Create a profile with **Jira base URL `demo`** (any
-project key, any token). The backend short-circuits the sync and serves
-~5,000 deterministically-generated tests — plus sample Test Sets / Plans /
-Executions, folders and preconditions — so the full UI can be exercised end to
-end. The header shows a yellow `DEMO` chip while a demo profile is active.
+To try the app without Jira, create a profile with **Jira base URL `demo`** (any
+project key, any token). The backend skips the sync and serves about 5,000
+deterministically generated tests, plus sample Test Sets, Plans and Executions,
+folders and preconditions, so you can use the whole UI end to end. The header shows a yellow `DEMO` chip while a demo profile is active.
 
 ## Roadmap
 
 | Phase | Theme | Status |
 | --- | --- | --- |
-| 0 | Foundations — scaffold, local store, profiles, PAT auth | ✅ |
-| 1 | MVP — fast browse / search / filter / sort, saved views, columns | ✅ |
+| 0 | Foundations: scaffold, local store, profiles, PAT auth | ✅ |
+| 1 | MVP: fast browse / search / filter / sort, saved views, columns | ✅ |
 | 2 | Local editing (fields / steps / custom fields) + on-commit sync, conflict resolution | ✅ |
 | 3 | Bulk operations (edit / transition / allocate / move / preconditions / review) | ✅ |
 | 4 | Workflow transitions, statistics dashboard, traceability Sankey | ✅ |

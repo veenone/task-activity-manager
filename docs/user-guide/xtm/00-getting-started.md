@@ -55,7 +55,7 @@ Demo mode is a safe place to learn the app: commits, component changes and impor
 
 3. When the sync finishes, the folder tree and the grid fill in, and the status bar shows the test count and the time of the last sync.
 
-The status bar also carries two things at all times. On the left, a dot and the words beside it say whether the local store came up: **Local store ready**, or **Starting up** while it has not. On the right it says which theme is in force, which is worth having on **System**, where the menu says System and this says what System resolved to.
+The status bar also carries two things at all times. On the left, a dot and the words beside it say whether the local store came up: **Local store ready**, or **Starting up** while it has not. On the right it names the theme in force. That helps when the theme is set to **System**: the menu says System, and the status bar says what System resolved to.
 
    ![The Browse view after the first sync](images/getting-started-05-after-sync.png)
 

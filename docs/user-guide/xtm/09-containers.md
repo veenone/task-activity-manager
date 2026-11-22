@@ -62,8 +62,8 @@ iteration's **Result** column to record it.
 To set several at once, tick the iterations you mean and a bar appears above the
 table: choose a result, then **Apply**. The tick in the header row selects every
 iteration, and **Clear** drops the selection without applying anything. An
-expanded iteration has the same for its steps. This matters most on a
-combinatorial dataset, where three parameters over three rows run as nine
+expanded iteration has the same for its steps. Bulk apply saves the most clicks
+on a combinatorial dataset, where three parameters over three rows run as nine
 iterations rather than three.
 
 A bulk apply is the same edit as picking each row by hand, so it journals the
@@ -195,5 +195,5 @@ Click **Bugs** in the toggle at the top left to list the defects linked to your 
 - **The run columns are missing.** They only show for Test Executions.
 - **A JUnit testcase is skipped as ambiguous.** Several tests share that summary. Rename the duplicates (see [Duplicates](04-duplicates.md)) and import again.
 - **An iteration result is refused with 403, "Current user does not have permissions to execute the Test Run".** Check whether the Test Execution is closed. The same account writes to an open execution without trouble, so the message names a permission when the cause is usually the execution's state.
-- **A step result is reported as skipped by Commit.** Only a demo profile can send one. Xray exposes no id for a step result, so XTM has nothing to address the write to. The result stays recorded locally and stays pending, so nothing is lost; it just does not reach Jira.
+- **A step result is reported as skipped by Commit.** Only a demo profile can send one. Xray exposes no id for a step result, so XTM has nothing to address the write to. The result stays recorded locally and stays pending, so nothing is lost, but it does not reach Jira.
 - **A row reads "iterations unavailable".** The run was found but could not be read or kept. Hover the marker for the reason, and look in `xtm.log` for the line naming the test and the execution. A test with no dataset shows nothing at all instead, which is not a fault.
