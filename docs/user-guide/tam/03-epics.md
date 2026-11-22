@@ -32,7 +32,7 @@ Giving an issue an epic moves it to the other tab on the next read.
 
 Select any row, epic or child, and the detail panel opens beside the tree. It is the same panel the [Backlog](01-backlog.md) uses, with the same editable fields.
 
-Changing an issue's **Epic** in that panel moves it in the tree as soon as the change is saved, and the row flashes where it lands so a move of a dozen rows is visible rather than something to hunt for. Like every other edit, the move is queued and reaches Jira on Commit.
+Changing an issue's **Epic** in that panel moves it in the tree as soon as the change is saved, and the row flashes where it lands, so even a move of a dozen rows shows where it went. Like every other edit, the move is queued and reaches Jira on Commit.
 
 ## Create an epic
 

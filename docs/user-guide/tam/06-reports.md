@@ -10,11 +10,11 @@ Pick a **Board** and a **Sprint**. A board defaults to its most recently closed 
 
 The summary sentence names the sprint and gives the figures: committed, added, removed, completed and carried over, in points or in cards, with the completion rate.
 
-Under it is the method line, because the numbers mean nothing without it:
+Under it is the method line, which says how the numbers were counted:
 
 > Done means the board's last column. TAM uses Jira history, so its totals can differ from Jira's own, and a removed card counts only once it comes back.
 
-Two more qualifications appear when they apply. **Committed is a minimum**, because a card added and removed before anyone looked leaves no trace to count. And where Jira returned only part of a card's history, the report says which cards and that those figures are not exact, rather than quietly rounding over the gap.
+Two more qualifications appear when they apply. **Committed is a minimum**, because a card added and removed before anyone looked leaves no trace to count. And where Jira returned only part of a card's history, the report says which cards and that those figures are not exact.
 
 ### The charts
 

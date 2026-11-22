@@ -35,7 +35,7 @@ The shortcuts do nothing while a dialog is open.
 
 **Ctrl+\\** shows or hides the navigation rail down the left side, which lists the same views. The rail is off by default and its state is remembered.
 
-## One thing to know before anything else
+## Nothing reaches Jira until you commit
 
 TAM writes nothing to Jira until you press Commit. Editing a field, dragging a card, filling a sprint, starting one, completing one, even deleting one: each is written to the local cache and queued as a pending change. The count sits in the top bar, and the dialog behind it is where changes are reviewed, discarded and sent.
 
