@@ -163,6 +163,23 @@ describe("core ProfileForm", () => {
     expect(screen.getByRole("button", { name: "Test connection" })).toBeDisabled();
   });
 
+  // The dialog around the form asks before Escape drops what was typed, so
+  // the form says when it holds anything unsaved (#542).
+  it("reports when it holds something typed, and when it is back as it was", async () => {
+    const onDirtyChange = vi.fn();
+    const baseline = { name: "QA", url: "https://jira.example.com", key: "QA", scope: "", caCert: "", allowTls: false };
+    render(<Harness adapter={adapter()} baseline={baseline} onDirtyChange={onDirtyChange} />);
+    expect(onDirtyChange).not.toHaveBeenCalledWith(true);
+
+    await userEvent.type(screen.getByLabelText("Jira base URL"), "/x");
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    await userEvent.type(screen.getByLabelText("Jira base URL"), "{Backspace}{Backspace}");
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    await userEvent.type(screen.getByLabelText("Personal Access Token"), "pat");
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  });
+
   it("holds Save while the app's own fields are invalid", async () => {
     render(<Harness adapter={adapter()} extraValid={false} />);
     await fillValid();

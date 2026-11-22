@@ -21,7 +21,7 @@ import type {
 } from "../api";
 import { useDuplicates } from "../queries/duplicates";
 import { TestDetail } from "./TestDetail";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { PreconditionDuplicatesView } from "./PreconditionDuplicatesView";
 import { Modal } from "./Modal";
 

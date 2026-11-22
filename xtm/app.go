@@ -1542,7 +1542,15 @@ func (a *App) runSync(profileID string, forceFull bool) error {
 	); logErr != nil {
 		log.Printf("xtm: record sync log: %v", logErr)
 	}
-	return syncFailure(syncErr)
+	// The failure is kept, worded as the status bar shows it, so a restart
+	// still shows it (#542). A finished sync cleared it in SetSyncState.
+	failure := syncFailure(syncErr)
+	if failure != nil {
+		if err := a.repo.SetSyncError(profileID, failure.Error()); err != nil {
+			log.Printf("xtm: record sync error: %v", err)
+		}
+	}
+	return failure
 }
 
 // ListSyncLog returns a profile's recent sync runs with success / failure

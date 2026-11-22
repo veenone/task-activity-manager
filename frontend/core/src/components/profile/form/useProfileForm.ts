@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { errMsg } from "../../../lib/errMsg";
 import { jiraUrlError, normalizeJiraUrl, projectKeyError } from "../profileValidation";
 
@@ -65,6 +65,9 @@ export interface ProfileFormOptions<C extends ReuseCandidate = ReuseCandidate> {
   // Something else the app knows clears the cache, such as a new backend.
   clearsCacheToo?: boolean;
   adapter: ProfileFormAdapter;
+  // Told whenever the form starts or stops holding input that differs from
+  // what it opened with, so a dialog can ask before closing over it.
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 // useProfileForm holds the fields both apps' profile forms share, their
@@ -107,6 +110,16 @@ export function useProfileForm<C extends ReuseCandidate = ReuseCandidate>(o: Pro
     name.trim() !== "" && url.trim() !== "" && urlError === "" &&
     key.trim() !== "" && keyError === "" && tokenSatisfied && !cred.invalid &&
     (o.extraValid ?? true);
+  const s = o.seed ?? {};
+  const dirty =
+    name !== (s.name ?? "") || url !== (s.url ?? "") || key !== (s.key ?? "") ||
+    scope !== (s.scope ?? "") || caCert !== (s.caCert ?? "") || allowTls !== (s.allowTls ?? false) ||
+    token !== "" || reuseFrom !== "" || !!o.credential?.entered;
+  const onDirtyChange = useRef(o.onDirtyChange);
+  useEffect(() => { onDirtyChange.current = o.onDirtyChange; }, [o.onDirtyChange]);
+  useEffect(() => {
+    onDirtyChange.current?.(dirty);
+  }, [dirty]);
   const willClearCache =
     !!o.cacheBaseline &&
     (key.trim() !== o.cacheBaseline.key || normalizeJiraUrl(url) !== o.cacheBaseline.url || !!o.clearsCacheToo);
@@ -145,6 +158,9 @@ export function useProfileForm<C extends ReuseCandidate = ReuseCandidate>(o: Pro
     try {
       const warning = await o.adapter.save(fields());
       if (warning) setError(warning);
+      // The typed token is stored now. Blank is "keep the stored one" on an
+      // edit, and leaving it typed would count as unsaved input.
+      if (isEdit) setToken("");
     } catch (e) {
       setError(errMsg(e));
     } finally {

@@ -158,6 +158,38 @@ describe("ProfilesDialog", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("disk full");
   });
 
+  // Escape or a click outside used to close the dialog over a typed URL and
+  // token without a word (#542).
+  it("asks before Escape drops a form holding unsaved input", async () => {
+    const user = userEvent.setup();
+    const typingForm = ({ onDirtyChange }: ProfileFormSlot<P>) => (
+      <input aria-label="Jira base URL" onChange={(e) => onDirtyChange?.(e.target.value !== "")} />
+    );
+    const props = setup({ renderForm: typingForm });
+    await user.click(screen.getByRole("button", { name: /Beta/ }));
+    await user.type(screen.getByLabelText("Jira base URL"), "https://jira.example.com");
+    await user.keyboard("{Escape}");
+
+    const ask = await screen.findByRole("alertdialog");
+    expect(ask).toHaveTextContent("Discard your changes to this profile?");
+    await user.click(within(ask).getByRole("button", { name: "Keep editing" }));
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Jira base URL")).toHaveValue("https://jira.example.com");
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Discard" }));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes on Escape without asking when nothing was typed", async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    await user.click(screen.getByRole("button", { name: /Beta/ }));
+    await user.keyboard("{Escape}");
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
   it("carries the app's subtitle sentence and list note", () => {
     setup({ subtitle: "The list is shared.", listNote: "Kiwi profiles are not listed." });
     expect(screen.getByText(/The list is shared\./)).toBeInTheDocument();

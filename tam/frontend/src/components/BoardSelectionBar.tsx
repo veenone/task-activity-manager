@@ -42,7 +42,7 @@ export function BoardSelectionBar({ count, sprints, sprintId, busy, onMove, onCl
   const ready = target === BACKLOG || !!chosen;
 
   return (
-    <div className="board-selection-bar" role="group" aria-label="Selected cards">
+    <div className="bulk-toolbar" role="group" aria-label="Selected cards">
       <span className="bulk-count">{plural(count, "card", "cards")} selected</span>
       <label className="board-picker">
         <span>Move to</span>
@@ -67,7 +67,7 @@ export function BoardSelectionBar({ count, sprints, sprintId, busy, onMove, onCl
       >
         {`Move ${plural(count, "card", "cards")}`}
       </button>
-      <button type="button" className="btn board-selection-clear" onClick={onClear}>Clear</button>
+      <button type="button" className="btn" onClick={onClear}>Clear</button>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useProfile } from "../contexts/ProfileContext";
 import { ListTests, SearchTestsCrossProject, GetTestSteps, errMsg } from "../api";
 import type { Step, StepDraft } from "../api";
 import { ProjectSidebar } from "./ProjectSidebar";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { Modal } from "./Modal";
 
 // A normalized source row: same-project rows carry no projectKey; cross-project

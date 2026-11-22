@@ -102,6 +102,9 @@ press **Manage** beside the profile picker, and fill in the form.
 **Show token** reveals what you typed. Where you already have a profile for the
 same server, **Reuse token from** saves pasting it again.
 
+Closing the dialog with Escape, a click outside it or the close button asks
+first when the form holds something you have not saved.
+
 The rest are optional:
 
 - **Scope JQL** narrows what syncs, for example `labels = team-a`. Anything the
@@ -173,7 +176,7 @@ When there is uncommitted work, a **N pending** button appears in the top bar.
    draft issue, sprint or board asks first, because discarding it loses
    everything typed into it.
 3. **Discard all** reverts everything, after a confirmation.
-4. **Commit (N)** sends what can be sent. The number is what Commit will push.
+4. **Commit (N)** sends what can be sent. The number counts the changes Commit will push, as the dialog title does.
 
 ![The Pending changes dialog over the board, holding one status move](images/getting-started-01-pending.png)
 
@@ -306,7 +309,8 @@ other issues you logged time on in the week shown. A cell adds Jira's entries
 to the pending ones, and a dot marks a cell with a pending entry.
 
 Each workday header measures the day against the **Day target**, 8 hours by
-default and kept per profile. A day that reached it reads `8h, complete`. A
+default and kept per profile. It takes 0.5 to 24 hours and says so when
+you leave a value outside that. A day that reached it reads `8h, complete`. A
 past day that did not reads `2h 30m short` or `nothing logged`. Today and the
 days ahead read as a running total, `2h of 8h`. Weekends have no target.
 

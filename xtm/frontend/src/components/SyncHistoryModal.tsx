@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { Pager } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { errMsg } from "../api";
 import { useSyncLog } from "../queries/app";
@@ -146,32 +147,8 @@ export function SyncHistoryModal({ onClose }: Props) {
         </div>
 
         {entries.length > PAGE_SIZE && (
-          <div className="board-pager synchist-pager">
-            <span className="muted board-pager-range">
-              {(safePage * PAGE_SIZE + 1).toLocaleString()}–
-              {Math.min(
-                (safePage + 1) * PAGE_SIZE,
-                entries.length,
-              ).toLocaleString()}{" "}
-              of {entries.length.toLocaleString()} · page {safePage + 1} of{" "}
-              {totalPages}
-            </span>
-            <span className="board-pager-nav">
-              <button
-                className="btn"
-                disabled={safePage === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                ‹ Prev
-              </button>
-              <button
-                className="btn"
-                disabled={safePage >= totalPages - 1}
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              >
-                Next ›
-              </button>
-            </span>
+          <div className="synchist-pager">
+            <Pager page={safePage} pageSize={PAGE_SIZE} total={entries.length} onPage={setPage} />
           </div>
         )}
     </Modal>

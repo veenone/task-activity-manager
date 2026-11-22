@@ -179,6 +179,24 @@ describe("WorklogView", () => {
     expect(screen.queryByText(/No open issue is assigned to you/)).not.toBeInTheDocument();
   });
 
+  it("says why it refuses a day target out of range, and keeps the stored one", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("columnheader", { name: new RegExp(dayLabel("2026-11-16")) });
+    const field = screen.getByRole("spinbutton", { name: /Day target/ });
+    await user.clear(field);
+    await user.type(field, "30");
+    await user.tab();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("The day target has to be between 0.5 and 24 hours.");
+    expect(field).toHaveValue(8);
+    expect(api.SetProfileSetting).not.toHaveBeenCalled();
+
+    await user.clear(field);
+    await user.type(field, "6");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("says why when the week cannot be read", async () => {
     vi.mocked(api.WorklogWeek).mockRejectedValue(new Error("TAM does not know your Jira user yet. Sync once or test the connection"));
     renderView();

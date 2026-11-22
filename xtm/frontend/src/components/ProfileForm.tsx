@@ -30,6 +30,8 @@ export interface ProfileFormProps {
   connection?: Connection;
   // Fires when a connection is created or updated ("connection" mode).
   onSaved?: (c: Connection) => void;
+  // Told when the form starts or stops holding unsaved input.
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 // ProfileForm creates or edits a profile, or a workspace connection. The
@@ -61,6 +63,7 @@ export function ProfileForm(p: ProfileFormProps) {
     extraValid: b.valid,
     cacheBaseline: !isConnection && profile ? { key: profile.projectKey, url: profile.jiraUrl } : undefined,
     clearsCacheToo: !isConnection && !!profile && x.backend !== profile.backend,
+    onDirtyChange: p.onDirtyChange,
     adapter: isConnection
       ? connectionAdapter(x, connection, p.workspaceId, p.onSaved)
       : profileAdapter(x, b, profile, p.onCreated),

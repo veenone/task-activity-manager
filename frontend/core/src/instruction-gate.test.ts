@@ -249,9 +249,15 @@ describe('instruction gate', () => {
       .filter(Boolean);
     expect(files.length, 'found no gate files to check').toBeGreaterThan(0);
 
-    const unpinned = files.filter(
-      (rel) => !git(['check-attr', 'eol', '--', rel]).endsWith(': lf'),
+    // One check-attr call for every file: a git process per file took this
+    // test past its 5 s timeout on a loaded Windows machine.
+    const pinned = new Set(
+      git(['check-attr', 'eol', '--', ...files])
+        .split(/\r?\n/)
+        .filter((line) => line.endsWith(': eol: lf'))
+        .map((line) => line.slice(0, -': eol: lf'.length)),
     );
+    const unpinned = files.filter((rel) => !pinned.has(rel));
     expect(unpinned, `not pinned to eol=lf: ${unpinned.join(', ')}`).toEqual([]);
 
     const crlf = files.filter((rel) => read(rel).includes('\r\n'));

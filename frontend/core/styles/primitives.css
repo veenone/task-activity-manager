@@ -1387,6 +1387,55 @@
   background: var(--warn-soft);
 }
 
+/* ===== Pager (#542) ===== */
+/* The controls only. A band, a border or a margin belongs to where the pager
+   sits, so each caller adds its own. */
+.pager {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: var(--fs-sm);
+}
+.pager-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Square, evenly sized step buttons: first / previous / next / last read as
+   one control group rather than four words of different lengths. */
+.pager-step {
+  min-width: 28px;
+  padding: 4px 6px;
+  text-align: center;
+}
+.pager-page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 4px;
+}
+.pager-page-input {
+  width: 52px;
+  padding: 3px 6px;
+  text-align: center;
+  margin-bottom: 0;
+}
+.pager-size {
+  width: auto;
+  padding: 3px 6px;
+  margin-bottom: 0;
+}
+.pager-range {
+  margin-left: auto;
+}
+/* A narrow side panel: the range takes a line of its own under the controls. */
+.pager-compact .pager-range {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
 /* ===== Board toolbar, mirrored from XTM's App.css ===== */
 /* Only the board itself scrolls, in both directions: its column strip is
    wider than the pane and its cells are taller. The toolbar above it and
@@ -1556,23 +1605,23 @@
    is the cell and not a gap in it. */
 .board-cell-target { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
 .board-move-keys { margin: 0 0 8px; }
-/* The bar several checked cards can be acted on from, mirrored from XTM's
-   bulk toolbar down to .bulk-count on the number. */
-.board-selection-bar {
+/* The bar a selection is acted on from, in both apps (#542): XTM's Browse
+   bulk toolbar, TAM's board and sprint selection bars. XTM's look, the
+   warning band, since it was the original. */
+.bulk-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 6px 10px;
-  margin: 0 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-2);
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: var(--warn-bg);
+  border-bottom: 1px solid var(--warn-border);
+  color: var(--warn-text);
+  font-size: var(--fs-md);
 }
 .bulk-count { font-weight: 600; }
-.board-selection-bar .bulk-count { color: var(--accent); }
-.board-selection-bar .board-picker { margin: 0; }
-.board-selection-clear { margin-left: auto; }
+.bulk-toolbar .board-picker { margin: 0; color: inherit; }
 .board-card-foot { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-muted); }
 .board-unmapped { margin-top: 12px; }
 .board-overflow { font-size: var(--fs-xs); color: var(--text-muted); padding: 2px 4px; }

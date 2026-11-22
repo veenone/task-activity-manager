@@ -5,7 +5,7 @@ import { useProfile } from "../../contexts/ProfileContext";
 import { useLabels } from "../../queries/app";
 import { keys } from "../../queries/keys";
 import { DeleteLabel, RenameLabel, errMsg } from "../../api";
-import { Pager } from "../Pager";
+import { Pager } from "@agile-suite/core";
 import { SortControl } from "../SortControl";
 
 interface Props {

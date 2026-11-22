@@ -49,6 +49,14 @@ describe("SettingsModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("labels the button with an ellipsis character while saving", async () => {
+    bindings.SetReportExportDirectory.mockReturnValue(new Promise(() => {}));
+    render(<SettingsModal onClose={vi.fn()} />);
+    await screen.findByLabelText(/Report export folder/);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+  });
+
   it("fills the field from the folder picker, and leaves it alone when the picker is cancelled", async () => {
     bindings.GetSettings.mockResolvedValue({ reportExportDir: "C:\\old" });
     render(<SettingsModal onClose={vi.fn()} />);

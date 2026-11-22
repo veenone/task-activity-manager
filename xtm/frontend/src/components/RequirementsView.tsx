@@ -25,7 +25,7 @@ import { TestDetail } from "./TestDetail";
 import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
 import { Menu } from "./Menu";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { SortControl } from "./SortControl";
 import { keyCompare, cmpStr, applyDir } from "../sort";
 import { useConfirm } from "./useConfirm";

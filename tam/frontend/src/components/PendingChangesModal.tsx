@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
-import type { Profile, Settings } from "../api";
-import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges, useUnpushableEdits } from "../queries/pending";
+import type { PendingChange, Profile, Settings } from "../api";
+import { groupPending, pendingGroupId, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges, useUnpushableEdits } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
 import { plural } from "../lib/format";
@@ -35,8 +35,9 @@ export function summaryLine(groups: PendingGroup[], rowCount: number): string {
   return line;
 }
 
-// countPushable is the number on the Commit button: the groups Commit will
-// actually deliver. Two things take a group out of it.
+// countPushable is the number on the Commit button: the changes Commit will
+// actually deliver, counted in the same unit as the dialog's title (#542).
+// A change goes when its group goes, and two things take a group out.
 //
 // A conflict holds its issue back, which it always has. And an issue
 // carrying a journal row Jira will refuse delivers nothing at all: an
@@ -55,11 +56,15 @@ export function summaryLine(groups: PendingGroup[], rowCount: number): string {
 // numeric id and a draft board's is a negative one, and neither is an issue
 // key Jira could refuse a field on.
 export function countPushable(
+  rows: PendingChange[],
   groups: PendingGroup[],
   conflictKeys: Set<string>,
   refusedKeys: Set<string>,
 ): number {
-  return groups.filter((g) => !conflictKeys.has(g.key) && !(g.kind === "issue" && refusedKeys.has(g.key))).length;
+  const going = new Set(
+    groups.filter((g) => !conflictKeys.has(g.key) && !(g.kind === "issue" && refusedKeys.has(g.key))).map((g) => g.id),
+  );
+  return rows.filter((r) => going.has(pendingGroupId(r))).length;
 }
 
 
@@ -98,7 +103,7 @@ export function PendingChangesModal({ onClose }: Props) {
   const refusedKeys = new Set((unpushable.data ?? []).map((e) => e.key));
   const refusedCount = groups.filter((g) => g.kind === "issue" && refusedKeys.has(g.key)).length;
 
-  const pushable = countPushable(groups, conflictKeys, refusedKeys);
+  const pushable = countPushable(rows, groups, conflictKeys, refusedKeys);
 
   // A held-back issue sits above the table: it is what blocks a clean
   // commit, so it belongs where the eye lands first. The rest keep

@@ -10,7 +10,7 @@ import {
   errMsg,
 } from "../api";
 import type { TestCase } from "../api";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { announce } from "./LiveRegion";
 import { Modal } from "./Modal";
 

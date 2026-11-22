@@ -19,6 +19,8 @@ interface Props {
   profiles?: Profile[];
   // Extra footer controls (Export / Delete) rendered left of Cancel / Save.
   extraActions?: ReactNode;
+  // Told when the form starts or stops holding unsaved input.
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 // ProfileForm creates or edits one profile. The shared fields, their checks,
@@ -28,7 +30,7 @@ interface Props {
 // Xray-only fields XTM shows (backend, bug filing, cross-project sources) stay
 // on the saved row untouched, because App.UpdateProfile writes them back, so a
 // profile edited here still works in XTM.
-export function ProfileForm({ onSaved, onCancel, profile, profiles, extraActions }: Props) {
+export function ProfileForm({ onSaved, onCancel, profile, profiles, extraActions, onDirtyChange }: Props) {
   const isEdit = !!profile;
   const x = useTamProfileExtras(profile);
   const f = useProfileForm<Profile>({
@@ -43,6 +45,7 @@ export function ProfileForm({ onSaved, onCancel, profile, profiles, extraActions
     reuseCandidates: (profiles ?? []).filter((p) => p.id !== profile?.id),
     extraValid: x.valid,
     cacheBaseline: profile && { key: profile.projectKey, url: profile.jiraUrl },
+    onDirtyChange,
     adapter: {
       test: (i) =>
         i.stored

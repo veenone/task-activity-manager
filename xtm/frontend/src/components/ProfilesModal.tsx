@@ -38,7 +38,7 @@ export function ProfilesModal({ profiles, activeId, defaultProfileId, onClose, o
       onSaved={onSaved}
       onDelete={onDelete}
       onClose={onClose}
-      renderForm={({ profile, onSaved: saved, onCancel, extraActions }) => (
+      renderForm={({ profile, onSaved: saved, onCancel, extraActions, onDirtyChange }) => (
         <ProfileForm
           hideHeading
           profile={profile}
@@ -46,6 +46,7 @@ export function ProfilesModal({ profiles, activeId, defaultProfileId, onClose, o
           onCreated={saved}
           onCancel={onCancel}
           extraActions={extraActions}
+          onDirtyChange={onDirtyChange}
         />
       )}
     />

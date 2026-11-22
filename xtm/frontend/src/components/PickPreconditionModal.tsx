@@ -3,7 +3,7 @@ import { useProfile } from "../contexts/ProfileContext";
 import { SearchPreconditionsCrossProject, errMsg } from "../api";
 import type { Precondition } from "../api";
 import { ProjectSidebar } from "./ProjectSidebar";
-import { Pager } from "./Pager";
+import { Pager } from "@agile-suite/core";
 import { Modal } from "./Modal";
 
 interface Props {

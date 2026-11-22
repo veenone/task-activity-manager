@@ -9,7 +9,7 @@ import type { SyncProgress } from "../api";
 function state(s: {
   progress?: SyncProgress | null;
   syncError?: string;
-  syncState?: { testCount: number; lastSyncedAt: string } | null;
+  syncState?: { testCount: number; lastSyncedAt: string; lastError?: string } | null;
   health?: { ok: boolean } | null;
   theme?: string;
 }): AppState {
@@ -57,6 +57,20 @@ describe("StatusBar", () => {
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByText(/Tests: 120 \/ 400/)).toBeInstanceOf(HTMLElement);
+  });
+
+  // TAM keeps the last failure across a restart; XTM forgot it, so a sync
+  // that failed before the app closed looked clean on the next launch (#542).
+  it("still shows the last sync's failure after a restart", () => {
+    render(
+      <StatusBar
+        s={state({
+          syncState: { testCount: 4210, lastSyncedAt: "2026-10-20T10:00:00Z", lastError: "Jira rejected this profile's token." },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Jira rejected this profile's token.");
   });
 
   it("shows the synced count when the last sync worked", () => {
