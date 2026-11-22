@@ -180,6 +180,9 @@ When there is uncommitted work, a **N pending** button appears in the top bar.
 
 ![The Pending changes dialog over the board, holding one status move](images/getting-started-01-pending.png)
 
+While Commit runs, a bar at the top of the dialog counts the changes sent so
+far against the total and names the issue it is pushing.
+
 A banner afterwards says what went, what failed and what was held back.
 Commit again to retry the failures.
 

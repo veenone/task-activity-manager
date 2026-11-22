@@ -6,6 +6,7 @@ import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
 import { plural } from "../lib/format";
 import { CommitBanner } from "./CommitBanner";
+import { CommitProgress } from "./CommitProgress";
 import { ConflictCard } from "./ConflictCard";
 import { PendingGroupRows } from "./PendingGroupRows";
 
@@ -135,6 +136,7 @@ export function PendingChangesModal({ onClose }: Props) {
       </div>
 
       <div className="bulk-body">
+        <CommitProgress />
         {lastCommit && (
           <CommitBanner
             result={lastCommit}

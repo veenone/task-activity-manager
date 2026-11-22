@@ -246,6 +246,21 @@ export interface CommitResult {
   remaining: number;
 }
 
+// COMMIT_PROGRESS_EVENT carries committer.Progress while a Commit runs. Its
+// own event, not the sync's, so the shell's banner never reads it as a sync.
+export const COMMIT_PROGRESS_EVENT = "tam:commit-progress";
+
+// CommitProgress mirrors committer.Progress: done and total count journal
+// rows, stage is the phase running, key the issue being pushed when the
+// phase names one, and finished marks the last frame of every Commit.
+export interface CommitProgress {
+  done: number;
+  total: number;
+  stage: string;
+  key: string;
+  finished: boolean;
+}
+
 export const ListUnpushableEdits: (profileId: string) => Promise<UnpushableEdit[]> =
   App.ListUnpushableEdits;
 export const ListPendingChanges: (profileId: string) => Promise<PendingChange[]> = App.ListPendingChanges;
