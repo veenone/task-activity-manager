@@ -6,6 +6,7 @@ import type {
 } from "../api";
 import { useConfirm } from "./useConfirm";
 import { Modal } from "./Modal";
+import { CommitProgress } from "./CommitProgress";
 import { formatComponentsValue } from "../lib/components";
 import { discardAsksFirst } from "../lib/pendingDiscard";
 
@@ -109,6 +110,8 @@ export function PendingChangesModal({
             ✕
           </button>
         </div>
+
+        <CommitProgress committing={committing} />
 
         {hasResult && (
           <div className="commit-result">

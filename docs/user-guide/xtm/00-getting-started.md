@@ -94,7 +94,9 @@ When you have pending changes, a yellow **N pending** button appears in the top 
    - **Commit N changes** at the bottom sends everything.
    - **Discard all** reverts every pending change. XTM asks you to confirm first, because this cannot be undone.
 
-3. Read the result at the top of the dialog. Successful commits leave the list. Failures and conflicts stay so you can retry or discard them.
+3. While the commit runs, a bar at the top of the dialog counts the changes sent so far out of the total and names the key going out now. A long list takes a while, so the bar is how you know it is still moving.
+
+4. Read the result at the top of the dialog. Successful commits leave the list. Failures and conflicts stay so you can retry or discard them.
 
    ![The dialog after a successful commit](images/getting-started-08-committed.png)
 
