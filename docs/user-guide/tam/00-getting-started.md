@@ -79,6 +79,8 @@ When you have uncommitted work, a **N pending** button appears in the top bar.
 3. **Discard all** reverts everything, after a confirmation.
 4. **Commit (N)** sends everything that can be sent. The number counts the changes Commit will push, the same unit as the count in the dialog title.
 
+While Commit runs, a bar at the top of the dialog counts the changes sent so far against the total and names the issue it is pushing, so a long list shows how far it has got.
+
 After a commit, a banner reports what happened: what went, what failed, and what was held back.
 
 ### When Jira has moved on

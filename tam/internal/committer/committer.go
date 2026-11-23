@@ -122,6 +122,8 @@ type Engine struct {
 	// Sprints pushes sprint edits, starts, completions and deletes; nil fails
 	// each one.
 	Sprints SprintWriter
+	// Progress receives the Commit's frames (progress.go); nil sends none.
+	Progress func(Progress)
 }
 
 // New returns an engine over the backend, the store, and the board order.
@@ -141,12 +143,15 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, Linked: []Linked{}, Logged: []Logged{}, Attached: []Attached{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
-	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies()}
+	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), prog: &progress{emit: e.Progress}}
+	defer run.prog.finish()
 	if err := run.reload(ctx); err != nil {
 		return res, err
 	}
+	run.prog.count(run.rows)
 	all := phases()
 	for i, p := range all {
+		run.prog.phase(p.name)
 		p.run(ctx, run)
 		if i == len(all)-1 {
 			break

@@ -73,6 +73,7 @@ type commitRun struct {
 	projectKey string
 	res        *Result
 	deps       *dependencies
+	prog       *progress
 	// rows is the journal as the last phase left it, oldest first.
 	rows []journal.PendingChange
 }
@@ -268,6 +269,7 @@ func (r *commitRun) createDrafts(ctx context.Context, level draftLevel) {
 	})
 	for _, t := range todo {
 		key := t.row.EntityKey
+		r.prog.step(key, 1)
 		if t.bad != nil {
 			// A draft that will not decode will not decode on the next Commit
 			// either; the row has to be discarded, not retried.
@@ -314,6 +316,7 @@ func (r *commitRun) pushEdits(ctx context.Context) {
 	sort.Strings(keys)
 	for _, key := range keys {
 		rows := byKey[key]
+		r.prog.step(key, len(rows))
 		// parentKey is the one edited field that references another issue;
 		// every other value is free text a placeholder check must not read.
 		parent := ""

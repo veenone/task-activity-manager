@@ -14,6 +14,8 @@ import (
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/permission"
 	"agile-suite/tam/internal/sprints"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // acquire marks the profile as running what ("sync", "commit", or "import")
@@ -133,7 +135,9 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 	if err != nil {
 		return committer.Result{}, err
 	}
-	res, err := a.commitEngine(p, b).Commit(a.ctx, p.ID, p.ProjectKey)
+	e := a.commitEngine(p, b)
+	e.Progress = a.emitCommitProgress
+	res, err := e.Commit(a.ctx, p.ID, p.ProjectKey)
 	if err != nil {
 		log.Printf("tam: commit %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return res, err
@@ -141,6 +145,20 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 	log.Printf("tam: committed %s (%s): %d sprints created, %d sprints changed, %d pushed, %d created, %d moved, %d conflicts, %d failures, %d held, %d left",
 		p.Name, p.ProjectKey, len(res.CreatedSprints), len(res.SprintsChanged), len(res.Committed), len(res.Created), len(res.Moved), len(res.Conflicts), len(res.Failures), len(res.Held), res.Remaining)
 	return res, nil
+}
+
+// commitProgressEvent carries committer.Progress frames to the pending
+// changes dialog. It is not syncProgressEvent, for the reason
+// reportProgressEvent is not: the shell's banner reads that one as a sync.
+const commitProgressEvent = "tam:commit-progress"
+
+// emitCommitProgress forwards one frame, dropped without a Wails runtime
+// behind the context for the reason emitProgress gives.
+func (a *App) emitCommitProgress(p committer.Progress) {
+	if a.ctx == nil || a.ctx.Value("events") == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, commitProgressEvent, p)
 }
 
 // commitEngine builds the commit engine over the profile's backend. The

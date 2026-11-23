@@ -439,6 +439,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .pending-issue { text-align: left; vertical-align: top; font-weight: normal; white-space: nowrap; }
 .pending-issue .chip { margin-left: 6px; }
 .pending-empty { padding: 24px 0; text-align: center; }
+/* A running Commit's bar, above the result banner it gives way to. */
+.commit-progress { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.commit-progress-line { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); }
 .b { font-weight: 600; }
 
 /* Plan 1b: editable details, activity, grid markers */
