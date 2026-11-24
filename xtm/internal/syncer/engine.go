@@ -125,6 +125,10 @@ type Engine struct {
 	// the length of one commitChanges call.
 	commitProgress func(Progress)
 	commitRun      *commitTracker
+	// createdThisRun holds the issue keys one commit run created or adopted,
+	// so the duplicate check after an unanswered create cannot hand the same
+	// issue to two rows (#607).
+	createdThisRun map[string]bool
 }
 
 // WithCommitProgress reports a commit's progress to fn: Fetched counts the

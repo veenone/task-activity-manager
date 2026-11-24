@@ -100,6 +100,8 @@ When you have pending changes, a yellow **N pending** button appears in the top 
 
    ![The dialog after a successful commit](images/getting-started-08-committed.png)
 
+   If Jira never answers a new test, precondition, requirement, bug or container (the request timed out or the connection dropped), the failure says the next commit will check first. Jira may have created it anyway. On the next commit XTM looks for an issue of that type with the same summary that you created since the first attempt. If it finds exactly one, it uses that issue instead of creating another and carries on with the steps or members. If it finds none, it creates the item as usual. If it finds more than one, it creates nothing and names them, so you can keep one, delete the rest in Jira and discard the change.
+
 ### When a commit reports a conflict
 
 A conflict means someone changed the same test in Jira after your last sync. XTM merges the edits that do not overlap and asks you about the rest. For each conflicting field it shows **Theirs (remote)** and **Mine (local)**. Pick one per field, or use **All mine** or **All theirs**, then click **Resolve & re-commit**. That commits only this test's changes; pending edits on other tests stay in the list. **Discard mine** drops your edits for that test instead.

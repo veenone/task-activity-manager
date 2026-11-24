@@ -169,9 +169,11 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	}
 	changes = filterChangesByID(changes, only)
 	e.commitRun = newCommitTracker(e.commitProgress, changes)
+	e.createdThisRun = map[string]bool{}
 	defer func() {
 		e.commitRun.finish()
 		e.commitRun = nil
+		e.createdThisRun = nil
 	}()
 	e.commitRun.send()
 
@@ -1364,16 +1366,17 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 
 	for _, c := range rows {
 		var p struct {
-			ProjectKey  string         `json:"projectKey"`
-			IssueType   string         `json:"issueType"`
-			Summary     string         `json:"summary"`
-			Description string         `json:"description"`
-			Priority    string         `json:"priority"`
-			Labels      []string       `json:"labels"`
-			TestKey     string         `json:"testKey"`
-			ExecKey     string         `json:"execKey"`
-			CreatedKey  string         `json:"createdKey"`
-			Fields      map[string]any `json:"fields"`
+			ProjectKey  string                  `json:"projectKey"`
+			IssueType   string                  `json:"issueType"`
+			Summary     string                  `json:"summary"`
+			Description string                  `json:"description"`
+			Priority    string                  `json:"priority"`
+			Labels      []string                `json:"labels"`
+			TestKey     string                  `json:"testKey"`
+			ExecKey     string                  `json:"execKey"`
+			CreatedKey  string                  `json:"createdKey"`
+			Fields      map[string]any          `json:"fields"`
+			Attempt     *testrepo.CreateAttempt `json:"createAttempt"`
 		}
 		if err := json.Unmarshal([]byte(c.AfterVal), &p); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed bug payload: " + err.Error()})
@@ -1396,7 +1399,10 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 				}
 			}
 		} else {
-			realKey, err := e.bugTarget().CreateBug(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Labels, p.Fields)
+			attempt := testrepo.CreateAttempt{Project: p.ProjectKey, Kind: backend.CreateKindIssue, IssueType: p.IssueType, Summary: p.Summary}
+			realKey, err := e.createOnce(ctx, profileID, c, e.bugTarget(), p.Attempt, attempt, func() (string, error) {
+				return e.bugTarget().CreateBug(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Labels, p.Fields)
+			})
 			if err != nil {
 				result.Failed = append(result.Failed, FailedCommit{TestKey: p.TestKey, Error: "create bug: " + sanitizeError(err.Error())})
 				continue
@@ -1470,20 +1476,24 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 func (e *Engine) commitRequirementCreates(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
 	for _, c := range rows {
 		var p struct {
-			ProjectKey  string         `json:"projectKey"`
-			IssueType   string         `json:"issueType"`
-			Summary     string         `json:"summary"`
-			Description string         `json:"description"`
-			Priority    string         `json:"priority"`
-			Components  string         `json:"components"`
-			FixVersions string         `json:"fixVersions"`
-			Fields      map[string]any `json:"fields"`
+			ProjectKey  string                  `json:"projectKey"`
+			IssueType   string                  `json:"issueType"`
+			Summary     string                  `json:"summary"`
+			Description string                  `json:"description"`
+			Priority    string                  `json:"priority"`
+			Components  string                  `json:"components"`
+			FixVersions string                  `json:"fixVersions"`
+			Fields      map[string]any          `json:"fields"`
+			Attempt     *testrepo.CreateAttempt `json:"createAttempt"`
 		}
 		if err := json.Unmarshal([]byte(c.AfterVal), &p); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed requirement payload: " + err.Error()})
 			continue
 		}
-		realKey, err := e.backend.CreateRequirement(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Components, p.FixVersions, p.Fields)
+		attempt := testrepo.CreateAttempt{Project: p.ProjectKey, Kind: backend.CreateKindIssue, IssueType: p.IssueType, Summary: p.Summary}
+		realKey, err := e.createOnce(ctx, profileID, c, e.backend, p.Attempt, attempt, func() (string, error) {
+			return e.backend.CreateRequirement(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Components, p.FixVersions, p.Fields)
+		})
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "create requirement: " + sanitizeError(err.Error())})
 			continue
@@ -1585,6 +1595,7 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 				Data     string `json:"data"`
 				Expected string `json:"expected"`
 			} `json:"steps"`
+			Attempt *testrepo.CreateAttempt `json:"createAttempt"`
 		}
 		if err := json.Unmarshal([]byte(c.AfterVal), &p); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed test payload: " + err.Error()})
@@ -1600,7 +1611,10 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 				components = append(components, s)
 			}
 		}
-		realKey, err := e.backend.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels, components, p.Fields)
+		attempt := testrepo.CreateAttempt{Project: projectKey, Kind: backend.CreateKindTest, Summary: p.Summary}
+		realKey, err := e.createOnce(ctx, profileID, c, e.backend, p.Attempt, attempt, func() (string, error) {
+			return e.backend.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels, components, p.Fields)
+		})
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "create test: " + sanitizeError(err.Error())})
 			continue
@@ -1876,11 +1890,12 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 			continue
 		}
 		var payload struct {
-			Summary     string         `json:"summary"`
-			Type        string         `json:"type"`
-			Description string         `json:"description"`
-			ProjectKey  string         `json:"projectKey"`
-			Fields      map[string]any `json:"fields"`
+			Summary     string                  `json:"summary"`
+			Type        string                  `json:"type"`
+			Description string                  `json:"description"`
+			ProjectKey  string                  `json:"projectKey"`
+			Fields      map[string]any          `json:"fields"`
+			Attempt     *testrepo.CreateAttempt `json:"createAttempt"`
 		}
 		if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
@@ -1893,7 +1908,10 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 		if pk == "" {
 			pk = projectKey
 		}
-		realKey, err := e.backend.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description, payload.Fields)
+		attempt := testrepo.CreateAttempt{Project: pk, Kind: backend.CreateKindPrecondition, Summary: payload.Summary}
+		realKey, err := e.createOnce(ctx, profileID, c, e.backend, payload.Attempt, attempt, func() (string, error) {
+			return e.backend.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description, payload.Fields)
+		})
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,
@@ -2188,15 +2206,19 @@ func (e *Engine) commitContainerEnv(ctx context.Context, c testrepo.PendingChang
 // placeholder if Jira returned none) for result reporting.
 func (e *Engine) commitContainerCreate(ctx context.Context, profileID string, c testrepo.PendingChange) (string, error) {
 	var payload struct {
-		Kind       string   `json:"kind"`
-		Summary    string   `json:"summary"`
-		ProjectKey string   `json:"projectKey"`
-		Members    []string `json:"members"`
+		Kind       string                  `json:"kind"`
+		Summary    string                  `json:"summary"`
+		ProjectKey string                  `json:"projectKey"`
+		Members    []string                `json:"members"`
+		Attempt    *testrepo.CreateAttempt `json:"createAttempt"`
 	}
 	if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
 		return c.EntityKey, fmt.Errorf("malformed container payload: %s", err)
 	}
-	realKey, err := e.backend.CreateContainer(ctx, payload.ProjectKey, payload.Kind, payload.Summary)
+	attempt := testrepo.CreateAttempt{Project: payload.ProjectKey, Kind: payload.Kind, Summary: payload.Summary}
+	realKey, err := e.createOnce(ctx, profileID, c, e.backend, payload.Attempt, attempt, func() (string, error) {
+		return e.backend.CreateContainer(ctx, payload.ProjectKey, payload.Kind, payload.Summary)
+	})
 	if err != nil {
 		return c.EntityKey, fmt.Errorf("create container: %s", sanitizeError(err.Error()))
 	}
