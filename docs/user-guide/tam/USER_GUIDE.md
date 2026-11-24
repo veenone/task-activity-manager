@@ -184,7 +184,10 @@ While Commit runs, a bar at the top of the dialog counts the changes sent so
 far against the total and names the issue it is pushing.
 
 A banner afterwards says what went, what failed and what was held back.
-Commit again to retry the failures.
+Commit again to retry the failures. When Jira answers that it is getting too
+many requests, TAM waits as long as Jira asks and sends the change again, up
+to three times and for half a minute at most, before it counts the change as
+failed.
 
 ### When Jira has moved on
 
