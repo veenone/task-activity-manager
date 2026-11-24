@@ -455,6 +455,8 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		if d.Extra == nil {
 			d.Extra = map[string]string{}
 		}
+		// Only Commit records a lost create; a new draft has sent nothing.
+		d.LostCreate = nil
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
