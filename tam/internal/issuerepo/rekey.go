@@ -2,6 +2,7 @@ package issuerepo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -138,4 +139,14 @@ func (r *Repository) MarkCreatedWithoutRekey(ctx context.Context, profileID, tem
 		return err
 	}
 	return tx.Commit()
+}
+
+// SetLostCreate records on a draft's create row that a create was sent and
+// got no answer, or clears that record when a is nil. It goes through
+// editDraft so it is the same one read and write every draft change makes,
+// and a later edit of the draft keeps it.
+func (r *Repository) SetLostCreate(ctx context.Context, profileID, key string, a *backend.CreateAttempt) error {
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		return editDraft(ctx, tx, profileID, key, func(d *backend.IssueDraft) { d.LostCreate = a })
+	})
 }

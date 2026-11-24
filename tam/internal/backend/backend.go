@@ -150,6 +150,10 @@ type IssueDraft struct {
 	ScreenFields []string `json:"screenFields"`
 
 	Extra map[string]string `json:"extra"`
+
+	// LostCreate is set by Commit when a create of this draft got no HTTP
+	// answer, so Jira may hold the issue already; see CreateAttempt.
+	LostCreate *CreateAttempt `json:"lostCreate,omitempty"`
 }
 
 // PendingMove is every board intent the journal holds for one issue, folded

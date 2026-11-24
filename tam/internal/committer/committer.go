@@ -203,14 +203,30 @@ func isDraftKey(key string) bool { return strings.HasPrefix(key, issuerepo.Draft
 
 // commitCreate posts one draft and rekeys it. A refused create blocks its
 // key, so every draft, edit, move and link naming it is held this Commit.
+// A draft whose last create got no answer is looked for first
+// (lostcreate.go), and the issue found is adopted instead of posted again.
 func (e *Engine) commitCreate(ctx context.Context, r *commitRun, createRow journal.PendingChange, d backend.IssueDraft) {
-	tempKey := createRow.EntityKey
+	if d.LostCreate != nil {
+		found, stop := e.findLostCreate(ctx, r, createRow, *d.LostCreate)
+		if stop {
+			return
+		}
+		if found != "" {
+			e.landCreate(ctx, r, createRow, found, nil)
+			return
+		}
+	}
 	realKey, leftOut, err := e.b.CreateIssue(ctx, r.projectKey, d)
 	if err != nil {
-		r.res.Failures = append(r.res.Failures, failure(tempKey, issuerepo.EntityIssueCreate, err.Error(), true))
-		r.deps.block(tempKey, tempKey, "which Jira refused")
+		e.createFailed(ctx, r, createRow.EntityKey, d, err)
 		return
 	}
+	e.landCreate(ctx, r, createRow, realKey, leftOut)
+}
+
+// landCreate rekeys a draft Jira now holds as realKey and clears its row.
+func (e *Engine) landCreate(ctx context.Context, r *commitRun, createRow journal.PendingChange, realKey string, leftOut []string) {
+	tempKey := createRow.EntityKey
 	rows := []journal.PendingChange{createRow}
 	if err := e.repo.Rekey(ctx, r.profileID, tempKey, realKey); err != nil {
 		// Jira has the issue even though the local rename failed. Clear the

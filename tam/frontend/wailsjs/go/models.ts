@@ -54,6 +54,22 @@ export namespace backend {
 	        this.restriction = source["restriction"];
 	    }
 	}
+	export class CreateAttempt {
+	    at: string;
+	    summary: string;
+	    type: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateAttempt(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.at = source["at"];
+	        this.summary = source["summary"];
+	        this.type = source["type"];
+	    }
+	}
 	export class FieldOption {
 	    id: string;
 	    value: string;
@@ -310,6 +326,7 @@ export namespace backend {
 	    sprintName: string;
 	    screenFields: string[];
 	    extra: Record<string, string>;
+	    lostCreate?: CreateAttempt;
 	
 	    static createFrom(source: any = {}) {
 	        return new IssueDraft(source);
@@ -330,7 +347,26 @@ export namespace backend {
 	        this.sprintName = source["sprintName"];
 	        this.screenFields = source["screenFields"];
 	        this.extra = source["extra"];
+	        this.lostCreate = this.convertValues(source["lostCreate"], CreateAttempt);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class IssueType {
 	    id: string;

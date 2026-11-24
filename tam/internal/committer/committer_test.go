@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +27,13 @@ type fake struct {
 	nextKey   int
 	updateErr map[string]error
 	createErr error
-	getErr    map[string]error
+	// createLost makes a create fail the way a timeout does, with no HTTP
+	// answer: "after" makes the issue first, "before" makes nothing.
+	// searches records the scope JQL of every search, which answers with
+	// every issue the fake's own user reported.
+	createLost string
+	searches   []string
+	getErr     map[string]error
 	links     []string
 	linkErr   error
 	// worklogs records "KEY started timeSpent comment" for every entry
@@ -87,8 +94,15 @@ func (f *fake) TestConnection(context.Context) (backend.User, error) {
 	return backend.User{Name: "f"}, nil
 }
 func (f *fake) IsDemo() bool { return false }
-func (f *fake) SearchIssuesPage(context.Context, string, string, string, int, int) ([]backend.Issue, int, error) {
-	return nil, 0, errors.New("not used")
+func (f *fake) SearchIssuesPage(_ context.Context, _, scopeJQL, _ string, _, _ int) ([]backend.Issue, int, error) {
+	f.searches = append(f.searches, scopeJQL)
+	var out []backend.Issue
+	for _, iss := range f.rows {
+		if iss.Reporter == "f" {
+			out = append(out, iss)
+		}
+	}
+	return out, len(out), nil
 }
 func (f *fake) IssueTypes(context.Context, string) ([]backend.IssueType, error) { return nil, nil }
 func (f *fake) CreateFields(context.Context, string, string) (backend.CreateFieldSet, error) {
@@ -157,10 +171,17 @@ func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.Issue
 	if err := f.createErrFor[d.Summary]; err != nil {
 		return "", nil, err
 	}
+	lost := &url.Error{Op: "Post", URL: "https://jira.example/rest/api/2/issue", Err: context.DeadlineExceeded}
+	if f.createLost == "before" {
+		return "", nil, lost
+	}
 	f.creates = append(f.creates, d)
 	key := fmt.Sprintf("%s-%d", projectKey, f.nextKey)
 	f.nextKey++
-	f.rows[key] = backend.Issue{Key: key, ID: "9", Project: projectKey, Type: d.Type, Summary: d.Summary, Status: "To Do", Labels: d.Labels, StoryPoints: d.StoryPoints, Updated: "2026-09-07T00:00:00Z"}
+	f.rows[key] = backend.Issue{Key: key, ID: "9", Project: projectKey, Type: d.Type, Summary: d.Summary, Reporter: "f", Status: "To Do", Labels: d.Labels, StoryPoints: d.StoryPoints, Updated: "2026-09-07T00:00:00Z"}
+	if f.createLost == "after" {
+		return "", nil, lost
+	}
 	return key, f.leftOut[d.Summary], nil
 }
 func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {

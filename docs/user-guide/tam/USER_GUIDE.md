@@ -189,6 +189,14 @@ many requests, TAM waits as long as Jira asks and sends the change again, up
 to three times and for half a minute at most, before it counts the change as
 failed.
 
+If creating a draft timed out, or the connection dropped before Jira answered,
+Jira may have made the issue anyway. The next Commit searches for an issue you
+reported since then with the same summary and type before it creates the draft
+again. If it finds exactly one, it takes that issue as the draft's key. Edits
+you made to the draft after the timeout are not applied to that issue, so check
+it. If it finds two or more, it sends nothing and names them, so you can delete
+the extra ones in Jira or discard the draft.
+
 ### When Jira has moved on
 
 If somebody changed an issue in Jira after you edited it here, Commit holds
