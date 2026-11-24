@@ -36,6 +36,8 @@ type Client struct {
 	// limiter paces every outbound request. Shared across goroutines so
 	// concurrent fetches respect one global rate.
 	limiter *rate.Limiter
+	// sleep waits before a rate-limit resend; nil is sleepCtx. Tests swap it.
+	sleep sleepFunc
 
 	// fieldMu guards fieldIDs, the per-instance cache of custom field ids by
 	// lower-cased name, filled from one /rest/api/2/field fetch.
@@ -145,14 +147,32 @@ func (c *Client) BaseURL() string { return c.baseURL }
 
 // Do sends a request after waiting for a slot from the rate limiter. It is
 // the single throttle point every helper goes through. A nil limiter is a
-// no-op so hand-built clients still work.
+// no-op so hand-built clients still work. When Jira answers that it is rate
+// limiting (see resendAfter), Do waits and sends again; each resend takes
+// its own limiter slot.
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
-	if c.limiter != nil {
-		if err := c.limiter.Wait(req.Context()); err != nil {
+	var waited time.Duration
+	for attempt := 0; ; attempt++ {
+		if c.limiter != nil {
+			if err := c.limiter.Wait(req.Context()); err != nil {
+				return nil, err
+			}
+		}
+		resp, err := c.http.Do(req)
+		if err != nil || attempt == maxResends {
+			return resp, err
+		}
+		wait, ok := resendAfter(req, resp, attempt)
+		if !ok || waited+wait > maxRetryWait {
+			return resp, nil
+		}
+		next, err := c.waitToResend(req, resp, wait)
+		if err != nil {
 			return nil, err
 		}
+		waited += wait
+		req = next
 	}
-	return c.http.Do(req)
 }
 
 // Myself fetches the authenticated user, which is the connection test.

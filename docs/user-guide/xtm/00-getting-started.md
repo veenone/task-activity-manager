@@ -96,7 +96,7 @@ When you have pending changes, a yellow **N pending** button appears in the top 
 
 3. While the commit runs, a bar at the top of the dialog counts the changes sent so far out of the total and names the key going out now. A long list takes a while, so the bar is how you know it is still moving.
 
-4. Read the result at the top of the dialog. Successful commits leave the list. Failures and conflicts stay so you can retry or discard them.
+4. Read the result at the top of the dialog. Successful commits leave the list. Failures and conflicts stay so you can retry or discard them. When Jira answers that it is getting too many requests, XTM waits as long as Jira asks and sends the change again, up to three times and for half a minute at most, before it counts the change as failed.
 
    ![The dialog after a successful commit](images/getting-started-08-committed.png)
 
