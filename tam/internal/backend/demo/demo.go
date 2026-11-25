@@ -262,6 +262,8 @@ func (b *Backend) GetIssue(_ context.Context, key string) (backend.Issue, error)
 		iss.StoryPoints = pts(13)
 		b.over[key] = iss
 	}
+	// The links, as the search row carries them (#612).
+	iss.Links = b.issueLinks(key)
 	return iss, nil
 }
 

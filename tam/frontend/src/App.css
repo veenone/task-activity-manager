@@ -1215,3 +1215,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .attachment-row { align-items: center; }
 .attachment-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attachment-save { padding: 2px 7px; font-size: var(--fs-xs); }
+
+/* The Dependencies view (#612). The graph pane is the epic tree's pane,
+   holding the shared G6 canvas, whose zoom controls float in its corner the
+   way PIE's do. */
+.deps-graph-pane { position: relative; }
+.deps-graph-pane .g6-canvas { border: none; border-radius: 0; }
+.deps-graph-pane .g6-zoom-controls { position: absolute; right: 10px; bottom: 10px; flex-direction: column; }
+.link-panel-body { display: flex; flex-direction: column; gap: 10px; }
+.new-link-modal { max-width: 480px; }

@@ -16,6 +16,7 @@ import { SprintsView } from "./components/SprintsView";
 import { ReportsView } from "./components/ReportsView";
 import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
+import { DependenciesView } from "./components/DependenciesView";
 import { FirstRun } from "./components/FirstRun";
 import { NavRail } from "./components/NavRail";
 import { PermissionNote } from "./components/PermissionNote";
@@ -275,6 +276,8 @@ export default function App() {
               <ReportsView onOpenBoards={() => setView("boards")} />
             ) : current.id === "dashboards" ? (
               <DashboardsView />
+            ) : current.id === "dependencies" ? (
+              <DependenciesView />
             ) : (
               <RitualsView />
             )

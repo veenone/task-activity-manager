@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { Graph, NodeEvent, type GraphData, type IElementEvent, type LayoutOptions } from "@antv/g6";
+import { EdgeEvent, Graph, NodeEvent, type EdgeData, type GraphData, type IElementEvent, type LayoutOptions } from "@antv/g6";
 
 // G6Canvas is the one place the suite talks to AntV G6 (#464, #465): it draws
 // the nodes, edges and groups it is given and reports a click. It moved here
@@ -32,9 +32,13 @@ export type CanvasEdge = {
   lit?: boolean;
   width?: number;
   label?: string;
+  // dashed draws a directed edge dashed, such as a link still pending a Commit.
+  dashed?: boolean;
 };
 export type CanvasCombo = { id: string; label: string; parent?: string; tone: "baseline" | "derived" | "external" };
 export type CanvasApi = { fit: () => void; relayout: () => void };
+// CanvasLayout is a G6 layout, named here so an app need not import G6 itself.
+export type CanvasLayout = LayoutOptions;
 
 // css reads a theme token when the graph draws, so it follows light and dark.
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
@@ -97,7 +101,9 @@ function data(nodes: CanvasNode[], edges: CanvasEdge[], combos: CanvasCombo[], f
         labelBackgroundFill: css("--surface"),
         labelBackgroundRadius: 4,
         labelPadding: [1, 4],
-        lineDash: e.directed ? undefined : [5, 4],
+        // An empty dash, not undefined, so an edge that stops being pending
+        // turns solid again: a redraw merges styles and keeps an old dash.
+        lineDash: e.directed && !e.dashed ? [] : [5, 4],
         endArrow: e.directed,
         opacity: e.faded ? 0.25 : 1,
       },
@@ -137,6 +143,8 @@ export default function G6Canvas({
   layout = COMBINED,
   follow = true,
   onSelect,
+  onSelectEdge,
+  onConnect,
   label,
   apiRef,
 }: {
@@ -148,6 +156,11 @@ export default function G6Canvas({
   // follow moves the camera to the focus; a flow keeps its layers in view.
   follow?: boolean;
   onSelect: (id: string) => void;
+  // onSelectEdge reports a click on an edge by its id.
+  onSelectEdge?: (id: string) => void;
+  // onConnect turns dragging a node into drawing a link to another node,
+  // reported as the pair; it replaces dragging the boxes around (#612).
+  onConnect?: (source: string, target: string) => void;
   label: string;
   apiRef?: Ref<CanvasApi>;
 }) {
@@ -165,6 +178,12 @@ export default function G6Canvas({
   // The latest handler, so the graph made once still calls the current one.
   const pick = useRef(onSelect);
   pick.current = onSelect;
+  const pickEdge = useRef(onSelectEdge);
+  pickEdge.current = onSelectEdge;
+  const connect = useRef(onConnect);
+  connect.current = onConnect;
+  // Whether the graph made once links by drag, fixed like its first layout.
+  const connectable = useRef(!!onConnect);
   // The colours come from tokens read at draw time, so a theme switch has to
   // draw again; the boxes stay where they are.
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme);
@@ -187,12 +206,29 @@ export default function G6Canvas({
       node: { type: "rect" },
       combo: { type: "rect" },
       layout: still(firstLayout.current),
-      behaviors: ["drag-canvas", "zoom-canvas", "drag-element"],
+      behaviors: [
+        "drag-canvas",
+        "zoom-canvas",
+        connectable.current
+          ? {
+              type: "create-edge",
+              trigger: "drag",
+              style: { stroke: css("--accent"), lineDash: [5, 4] },
+              // The view journals the link and redraws; returning nothing
+              // keeps G6 from adding an edge of its own.
+              onCreate: (edge: EdgeData) => {
+                connect.current?.(String(edge.source), String(edge.target));
+                return undefined;
+              },
+            }
+          : "drag-element",
+      ],
       // Two link types between the same pair bend apart instead of overlapping.
       transforms: ["process-parallel-edges"],
       plugins: [{ type: "minimap", key: "minimap", size: [150, 96], position: "left-bottom" }],
     });
     g.on(NodeEvent.CLICK, (e: IElementEvent) => pick.current(e.target.id));
+    g.on(EdgeEvent.CLICK, (e: IElementEvent) => pickEdge.current?.(e.target.id));
     graph.current = g;
     return () => {
       graph.current = null;

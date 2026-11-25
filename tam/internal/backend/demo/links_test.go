@@ -58,3 +58,19 @@ func TestDemoSearchCarriesEachLinkOnBothEnds(t *testing.T) {
 		t.Errorf("a created link shows from its far end with an id: %+v %v", made, ok)
 	}
 }
+
+// GetIssue carries the links too, as Jira's issue read does once it asks
+// for issuelinks, so Commit's read-back caches a link it just created.
+func TestDemoGetIssueCarriesTheLinks(t *testing.T) {
+	b := demobackend.New("DEMO")
+	if err := b.CreateLink(context.Background(), "DEMO-401", backend.LinkDraft{Type: "Blocks", Direction: "outward", ToKey: "DEMO-409"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	iss, err := b.GetIssue(context.Background(), "DEMO-401")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l, ok := find(iss.Links, "Blocks", "outward", "DEMO-409"); !ok || l.ID == "" {
+		t.Errorf("links = %+v, want the new Blocks link with an id", iss.Links)
+	}
+}
