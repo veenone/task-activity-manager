@@ -9,7 +9,7 @@ import { type Notice, NoticeContext, StatusBar } from "./StatusBar";
 vi.mock("../wailsjs/go/main/App", () => ({ ExpandIssue: vi.fn() }));
 
 // jsdom has no canvas, so G6 is replaced by a list of what it was given.
-vi.mock("./G6Canvas", () => ({
+vi.mock("@agile-suite/core/src/g6/G6Canvas", () => ({
   default: ({
     nodes,
     edges,

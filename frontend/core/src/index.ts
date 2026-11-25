@@ -81,3 +81,6 @@ export { parseRich, detectFormat } from "./richtext/detect";
 export { toPlainText } from "./richtext/plain";
 export { RichTextField, SyntaxToggle, RICH_TEXT_SENTENCES, FORMAT_LABEL } from "./richtext/RichTextField";
 export type { RichFormat, Block, Inline } from "./richtext/ast";
+// Types only: the canvas itself is imported lazily by path,
+// "@agile-suite/core/src/g6/G6Canvas", so G6 stays out of an app's first chunk.
+export type { CanvasApi, CanvasCombo, CanvasEdge, CanvasNode } from "./g6/G6Canvas";

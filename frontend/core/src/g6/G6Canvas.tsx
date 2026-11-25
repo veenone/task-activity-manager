@@ -1,10 +1,13 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { Graph, NodeEvent, type GraphData, type IElementEvent, type LayoutOptions } from "@antv/g6";
 
-// G6Canvas is the one place PIE talks to AntV G6 (#464, #465): it draws the
-// nodes, edges and groups it is given and reports a click. Everything about
-// what to draw lives in plain modules (graphModel, baselineData) that are
-// tested without a canvas; jsdom has none, so this stays thin.
+// G6Canvas is the one place the suite talks to AntV G6 (#464, #465): it draws
+// the nodes, edges and groups it is given and reports a click. It moved here
+// from PIE so TAM's Dependencies view draws through the same wrapper (#612).
+// What to draw lives in plain modules (PIE's graphModel, TAM's
+// dependencyGraph) tested without a canvas; jsdom has none, so this stays
+// thin. Apps import it lazily by path rather than from the core index, so G6
+// stays out of their first chunk.
 
 export type CanvasNode = {
   id: string;
@@ -250,8 +253,8 @@ export default function G6Canvas({
           {`The graph could not be drawn: ${failed}`}
         </p>
       )}
-      <div ref={box} className="pie-g6" role="img" aria-label={label} />
-      <div className="pie-zoom-controls" role="group" aria-label="Graph zoom">
+      <div ref={box} className="g6-canvas" role="img" aria-label={label} />
+      <div className="g6-zoom-controls" role="group" aria-label="Graph zoom">
         <button type="button" className="btn btn-ghost" aria-label="Zoom in" onClick={() => zoom(1.25)}>
           +
         </button>

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { query } from "../wailsjs/go/models";
-import type { CanvasNode } from "./G6Canvas";
+import type { CanvasNode } from "@agile-suite/core/src/g6/G6Canvas";
 import { FIX_STATES, type FixState, fixState } from "./mapData";
 import { LayeredFlow } from "./LayeredFlow";
 import { projectLabel } from "./linked";

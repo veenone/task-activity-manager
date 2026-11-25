@@ -6,7 +6,7 @@ import type { Edge } from "./linkData";
 import { ProjectGraphView } from "./ProjectGraphView";
 
 // jsdom has no canvas, so G6 is replaced by lists of what it was given.
-vi.mock("./G6Canvas", () => ({
+vi.mock("@agile-suite/core/src/g6/G6Canvas", () => ({
   default: ({
     nodes,
     edges,

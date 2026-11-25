@@ -1007,12 +1007,6 @@ button.pie-cov-key:focus-visible {
   font-size: var(--fs-sm);
 }
 
-.pie-zoom-controls {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
 /* The Confluence part of a profile's form (#453). */
 .pie-profile-confluence {
   display: flex;
@@ -1174,7 +1168,8 @@ button.pie-cov-key:focus-visible {
   gap: 6px;
   min-width: 0;
 }
-.pie-graph-main .pie-zoom-controls {
+/* The canvas's own box and zoom controls live in core's primitives.css. */
+.pie-graph-main .g6-zoom-controls {
   position: absolute;
   right: 10px;
   bottom: 10px;
@@ -1187,17 +1182,6 @@ button.pie-cov-key:focus-visible {
   color: var(--text-muted);
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-/* G6 places its minimap inside this box, so it must be the positioned,
-   clipped one. */
-.pie-g6 {
-  position: relative;
-  flex: 1;
-  min-height: 420px;
-  overflow: hidden;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-2);
 }
 .pie-graph-details {
   display: flex;

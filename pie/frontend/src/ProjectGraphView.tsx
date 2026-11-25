@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import type { query } from "../wailsjs/go/models";
-import type { CanvasApi } from "./G6Canvas";
+import type { CanvasApi } from "@agile-suite/core/src/g6/G6Canvas";
 import { back, countWidth, forward, type History, radialAround, visit } from "./graphModel";
 import {
   busiest,
@@ -14,7 +14,7 @@ import { ProjectInput } from "./ProjectInput";
 import { useKept } from "./viewKeep";
 
 // G6 is loaded with the view, not with the app.
-const G6Canvas = lazy(() => import("./G6Canvas"));
+const G6Canvas = lazy(() => import("@agile-suite/core/src/g6/G6Canvas"));
 
 const short = (s: string) => (s.length > 20 ? `${s.slice(0, 19)}…` : s);
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
