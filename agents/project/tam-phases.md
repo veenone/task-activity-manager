@@ -2599,6 +2599,17 @@ whose permission Jira denied are disabled. Call flow: `Engine.Sync` ->
   journals the link and G6 draws no edge of its own.
 - The demo backend seeds a short Blocks chain (`seedLinks`) and keeps links
   the way Jira does, one id seen from both ends.
+- The export goes through `App.ExportDependencies(profileID, scope, image)`.
+  The backend reads the rows itself (`ListIssuesForExport` with an empty
+  query, so issues with no link are included, plus `DependencyGraph`), and
+  `issueexport.SelectDependencies` narrows them to the scope. An empty focus
+  means the whole profile. Otherwise the scope is the chain's keys and the
+  link types it was followed through, as `chainExport` computes them on the
+  frontend. `issueexport.DependencyWorkbook` writes the Issues, Links and
+  Graph sheets with the backlog export's styles. The picture comes from
+  `graphImage` in the core G6 module, which draws on a G6 graph of its own,
+  off screen, and returns `toDataURL({ mode: "overall" })`, so the user's
+  view does not move. `DecodePNG` refuses anything that isn't a PNG data URL.
 
 ## Commands
 

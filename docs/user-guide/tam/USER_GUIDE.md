@@ -601,8 +601,12 @@ Pressing an issue lights what it waits on and what waits on it, and opens the
 issue panel. Dragging from one issue to another asks for the link's wording and
 journals the link; a **Blocks** link that would close a loop asks first.
 Pressing an arrow offers **Remove link** and **Change type to**. A link waiting
-for Commit is drawn dashed and labelled **pending** or **removal pending**. See
-[Dependencies](10-dependencies.md) for the details.
+for Commit is drawn dashed and labelled **pending** or **removal pending**.
+
+**Export chain** writes the picked issue and its chain to an Excel workbook, and
+**Export all** writes every synced issue, linked or not, with every link of every
+type, whatever the filters. Each workbook has an Issues sheet, a Links sheet and
+a picture of the graph. See [Dependencies](10-dependencies.md) for the details.
 
 ## 16. Syncing
 

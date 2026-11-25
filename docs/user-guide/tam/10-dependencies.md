@@ -46,6 +46,23 @@ A pending link offers **Discard the link** instead, and a pending removal **Keep
 
 A link cached before TAM stored link ids cannot be removed until the next sync gives it one; the panel says so.
 
+## Exporting for a report
+
+Two buttons at the right of the filter bar write an Excel workbook wherever you choose.
+
+- **Export chain** needs a picked issue. It exports that issue and the issues lit around it: what it waits on and what waits on it, through the link types chosen in the filter bar.
+- **Export all** exports every issue the profile has synced, with or without links, and every link of every type. The filters do not narrow it, so the report means the same thing whoever exports it.
+
+The workbook has three sheets:
+
+| Sheet | What it holds |
+|---|---|
+| Issues | One row per issue: its key, type, summary, status, assignee and sprint, how many issues block it, how many it blocks, how many other links it has, and the linked issues by name, such as `Blocks → PLAT-7; Relates ← PLAT-2`. An issue with no links says **No dependencies**. A chain export adds **In the chain**, which marks the picked issue **Selected** and every other row **Upstream** or **Downstream**. An issue that is not synced to this profile is listed last, with the status **Not in this profile**. |
+| Links | One row per link: the issue it comes from, its type, the issue it goes to, both summaries, and whether it is **Committed**, **Pending** or **Removal pending**. |
+| Graph | A picture of the graph. For a chain it shows the chain alone; for the whole profile it shows every linked issue. Issues with no links are in the Issues sheet but not in the picture. |
+
+Pending changes are exported as they stand, so a report taken before Commit says which links are still waiting. If the picture cannot be drawn, the workbook is still written without the Graph sheet, and the message under the filter bar says so.
+
 ## What it does not do
 
 - It does not create issues. Draft them in the [Backlog](01-backlog.md) first.
