@@ -63,10 +63,11 @@ See [`CHANGELOG.md`](../../../tam/CHANGELOG.md) for the full history.
 12. [Reports](#12-reports)
 13. [Dashboards](#13-dashboards)
 14. [Rituals](#14-rituals)
-15. [Syncing](#15-syncing)
-16. [Settings and profile management](#16-settings-and-profile-management)
-17. [Diagnostics and troubleshooting](#17-diagnostics-and-troubleshooting)
-18. [Glossary](#18-glossary)
+15. [Dependencies](#15-dependencies)
+16. [Syncing](#16-syncing)
+17. [Settings and profile management](#17-settings-and-profile-management)
+18. [Diagnostics and troubleshooting](#18-diagnostics-and-troubleshooting)
+19. [Glossary](#19-glossary)
 
 ---
 
@@ -151,7 +152,7 @@ The native menu bar carries the same things:
 | Menu | Items |
 | --- | --- |
 | **File** | Profiles…, Settings…, Sync (**Ctrl+R**), Full Sync (**Ctrl+Shift+R**), Quit (**Ctrl+Q**) |
-| **View** | The nine views (**Ctrl+1** to **Ctrl+9**, ignored while a dialog is open), and Navigation Rail (**Ctrl+\\**) |
+| **View** | The ten views (**Ctrl+1** to **Ctrl+9** and **Ctrl+0**, ignored while a dialog is open), and Navigation Rail (**Ctrl+\\**) |
 | **Help** | Diagnostics…, About |
 
 The views, in menu order: Backlog, Assigned to me, Worklog, Epics, Boards, Sprints,
@@ -587,7 +588,23 @@ Confluence**, with **Recreate on next Sync** and **Remove local copy**.
 Every ritual page lives under a root page set in the profile. Changing the root
 re-syncs straight afterwards.
 
-## 15. Syncing
+## 15. Dependencies
+
+A graph of how the project's issues wait on each other: each issue is a box and
+each link an arrow from the issue that blocks to the one it holds up, laid out
+left to right. The sync reads every issue's links, so the graph covers the whole
+cached project. It starts on Jira's **Blocks** type; the sprint, status,
+assignee and link type filters narrow it, keeping a link while either of its
+issues matches.
+
+Pressing an issue lights what it waits on and what waits on it, and opens the
+issue panel. Dragging from one issue to another asks for the link's wording and
+journals the link; a **Blocks** link that would close a loop asks first.
+Pressing an arrow offers **Remove link** and **Change type to**. A link waiting
+for Commit is drawn dashed and labelled **pending** or **removal pending**. See
+[Dependencies](10-dependencies.md) for the details.
+
+## 16. Syncing
 
 **Sync** at the right of the top bar pulls what changed since the last sync in
 one click. Also **File → Sync** or **Ctrl+R**.
@@ -618,7 +635,7 @@ in demo mode, and for a card from another project, everything stays enabled
 and Jira decides at commit. Sync again after an administrator changes your
 permissions. Column limits and creating a board are not covered.
 
-## 16. Settings and profile management
+## 17. Settings and profile management
 
 **File → Settings…** holds the **Report export folder**, where spreadsheets and
 decks are written.
@@ -635,7 +652,7 @@ Switching profiles is blocked while a sync or a commit is running.
 **More → Take the tour** walks through the view you are on; **Take the
 first-run tour** walks through the whole loop.
 
-## 17. Diagnostics and troubleshooting
+## 18. Diagnostics and troubleshooting
 
 **Help → Diagnostics** shows the database paths, the build and the recent log.
 It is the first thing to collect when something misbehaves.
@@ -650,7 +667,7 @@ It is the first thing to collect when something misbehaves.
 | Sync, Commit or Refresh is disabled | Another of them, a report rebuild or a ritual sync holds the profile's lock. |
 | The Rituals view says it cannot sync | Add the Confluence settings to the profile. |
 
-## 18. Glossary
+## 19. Glossary
 
 | Term | What it means |
 | --- | --- |
