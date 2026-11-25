@@ -10,6 +10,7 @@ import {profile} from '../models';
 import {ritualsync} from '../models';
 import {main} from '../models';
 import {issuerepo} from '../models';
+import {issueexport} from '../models';
 import {reportout} from '../models';
 import {boardrepo} from '../models';
 import {settings} from '../models';
@@ -83,6 +84,8 @@ export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:
 export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
 
 export function ExportBacklog(arg1:string,arg2:issuerepo.IssueQuery):Promise<string>;
+
+export function ExportDependencies(arg1:string,arg2:issueexport.DependencyScope,arg3:string):Promise<string>;
 
 export function ExportDiagnostics():Promise<string>;
 

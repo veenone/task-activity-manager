@@ -1302,6 +1302,27 @@ export namespace importfile {
 
 }
 
+export namespace issueexport {
+	
+	export class DependencyScope {
+	    focus: string;
+	    keys: string[];
+	    types: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DependencyScope(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.focus = source["focus"];
+	        this.keys = source["keys"];
+	        this.types = source["types"];
+	    }
+	}
+
+}
+
 export namespace issuerepo {
 	
 	export class DependencyLink {

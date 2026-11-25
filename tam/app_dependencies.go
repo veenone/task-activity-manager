@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/issueexport"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/permission"
 )
@@ -41,4 +42,38 @@ func (a *App) GetDependencyGraph(profileID string) (issuerepo.DependencyGraph, e
 		return issuerepo.DependencyGraph{}, err
 	}
 	return a.repo.DependencyGraph(a.ctx, profileID)
+}
+
+// ExportDependencies writes the Dependencies view as a workbook where the
+// user says (#612): one issue's chain, or with no focus every issue of the
+// profile, linked or not. image is the graph the view drew, as a PNG data
+// URL, or "" for none. A cancelled dialog answers "" with no error.
+func (a *App) ExportDependencies(profileID string, scope issueexport.DependencyScope, image string) (string, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return "", err
+	}
+	pic, err := issueexport.DecodePNG(image)
+	if err != nil {
+		return "", err
+	}
+	all, err := a.repo.ListIssuesForExport(a.ctx, p.ID, issuerepo.IssueQuery{})
+	if err != nil {
+		return "", err
+	}
+	g, err := a.repo.DependencyGraph(a.ctx, p.ID)
+	if err != nil {
+		return "", err
+	}
+	d := issueexport.SelectDependencies(all, g, scope)
+	d.Image = pic
+	data, err := issueexport.DependencyWorkbook(d)
+	if err != nil {
+		return "", err
+	}
+	title := p.Name
+	if scope.Focus != "" {
+		title = scope.Focus
+	}
+	return a.writeExport(dependencyExport, title, "xlsx", data)
 }

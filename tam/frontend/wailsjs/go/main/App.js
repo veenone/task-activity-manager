@@ -130,6 +130,10 @@ export function ExportBacklog(arg1, arg2) {
   return window['go']['main']['App']['ExportBacklog'](arg1, arg2);
 }
 
+export function ExportDependencies(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportDependencies'](arg1, arg2, arg3);
+}
+
 export function ExportDiagnostics() {
   return window['go']['main']['App']['ExportDiagnostics']();
 }
