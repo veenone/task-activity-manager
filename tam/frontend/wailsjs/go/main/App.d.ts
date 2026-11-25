@@ -102,6 +102,8 @@ export function GetConfluenceConfig(arg1:string):Promise<profile.ConfluenceConfi
 
 export function GetCreateFields(arg1:string,arg2:string):Promise<backend.CreateFieldSet>;
 
+export function GetDependencyGraph(arg1:string):Promise<issuerepo.DependencyGraph>;
+
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function GetEditableFields(arg1:string,arg2:string):Promise<Array<string>>;

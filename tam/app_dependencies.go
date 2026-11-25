@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/permission"
 )
 
@@ -30,4 +31,14 @@ func (a *App) RetypeLink(profileID, key string, l backend.Link, newType string) 
 		return err
 	}
 	return a.repo.RetypeLink(a.ctx, p.ID, strings.TrimSpace(key), l, newType)
+}
+
+// GetDependencyGraph returns the Dependencies view's data from the cache and
+// the journal: every link once, outward issue to inward, and the issues it
+// joins (#612).
+func (a *App) GetDependencyGraph(profileID string) (issuerepo.DependencyGraph, error) {
+	if err := a.requireStore(); err != nil {
+		return issuerepo.DependencyGraph{}, err
+	}
+	return a.repo.DependencyGraph(a.ctx, profileID)
 }

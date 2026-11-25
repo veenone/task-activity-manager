@@ -166,6 +166,10 @@ export function GetCreateFields(arg1, arg2) {
   return window['go']['main']['App']['GetCreateFields'](arg1, arg2);
 }
 
+export function GetDependencyGraph(arg1) {
+  return window['go']['main']['App']['GetDependencyGraph'](arg1);
+}
+
 export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
