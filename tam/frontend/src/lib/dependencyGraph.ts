@@ -3,11 +3,14 @@
 // handed to the shared G6 canvas. A link points from its outward issue to
 // its inward one, so "A blocks B" is an arrow from A to B and B waits on A.
 
-import type { CanvasEdge, CanvasNode } from "@agile-suite/core";
+import type { CanvasEdge, CanvasLayout, CanvasNode } from "@agile-suite/core";
 import { ASSIGNEE_NONE } from "../api";
 import type { DependencyGraph, DependencyLink, Issue } from "../api";
 
 export const BLOCKS = "Blocks";
+
+// A chain reads left to right: what an issue waits on sits to its left.
+export const DEP_LAYOUT = { type: "antv-dagre", rankdir: "LR", nodesep: 18, ranksep: 70 } as CanvasLayout;
 
 export interface DepFilter {
   types: string[];
@@ -140,4 +143,34 @@ export function canvasData(g: DependencyGraph, v: VisibleGraph, focus: string | 
     };
   });
   return { nodes, edges };
+}
+
+// DependencyScope is what the backend exports: with a focus, its chain's
+// issues and the links of types between them; with none, the whole profile.
+export interface DependencyScope {
+  focus: string;
+  keys: string[];
+  types: string[];
+}
+
+// GraphExport is an export's scope and the picture to draw for it.
+export interface GraphExport {
+  scope: DependencyScope;
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+}
+
+// chainExport is the picked issue's chain as the view lights it, drawn with
+// nothing else, so the picture holds no faded strangers.
+export function chainExport(g: DependencyGraph, v: VisibleGraph, focus: string, types: string[]): GraphExport {
+  const c = chain(v.links, focus);
+  const keys = new Set([focus, ...c.up, ...c.down]);
+  const only: VisibleGraph = { links: v.links.filter((l) => c.edges.has(edgeId(l))), keys };
+  return { scope: { focus, keys: [...keys], types }, ...canvasData(g, only, focus, "") };
+}
+
+// wholeExport is every link of every type, whatever the view's filters; the
+// issues with no link go in the workbook, not the picture.
+export function wholeExport(g: DependencyGraph): GraphExport {
+  return { scope: { focus: "", keys: [], types: [] }, ...canvasData(g, visibleGraph(g, { ...NO_DEP_FILTER, types: g.links.map((l) => l.type) }), null, "") };
 }

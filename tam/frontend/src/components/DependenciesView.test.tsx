@@ -10,6 +10,7 @@ import type { DependencyGraph, DependencyLink, Issue } from "../api";
 import { profileBackend } from "../profileBackend";
 import { ModalProvider } from "../modals";
 import { DependenciesView } from "./DependenciesView";
+import { graphImage } from "@agile-suite/core/src/g6/G6Canvas";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
@@ -35,6 +36,7 @@ vi.mock("../api", async () => {
     ListProjectTypes: vi.fn(),
     ListPriorities: vi.fn(),
     SearchUsers: vi.fn(),
+    ExportDependencies: vi.fn(),
   };
 });
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => ({ status: "idle" }) }));
@@ -57,7 +59,9 @@ vi.mock("@agile-suite/core/src/g6/G6Canvas", () => ({
       <button type="button" onClick={() => onConnect("PLAT-1", "PLAT-4")}>drag PLAT-1 to PLAT-4</button>
     </div>
   ),
+  graphImage: vi.fn(),
 }));
+const PICTURE = "data:image/png;base64,iVBORw0KGgo=";
 
 function issue(key: string, over: Partial<Issue> = {}): Issue {
   return {
@@ -121,6 +125,8 @@ beforeEach(() => {
   vi.mocked(api.ListProjectTypes).mockResolvedValue([]);
   vi.mocked(api.ListPriorities).mockResolvedValue([]);
   vi.mocked(api.SearchUsers).mockResolvedValue([]);
+  vi.mocked(api.ExportDependencies).mockResolvedValue("C:\\out\\deps.xlsx");
+  vi.mocked(graphImage).mockResolvedValue(PICTURE);
 });
 
 describe("DependenciesView (#612)", () => {
@@ -192,5 +198,61 @@ describe("DependenciesView (#612)", () => {
     vi.mocked(api.GetDependencyGraph).mockResolvedValue({ ...graph, links: [link("PLAT-1", "PLAT-2", { pending: true, pendingId: 9, id: "" })] });
     renderView();
     expect(await screen.findByRole("button", { name: "edge PLAT-1 to PLAT-2, pending" })).toBeInTheDocument();
+  });
+});
+
+describe("exporting the dependencies (#612)", () => {
+  it("exports the picked issue and its chain, with a picture of the chain alone", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const chainButton = await screen.findByRole("button", { name: "Export chain" });
+    expect(chainButton).toBeDisabled();
+    await user.click(await screen.findByRole("button", { name: "node PLAT-2" }));
+    await user.click(chainButton);
+    await waitFor(() => expect(api.ExportDependencies).toHaveBeenCalled());
+    const [profile, scope, image] = vi.mocked(api.ExportDependencies).mock.calls[0];
+    expect(profile).toBe("p1");
+    expect(scope.focus).toBe("PLAT-2");
+    expect([...scope.keys].sort()).toEqual(["PLAT-1", "PLAT-2", "PLAT-3"]);
+    expect(scope.types).toEqual(["Blocks"]);
+    expect(image).toBe(PICTURE);
+    const [nodes] = vi.mocked(graphImage).mock.calls[0];
+    expect(nodes.map((n) => n.id)).toEqual(["PLAT-1", "PLAT-2", "PLAT-3"]);
+    expect(await screen.findByText("Saved to C:\\out\\deps.xlsx")).toBeInTheDocument();
+  });
+
+  it("exports every issue and every link type whatever the filters", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("option", { name: "Done" });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "Done");
+    await user.click(screen.getByRole("button", { name: "Export all" }));
+    await waitFor(() => expect(api.ExportDependencies).toHaveBeenCalled());
+    expect(vi.mocked(api.ExportDependencies).mock.calls[0][1]).toEqual({ focus: "", keys: [], types: [] });
+    const [nodes, edges] = vi.mocked(graphImage).mock.calls[0];
+    expect(nodes.map((n) => n.id)).toEqual(["PLAT-1", "PLAT-2", "PLAT-3", "PLAT-4"]);
+    expect(edges.map((e) => e.type)).toContain("Relates");
+  });
+
+  it("still exports the workbook when the picture cannot be drawn, and says so", async () => {
+    vi.mocked(graphImage).mockRejectedValueOnce(new Error("no canvas"));
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("button", { name: "Export all" }));
+    await waitFor(() => expect(api.ExportDependencies).toHaveBeenCalled());
+    expect(vi.mocked(api.ExportDependencies).mock.calls[0][2]).toBe("");
+    expect(await screen.findByText(/without the graph picture: no canvas/)).toBeInTheDocument();
+  });
+
+  it("says when the export failed, and says nothing when the dialog was cancelled", async () => {
+    vi.mocked(api.ExportDependencies).mockRejectedValueOnce(new Error("disk full")).mockResolvedValueOnce("");
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("button", { name: "Export all" }));
+    expect(await screen.findByText("The dependencies could not be exported: disk full")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Export all" }));
+    await waitFor(() => expect(api.ExportDependencies).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/could not be exported/)).toBeNull());
+    expect(screen.queryByText(/Saved to/)).toBeNull();
   });
 });

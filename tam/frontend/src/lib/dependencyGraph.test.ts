@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DependencyGraph, DependencyLink, Issue } from "../api";
-import { NO_DEP_FILTER, canvasData, chain, closesCycle, defaultTypes, edgeId, visibleGraph } from "./dependencyGraph";
+import { NO_DEP_FILTER, canvasData, chain, chainExport, closesCycle, defaultTypes, edgeId, visibleGraph, wholeExport } from "./dependencyGraph";
 
 const issue = (key: string, over: Partial<Issue> = {}): Issue =>
   ({ key, summary: `Summary of ${key}`, type: "story", status: "To Do", statusCategory: "new", assignee: "", sprintId: "", sprintName: "", ...over }) as Issue;
@@ -81,5 +81,33 @@ describe("a blocks link that closes a cycle (#612)", () => {
     expect(closesCycle(graph.links, "C", "D")).toBe(false);
     const leaving = graph.links.map((l) => (l.outward === "B" ? { ...l, pending: true, removal: true } : l));
     expect(closesCycle(leaving, "C", "A")).toBe(false);
+  });
+});
+
+describe("what an export sends (#612)", () => {
+  it("sends a picked issue's chain alone, with the types it was followed through", () => {
+    const v = visibleGraph(graph, { ...NO_DEP_FILTER, types: ["Blocks"] });
+    const out = chainExport(graph, v, "B", ["Blocks"]);
+    expect(out.scope.focus).toBe("B");
+    expect([...out.scope.keys].sort()).toEqual(["A", "B", "C"]);
+    expect(out.scope.types).toEqual(["Blocks"]);
+    expect(out.edges.map((e) => e.id).sort()).toEqual(["A>B", "B>C"]);
+    // The picture is of the chain alone, so nothing in it is faded.
+    expect(out.nodes.some((n) => n.faded)).toBe(false);
+  });
+
+  it("follows the chain both ways and leaves out what it does not reach", () => {
+    const v = visibleGraph(graph, { ...NO_DEP_FILTER, types: ["Blocks"] });
+    // C waits on B, A through B, and OPS-9; D only relates to it.
+    expect(chainExport(graph, v, "C", ["Blocks"]).scope.keys.sort()).toEqual(["A", "B", "C", "OPS-9"]);
+    const relates = visibleGraph(graph, { ...NO_DEP_FILTER, types: ["Relates"] });
+    expect(chainExport(graph, relates, "D", ["Relates"]).scope.keys.sort()).toEqual(["C", "D"]);
+  });
+
+  it("sends the whole profile with no focus, drawing every link of every type", () => {
+    const out = wholeExport(graph);
+    expect(out.scope).toEqual({ focus: "", keys: [], types: [] });
+    expect(out.edges.map((e) => e.id)).toEqual(["A>B", "B>C", "D>C", "OPS-9>C"]);
+    expect(out.nodes.map((n) => n.id)).toEqual(["A", "B", "C", "D", "OPS-9"]);
   });
 });

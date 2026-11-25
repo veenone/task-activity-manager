@@ -135,6 +135,32 @@ const still = (l: LayoutOptions): LayoutOptions => ({ ...l, animation: false }) 
 // pass its own layout, such as a radial one around a centre.
 const COMBINED: LayoutOptions = { type: "combo-combined", spacing: 24, comboPadding: 24 };
 
+// graphImage draws nodes and edges on a graph of its own, off screen, and
+// answers with a PNG data URL of all of it. An export wants every node, not
+// the part of the canvas the user panned to, and must not move their view
+// (#612). The background is the surface, so the theme's text stays legible.
+export async function graphImage(nodes: CanvasNode[], edges: CanvasEdge[], focus: string | null, layout: LayoutOptions): Promise<string> {
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:-20000px;top:0;width:1600px;height:1000px";
+  document.body.appendChild(box);
+  const g = new Graph({
+    container: box,
+    animation: false,
+    background: css("--surface"),
+    node: { type: "rect" },
+    layout: still(layout),
+    transforms: ["process-parallel-edges"],
+  });
+  try {
+    g.setData(data(nodes, edges, NO_COMBOS, focus));
+    await g.render();
+    return await g.toDataURL({ mode: "overall", type: "image/png" });
+  } finally {
+    g.destroy();
+    box.remove();
+  }
+}
+
 export default function G6Canvas({
   nodes,
   edges,

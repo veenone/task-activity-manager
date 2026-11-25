@@ -1,6 +1,5 @@
 import { Suspense, lazy, useMemo, useState } from "react";
 import { MultiSelect, useProfile, useViewState } from "@agile-suite/core";
-import type { CanvasLayout } from "@agile-suite/core";
 import { ASSIGNEE_NONE } from "../api";
 import type { Profile, Settings } from "../api";
 import { useDependencyGraph } from "../queries/dependencies";
@@ -9,20 +8,18 @@ import { useOpenSprints } from "../queries/boards";
 import { useLinkTypes } from "../queries/pending";
 import { useDenial } from "../queries/permissions";
 import { PERM_LINK_ISSUES } from "../api/permissions";
-import { canvasData, chain, defaultTypes, edgeId, visibleGraph } from "../lib/dependencyGraph";
+import { DEP_LAYOUT, canvasData, chain, chainExport, defaultTypes, edgeId, visibleGraph, wholeExport } from "../lib/dependencyGraph";
 import { useGuardedSelect } from "../lib/unsavedEdit";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { LinkPanel } from "./LinkPanel";
 import { NewLinkDialog } from "./NewLinkDialog";
 import { useDependencyEdits } from "./useDependencyEdits";
+import { useDependencyExport } from "./useDependencyExport";
 
 // G6 is loaded with the view, not with the app, the way PIE loads it.
 const G6Canvas = lazy(() => import("@agile-suite/core/src/g6/G6Canvas"));
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-// A chain reads left to right: what an issue waits on sits to its left.
-const LAYOUT = { type: "antv-dagre", rankdir: "LR", nodesep: 18, ranksep: 70 } as CanvasLayout;
 
 // DependenciesView is the project's linked issues as a graph (#612): Blocks
 // links by default, filtered by sprint, status, assignee and link type.
@@ -45,6 +42,7 @@ export function DependenciesView() {
   const selectIssue = useGuardedSelect(selectedKey, setSelectedKey);
   const edits = useDependencyEdits(activeId, graph.data);
   const denial = useDenial(activeId);
+  const exporter = useDependencyExport(activeId);
 
   const [filtersFor, setFiltersFor] = useState(activeId);
   if (filtersFor !== activeId) {
@@ -109,7 +107,27 @@ export function DependenciesView() {
           selected={chosenTypes}
           onChange={setTypes}
         />
+        <button
+          type="button"
+          className="btn filter-export"
+          title="Export the selected issue and its dependencies"
+          disabled={!focus || !graph.data || !visible || exporter.busy}
+          onClick={() => graph.data && visible && focus && void exporter.run(chainExport(graph.data, visible, focus, chosenTypes))}
+        >
+          Export chain
+        </button>
+        <button
+          type="button"
+          className="btn filter-export"
+          title="Export every issue in the profile and how they are linked, whatever the filters"
+          disabled={!graph.data || exporter.busy}
+          onClick={() => graph.data && void exporter.run(wholeExport(graph.data))}
+        >
+          Export all
+        </button>
       </div>
+      {exporter.saved && <p className="muted small filter-note">{`Saved to ${exporter.saved}${exporter.note ? `, ${exporter.note}` : ""}`}</p>}
+      {exporter.error && <p className="error-text filter-note">The dependencies could not be exported: {exporter.error}</p>}
 
       <p className="muted epics-summary">
         {visible ? `${count(visible.keys.size, "issue")}, ${count(visible.links.length, "link")}` : ""}
@@ -132,7 +150,7 @@ export function DependenciesView() {
                 nodes={drawn.nodes}
                 edges={drawn.edges}
                 focus={focus}
-                layout={LAYOUT}
+                layout={DEP_LAYOUT}
                 onSelect={pickIssue}
                 onSelectEdge={pickLink}
                 onConnect={edits.connect}
