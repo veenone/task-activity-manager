@@ -190,6 +190,7 @@ type exportKind struct {
 var (
 	sprintReportExport = exportKind{dialogTitle: "Save the sprint report", filePrefix: "tam-report"}
 	backlogExport      = exportKind{dialogTitle: "Save the backlog", filePrefix: "tam-backlog"}
+	dependencyExport   = exportKind{dialogTitle: "Save the dependencies", filePrefix: "tam-dependencies"}
 )
 
 func (a *App) writeExport(what exportKind, title, extension string, data []byte) (string, error) {

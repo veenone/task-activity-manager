@@ -82,6 +82,7 @@ var menuViews = []struct{ id, label, accelerator string }{
 	{"reports", "Reports", "7"},
 	{"dashboards", "Dashboards", "8"},
 	{"rituals", "Rituals", "9"},
+	{"dependencies", "Dependencies", "0"},
 }
 
 // appMenu is the native menu bar, and TAM's primary navigation: the View menu

@@ -13,9 +13,14 @@ import (
 )
 
 // LinkField is the journal field of a link row: type, direction, and
-// target, so the journal's uniqueness refuses the same link twice.
+// target, so the journal's uniqueness refuses the same link twice. A
+// removal's field leads with "-|", so it never collides with an add.
 func LinkField(d backend.LinkDraft) string {
-	return d.Type + "|" + d.Direction + "|" + d.ToKey
+	field := d.Type + "|" + d.Direction + "|" + d.ToKey
+	if d.RemoveID != "" {
+		return "-|" + field
+	}
+	return field
 }
 
 // rewriteLinkTarget repoints every link whose target is from: a pending
@@ -71,8 +76,23 @@ func rewriteLinkTarget(ctx context.Context, tx *sql.Tx, profileID, from, to stri
 // be a cached issue (a draft counts), the target another key, and the same
 // link must not exist yet, cached or pending.
 func (r *Repository) AddLink(ctx context.Context, profileID, key string, d backend.LinkDraft) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := addLinkTx(ctx, tx, profileID, key, d); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// addLinkTx is AddLink inside the caller's transaction, so a retype can
+// journal its removal and its add together.
+func addLinkTx(ctx context.Context, tx *sql.Tx, profileID, key string, d backend.LinkDraft) error {
 	d.Type = strings.TrimSpace(d.Type)
 	d.ToKey = strings.TrimSpace(d.ToKey)
+	d.RemoveID = ""
 	switch {
 	case d.Type == "":
 		return errors.New("link type is empty")
@@ -87,12 +107,6 @@ func (r *Repository) AddLink(ctx context.Context, profileID, key string, d backe
 	if err != nil {
 		return fmt.Errorf("encode link: %w", err)
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
 	var exists int
 	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM issue WHERE profile_id = ? AND key = ?`, profileID, key).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
@@ -117,10 +131,7 @@ func (r *Repository) AddLink(ctx context.Context, profileID, key string, d backe
 	if err := journal.Put(tx, profileID, EntityLink, key, field, "", string(encoded), ""); err != nil {
 		return err
 	}
-	if err := journal.Audit(tx, profileID, EntityLink, key, "link", field, "", d.ToKey, ""); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return journal.Audit(tx, profileID, EntityLink, key, "link", field, "", d.ToKey, "")
 }
 
 // PendingLinks returns the links the journal holds for key, as Link rows
@@ -140,8 +151,8 @@ func (r *Repository) PendingLinks(ctx context.Context, profileID, key string) ([
 			return nil, fmt.Errorf("decode pending link %d: %w", p.ID, err)
 		}
 		links = append(links, backend.Link{
-			Direction: d.Direction, Type: d.Type, Key: d.ToKey, Summary: d.ToSummary, IssueType: d.ToType,
-			Pending: true, PendingID: p.ID,
+			ID: d.RemoveID, Direction: d.Direction, Type: d.Type, Key: d.ToKey, Summary: d.ToSummary, IssueType: d.ToType,
+			Pending: true, PendingID: p.ID, Removal: d.RemoveID != "",
 		})
 	}
 	return links, nil

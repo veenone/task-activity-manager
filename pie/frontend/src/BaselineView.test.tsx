@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { BaselineView } from "./BaselineView";
 
 // jsdom has no canvas, so G6 is replaced by lists of what it was given.
-vi.mock("./G6Canvas", () => ({
+vi.mock("@agile-suite/core/src/g6/G6Canvas", () => ({
   default: ({
     nodes,
     edges,

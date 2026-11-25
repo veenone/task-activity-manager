@@ -131,6 +131,7 @@ func (stubIssueBackend) CreateFields(context.Context, string, string) (backend.C
 func (stubIssueBackend) LinkTypes(context.Context) ([]backend.LinkType, error) {
 	return nil, errors.New("not used")
 }
+func (stubIssueBackend) DeleteLink(context.Context, string) error { return errors.New("not used") }
 func (stubIssueBackend) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
 }

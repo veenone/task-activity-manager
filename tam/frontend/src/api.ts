@@ -27,3 +27,4 @@ export * from "./api/dashboards";
 export * from "./api/worklog";
 export * from "./api/attachments";
 export * from "./api/permissions";
+export * from "./api/dependencies";

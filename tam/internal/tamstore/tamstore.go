@@ -106,7 +106,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 26,
+	Version: 27,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -428,6 +428,18 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 27,
+		// Jira's link id on issue_link, which removing a link deletes by
+		// (#612). Version 26's shape: the sync now stores every issue's
+		// links, so clearing the watermark refills them all with ids.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "issue_link", "link_id TEXT NOT NULL DEFAULT ''"); err != nil {
+				return err
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -570,6 +582,8 @@ CREATE TABLE IF NOT EXISTS issue_link (
 	direction  TEXT NOT NULL,
 	to_summary TEXT NOT NULL DEFAULT '',
 	to_type    TEXT NOT NULL DEFAULT '',
+	-- Jira's id for the link, which a removal deletes by (#612).
+	link_id    TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, from_key, to_key, link_type, direction)
 );
 CREATE TABLE IF NOT EXISTS sync_state (

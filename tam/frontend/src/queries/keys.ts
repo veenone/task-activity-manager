@@ -42,6 +42,9 @@ export const keys = {
   // because the dialog that shows them spans every issue with pending work.
   unpushableEdits: (profileId: string) => [profileId, "unpushableEdits"] as const,
   linkTypes: (profileId: string) => [profileId, "linkTypes"] as const,
+  // The Dependencies view's graph (#612): a sync stores the links it draws
+  // and a local link edit journals them, so both refresh it.
+  dependencies: (profileId: string) => [profileId, "dependencies"] as const,
   tree: (profileId: string, q: TreeQuery) => [profileId, "tree", q] as const,
   epics: (profileId: string) => [profileId, "epics"] as const,
   boards: (profileId: string) => [profileId, "boards"] as const,

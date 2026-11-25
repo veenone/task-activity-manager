@@ -18,10 +18,11 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 | [Reports](06-reports.md) | Sprint figures, charts, velocity, people, and publishing to Confluence |
 | [Dashboards](07-dashboards.md) | Saved Jira filters, counted and kept so they read offline |
 | [Rituals](08-rituals.md) | Sprint ritual pages in Confluence, and the done agreement |
+| [Dependencies](10-dependencies.md) | How issues block each other as a graph, and adding, removing and retyping links |
 
 ## Switching views
 
-Each view has a tab in the band under the top bar. The **View** menu lists the same nine with the shortcuts Ctrl+1 to Ctrl+9:
+Each view has a tab in the band under the top bar. The **View** menu lists the same ten with the shortcuts Ctrl+1 to Ctrl+9 and Ctrl+0:
 
 | Shortcut | View | Shortcut | View |
 |---|---|---|---|
@@ -29,7 +30,7 @@ Each view has a tab in the band under the top bar. The **View** menu lists the s
 | Ctrl+2 | Assigned to me | Ctrl+7 | Reports |
 | Ctrl+3 | Worklog | Ctrl+8 | Dashboards |
 | Ctrl+4 | Epics | Ctrl+9 | Rituals |
-| Ctrl+5 | Boards | | |
+| Ctrl+5 | Boards | Ctrl+0 | Dependencies |
 
 The shortcuts do nothing while a dialog is open.
 
@@ -41,7 +42,7 @@ TAM writes nothing to Jira until you press Commit. Editing a field, dragging a c
 
 Everything else in these guides assumes that loop. [Getting started](00-getting-started.md) walks through it.
 
-## One document instead of ten
+## One document instead of eleven
 
 [USER_GUIDE.md](USER_GUIDE.md) is the same material as one numbered document, which is what the PDF is built from. The pages here are the ones to read on screen and the ones to edit; the single file carries the same content for distribution.
 

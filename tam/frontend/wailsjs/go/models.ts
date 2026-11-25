@@ -174,6 +174,34 @@ export namespace backend {
 	        this.scope = source["scope"];
 	    }
 	}
+	export class Link {
+	    id: string;
+	    direction: string;
+	    type: string;
+	    key: string;
+	    summary: string;
+	    issueType: string;
+	    pending: boolean;
+	    pendingId: number;
+	    removal: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Link(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.direction = source["direction"];
+	        this.type = source["type"];
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.issueType = source["issueType"];
+	        this.pending = source["pending"];
+	        this.pendingId = source["pendingId"];
+	        this.removal = source["removal"];
+	    }
+	}
 	export class Issue {
 	    key: string;
 	    id: string;
@@ -203,6 +231,7 @@ export namespace backend {
 	    aggregateRemainingSeconds?: number;
 	    aggregateTimeSpentSeconds?: number;
 	    description?: string;
+	    links?: Link[];
 	    pending: boolean;
 	    draft: boolean;
 	
@@ -240,33 +269,28 @@ export namespace backend {
 	        this.aggregateRemainingSeconds = source["aggregateRemainingSeconds"];
 	        this.aggregateTimeSpentSeconds = source["aggregateTimeSpentSeconds"];
 	        this.description = source["description"];
+	        this.links = this.convertValues(source["links"], Link);
 	        this.pending = source["pending"];
 	        this.draft = source["draft"];
 	    }
-	}
-	export class Link {
-	    direction: string;
-	    type: string;
-	    key: string;
-	    summary: string;
-	    issueType: string;
-	    pending: boolean;
-	    pendingId: number;
 	
-	    static createFrom(source: any = {}) {
-	        return new Link(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.direction = source["direction"];
-	        this.type = source["type"];
-	        this.key = source["key"];
-	        this.summary = source["summary"];
-	        this.issueType = source["issueType"];
-	        this.pending = source["pending"];
-	        this.pendingId = source["pendingId"];
-	    }
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class IssueDetail {
 	    key: string;
@@ -409,6 +433,7 @@ export namespace backend {
 	    toKey: string;
 	    toSummary: string;
 	    toType: string;
+	    removeId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new LinkDraft(source);
@@ -421,6 +446,7 @@ export namespace backend {
 	        this.toKey = source["toKey"];
 	        this.toSummary = source["toSummary"];
 	        this.toType = source["toType"];
+	        this.removeId = source["removeId"];
 	    }
 	}
 	export class LinkType {
@@ -962,6 +988,7 @@ export namespace committer {
 	    key: string;
 	    toKey: string;
 	    type: string;
+	    removed: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Linked(source);
@@ -972,6 +999,7 @@ export namespace committer {
 	        this.key = source["key"];
 	        this.toKey = source["toKey"];
 	        this.type = source["type"];
+	        this.removed = source["removed"];
 	    }
 	}
 	export class Logged {
@@ -1274,7 +1302,107 @@ export namespace importfile {
 
 }
 
+export namespace issueexport {
+	
+	export class DependencyScope {
+	    focus: string;
+	    keys: string[];
+	    types: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DependencyScope(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.focus = source["focus"];
+	        this.keys = source["keys"];
+	        this.types = source["types"];
+	    }
+	}
+
+}
+
 export namespace issuerepo {
+	
+	export class DependencyLink {
+	    id: string;
+	    type: string;
+	    outward: string;
+	    inward: string;
+	    owner: string;
+	    direction: string;
+	    pending: boolean;
+	    pendingId: number;
+	    removal: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DependencyLink(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.outward = source["outward"];
+	        this.inward = source["inward"];
+	        this.owner = source["owner"];
+	        this.direction = source["direction"];
+	        this.pending = source["pending"];
+	        this.pendingId = source["pendingId"];
+	        this.removal = source["removal"];
+	    }
+	}
+	export class ExternalIssue {
+	    key: string;
+	    summary: string;
+	    issueType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExternalIssue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.issueType = source["issueType"];
+	    }
+	}
+	export class DependencyGraph {
+	    issues: backend.Issue[];
+	    external: ExternalIssue[];
+	    links: DependencyLink[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DependencyGraph(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.issues = this.convertValues(source["issues"], backend.Issue);
+	        this.external = this.convertValues(source["external"], ExternalIssue);
+	        this.links = this.convertValues(source["links"], DependencyLink);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class EpicNode {
 	    issue: backend.Issue;
@@ -1316,6 +1444,7 @@ export namespace issuerepo {
 		    return a;
 		}
 	}
+	
 	export class FilterOptions {
 	    statuses: string[];
 	    assignees: string[];

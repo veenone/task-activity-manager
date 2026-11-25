@@ -7,12 +7,12 @@ import {
   useState,
 } from "react";
 import type { LayoutOptions } from "@antv/g6";
-import type { CanvasApi, CanvasNode } from "./G6Canvas";
+import type { CanvasApi, CanvasNode } from "@agile-suite/core/src/g6/G6Canvas";
 import { countWidth } from "./graphModel";
 import { type FlowPath, layered } from "./flowLayers";
 
 // G6 is loaded with the view, not with the app.
-const G6Canvas = lazy(() => import("./G6Canvas"));
+const G6Canvas = lazy(() => import("@agile-suite/core/src/g6/G6Canvas"));
 
 // Layers run left to right, a box's paths into and out of it straight across.
 const LAYERS: LayoutOptions = {

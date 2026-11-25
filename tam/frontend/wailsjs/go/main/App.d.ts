@@ -10,6 +10,7 @@ import {profile} from '../models';
 import {ritualsync} from '../models';
 import {main} from '../models';
 import {issuerepo} from '../models';
+import {issueexport} from '../models';
 import {reportout} from '../models';
 import {boardrepo} from '../models';
 import {settings} from '../models';
@@ -84,6 +85,8 @@ export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise
 
 export function ExportBacklog(arg1:string,arg2:issuerepo.IssueQuery):Promise<string>;
 
+export function ExportDependencies(arg1:string,arg2:issueexport.DependencyScope,arg3:string):Promise<string>;
+
 export function ExportDiagnostics():Promise<string>;
 
 export function ExportProfile(arg1:string):Promise<string>;
@@ -101,6 +104,8 @@ export function GetCachedIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 export function GetConfluenceConfig(arg1:string):Promise<profile.ConfluenceConfig>;
 
 export function GetCreateFields(arg1:string,arg2:string):Promise<backend.CreateFieldSet>;
+
+export function GetDependencyGraph(arg1:string):Promise<issuerepo.DependencyGraph>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
@@ -200,11 +205,15 @@ export function RefreshDashboard(arg1:string,arg2:string):Promise<dashboardrepo.
 
 export function RefreshDetails(arg1:string):Promise<void>;
 
+export function RemoveLink(arg1:string,arg2:string,arg3:backend.Link):Promise<void>;
+
 export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ResolveRitualConflict(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<void>;
+
+export function RetypeLink(arg1:string,arg2:string,arg3:backend.Link,arg4:string):Promise<void>;
 
 export function RitualMacroIssues(arg1:string,arg2:string):Promise<main.RitualMacroPreview>;
 

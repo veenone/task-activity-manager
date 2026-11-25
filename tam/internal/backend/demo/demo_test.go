@@ -185,7 +185,8 @@ func TestDemoBackendDetailAndTypes(t *testing.T) {
 	b := demobackend.New("DEMO")
 	ctx := context.Background()
 	d, err := b.GetIssueDetail(ctx, "DEMO-412")
-	if err != nil || len(d.Links) != 3 {
+	// Three curated links and the two Blocks links of the seeded chain (#612).
+	if err != nil || len(d.Links) != 5 {
 		t.Errorf("detail = %+v, %v", d, err)
 	}
 	if len(d.Comments) != 2 || d.CommentTotal != 2 || d.CommentsTruncated {

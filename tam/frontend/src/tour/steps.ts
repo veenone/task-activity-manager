@@ -102,6 +102,10 @@ const VIEW_WORDS: Record<string, { purpose: string; body: string }> = {
     purpose: "The numbers behind one of your saved Jira filters, counted and kept so they read with Jira unreachable.",
     body: "Each panel is one filter. Refresh re-runs it; the stamp says how old the figures are.",
   },
+  dependencies: {
+    purpose: "How the project's issues wait on each other: each arrow runs from an issue to the one it blocks.",
+    body: "Pick an issue to light its chain. Drag from one issue to another to link them; the link is journaled and reaches Jira on Commit.",
+  },
   rituals: {
     purpose: "The team's standing documents, edited here and synced to Confluence.",
     body: "The document you are editing is local until it is synced, the same way an issue edit is.",
