@@ -102,6 +102,11 @@ type Issue struct {
 	// that TAM has never looked.
 	Description *string `json:"description"`
 
+	// Links are the issue's links as the sync read them, stored so the
+	// Dependencies view covers every cached issue (#612). nil when the
+	// response did not carry the field, which leaves the cached links alone.
+	Links []Link `json:"links"`
+
 	// Pending and Draft are computed by the repository's reads, never
 	// stored: Pending says the journal holds a change for this key, Draft
 	// says the key is a local placeholder Commit has not yet created.
@@ -289,6 +294,9 @@ type LinkDraft struct {
 
 // Link is one issue link seen from the issue that owns it.
 type Link struct {
+	// ID is Jira's id for the link, which a removal deletes by. Empty for a
+	// pending link and for one cached before schema 27.
+	ID        string `json:"id"`
 	Direction string `json:"direction"` // "outward" or "inward"
 	Type      string `json:"type"`      // the Jira link type name, e.g. "Tested By"
 	Key       string `json:"key"`       // the other issue

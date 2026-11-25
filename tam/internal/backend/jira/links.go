@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"agile-suite/tam/internal/backend"
@@ -59,4 +60,38 @@ func (b *Backend) CreateLink(ctx context.Context, fromKey string, d backend.Link
 		"outwardIssue": map[string]string{"key": outward},
 	}
 	return b.c.Post(ctx, "/rest/api/2/issueLink", body)
+}
+
+// parseLinks flattens Jira's issuelinks array: each entry names the link
+// type and carries either an inwardIssue or an outwardIssue.
+func parseLinks(raw json.RawMessage) []backend.Link {
+	out := []backend.Link{}
+	if len(raw) == 0 {
+		return out
+	}
+	type linked struct {
+		Key    string `json:"key"`
+		Fields struct {
+			Summary   string `json:"summary"`
+			IssueType named  `json:"issuetype"`
+		} `json:"fields"`
+	}
+	var entries []struct {
+		ID      string  `json:"id"`
+		Type    named   `json:"type"`
+		Inward  *linked `json:"inwardIssue"`
+		Outward *linked `json:"outwardIssue"`
+	}
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		return out
+	}
+	for _, e := range entries {
+		if e.Inward != nil {
+			out = append(out, backend.Link{ID: e.ID, Direction: "inward", Type: e.Type.Name, Key: e.Inward.Key, Summary: e.Inward.Fields.Summary, IssueType: e.Inward.Fields.IssueType.Name})
+		}
+		if e.Outward != nil {
+			out = append(out, backend.Link{ID: e.ID, Direction: "outward", Type: e.Type.Name, Key: e.Outward.Key, Summary: e.Outward.Fields.Summary, IssueType: e.Outward.Fields.IssueType.Name})
+		}
+	}
+	return out
 }
