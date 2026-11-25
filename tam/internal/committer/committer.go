@@ -86,11 +86,13 @@ func failure(key, entityType, message string, retryable bool) Failure {
 	return Failure{Key: key, EntityType: entityType, Error: message, Retryable: retryable, Reachable: []string{}}
 }
 
-// Linked is a link Commit created.
+// Linked is a link Commit created, or deleted when Removed is set.
 type Linked struct {
 	Key   string `json:"key"`
 	ToKey string `json:"toKey"`
 	Type  string `json:"type"`
+	// Removed says the link was deleted rather than created (#612).
+	Removed bool `json:"removed"`
 }
 
 // Result is what one Commit did. Held are the rows it did not send because
@@ -298,7 +300,7 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 	res.Committed = append(res.Committed, key)
 }
 
-// commitLinks pushes every link row, read fresh so a link added from or to
+// commitLinks pushes every link row, an add or a removal (#612), read fresh so a link added from or to
 // a draft carries the key the create pass gave it. A row whose source or
 // target is a draft this Commit could not create is held; one whose target
 // is a draft nothing in this Commit knows fails, since no retry creates it;
@@ -341,18 +343,34 @@ func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result,
 			res.Failures = append(res.Failures, linkFailure(p, err.Error(), false))
 			continue
 		}
-		if err := e.b.CreateLink(ctx, p.EntityKey, d); err != nil {
+		removal := d.RemoveID != ""
+		push := func() error { return e.b.CreateLink(ctx, p.EntityKey, d) }
+		if removal {
+			push = func() error { return e.b.DeleteLink(ctx, d.RemoveID) }
+		}
+		if err := push(); err != nil {
 			res.Failures = append(res.Failures, linkFailure(p, err.Error(), true))
 			continue
 		}
 		if err := e.repo.MarkCommitted(ctx, profileID, []journal.PendingChange{p}); err != nil {
-			res.Failures = append(res.Failures, linkFailure(p, "linked in Jira but the journal could not be cleared: "+err.Error(), true))
+			res.Failures = append(res.Failures, linkFailure(p, "sent to Jira but the journal could not be cleared: "+err.Error(), true))
 			continue
 		}
 		if err := e.repo.ClearDetail(ctx, profileID, p.EntityKey); err != nil {
 			log.Printf("tam: clear detail for %s after a link push: %v", p.EntityKey, err)
 		}
-		res.Linked = append(res.Linked, Linked{Key: p.EntityKey, ToKey: d.ToKey, Type: d.Type})
+		// The cache follows Jira at once, so the Dependencies view does not
+		// wait for a sync (#612): a deleted link leaves both ends, and the
+		// source of a created one is read back, which caches the new link
+		// with the id Jira gave it.
+		if removal {
+			if err := e.repo.DropCachedLink(ctx, profileID, d.RemoveID); err != nil {
+				log.Printf("tam: drop cached link %s after its delete: %v", d.RemoveID, err)
+			}
+		} else {
+			e.refresh(ctx, profileID, p.EntityKey)
+		}
+		res.Linked = append(res.Linked, Linked{Key: p.EntityKey, ToKey: d.ToKey, Type: d.Type, Removed: removal})
 	}
 }
 

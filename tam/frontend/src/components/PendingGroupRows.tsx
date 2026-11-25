@@ -135,8 +135,8 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
 
   const lines: Line[] = [
     ...g.links.map(({ row, link }) => ({
-      row, field: "Link", before: "", after: `${link.type} (${link.direction}) ${link.toKey} ${link.toSummary}`,
-      discardLabel: `Discard link to ${link.toKey}`,
+      row, field: link.removeId ? "Remove link" : "Link", before: "", after: `${link.type} (${link.direction}) ${link.toKey} ${link.toSummary}`,
+      discardLabel: link.removeId ? `Discard the removal of the link to ${link.toKey}` : `Discard link to ${link.toKey}`,
     })),
     ...g.worklogs.map(({ row, log }) => ({
       row, field: "Work log", before: "", after: worklogEntryLine(log),

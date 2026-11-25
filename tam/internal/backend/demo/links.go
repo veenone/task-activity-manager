@@ -125,3 +125,17 @@ func (b *Backend) CreateLink(_ context.Context, fromKey string, d backend.LinkDr
 	b.links = append(b.links, demoLink{id: strconv.Itoa(b.nextLink), typ: d.Type, outward: b.canonical(outward), inward: b.canonical(inward)})
 	return nil
 }
+
+// DeleteLink drops the link with the id, seeded or created this run, so
+// neither end shows it from now on.
+func (b *Backend) DeleteLink(_ context.Context, id string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for i, l := range b.links {
+		if l.id == id {
+			b.links = append(b.links[:i], b.links[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("demo: no link %s", id)
+}

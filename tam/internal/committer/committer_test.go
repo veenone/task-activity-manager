@@ -35,6 +35,7 @@ type fake struct {
 	searches   []string
 	getErr     map[string]error
 	links     []string
+	unlinked  []string
 	linkErr   error
 	// worklogs records "KEY started timeSpent comment" for every entry
 	// pushed, and worklogErr refuses the ones for the keys it names.
@@ -634,4 +635,13 @@ func TestCommitReportsTheFieldsACreateLeftOut(t *testing.T) {
 	if got := res.Created[0].LeftOut; len(got) != 1 || got[0] != "Team (customfield_10253)" {
 		t.Errorf("leftOut = %+v, want the field the create did not send", got)
 	}
+}
+
+// DeleteLink records the id of every link deleted (#612).
+func (f *fake) DeleteLink(_ context.Context, id string) error {
+	if f.linkErr != nil {
+		return f.linkErr
+	}
+	f.unlinked = append(f.unlinked, id)
+	return nil
 }

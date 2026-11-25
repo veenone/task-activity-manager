@@ -15,15 +15,20 @@ interface Props {
 // first, rather than by whether a field is set.
 export function describe(a: AuditEntry): string {
   if (a.entityType === "link") {
-    const [type = "", direction = "", key = ""] = a.field.split("|");
+    // A removal's field leads with "-|" (#612).
+    const removal = a.field.startsWith("-|");
+    const [type = "", direction = "", key = ""] = (removal ? a.field.slice(2) : a.field).split("|");
     const what = `${type} (${direction}) to ${key}`;
+    const link = removal ? "the removal of the link" : "the link";
     switch (a.action) {
       case "link":
         return `${a.actor} added a link: ${what}`;
+      case "unlink":
+        return `${a.actor} removed a link: ${what}`;
       case "commit":
-        return `${a.actor} pushed the link ${what}`;
+        return `${a.actor} pushed ${link} ${what}`;
       case "discard":
-        return `${a.actor} discarded the link ${what}`;
+        return `${a.actor} discarded ${link} ${what}`;
     }
   }
   if (isMoveEntity(a.entityType)) {

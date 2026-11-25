@@ -75,6 +75,12 @@ func (r *Repository) ReplaceRow(ctx context.Context, profileID string, iss backe
 	if err := upsertIssue(ctx, tx, profileID, iss, time.Now()); err != nil {
 		return err
 	}
+	// The row's links too, as a sync page stores them (#612).
+	if iss.Links != nil {
+		if err := replaceLinks(ctx, tx, profileID, iss.Key, iss.Links); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE issue SET detail_json = NULL, detail_fetched_at = NULL WHERE profile_id = ? AND key = ?`,
 		profileID, iss.Key); err != nil {

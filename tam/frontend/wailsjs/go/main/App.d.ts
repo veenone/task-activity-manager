@@ -200,11 +200,15 @@ export function RefreshDashboard(arg1:string,arg2:string):Promise<dashboardrepo.
 
 export function RefreshDetails(arg1:string):Promise<void>;
 
+export function RemoveLink(arg1:string,arg2:string,arg3:backend.Link):Promise<void>;
+
 export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ResolveRitualConflict(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<void>;
+
+export function RetypeLink(arg1:string,arg2:string,arg3:backend.Link,arg4:string):Promise<void>;
 
 export function RitualMacroIssues(arg1:string,arg2:string):Promise<main.RitualMacroPreview>;
 

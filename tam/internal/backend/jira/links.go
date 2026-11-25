@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -94,4 +95,9 @@ func parseLinks(raw json.RawMessage) []backend.Link {
 		}
 	}
 	return out
+}
+
+// DeleteLink deletes the link with Jira's id (#612).
+func (b *Backend) DeleteLink(ctx context.Context, id string) error {
+	return b.c.Delete(ctx, "/rest/api/2/issueLink/"+url.PathEscape(id))
 }

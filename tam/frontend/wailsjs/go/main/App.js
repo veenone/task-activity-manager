@@ -362,6 +362,10 @@ export function RefreshDetails(arg1) {
   return window['go']['main']['App']['RefreshDetails'](arg1);
 }
 
+export function RemoveLink(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RemoveLink'](arg1, arg2, arg3);
+}
+
 export function ResolveConflictKeepRemote(arg1, arg2) {
   return window['go']['main']['App']['ResolveConflictKeepRemote'](arg1, arg2);
 }
@@ -372,6 +376,10 @@ export function ResolveConflictOverride(arg1, arg2, arg3) {
 
 export function ResolveRitualConflict(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['ResolveRitualConflict'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function RetypeLink(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RetypeLink'](arg1, arg2, arg3, arg4);
 }
 
 export function RitualMacroIssues(arg1, arg2) {

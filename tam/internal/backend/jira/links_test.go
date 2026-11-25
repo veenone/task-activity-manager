@@ -43,3 +43,14 @@ func TestCreateLinkPutsTheSourceOnTheRightSide(t *testing.T) {
 		t.Error("bad direction must be refused before any request")
 	}
 }
+
+// A removal deletes the link by the id the sync stored (#612).
+func TestDeleteLinkDeletesByJirasID(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	if err := b.DeleteLink(context.Background(), "10431"); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.writes) != 1 || f.writes[0] != "DELETE /rest/api/2/issueLink/10431 " {
+		t.Errorf("writes = %q", f.writes)
+	}
+}
