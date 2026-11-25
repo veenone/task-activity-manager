@@ -66,12 +66,23 @@ func findPlaceholder(v any, path string, negRef bool) (string, bool) {
 		sort.Strings(keys)
 		for _, k := range keys {
 			lower := strings.ToLower(k)
-			if where, found := findPlaceholder(t[k], path+"."+k, strings.Contains(lower, "sprint") || strings.Contains(lower, "board")); found {
+			if where, found := findPlaceholder(t[k], path+"."+k, negativeRefKey(lower)); found {
 				return where, true
 			}
 		}
 	}
 	return "", false
+}
+
+// negativeRefKey says a payload key names something whose drafts carry a
+// negative id: a sprint, a board, a release (a fix version) or a component.
+func negativeRefKey(lower string) bool {
+	for _, word := range []string{"sprint", "board", "version", "component"} {
+		if strings.Contains(lower, word) {
+			return true
+		}
+	}
+	return false
 }
 
 func negativeWhole(s string) bool {

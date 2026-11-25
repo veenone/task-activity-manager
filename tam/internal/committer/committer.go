@@ -284,6 +284,19 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 	if parent, edited := fields["parentKey"]; edited {
 		refs["parentKey"] = parent
 	}
+	// Components and fix versions name catalog ids, where a draft is a
+	// negative number. Nothing creates those drafts yet, so one here is
+	// refused, not held.
+	for _, name := range []string{"components", "fixVersions"} {
+		if v, edited := fields[name]; edited {
+			ids, err := backend.ParseIDs(v)
+			if err != nil {
+				res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, err.Error(), false))
+				return
+			}
+			refs[name] = ids
+		}
+	}
 	if err := assertNoPlaceholders(refs); err != nil {
 		res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, err.Error(), false))
 		return

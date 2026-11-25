@@ -15,12 +15,13 @@ import (
 
 // EditableFields are the fields EditField accepts, in the order the panel
 // shows them. Their names are the JSON names on backend.Issue.
-var EditableFields = []string{"summary", "description", "priority", "labels", "storyPoints", "assignee", "parentKey"}
+var EditableFields = []string{"summary", "description", "priority", "labels", "storyPoints", "assignee", "parentKey", "components", "fixVersions"}
 
 // fieldColumns maps a field name to its issue column.
 var fieldColumns = map[string]string{
 	"summary": "summary", "description": "description", "priority": "priority",
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee", "parentKey": "parent_key",
+	"components": "components", "fixVersions": "fix_versions",
 }
 
 // draftTypes are the logical types a draft may have whatever the project
@@ -58,6 +59,10 @@ func FieldValue(iss backend.Issue, field string) string {
 		return backend.FormatPoints(iss.StoryPoints)
 	case "parentKey":
 		return iss.ParentKey
+	case "components":
+		return backend.FormatIDs(iss.Components)
+	case "fixVersions":
+		return backend.FormatIDs(iss.FixVersions)
 	}
 	return ""
 }
@@ -75,6 +80,10 @@ func validateField(field, value string) error {
 		if _, err := backend.ParsePoints(value); err != nil {
 			return err
 		}
+	case "components", "fixVersions":
+		if _, err := backend.ParseIDs(value); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -88,10 +97,12 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 		labels      string
 		points      sql.NullFloat64
 		description sql.NullString
+		components  string
+		fixVersions string
 	)
 	err = q.QueryRowContext(ctx,
-		`SELECT summary, priority, assignee, assignee_name, labels, story_points, description, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
-		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &iss.AssigneeName, &labels, &points, &description, &updated, &iss.ParentKey, &iss.Type)
+		`SELECT summary, priority, assignee, assignee_name, labels, story_points, description, updated, parent_key, type, components, fix_versions FROM issue WHERE profile_id = ? AND key = ?`,
+		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &iss.AssigneeName, &labels, &points, &description, &updated, &iss.ParentKey, &iss.Type, &components, &fixVersions)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", "", ErrNotFound
 	}
@@ -99,6 +110,9 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 		return "", "", "", fmt.Errorf("read %s: %w", key, err)
 	}
 	_ = json.Unmarshal([]byte(labels), &iss.Labels)
+	if err := decodeCatalogIDs(&iss, components, fixVersions); err != nil {
+		return "", "", "", err
+	}
 	if points.Valid {
 		v := points.Float64
 		iss.StoryPoints = &v
@@ -167,6 +181,8 @@ func validateParent(ctx context.Context, q execer, profileID, key, ownType, valu
 // writeField stores the text form of a field on the row.
 func writeField(ctx context.Context, q execer, profileID, key, field, value string) error {
 	switch field {
+	case "components", "fixVersions":
+		return writeCatalogField(ctx, q, profileID, key, field, value)
 	case "labels":
 		encoded, _ := json.Marshal(backend.SplitLabels(value))
 		_, err := q.ExecContext(ctx, `UPDATE issue SET labels = ? WHERE profile_id = ? AND key = ?`, string(encoded), profileID, key)
@@ -274,6 +290,7 @@ func (r *Repository) EditField(ctx context.Context, profileID, key, field, value
 	if field == "parentKey" {
 		value = strings.TrimSpace(value)
 	}
+	value = normalizeCatalogValue(field, value)
 	if current == value {
 		return nil
 	}
@@ -281,6 +298,9 @@ func (r *Repository) EditField(ctx context.Context, profileID, key, field, value
 		if err := validateParent(ctx, tx, profileID, key, ownType, value); err != nil {
 			return err
 		}
+	}
+	if err := checkCatalogIDs(ctx, tx, profileID, field, current, value); err != nil {
+		return err
 	}
 	if err := writeField(ctx, tx, profileID, key, field, value); err != nil {
 		return err
@@ -343,8 +363,12 @@ func (r *Repository) EditFields(ctx context.Context, profileID string, edits []E
 				return nil, fmt.Errorf("%s: %w", e.Key, err)
 			}
 		}
+		value = normalizeCatalogValue(e.Field, value)
 		if current == value {
 			continue
+		}
+		if err := checkCatalogIDs(ctx, tx, profileID, e.Field, current, value); err != nil {
+			return nil, fmt.Errorf("%s: %w", e.Key, err)
 		}
 		if err := writeField(ctx, tx, profileID, e.Key, e.Field, value); err != nil {
 			return nil, err

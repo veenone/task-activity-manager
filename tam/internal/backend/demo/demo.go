@@ -274,7 +274,7 @@ func pts(v float64) *float64 { return &v }
 // a fixed answer rather than demo data because a screen is a Jira
 // configuration, not something a demo dataset can pretend to have.
 func (b *Backend) EditableFields(context.Context, string) ([]string, error) {
-	return []string{"assignee", "description", "labels", "parentKey", "priority", "storyPoints", "summary"}, nil
+	return []string{"assignee", "components", "description", "fixVersions", "labels", "parentKey", "priority", "storyPoints", "summary"}, nil
 }
 
 func (b *Backend) UpdateIssue(_ context.Context, key string, fields map[string]string) error {
@@ -304,6 +304,16 @@ func (b *Backend) UpdateIssue(_ context.Context, key string, fields map[string]s
 			b.desc[key] = v
 		case "parentKey":
 			iss.ParentKey = v
+		case "components", "fixVersions":
+			ids, err := backend.ParseIDs(v)
+			if err != nil {
+				return err
+			}
+			if name == "components" {
+				iss.Components = ids
+			} else {
+				iss.FixVersions = ids
+			}
 		default:
 			return fmt.Errorf("field %q cannot be sent to Jira", name)
 		}
