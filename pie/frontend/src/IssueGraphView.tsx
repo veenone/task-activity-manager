@@ -2,7 +2,7 @@ import { lazy, Suspense, useContext, useMemo, useRef, useState } from "react";
 import { ExpandIssue } from "../wailsjs/go/main/App";
 import type { query } from "../wailsjs/go/models";
 import { BrowserOpenURL } from "../wailsjs/runtime/runtime";
-import type { CanvasApi } from "./G6Canvas";
+import type { CanvasApi } from "@agile-suite/core/src/g6/G6Canvas";
 import {
   add,
   back,
@@ -27,7 +27,7 @@ import { useKept } from "./viewKeep";
 
 // G6 is loaded with the view, not with the app, so it costs nothing until
 // someone opens the issue graph.
-const G6Canvas = lazy(() => import("./G6Canvas"));
+const G6Canvas = lazy(() => import("@agile-suite/core/src/g6/G6Canvas"));
 
 const OFFLINE =
   "Offline: Jira cannot be reached, so the graph shows the issues stored on this computer. Run, Refresh links and Publish need Jira.";

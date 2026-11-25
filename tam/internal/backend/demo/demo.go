@@ -30,7 +30,10 @@ type Backend struct {
 	desc     map[string]string
 	nextKey  int
 	conflict map[string]bool
-	links    map[string][]backend.Link
+	// links are the seeded Blocks chain in links.go and every link created
+	// this run; nextLink is the id the last created one took.
+	links    []demoLink
+	nextLink int
 	// worklogs holds the entries keyed by issue: the closed sprint's sample
 	// (demo.SampleWorklogs), which the reports' time figures are drawn from,
 	// plus whatever a Commit pushed this run. Only Sprint 11 is seeded.
@@ -86,7 +89,8 @@ func New(projectKey string) *Backend {
 		desc:          map[string]string{},
 		nextKey:       500,
 		conflict:      map[string]bool{},
-		links:         map[string][]backend.Link{},
+		links:         seedLinks(),
+		nextLink:      20100,
 		worklogs:      demo.SampleWorklogs(demo.Issues(projectKey)),
 		sprintState:   map[int]string{},
 		sprintDraft:   map[int]backend.SprintDraft{},
@@ -170,7 +174,12 @@ func (b *Backend) SearchIssuesPage(_ context.Context, _, scopeJQL, _ string, sta
 	if end > total {
 		end = total
 	}
-	return all[startAt:end], total, nil
+	page := all[startAt:end]
+	// Each row carries its links, as Jira's does once the sync asks (#612).
+	for i := range page {
+		page[i].Links = b.issueLinks(page[i].Key)
+	}
+	return page, total, nil
 }
 
 // sprintScope reads a "sprint = N" query, the one narrowing the demo
@@ -208,7 +217,7 @@ func (b *Backend) GetIssueDetail(_ context.Context, key string) (backend.IssueDe
 	if desc, ok := b.desc[key]; ok {
 		d.Description = desc
 	}
-	d.Links = append(d.Links, b.links[key]...)
+	d.Links = append(d.Links, b.dependencyLinks(key)...)
 	return d, nil
 }
 
@@ -253,6 +262,8 @@ func (b *Backend) GetIssue(_ context.Context, key string) (backend.Issue, error)
 		iss.StoryPoints = pts(13)
 		b.over[key] = iss
 	}
+	// The links, as the search row carries them (#612).
+	iss.Links = b.issueLinks(key)
 	return iss, nil
 }
 
@@ -368,31 +379,4 @@ func (b *Backend) CreateFields(_ context.Context, _, logicalType string) (backen
 // screen, so More fields never has to be explained away offline.
 func demoFields(specs []backend.FieldSpec) (backend.CreateFieldSet, error) {
 	return backend.CreateFieldSet{Fields: specs, ScreenKnown: true}, nil
-}
-
-// demoLinkTypes are the three link types the demo defines.
-var demoLinkTypes = []backend.LinkType{
-	{Name: "Relates", Inward: "relates to", Outward: "relates to"},
-	{Name: "Blocks", Inward: "is blocked by", Outward: "blocks"},
-	{Name: "Tested By", Inward: "is tested by", Outward: "tests"},
-}
-
-func (b *Backend) LinkTypes(context.Context) ([]backend.LinkType, error) {
-	return append([]backend.LinkType{}, demoLinkTypes...), nil
-}
-
-// CreateLink records the link so the detail shows it from now on.
-func (b *Backend) CreateLink(_ context.Context, fromKey string, d backend.LinkDraft) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if _, ok := b.find(fromKey); !ok {
-		return fmt.Errorf("demo: no issue %s", fromKey)
-	}
-	if _, ok := b.find(d.ToKey); !ok {
-		return fmt.Errorf("demo: no issue %s", d.ToKey)
-	}
-	b.links[fromKey] = append(b.links[fromKey], backend.Link{
-		Direction: d.Direction, Type: d.Type, Key: d.ToKey, Summary: d.ToSummary, IssueType: d.ToType,
-	})
-	return nil
 }

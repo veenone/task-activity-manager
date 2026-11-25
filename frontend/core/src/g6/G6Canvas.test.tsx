@@ -3,13 +3,20 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import G6Canvas, { type CanvasNode } from "./G6Canvas";
 
+type Handler = (e: { target: { id: string } }) => void;
+type Recorded = {
+  calls: string[];
+  fills: string[];
+  options: Record<string, unknown>;
+  handlers: Record<string, Handler>;
+  edges: { style: Record<string, unknown> }[];
+};
 // jsdom has no canvas, so G6's Graph is a recorder of what it was asked.
 const failNext = vi.hoisted(() => [] as string[]);
-const made = vi.hoisted(
-  () => [] as { calls: string[]; fills: string[]; options: Record<string, unknown> }[],
-);
+const made = vi.hoisted(() => [] as Recorded[]);
 vi.mock("@antv/g6", () => ({
   NodeEvent: { CLICK: "node:click" },
+  EdgeEvent: { CLICK: "edge:click" },
   Graph: class {
     calls: string[] = [];
     options: Record<string, unknown>;
@@ -18,10 +25,15 @@ vi.mock("@antv/g6", () => ({
       made.push(this);
     }
     fills: string[] = [];
-    on() {}
-    // The first node's fill, as G6 was handed it.
-    setData(d: { nodes: { style: { fill: string } }[] }) {
+    handlers: Record<string, Handler> = {};
+    edges: { style: Record<string, unknown> }[] = [];
+    on(event: string, fn: Handler) {
+      this.handlers[event] = fn;
+    }
+    // The first node's fill, as G6 was handed it, and the last edges.
+    setData(d: { nodes: { style: { fill: string } }[]; edges: { style: Record<string, unknown> }[] }) {
       this.fills.push(d.nodes[0]?.style.fill);
+      this.edges = d.edges;
     }
     setLayout(l: { type: string }) {
       this.calls.push(`layout:${l.type}`);
@@ -244,4 +256,42 @@ it("redraws in the new theme's colours when the theme switches", async () => {
   expect(g.fills[g.fills.length - 1]).toBe("black");
   root.style.removeProperty("--surface");
   delete root.dataset.theme;
+});
+
+type Behavior = string | { type: string; onCreate?: (e: { source: string; target: string }) => unknown };
+
+// TAM's Dependencies view links two issues by dragging from one to the other
+// (#612): the canvas reports the pair and draws nothing itself, since the
+// link is the view's to journal.
+it("reports a drag between two nodes as a connection and draws no edge of its own", async () => {
+  const onConnect = vi.fn();
+  render(<G6Canvas nodes={nodes} edges={none} focus={null} onSelect={() => {}} onConnect={onConnect} label="Graph" />);
+  await settle();
+  const behaviors = made[0].options.behaviors as Behavior[];
+  expect(behaviors).not.toContain("drag-element");
+  const create = behaviors.find((b) => typeof b === "object" && b.type === "create-edge");
+  expect(typeof create === "object" && create.onCreate?.({ source: "A-1", target: "B-1" })).toBeUndefined();
+  expect(onConnect).toHaveBeenCalledWith("A-1", "B-1");
+});
+
+it("keeps dragging boxes, and creates nothing, when no connection is asked for", async () => {
+  render(<G6Canvas nodes={nodes} edges={none} focus={null} onSelect={() => {}} label="Graph" />);
+  await settle();
+  expect(made[0].options.behaviors).toEqual(["drag-canvas", "zoom-canvas", "drag-element"]);
+});
+
+it("reports a click on an edge, and draws a dashed edge with its arrow", async () => {
+  const onSelectEdge = vi.fn();
+  const edges = [
+    { id: "e1", source: "A-1", target: "B-1", type: "Blocks", directed: true, dashed: true },
+    { id: "e2", source: "B-1", target: "A-1", type: "Blocks", directed: true },
+  ];
+  render(<G6Canvas nodes={nodes} edges={edges} focus={null} onSelect={() => {}} onSelectEdge={onSelectEdge} label="Graph" />);
+  await settle();
+  const g = made[0];
+  g.handlers["edge:click"]({ target: { id: "e1" } });
+  expect(onSelectEdge).toHaveBeenCalledWith("e1");
+  expect(g.edges[0].style).toMatchObject({ endArrow: true, lineDash: [5, 4] });
+  // A solid edge carries an empty dash, so one that was pending turns solid.
+  expect(g.edges[1].style).toMatchObject({ endArrow: true, lineDash: [] });
 });

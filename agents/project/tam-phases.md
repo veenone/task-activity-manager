@@ -2568,6 +2568,49 @@ whose permission Jira denied are disabled. Call flow: `Engine.Sync` ->
 - The demo backend does not implement `PermissionBackend`, which is how
   demo mode allows everything.
 
+## The Dependencies view (#612)
+
+- Links come from the sync. `issuelinks` is in `baseFields`, `parseIssue`
+  fills `Issue.Links` (nil when the response lacked the field), and
+  `UpsertPage` and `ReplaceRow` replace an issue's `issue_link` rows through
+  `replaceLinks`. `FinishFullSync` drops only the links of issues no page
+  wrote. Schema 27 added `issue_link.link_id`, Jira's link id, and cleared the
+  watermark so the next sync refills it.
+- A removal is an `EntityLink` journal row like an add. Its `LinkDraft`
+  carries `RemoveID` and its field leads with `-|`, so it cannot collide with
+  an add. `RetypeLink` journals a removal and an add in one transaction;
+  Jira has no call that changes a link's type. `commitLinks` sends a removal
+  through `IssueBackend.DeleteLink` (`DELETE /rest/api/2/issueLink/{id}`) and
+  drops the cached rows by id; after an add it reads the source back so the
+  new link is cached with its id before the next sync.
+- `issuerepo.DependencyGraph` returns each link once, outward issue to inward
+  issue, deduplicated by link id, with pending adds and removals folded in.
+  `Owner` and `Direction` name the issue the link is cached or journaled
+  under, which `RemoveLink` and `RetypeLink` need.
+- The frontend keeps what to draw in `lib/dependencyGraph.ts`: filters, the
+  upstream and downstream chain, the cycle check, and the canvas nodes and
+  edges. `useDependencyEdits` holds the link edits; `LinkPanel` and
+  `NewLinkDialog` are the view's own panel and dialog, built on core's
+  `Modal` and the detail panel's frame.
+- The G6 canvas lives in `frontend/core/src/g6/G6Canvas.tsx` and both apps
+  import it lazily by that path, so G6 stays out of their first chunk; core's
+  index exports only its types. `onConnect` swaps `drag-element` for G6's
+  `create-edge` behaviour and returns nothing from `onCreate`, so the view
+  journals the link and G6 draws no edge of its own.
+- The demo backend seeds a short Blocks chain (`seedLinks`) and keeps links
+  the way Jira does, one id seen from both ends.
+- The export goes through `App.ExportDependencies(profileID, scope, image)`.
+  The backend reads the rows itself (`ListIssuesForExport` with an empty
+  query, so issues with no link are included, plus `DependencyGraph`), and
+  `issueexport.SelectDependencies` narrows them to the scope. An empty focus
+  means the whole profile. Otherwise the scope is the chain's keys and the
+  link types it was followed through, as `chainExport` computes them on the
+  frontend. `issueexport.DependencyWorkbook` writes the Issues, Links and
+  Graph sheets with the backlog export's styles. The picture comes from
+  `graphImage` in the core G6 module, which draws on a G6 graph of its own,
+  off screen, and returns `toDataURL({ mode: "overall" })`, so the user's
+  view does not move. `DecodePNG` refuses anything that isn't a PNG data URL.
+
 ## Commands
 
     wails dev                      # run with hot reload

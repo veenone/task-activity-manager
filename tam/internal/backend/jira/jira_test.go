@@ -168,7 +168,7 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			_, _ = w.Write([]byte(f.linkTypes))
 		case strings.HasSuffix(r.URL.Path, "/worklog") && r.Method == http.MethodGet:
 			_, _ = w.Write([]byte(f.worklogs))
-		case r.Method == http.MethodPut || r.Method == http.MethodPost:
+		case r.Method == http.MethodPut || r.Method == http.MethodPost || r.Method == http.MethodDelete:
 			body, _ := io.ReadAll(r.Body)
 			f.writes = append(f.writes, r.Method+" "+r.URL.Path+" "+string(body))
 			if f.writeFail != "" {

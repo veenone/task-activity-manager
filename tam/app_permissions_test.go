@@ -73,6 +73,8 @@ func TestBindingsRefuseAnActionWhosePermissionIsDenied(t *testing.T) {
 		{"EditIssue summary", permission.EditIssues, func() error { return a.EditIssue(id, "PLAT-1", "summary", "changed") }},
 		{"EditIssue assignee", permission.AssignIssues, func() error { return a.EditIssue(id, "PLAT-1", "assignee", "jdoe") }},
 		{"AddLink", permission.LinkIssues, func() error { return a.AddLink(id, "PLAT-1", backend.LinkDraft{}) }},
+		{"RemoveLink", permission.LinkIssues, func() error { return a.RemoveLink(id, "PLAT-1", backend.Link{ID: "1"}) }},
+		{"RetypeLink", permission.LinkIssues, func() error { return a.RetypeLink(id, "PLAT-1", backend.Link{ID: "1"}, "Relates") }},
 		{"LogWork", permission.WorkOnIssues, func() error { return a.LogWork(id, "PLAT-1", "1h", "", "") }},
 		{"AttachFiles", permission.CreateAttachments, func() error { return a.AttachFiles(id, "PLAT-1", []string{file}) }},
 	}

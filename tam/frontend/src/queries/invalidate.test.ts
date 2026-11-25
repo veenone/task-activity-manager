@@ -20,3 +20,18 @@ describe("invalidateProfileData", () => {
     expect(qc.getQueryState(key)?.isInvalidated).toBe(true);
   });
 });
+
+// The Dependencies view reads links a sync stores and a local link edit
+// journals, so both have to refresh it (#612).
+describe("the dependency graph", () => {
+  it("is refreshed by a sync and by a local write", async () => {
+    const { invalidateWrites } = await import("./invalidate");
+    const { keys } = await import("./keys");
+    for (const run of [(qc: QueryClient) => invalidateProfileData(qc, "p1"), (qc: QueryClient) => invalidateWrites(qc, "p1", "PLAT-1")]) {
+      const qc = new QueryClient();
+      qc.setQueryData(keys.dependencies("p1"), { issues: [], external: [], links: [] });
+      run(qc);
+      expect(qc.getQueryState(keys.dependencies("p1"))?.isInvalidated).toBe(true);
+    }
+  });
+});

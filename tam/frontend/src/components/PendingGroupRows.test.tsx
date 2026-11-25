@@ -47,3 +47,17 @@ describe("discarding a pending row (#535)", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 });
+
+describe("a pending link removal (#612)", () => {
+  it("reads as a removal and discards as one", async () => {
+    const removal: PendingChange = {
+      id: 7, entityType: "link", entityKey: "PLAT-1", field: "-|Blocks|outward|PLAT-2", beforeVal: "", baseVersion: "", createdAt: "",
+      afterVal: JSON.stringify({ type: "Blocks", direction: "outward", toKey: "PLAT-2", toSummary: "Pay", toType: "Story", removeId: "10100" }),
+    };
+    const user = userEvent.setup();
+    const onDiscard = show(removal);
+    expect(screen.getByText("Remove link")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Discard the removal of the link to PLAT-2" }));
+    expect(onDiscard).toHaveBeenCalledWith(removal);
+  });
+});

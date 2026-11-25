@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./styles/tokens.css": "./styles/tokens.css",
-    "./styles/primitives.css": "./styles/primitives.css"
+    "./styles/primitives.css": "./styles/primitives.css",
+    "./src/g6/G6Canvas": "./src/g6/G6Canvas.tsx"
   },
   "scripts": {
     "test": "vitest run",
@@ -14,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@antv/g6": "5.1.1",
     "driver.js": "^1.8.0",
     "marked": "18.0.13"
   },

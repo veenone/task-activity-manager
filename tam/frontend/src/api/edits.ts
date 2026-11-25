@@ -2,7 +2,7 @@
 
 import * as App from "../../wailsjs/go/main/App";
 import { backend } from "../../wailsjs/go/models";
-import type { DraftType, Issue, ProjectType, Worklog } from "./issues";
+import type { DraftType, Issue, Link, ProjectType, Worklog } from "./issues";
 
 // DRAFT_PREFIX starts the temporary key of an issue created locally and
 // not yet committed. It matches issuerepo.DraftPrefix.
@@ -100,6 +100,8 @@ export interface LinkDraft {
   toKey: string;
   toSummary: string;
   toType: string;
+  // Set on a journaled removal: the Jira id of the link it deletes (#612).
+  removeId?: string;
 }
 
 export const EditIssue: (profileId: string, key: string, field: string, value: string) => Promise<void> =
@@ -138,6 +140,12 @@ export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>
   App.LookupIssue(profileId, key) as Promise<Issue>;
 export const AddLink = (profileId: string, key: string, link: LinkDraft): Promise<void> =>
   App.AddLink(profileId, key, backend.LinkDraft.createFrom(link));
+// RemoveLink and RetypeLink journal a change to a cached link, which Jira
+// deletes by the id the sync stored; a retype is a removal plus an add (#612).
+export const RemoveLink = (profileId: string, key: string, link: Link): Promise<void> =>
+  App.RemoveLink(profileId, key, backend.Link.createFrom(link));
+export const RetypeLink = (profileId: string, key: string, link: Link, newType: string): Promise<void> =>
+  App.RetypeLink(profileId, key, backend.Link.createFrom(link), newType);
 
 // ListWorklogs is Jira's entries for the issue followed by the ones the
 // journal holds. It is called when the Work log section is expanded, not on

@@ -82,7 +82,7 @@ The Jira calls live in `core/jira`, which both apps already use.
 - Demo data for both, in TAM's demo backend, with in-memory writes like
   `demoSprints`.
 
-### Storage (tamstore, schema v27)
+### Storage (tamstore, schema v28)
 
 - `project_version`: profile_id, project, id, name, description, start_date,
   release_date, released, archived, draft, PK (profile_id, id). A draft has a
@@ -224,7 +224,7 @@ get fixed before these fields use it.
 
 Four PRs, each usable on its own:
 
-1. Core client (components moved, versions added), schema v27, sync, demo
+1. Core client (components moved, versions added), schema v28, sync, demo
    data.
 2. Issue fields: panel, New issue, Backlog bulk set, journal and commit of the
    two fields.

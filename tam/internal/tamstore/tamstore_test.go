@@ -782,7 +782,7 @@ func TestVersionFourteenMigrationAddsAssigneeNameAndClearsEveryWatermark(t *test
 	}
 }
 
-func TestVersionTwentySevenMigrationAddsCatalogColumnsAndClearsEveryWatermark(t *testing.T) {
+func TestVersionTwentyEightMigrationAddsCatalogColumnsAndClearsEveryWatermark(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tam.db")
 	db, err := tamstore.Open(path)
 	if err != nil {
@@ -795,7 +795,7 @@ func TestVersionTwentySevenMigrationAddsCatalogColumnsAndClearsEveryWatermark(t 
 		`DROP TABLE project_component`,
 		`INSERT INTO issue (profile_id, key, summary) VALUES ('p1', 'PLAT-412', 'Promo code')`,
 		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-11-05T10:42:00Z', '2026-11-01T09:00:00Z', '')`,
-		`UPDATE meta SET value = '26' WHERE key = 'schema_version'`,
+		`UPDATE meta SET value = '27' WHERE key = 'schema_version'`,
 	} {
 		if _, err := db.DB().Exec(stmt); err != nil {
 			t.Fatalf("%s: %v", stmt, err)
@@ -813,7 +813,7 @@ func TestVersionTwentySevenMigrationAddsCatalogColumnsAndClearsEveryWatermark(t 
 		t.Fatalf("read the new columns: %v", err)
 	}
 	if components != "[]" || fixVersions != "[]" {
-		t.Errorf("components %q fix_versions %q, want [] for a row cached before version 27", components, fixVersions)
+		t.Errorf("components %q fix_versions %q, want [] for a row cached before version 28", components, fixVersions)
 	}
 	for _, table := range []string{"project_version", "project_component"} {
 		if _, err := db.DB().Exec(`SELECT profile_id, project, id, name, draft FROM ` + table); err != nil {

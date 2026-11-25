@@ -16,10 +16,10 @@ import type {
   CanvasCombo,
   CanvasEdge,
   CanvasNode,
-} from "./G6Canvas";
+} from "@agile-suite/core/src/g6/G6Canvas";
 import { useKept } from "./viewKeep";
 
-const G6Canvas = lazy(() => import("./G6Canvas"));
+const G6Canvas = lazy(() => import("@agile-suite/core/src/g6/G6Canvas"));
 
 type Scope = "inside" | "crossing" | "both";
 type Analysis = "blockers" | "impact" | "none";

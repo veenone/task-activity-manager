@@ -132,15 +132,8 @@ func (r *Repository) WriteDetail(ctx context.Context, profileID, key string, d b
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM issue_link WHERE profile_id = ? AND from_key = ?`, profileID, key); err != nil {
-		return fmt.Errorf("clear links for %s: %w", key, err)
-	}
-	for _, l := range d.Links {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT OR REPLACE INTO issue_link (profile_id, from_key, to_key, link_type, direction, to_summary, to_type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			profileID, key, l.Key, l.Type, l.Direction, l.Summary, l.IssueType); err != nil {
-			return fmt.Errorf("write link %s -> %s: %w", key, l.Key, err)
-		}
+	if err := replaceLinks(ctx, tx, profileID, key, d.Links); err != nil {
+		return err
 	}
 	if err := reapplyPending(ctx, tx, profileID, map[string]bool{key: true}); err != nil {
 		return err
@@ -152,7 +145,7 @@ func (r *Repository) WriteDetail(ctx context.Context, profileID, key string, d b
 // then the other key.
 func (r *Repository) ListLinks(ctx context.Context, profileID, key string) ([]backend.Link, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT direction, link_type, to_key, to_summary, to_type FROM issue_link
+		`SELECT link_id, direction, link_type, to_key, to_summary, to_type FROM issue_link
 		 WHERE profile_id = ? AND from_key = ? ORDER BY link_type, direction, to_key`, profileID, key)
 	if err != nil {
 		return nil, fmt.Errorf("list links for %s: %w", key, err)
@@ -161,7 +154,7 @@ func (r *Repository) ListLinks(ctx context.Context, profileID, key string) ([]ba
 	links := []backend.Link{}
 	for rows.Next() {
 		var l backend.Link
-		if err := rows.Scan(&l.Direction, &l.Type, &l.Key, &l.Summary, &l.IssueType); err != nil {
+		if err := rows.Scan(&l.ID, &l.Direction, &l.Type, &l.Key, &l.Summary, &l.IssueType); err != nil {
 			return nil, err
 		}
 		links = append(links, l)

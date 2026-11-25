@@ -20,7 +20,8 @@ const DefaultRequirementType = "Requirement"
 // description is among them so the sync caches it on the row: it is the one
 // field the detail panel used to pay a round trip for on every selection.
 // timeFields are among them for the reason timetracking.go gives.
-var baseFields = append([]string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "components", "fixVersions", "issuetype", "project", "parent", "created", "updated"}, timeFields...)
+// issuelinks is among them so every pulled issue stores its links (#612).
+var baseFields = append([]string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "components", "fixVersions", "issuetype", "project", "parent", "created", "updated", "issuelinks"}, timeFields...)
 
 // fieldIDs are the discovered custom field ids. Any may be empty when the
 // instance lacks the field.
@@ -292,6 +293,11 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 		_ = json.Unmarshal(f[ids.Rank], &iss.Rank)
 	}
 	readTimeTracking(&iss, f)
+	// Absent is a response that did not ask, so Links stays nil and the
+	// store keeps what it had; present, even empty, is the issue's answer.
+	if raw, ok := f["issuelinks"]; ok {
+		iss.Links = parseLinks(raw)
+	}
 	return iss
 }
 
@@ -364,37 +370,4 @@ func parseSprint(raw json.RawMessage) (id, name string) {
 		return id, name
 	}
 	return "", ""
-}
-
-// parseLinks flattens Jira's issuelinks array: each entry names the link
-// type and carries either an inwardIssue or an outwardIssue.
-func parseLinks(raw json.RawMessage) []backend.Link {
-	out := []backend.Link{}
-	if len(raw) == 0 {
-		return out
-	}
-	type linked struct {
-		Key    string `json:"key"`
-		Fields struct {
-			Summary   string `json:"summary"`
-			IssueType named  `json:"issuetype"`
-		} `json:"fields"`
-	}
-	var entries []struct {
-		Type    named   `json:"type"`
-		Inward  *linked `json:"inwardIssue"`
-		Outward *linked `json:"outwardIssue"`
-	}
-	if err := json.Unmarshal(raw, &entries); err != nil {
-		return out
-	}
-	for _, e := range entries {
-		if e.Inward != nil {
-			out = append(out, backend.Link{Direction: "inward", Type: e.Type.Name, Key: e.Inward.Key, Summary: e.Inward.Fields.Summary, IssueType: e.Inward.Fields.IssueType.Name})
-		}
-		if e.Outward != nil {
-			out = append(out, backend.Link{Direction: "outward", Type: e.Type.Name, Key: e.Outward.Key, Summary: e.Outward.Fields.Summary, IssueType: e.Outward.Fields.IssueType.Name})
-		}
-	}
-	return out
 }

@@ -87,7 +87,7 @@
 - [ ] **Step 4:** `cd core && go test ./jira/`. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(core): Jira fix version client`.
 
-### Task 3: Schema v27 and the catalog repository
+### Task 3: Schema v28 and the catalog repository
 
 **Files:**
 - Create: `tam/internal/tamstore/catalog.go` (`catalogDDL`), `tam/internal/issuerepo/catalog.go`, `tam/internal/issuerepo/catalog_test.go`
@@ -122,7 +122,7 @@
 - [ ] **Step 2:** `cd tam && go test ./internal/tamstore/ ./internal/issuerepo/`. Expected: FAIL. The migration test fails on the missing column; the others fail to build until the stub signatures exist, then fail on assertions.
 - [ ] **Step 3:** Implement. Migration 27 follows version 26's shape: `store.AddColumnIfMissing` for both issue columns, then `UPDATE sync_state SET last_synced = ''`. Clearing the watermark is what makes the next sync re-read every issue. Add both tables to the `PurgeProfile` list.
 - [ ] **Step 4:** `cd tam && go test ./internal/tamstore/ ./internal/issuerepo/` passes. Then from the repo root run `npx vitest run frontend/core/src/instruction-gate.test.ts --root frontend/core`; the purge gate passes.
-- [ ] **Step 5:** Commit: `feat(tam): cache fix versions and components (schema v27)`.
+- [ ] **Step 5:** Commit: `feat(tam): cache fix versions and components (schema v28)`.
 
 ### Task 4: Backends read the catalog and the two issue fields
 

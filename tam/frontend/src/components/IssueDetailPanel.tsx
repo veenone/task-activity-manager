@@ -590,15 +590,15 @@ function LinkGroups({ links, onDiscard, onOpen, discarding }: { links: Link[]; o
           <h3 className="link-group-title">{label.replace(/ \((inward|outward)\)$/, "")} <span className="muted small">{label.match(/\((inward|outward)\)$/)?.[1]}</span></h3>
           <ul className="linked-list">
             {items.map((l) => (
-              <li key={`${l.type}-${l.direction}-${l.key}`} className="linked-row">
+              <li key={l.pending ? `pending-${l.pendingId}` : `${l.type}-${l.direction}-${l.key}`} className="linked-row">
                 <InPanelKey issueKey={l.key} onOpen={onOpen} className="linked-key" />
                 <span>{toPlainText(l.summary, "summary")}</span>
                 <span className="muted small">{l.issueType}</span>
                 {l.pending && (
                   <>
                     <span className="pending-dot" role="img" aria-label="Pending changes" />
-                    <span className="muted small">pending</span>
-                    <button type="button" className="btn btn-discard btn-discard-row" aria-label={`Discard link to ${l.key}`} disabled={discarding} onClick={() => onDiscard(l.pendingId ?? 0)}>
+                    <span className="muted small">{l.removal ? "removal pending" : "pending"}</span>
+                    <button type="button" className="btn btn-discard btn-discard-row" aria-label={l.removal ? `Discard the removal of the link to ${l.key}` : `Discard link to ${l.key}`} disabled={discarding} onClick={() => onDiscard(l.pendingId ?? 0)}>
                       <span className="discard-mark" aria-hidden="true">✕</span>Discard
                     </button>
                   </>

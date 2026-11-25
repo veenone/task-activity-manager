@@ -1995,3 +1995,21 @@
 .multiselect-list label:hover {
   background: var(--surface-2);
 }
+
+/* The G6 graph canvas, shared by PIE's graphs and TAM's Dependencies view
+   (#612). G6 places its minimap inside this box, so it must be the
+   positioned, clipped one. */
+.g6-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+.g6-zoom-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}

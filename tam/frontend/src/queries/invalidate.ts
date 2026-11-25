@@ -41,6 +41,7 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     keys.worklogWeeks(profileId),
     // A sync is the only thing that rereads what the token may do.
     keys.permissions(profileId),
+    keys.dependencies(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }
@@ -66,4 +67,6 @@ export function invalidateWrites(qc: QueryClient, profileId: string, key?: strin
   qc.invalidateQueries({ queryKey: [profileId, "boardSprintDetails"] });
   // A logged or discarded entry changes the Worklog view's cells and totals.
   qc.invalidateQueries({ queryKey: keys.worklogWeeks(profileId) });
+  // A link edit, or any edit to an issue the graph draws (#612).
+  qc.invalidateQueries({ queryKey: keys.dependencies(profileId) });
 }

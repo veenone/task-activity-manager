@@ -6,7 +6,7 @@ import * as api from "../wailsjs/go/main/App";
 
 vi.mock("../wailsjs/go/main/App", () => ({ RefreshLinks: vi.fn() }));
 // jsdom has no canvas, so G6 is replaced by a list of what it was given.
-vi.mock("./G6Canvas", () => ({
+vi.mock("@agile-suite/core/src/g6/G6Canvas", () => ({
   default: ({
     nodes,
     edges,

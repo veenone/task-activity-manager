@@ -181,6 +181,11 @@ func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []ba
 		if err := upsertIssue(ctx, tx, profileID, iss, syncedAt); err != nil {
 			return err
 		}
+		if iss.Links != nil {
+			if err := replaceLinks(ctx, tx, profileID, iss.Key, iss.Links); err != nil {
+				return err
+			}
+		}
 		keys[iss.Key] = true
 	}
 	if err := reapplyPending(ctx, tx, profileID, keys); err != nil {

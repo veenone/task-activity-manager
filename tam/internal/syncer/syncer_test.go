@@ -130,6 +130,7 @@ func (f *fake) CreateFields(context.Context, string, string) (backend.CreateFiel
 func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {
 	return nil, errors.New("not used")
 }
+func (f *fake) DeleteLink(context.Context, string) error { return errors.New("not used") }
 func (f *fake) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
 }
@@ -414,6 +415,7 @@ func (c *cancelOnSearch) CreateFields(context.Context, string, string) (backend.
 func (c *cancelOnSearch) LinkTypes(context.Context) ([]backend.LinkType, error) {
 	return nil, errors.New("not used")
 }
+func (c *cancelOnSearch) DeleteLink(context.Context, string) error { return errors.New("not used") }
 func (c *cancelOnSearch) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
 }

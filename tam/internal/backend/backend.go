@@ -106,6 +106,11 @@ type Issue struct {
 	// that TAM has never looked.
 	Description *string `json:"description"`
 
+	// Links are the issue's links as the sync read them, stored so the
+	// Dependencies view covers every cached issue (#612). nil when the
+	// response did not carry the field, which leaves the cached links alone.
+	Links []Link `json:"links,omitempty"`
+
 	// Pending and Draft are computed by the repository's reads, never
 	// stored: Pending says the journal holds a change for this key, Draft
 	// says the key is a local placeholder Commit has not yet created.
@@ -289,10 +294,16 @@ type LinkDraft struct {
 	ToKey     string `json:"toKey"`
 	ToSummary string `json:"toSummary"`
 	ToType    string `json:"toType"`
+	// RemoveID, when set, makes the row a removal of the Jira link with
+	// this id rather than an add (#612). A retype is a removal plus an add.
+	RemoveID string `json:"removeId,omitempty"`
 }
 
 // Link is one issue link seen from the issue that owns it.
 type Link struct {
+	// ID is Jira's id for the link, which a removal deletes by. Empty for a
+	// pending link and for one cached before schema 27.
+	ID        string `json:"id"`
 	Direction string `json:"direction"` // "outward" or "inward"
 	Type      string `json:"type"`      // the Jira link type name, e.g. "Tested By"
 	Key       string `json:"key"`       // the other issue
@@ -302,6 +313,8 @@ type Link struct {
 	// PendingID is its journal row, for Discard.
 	Pending   bool  `json:"pending"`
 	PendingID int64 `json:"pendingId"`
+	// Removal marks a pending row that removes the link rather than adds it.
+	Removal bool `json:"removal"`
 }
 
 // Comment is one comment on an issue, as the detail panel reads it.
@@ -704,6 +717,8 @@ type IssueBackend interface {
 	// CreateLink links fromKey to the draft's target with the draft's type
 	// and direction.
 	CreateLink(ctx context.Context, fromKey string, d LinkDraft) error
+	// DeleteLink deletes the link with Jira's id (#612).
+	DeleteLink(ctx context.Context, id string) error
 	// SearchUsers lists the people who can be assigned an issue in
 	// projectKey whose name or display name matches query. A blank query
 	// asks for the first page of anyone assignable, which is what seeds the

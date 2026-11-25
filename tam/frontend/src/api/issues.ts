@@ -101,6 +101,9 @@ export interface Issue {
 }
 
 export interface Link {
+  // Jira's id for the link, which a removal deletes by; empty for a pending
+  // add and for a link cached before schema 27 (#612).
+  id?: string;
   direction: "inward" | "outward" | string;
   type: string;
   key: string;
@@ -108,6 +111,8 @@ export interface Link {
   issueType: string;
   pending?: boolean;
   pendingId?: number;
+  // A pending row that removes the link rather than adds it.
+  removal?: boolean;
 }
 
 // Worklog is one entry against an issue. started carries its own UTC offset,
