@@ -22,7 +22,7 @@ const (
 
 // issueColumns is the SELECT list every row read uses, in scan order.
 const issueColumns = `key, id, project, type, summary, description, status, status_id, status_category, assignee, assignee_name, assignee_email, reporter, priority, labels,
-	sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s,
+	components, fix_versions, sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s,
 	aggregate_estimate_s, aggregate_remaining_s, aggregate_time_spent_s,
 	rank, created, updated, ` + pendingFlag
 
@@ -110,16 +110,17 @@ func orderFor(q IssueQuery) string {
 // column is always carried.
 const upsertIssueSQL = `
 	INSERT INTO issue (profile_id, key, id, project, type, summary, description, status, status_id, status_category, assignee, assignee_name, assignee_email, reporter, priority, labels,
-		sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s,
+		components, fix_versions, sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s,
 		aggregate_estimate_s, aggregate_remaining_s, aggregate_time_spent_s,
 		rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
 		description = COALESCE(excluded.description, issue.description),
 		status = excluded.status, status_id = excluded.status_id, status_category = excluded.status_category,
 		assignee = excluded.assignee, assignee_name = excluded.assignee_name, assignee_email = excluded.assignee_email, reporter = excluded.reporter,
-		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
+		priority = excluded.priority, labels = excluded.labels,
+		components = excluded.components, fix_versions = excluded.fix_versions, sprint_id = excluded.sprint_id,
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
 		story_points = excluded.story_points,
 		original_estimate_s = excluded.original_estimate_s, remaining_estimate_s = excluded.remaining_estimate_s,
@@ -134,6 +135,10 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 	if err != nil {
 		return fmt.Errorf("labels for %s: %w", iss.Key, err)
 	}
+	components, fixVersions, err := encodeCatalogIDs(iss)
+	if err != nil {
+		return err
+	}
 	var points sql.NullFloat64
 	if iss.StoryPoints != nil {
 		points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
@@ -143,7 +148,7 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 		description = sql.NullString{String: *iss.Description, Valid: true}
 	}
 	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, description, iss.Status, iss.StatusID, iss.StatusCategory,
-		iss.Assignee, iss.AssigneeName, iss.AssigneeEmail, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
+		iss.Assignee, iss.AssigneeName, iss.AssigneeEmail, iss.Reporter, iss.Priority, string(labels), components, fixVersions, iss.SprintID, iss.SprintName, iss.ParentKey,
 		points, nullSeconds(iss.OriginalEstimateSeconds), nullSeconds(iss.RemainingEstimateSeconds),
 		nullSeconds(iss.TimeSpentSeconds), nullSeconds(iss.AggregateEstimateSeconds),
 		nullSeconds(iss.AggregateRemainingSeconds), nullSeconds(iss.AggregateTimeSpentSeconds),
@@ -577,6 +582,8 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		iss          backend.Issue
 		description  sql.NullString
 		labels       string
+		components   string
+		fixVersions  string
 		points       sql.NullFloat64
 		estimate     sql.NullInt64
 		remaining    sql.NullInt64
@@ -587,7 +594,7 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		pending      int
 	)
 	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &description, &iss.Status, &iss.StatusID, &iss.StatusCategory, &iss.Assignee, &iss.AssigneeName, &iss.AssigneeEmail,
-		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
+		&iss.Reporter, &iss.Priority, &labels, &components, &fixVersions, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
 		&estimate, &remaining, &spent, &famEstimate, &famRemaining, &aggregate,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
@@ -609,6 +616,9 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		return backend.Issue{}, fmt.Errorf("labels for %s: %w", iss.Key, err)
 	}
 	iss.Labels = backend.NonNil(iss.Labels)
+	if err := decodeCatalogIDs(&iss, components, fixVersions); err != nil {
+		return backend.Issue{}, err
+	}
 	if points.Valid {
 		v := points.Float64
 		iss.StoryPoints = &v

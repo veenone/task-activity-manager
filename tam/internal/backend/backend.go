@@ -57,7 +57,11 @@ type Issue struct {
 	Reporter       string   `json:"reporter"`
 	Priority       string   `json:"priority"`
 	Labels         []string `json:"labels"`
-	SprintID       string   `json:"sprintId"`
+	// Components and FixVersions hold catalog ids (see catalog.go), so a
+	// rename in Jira never touches the issue rows.
+	Components  []int  `json:"components"`
+	FixVersions []int  `json:"fixVersions"`
+	SprintID    string `json:"sprintId"`
 	SprintName     string   `json:"sprintName"`
 	ParentKey      string   `json:"parentKey"`
 	StoryPoints    *float64 `json:"storyPoints"`
@@ -212,9 +216,9 @@ func SplitLabels(s string) []string {
 // JSON null, and null is what makes a label list or a column's status ids
 // read as "missing" rather than "none"; the store layers all go through
 // here so none of them has to carry a copy of the same three lines.
-func NonNil(s []string) []string {
+func NonNil[T any](s []T) []T {
 	if s == nil {
-		return []string{}
+		return []T{}
 	}
 	return s
 }

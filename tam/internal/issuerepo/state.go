@@ -112,7 +112,8 @@ func (r *Repository) ResetSyncCursor(ctx context.Context, profileID string) erro
 
 // PurgeProfile drops everything the local store holds for a profile: its
 // links, issues, sync state, settings, cached people, the edit screens its
-// instance reported, and the dashboards pinned under it. The profile row itself lives in
+// instance reported, the dashboards pinned under it, and the project's
+// releases and components. The profile row itself lives in
 // the shared database, so deleting it there leaves these rows orphaned
 // until this runs.
 func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
@@ -122,7 +123,7 @@ func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
 	}
 	defer tx.Rollback()
 
-	for _, table := range []string{"issue_link", "issue", "sync_state", "profile_setting", "jira_user", "edit_screen", "dashboard"} {
+	for _, table := range []string{"issue_link", "issue", "sync_state", "profile_setting", "jira_user", "edit_screen", "dashboard", "project_version", "project_component"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
 			return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
 		}
