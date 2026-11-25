@@ -20,7 +20,7 @@ const DefaultRequirementType = "Requirement"
 // description is among them so the sync caches it on the row: it is the one
 // field the detail panel used to pay a round trip for on every selection.
 // timeFields are among them for the reason timetracking.go gives.
-var baseFields = append([]string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "issuetype", "project", "parent", "created", "updated"}, timeFields...)
+var baseFields = append([]string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "components", "fixVersions", "issuetype", "project", "parent", "created", "updated"}, timeFields...)
 
 // fieldIDs are the discovered custom field ids. Any may be empty when the
 // instance lacks the field.
@@ -225,6 +225,7 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 	if err := json.Unmarshal(f["labels"], &labels); err == nil && labels != nil {
 		iss.Labels = labels
 	}
+	iss.Components, iss.FixVersions = catalogIDs(f["components"]), catalogIDs(f["fixVersions"])
 	var priority, issueType named
 	// The status carries one thing the other two do not: the category Jira
 	// files it under, which is the same three keys on every instance while
