@@ -182,3 +182,8 @@ func TestCreateComponentOmitsEmptyOptionalFields(t *testing.T) {
 		t.Fatalf("body %v, want no empty leadUserName or description", body)
 	}
 }
+
+// newTestClient points a client at srv with the server's own transport.
+func newTestClient(srv *httptest.Server) *Client {
+	return NewClientWithHTTP(srv.URL, "tok", srv.Client())
+}
