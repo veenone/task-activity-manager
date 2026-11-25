@@ -151,6 +151,7 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 	}
 
 	e.syncPermissions(ctx, profileID, projectKey)
+	e.syncCatalog(ctx, profileID, projectKey)
 
 	// What the project holds, before the profile's scope JQL and the
 	// incremental cut-off narrow it. maxResults of zero asks for the count
