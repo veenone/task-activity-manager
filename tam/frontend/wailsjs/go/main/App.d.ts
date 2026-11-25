@@ -237,6 +237,8 @@ export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetDoneAgreementTick(arg1:string,arg2:number,arg3:string,arg4:string,arg5:boolean):Promise<void>;
 
+export function SetIssuesCatalog(arg1:string,arg2:Array<string>,arg3:string,arg4:Array<number>,arg5:boolean):Promise<issuerepo.CatalogSetResult>;
+
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
 
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;

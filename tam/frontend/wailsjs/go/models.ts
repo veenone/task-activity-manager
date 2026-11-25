@@ -1383,6 +1383,20 @@ export namespace issueexport {
 
 export namespace issuerepo {
 	
+	export class CatalogSetResult {
+	    changed: string[];
+	    skipped: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogSetResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.changed = source["changed"];
+	        this.skipped = source["skipped"];
+	    }
+	}
 	export class DependencyLink {
 	    id: string;
 	    type: string;

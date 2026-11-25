@@ -434,6 +434,10 @@ export function SetDoneAgreementTick(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SetDoneAgreementTick'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function SetIssuesCatalog(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetIssuesCatalog'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function SetNavRailVisible(arg1) {
   return window['go']['main']['App']['SetNavRailVisible'](arg1);
 }

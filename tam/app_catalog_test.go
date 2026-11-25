@@ -37,6 +37,17 @@ func TestEditIssueRefusesFixVersionsWithoutResolveIssues(t *testing.T) {
 	}
 }
 
+func TestSetIssuesCatalogJournalsAndChecksPermissions(t *testing.T) {
+	a, id := seedCatalogApp(t, map[string]bool{permission.ResolveIssues: false})
+	res, err := a.SetIssuesCatalog(id, []string{"PLAT-1"}, "components", []int{10000}, true)
+	if err != nil || len(res.Changed) != 1 {
+		t.Fatalf("components: %+v, %v", res, err)
+	}
+	if _, err := a.SetIssuesCatalog(id, []string{"PLAT-1"}, "fixVersions", []int{10100}, true); err == nil || !strings.Contains(err.Error(), "Resolve Issues") {
+		t.Fatalf("fix versions without Resolve Issues: %v", err)
+	}
+}
+
 func TestGetVersionsAndComponentsReadTheProfilesProject(t *testing.T) {
 	a, id := seedCatalogApp(t, nil)
 	vs, err := a.GetVersions(id)
