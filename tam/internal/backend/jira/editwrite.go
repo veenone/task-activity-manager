@@ -54,11 +54,7 @@ func jiraFields(fields map[string]string, ids fieldIDs, pointsID string, screen 
 			if err != nil {
 				return nil, err
 			}
-			refs := make([]map[string]string, len(ids))
-			for i, id := range ids {
-				refs[i] = map[string]string{"id": strconv.Itoa(id)}
-			}
-			out[name] = refs
+			out[name] = idRefs(ids)
 		case "storyPoints":
 			p, err := backend.ParsePoints(v)
 			if err != nil {
@@ -83,6 +79,16 @@ func jiraFields(fields map[string]string, ids fieldIDs, pointsID string, screen 
 		}
 	}
 	return out, nil
+}
+
+// idRefs is a list of catalog ids as Jira takes components and fix
+// versions: [{"id": "10000"}]. An empty list clears the field.
+func idRefs(ids []int) []map[string]string {
+	refs := make([]map[string]string, len(ids))
+	for i, id := range ids {
+		refs[i] = map[string]string{"id": strconv.Itoa(id)}
+	}
+	return refs
 }
 
 func nameOrNull(v string) any {

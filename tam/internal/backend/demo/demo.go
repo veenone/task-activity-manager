@@ -356,6 +356,7 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 		Key: key, ID: fmt.Sprintf("%d", 30000+b.nextKey), Project: projectKey, Type: d.Type, Summary: d.Summary,
 		Status: "To Do", Assignee: d.Assignee, AssigneeName: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
 		ParentKey: parentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
+		Components: backend.NonNil(d.Components), FixVersions: backend.NonNil(d.FixVersions),
 	}
 	b.desc[key] = d.Description
 	return key, nil, nil

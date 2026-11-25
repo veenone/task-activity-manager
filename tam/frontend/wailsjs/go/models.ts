@@ -374,6 +374,8 @@ export namespace backend {
 	    labels: string[];
 	    assignee: string;
 	    storyPoints?: number;
+	    components: number[];
+	    fixVersions: number[];
 	    parentKey: string;
 	    statusId: string;
 	    sprintId: string;
@@ -395,6 +397,8 @@ export namespace backend {
 	        this.labels = source["labels"];
 	        this.assignee = source["assignee"];
 	        this.storyPoints = source["storyPoints"];
+	        this.components = source["components"];
+	        this.fixVersions = source["fixVersions"];
 	        this.parentKey = source["parentKey"];
 	        this.statusId = source["statusId"];
 	        this.sprintId = source["sprintId"];

@@ -405,6 +405,10 @@ func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, val
 			d.Labels = backend.SplitLabels(value)
 		case "storyPoints":
 			d.StoryPoints, _ = backend.ParsePoints(value)
+		case "components":
+			d.Components, _ = backend.ParseIDs(value)
+		case "fixVersions":
+			d.FixVersions, _ = backend.ParseIDs(value)
 		case "parentKey":
 			d.ParentKey = strings.TrimSpace(value)
 		}
@@ -534,6 +538,9 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 			profileID, key, projectKey, d.Type, d.Summary, d.Description, StatusDraft, d.Assignee, d.Assignee, d.Priority, string(labels),
 			d.SprintID, d.SprintName, d.ParentKey, points, now, string(detail), now); err != nil {
 			return nil, fmt.Errorf("insert draft: %w", err)
+		}
+		if err := putDraftCatalog(ctx, tx, profileID, key, d); err != nil {
+			return nil, err
 		}
 		if err := journal.Put(tx, profileID, EntityIssueCreate, key, FieldCreate, "", string(encoded), ""); err != nil {
 			return nil, err

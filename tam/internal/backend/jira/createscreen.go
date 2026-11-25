@@ -78,6 +78,22 @@ func (b *Backend) applyOwnFields(ctx context.Context, d backend.IssueDraft, ids 
 			fields[ids.EpicLink] = d.ParentKey
 		}
 	}
+	// Components and fix versions are optional on a screen like the
+	// estimate, and named the way the panel labels them when left out.
+	for _, c := range []struct {
+		id  string
+		ids []int
+	}{{"components", d.Components}, {"fixVersions", d.FixVersions}} {
+		if len(c.ids) == 0 {
+			continue
+		}
+		if !screen.carries(c.id) {
+			log.Printf("tam: the %s create of %q leaves out %s: it is not on the create screen", d.Type, d.Summary, c.id)
+			leftOut = append(leftOut, editFieldLabels[c.id])
+			continue
+		}
+		fields[c.id] = idRefs(c.ids)
+	}
 	return leftOut
 }
 

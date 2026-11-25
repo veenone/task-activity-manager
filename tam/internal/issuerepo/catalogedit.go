@@ -50,6 +50,24 @@ func writeCatalogField(ctx context.Context, q execer, profileID, key, field, val
 	return err
 }
 
+// putDraftCatalog checks a new draft's components and fix versions against
+// the catalog, as an edit adding them would be, and writes them on its row.
+func putDraftCatalog(ctx context.Context, q execer, profileID, key string, d backend.IssueDraft) error {
+	for field, ids := range map[string][]int{"components": d.Components, "fixVersions": d.FixVersions} {
+		if len(ids) == 0 {
+			continue
+		}
+		value := backend.FormatIDs(ids)
+		if err := checkCatalogIDs(ctx, q, profileID, field, "", value); err != nil {
+			return err
+		}
+		if err := writeCatalogField(ctx, q, profileID, key, field, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // checkCatalogIDs refuses an id the edit adds that the profile's catalog
 // does not hold, and a fix version that is released or archived. An id the
 // issue already had passes whatever its state: a shipped release stays on
