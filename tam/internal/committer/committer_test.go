@@ -34,9 +34,9 @@ type fake struct {
 	createLost string
 	searches   []string
 	getErr     map[string]error
-	links     []string
-	unlinked  []string
-	linkErr   error
+	links      []string
+	unlinked   []string
+	linkErr    error
 	// worklogs records "KEY started timeSpent comment" for every entry
 	// pushed, and worklogErr refuses the ones for the keys it names.
 	worklogs   []string
