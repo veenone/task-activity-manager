@@ -202,6 +202,7 @@ func Issues(projectKey string) []backend.Issue {
 		withSampleTime(&iss, "")
 		out = append(out, iss)
 	}
+	tagCatalog(out)
 	return out
 }
 

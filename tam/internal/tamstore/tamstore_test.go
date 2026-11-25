@@ -782,6 +782,55 @@ func TestVersionFourteenMigrationAddsAssigneeNameAndClearsEveryWatermark(t *test
 	}
 }
 
+func TestVersionTwentyEightMigrationAddsCatalogColumnsAndClearsEveryWatermark(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE issue DROP COLUMN components`,
+		`ALTER TABLE issue DROP COLUMN fix_versions`,
+		`DROP TABLE project_version`,
+		`DROP TABLE project_component`,
+		`INSERT INTO issue (profile_id, key, summary) VALUES ('p1', 'PLAT-412', 'Promo code')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-11-05T10:42:00Z', '2026-11-01T09:00:00Z', '')`,
+		`UPDATE meta SET value = '27' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var components, fixVersions, lastSynced string
+	if err := db.DB().QueryRow(`SELECT components, fix_versions FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-412'`).Scan(&components, &fixVersions); err != nil {
+		t.Fatalf("read the new columns: %v", err)
+	}
+	if components != "[]" || fixVersions != "[]" {
+		t.Errorf("components %q fix_versions %q, want [] for a row cached before version 28", components, fixVersions)
+	}
+	for _, table := range []string{"project_version", "project_component"} {
+		if _, err := db.DB().Exec(`SELECT profile_id, project, id, name, draft FROM ` + table); err != nil {
+			t.Errorf("%s: %v", table, err)
+		}
+	}
+	if err := db.DB().QueryRow(`SELECT last_synced FROM sync_state WHERE profile_id = 'p1'`).Scan(&lastSynced); err != nil {
+		t.Fatalf("read sync_state: %v", err)
+	}
+	if lastSynced != "" {
+		t.Errorf("last_synced = %q, want empty so the next sync refetches every issue", lastSynced)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}
+
 func TestSchemaVersionThirteenAddsTheSprintDraftFlag(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tam.db")
 	db, err := tamstore.Open(path)

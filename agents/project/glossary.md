@@ -76,6 +76,11 @@ sprint's additions. It decides nothing: `donerule`, `backend.IsDone` and
 Jira's data, and `donerule`'s package comment distinguishes all four.
 _Avoid_: definition of done, DoD, done rule, done criteria
 
+**Release**:
+A Jira fix version of the profile's project. TAM's UI says release; the code
+says version, after Jira's API.
+_Avoid_: milestone, fix version (in UI text)
+
 **Sprint report**:
 The reconstruction of one sprint from its issues' changelog: committed, added,
 removed, completed, carried over.

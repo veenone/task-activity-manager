@@ -233,6 +233,17 @@ account may see a different set.
   against a live instance: a scrum board that answered with no limits would
   read as a board with none rather than misreport one (#101).
 
+## Jira versions and components
+
+- Releasing is `PUT /rest/api/2/version/{id}` with `released` and
+  `releaseDate`. Its `moveUnfixedIssuesTo` takes the target version's URI
+  (`{base}/rest/api/2/version/{id}`), not its id. `core/jira`'s
+  `ReleaseVersion` builds the URI from an id (#605).
+- `DELETE /rest/api/2/version/{id}` takes `moveFixIssuesTo` as a plain id in
+  the query. The component delete is the same with `moveIssuesTo`.
+- Version and component ids arrive as numeric strings. TAM stores them as
+  ints, so a draft can take a negative id the way a sprint draft does.
+
 ## Confluence API
 
 - A form post to Data Center needs `X-Atlassian-Token: nocheck`. Without it

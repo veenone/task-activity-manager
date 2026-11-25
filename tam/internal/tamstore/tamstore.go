@@ -106,8 +106,8 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 27,
-	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
+	Version: 28,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + catalogDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -440,6 +440,23 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 28,
+		// The issue's components and fix versions, as catalog ids (#605).
+		// catalogDDL is in Base, so the two tables need nothing here.
+		// Version 26's shape otherwise: column adds and a watermark clear.
+		Apply: func(db *sql.DB) error {
+			for _, col := range []string{
+				"components TEXT NOT NULL DEFAULT '[]'",
+				"fix_versions TEXT NOT NULL DEFAULT '[]'",
+			} {
+				if err := store.AddColumnIfMissing(db, "issue", col); err != nil {
+					return err
+				}
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -531,7 +548,11 @@ CREATE TABLE IF NOT EXISTS issue (
 	reporter          TEXT NOT NULL DEFAULT '',
 	priority          TEXT NOT NULL DEFAULT '',
 	labels            TEXT NOT NULL DEFAULT '[]',
-	sprint_id         TEXT NOT NULL DEFAULT '',
+	-- Catalog ids, JSON arrays like labels: project_component's and
+	-- project_version's.
+	components        TEXT NOT NULL DEFAULT '[]',
+	fix_versions      TEXT NOT NULL DEFAULT '[]',
+	sprint_id        TEXT NOT NULL DEFAULT '',
 	sprint_name       TEXT NOT NULL DEFAULT '',
 	parent_key        TEXT NOT NULL DEFAULT '',
 	story_points      REAL,
