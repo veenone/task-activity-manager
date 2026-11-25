@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useFocusWhen } from "./useFocusWhen";
 
 export interface MultiOption {
   value: string;
   label: string;
+  // An option that may stay selected but cannot be newly checked, such as a
+  // release that has shipped.
+  disabled?: boolean;
 }
 
 interface Props {
@@ -13,6 +17,14 @@ interface Props {
   // Label shown when nothing is selected (e.g. "All requirements").
   allLabel?: string;
   title?: string;
+  // id goes on the trigger, so a caller's <label htmlFor> names it.
+  id?: string;
+  // label names the trigger and the search box for assistive technology.
+  // The trigger reads "label: summary", which keeps the visible summary in
+  // its accessible name.
+  label?: string;
+  describedBy?: string;
+  disabled?: boolean;
 }
 
 // MultiSelect is a compact checkbox dropdown: a button shows the selection
@@ -29,8 +41,13 @@ export function MultiSelect({
   onChange,
   allLabel = "All",
   title,
+  id,
+  label,
+  describedBy,
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const focusRef = useFocusWhen<HTMLInputElement>(open);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -54,6 +71,15 @@ export function MultiSelect({
     ? options.filter((o) => o.label.toLowerCase().includes(q))
     : options;
 
+  // Escape shuts the panel and hands focus back to the trigger, so a
+  // keyboard user is not left on a checkbox that just disappeared.
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Escape" || !open) return;
+    e.stopPropagation();
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
   const sel = new Set(selected);
   function toggle(v: string) {
     const next = new Set(sel);
@@ -70,10 +96,17 @@ export function MultiSelect({
         : `${selected.length} selected`;
 
   return (
-    <div className="multiselect" ref={ref}>
+    <div className="multiselect" ref={ref} onKeyDown={onKeyDown}>
       <button
         type="button"
         className="multiselect-btn"
+        ref={triggerRef}
+        id={id}
+        aria-label={label ? `${label}: ${summary}` : undefined}
+        aria-describedby={describedBy}
+        aria-haspopup="true"
+        aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         title={title}
       >
@@ -89,6 +122,7 @@ export function MultiSelect({
               className="multiselect-search"
               type="search"
               ref={focusRef}
+              aria-label={label ? `Search ${label}` : "Search"}
               placeholder="Search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -110,6 +144,7 @@ export function MultiSelect({
                   <input
                     type="checkbox"
                     checked={sel.has(o.value)}
+                    disabled={o.disabled && !sel.has(o.value)}
                     onChange={() => toggle(o.value)}
                   />
                   <span>{o.label}</span>

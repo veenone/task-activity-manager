@@ -75,6 +75,56 @@ describe("MultiSelect", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(TYPES.length);
   });
 
+  // The 2026-11-23 audit: a trigger that opens a panel says whether it is
+  // open, and the panel shuts on Escape with focus back where it started.
+  it("reports whether it is open and closes on Escape", async () => {
+    const user = userEvent.setup();
+    render(<MultiSelect options={TYPES} selected={[]} onChange={vi.fn()} allLabel="All types" />);
+    const trigger = screen.getByRole("button", { name: /All types/ });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("aria-haspopup", "true");
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("checkbox", { name: "Task" })).toBeNull();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
+  // A placeholder is not a label: it goes as soon as the user types.
+  it("names the trigger and the search box from its label", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 10 }, (_, i) => ({ value: String(i), label: `Option ${i}` }));
+    render(<MultiSelect options={many} selected={[]} onChange={vi.fn()} allLabel="None" label="Components" id="pick" />);
+    const trigger = screen.getByRole("button", { name: "Components: None" });
+    expect(trigger).toHaveAttribute("id", "pick");
+    await user.click(trigger);
+    expect(screen.getByRole("searchbox", { name: "Search Components" })).toBeInTheDocument();
+  });
+
+  // A released version stays on an issue that has it but cannot be added
+  // again, so its box can be cleared and never newly checked.
+  it("lets a disabled option be cleared but not checked", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const opts = [{ value: "a", label: "A" }, { value: "b", label: "B", disabled: true }, { value: "c", label: "C", disabled: true }];
+    render(<MultiSelect options={opts} selected={["c"]} onChange={onChange} />);
+    await user.click(screen.getByRole("button", { name: /C/ }));
+    expect(screen.getByRole("checkbox", { name: "B" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "C" })).toBeEnabled();
+    await user.click(screen.getByRole("checkbox", { name: "C" }));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("does not open when disabled", async () => {
+    const user = userEvent.setup();
+    render(<MultiSelect options={TYPES} selected={[]} onChange={vi.fn()} allLabel="All types" disabled />);
+    const trigger = screen.getByRole("button", { name: /All types/ });
+    expect(trigger).toBeDisabled();
+    await user.click(trigger);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
   // An empty list is a profile that has never synced, not a broken control.
   it("says so when there is nothing to choose from", async () => {
     const user = userEvent.setup();
