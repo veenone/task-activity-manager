@@ -162,6 +162,10 @@ export function GetCachedIssue(arg1, arg2) {
   return window['go']['main']['App']['GetCachedIssue'](arg1, arg2);
 }
 
+export function GetComponents(arg1) {
+  return window['go']['main']['App']['GetComponents'](arg1);
+}
+
 export function GetConfluenceConfig(arg1) {
   return window['go']['main']['App']['GetConfluenceConfig'](arg1);
 }
@@ -216,6 +220,10 @@ export function GetSubtaskTypeName(arg1) {
 
 export function GetSyncState(arg1) {
   return window['go']['main']['App']['GetSyncState'](arg1);
+}
+
+export function GetVersions(arg1) {
+  return window['go']['main']['App']['GetVersions'](arg1);
 }
 
 export function Health() {

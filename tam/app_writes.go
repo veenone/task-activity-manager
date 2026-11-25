@@ -53,7 +53,7 @@ func (a *App) EditIssue(profileID, key, field, value string) error {
 	if strings.TrimSpace(key) == "" {
 		return errors.New("issue key is empty")
 	}
-	if err := a.allowOnIssue(profileID, key, editPermission(field)); err != nil {
+	if err := a.allowEdit(profileID, []string{key}, field); err != nil {
 		return err
 	}
 	return a.repo.EditField(a.ctx, profileID, key, field, value)

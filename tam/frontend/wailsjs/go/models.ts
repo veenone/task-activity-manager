@@ -54,6 +54,32 @@ export namespace backend {
 	        this.restriction = source["restriction"];
 	    }
 	}
+	export class Component {
+	    id: number;
+	    project: string;
+	    name: string;
+	    description: string;
+	    leadName: string;
+	    leadDisplayName: string;
+	    assigneeType: string;
+	    draft: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Component(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project = source["project"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.leadName = source["leadName"];
+	        this.leadDisplayName = source["leadDisplayName"];
+	        this.assigneeType = source["assigneeType"];
+	        this.draft = source["draft"];
+	    }
+	}
 	export class CreateAttempt {
 	    at: string;
 	    summary: string;
@@ -217,6 +243,8 @@ export namespace backend {
 	    reporter: string;
 	    priority: string;
 	    labels: string[];
+	    components: number[];
+	    fixVersions: number[];
 	    sprintId: string;
 	    sprintName: string;
 	    parentKey: string;
@@ -255,6 +283,8 @@ export namespace backend {
 	        this.reporter = source["reporter"];
 	        this.priority = source["priority"];
 	        this.labels = source["labels"];
+	        this.components = source["components"];
+	        this.fixVersions = source["fixVersions"];
 	        this.sprintId = source["sprintId"];
 	        this.sprintName = source["sprintName"];
 	        this.parentKey = source["parentKey"];
@@ -583,6 +613,34 @@ export namespace backend {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
+	    }
+	}
+	export class Version {
+	    id: number;
+	    project: string;
+	    name: string;
+	    description: string;
+	    startDate: string;
+	    releaseDate: string;
+	    released: boolean;
+	    archived: boolean;
+	    draft: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Version(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project = source["project"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.startDate = source["startDate"];
+	        this.releaseDate = source["releaseDate"];
+	        this.released = source["released"];
+	        this.archived = source["archived"];
+	        this.draft = source["draft"];
 	    }
 	}
 

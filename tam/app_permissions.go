@@ -61,12 +61,26 @@ func (a *App) allowOnIssues(profileID string, keys []string, perm string) error 
 	return nil
 }
 
-// editPermission is the permission one field edit needs: changing who an
-// issue is assigned to is its own permission in Jira, and everything else
-// the detail panel edits is Edit Issues.
-func editPermission(field string) string {
-	if field == "assignee" {
-		return permission.AssignIssues
+// editPermissions is what one field edit needs: changing who an issue is
+// assigned to is its own permission in Jira, a fix version needs Resolve
+// Issues on top of Edit Issues, and everything else the detail panel edits
+// is Edit Issues.
+func editPermissions(field string) []string {
+	switch field {
+	case "assignee":
+		return []string{permission.AssignIssues}
+	case "fixVersions":
+		return []string{permission.EditIssues, permission.ResolveIssues}
 	}
-	return permission.EditIssues
+	return []string{permission.EditIssues}
+}
+
+// allowEdit is allowOnIssues for every permission the field's edit needs.
+func (a *App) allowEdit(profileID string, keys []string, field string) error {
+	for _, perm := range editPermissions(field) {
+		if err := a.allowOnIssues(profileID, keys, perm); err != nil {
+			return err
+		}
+	}
+	return nil
 }
