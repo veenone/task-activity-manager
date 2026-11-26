@@ -30,7 +30,14 @@ interface Props {
   sort: SortColumn | "";
   desc: boolean;
   onSort: (column: SortColumn) => void;
+  // checked and onCheck draw a checkbox in each key cell, for a view with a
+  // selection bar (the Backlog). Without them the table draws none.
+  checked?: Set<string>;
+  onCheck?: (key: string) => void;
 }
+
+// A checkbox and its margin, which the key column has to make room for.
+const CHECK_PX = 22;
 
 // IssueTable renders one page of issues in the mockup's columns.
 //
@@ -54,7 +61,7 @@ interface Props {
 // 30, so the virtualiser rendered every row of every page anyway: it bought
 // nothing and cost absolutely positioned rows, which is what forced the
 // header outside the scroller in the first place.
-export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, desc, onSort }: Props) {
+export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, desc, onSort, checked, onCheck }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const counts = subtaskCounts(issues);
@@ -69,7 +76,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
     bodyRef.current?.querySelector<HTMLElement>(`[data-row-index="${from + delta}"]`)?.focus();
   }
 
-  const keyWidth = keyColumnWidth(issues.map((i) => i.key), PENDING_DOT_PX);
+  const keyWidth = keyColumnWidth(issues.map((i) => i.key), PENDING_DOT_PX + (onCheck ? CHECK_PX : 0));
   const typeWidth = typeColumnWidth(issues.map((i) => typeChipLabel(i.type, subtaskLabel)));
   const sortedLabel = GRID_COLUMNS.find((c) => c.id === sort)?.label;
   const parentKeys = drawnParents(issues);
@@ -165,6 +172,19 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               tabIndex={selected || (selectedKey === "" && index === 0) ? 0 : -1}
             >
               <span role="gridcell" className="issue-key" title={iss.key}>
+                {onCheck && (
+                  <input
+                    type="checkbox"
+                    className="issue-check"
+                    // Out of the tab order, as on the Sprints view: the grid
+                    // is one tab stop and the arrows walk it.
+                    tabIndex={-1}
+                    checked={checked?.has(iss.key) ?? false}
+                    aria-label={`Check ${iss.key}`}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => onCheck(iss.key)}
+                  />
+                )}
                 {iss.key}
                 {iss.pending && <span className="pending-dot" role="img" aria-label="Pending changes" title="Has pending changes" />}
               </span>

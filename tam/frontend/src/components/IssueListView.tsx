@@ -5,6 +5,7 @@ import type { Issue, IssueQuery, Profile, Settings, SortColumn } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
 import { useOpenSprints } from "../queries/boards";
 import { IssueTable } from "./IssueTable";
+import { CatalogBulkBar } from "./CatalogBulkBar";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
@@ -40,6 +41,8 @@ interface IssueListViewProps {
   // header and stale-rows note) can build it from the exact query this view
   // already ran, instead of paying for a second one.
   onPage?: (total: number, rows: Issue[]) => void;
+  // bulk draws row checkboxes and the selection bar over them.
+  bulk?: boolean;
 }
 
 // IssueListView is the issue grid with its filter bar and pager, generic over
@@ -47,7 +50,7 @@ interface IssueListViewProps {
 // and page state live in the view-state store, so they outlast the tab, and
 // reset in the render the profile changes in. Selection is kept here too,
 // so the detail panel can sit beside the table.
-export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote, onPage }: IssueListViewProps) {
+export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote, onPage, bulk }: IssueListViewProps) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const createDenied = useDenial(activeId)(PERM_CREATE_ISSUES);
   const [text, setText] = useViewState(activeId, viewId, "text", "");
@@ -71,9 +74,20 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
   // them during the render that first sees the new id. An effect would be one
   // commit too late: a query would go out pairing the new profile with the
   // old filters before the reset landed.
+  // The checked rows for the selection bar. They survive paging and
+  // filtering, the way the board's checks do, and go with the profile.
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  function toggleCheck(key: string) {
+    setChecked((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }
   const [filtersFor, setFiltersFor] = useState(activeId);
   if (filtersFor !== activeId) {
     setFiltersFor(activeId);
+    setChecked(new Set());
     setText("");
     setFilter(NO_FILTER);
     setSprintId("");
@@ -216,6 +230,8 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
       {exported && <p className="muted small filter-note">Saved to {exported}</p>}
       {exportError && <p className="error-text filter-note">The backlog could not be exported: {exportError}</p>}
 
+      {bulk && checked.size > 0 && <CatalogBulkBar profileId={activeId} keys={[...checked]} onClear={() => setChecked(new Set())} />}
+
       <div className="backlog-body">
         <div className="backlog-grid">
           {issues.isError ? (
@@ -229,7 +245,7 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
               {filtered ? "No issues match this filter." : emptyNote}
             </p>
           ) : (
-            <IssueTable key={activeId} issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={selectIssue} sort={sort} desc={desc} onSort={toggleSort} />
+            <IssueTable key={activeId} issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={selectIssue} sort={sort} desc={desc} onSort={toggleSort} checked={bulk ? checked : undefined} onCheck={bulk ? toggleCheck : undefined} />
           )}
           <Pager
             page={page}
