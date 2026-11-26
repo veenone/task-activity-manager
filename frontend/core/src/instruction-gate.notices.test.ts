@@ -94,11 +94,16 @@ describe('instruction gate: third-party notices', () => {
     expect(JSON.parse(read('tam/wails.json')).info.copyright).toContain('GPL-3.0-only');
   });
 
+  // The walk is a synchronous existsSync per dependency per directory level,
+  // so it is I/O-bound: about half a second beside the other gate files, and
+  // over 8 s in the pre-commit hook on a busy Windows machine (#615). The
+  // timeout is generous for the reason the contract-names gate gives: a
+  // failure here should mean a notice is missing, not that the disk was busy.
   it('lists every production npm package of tam/frontend and frontend/core', () => {
     const want = npmProduction();
     expect(want.length, 'walked no npm dependencies').toBeGreaterThan(10);
     const have = listed('npm');
     const missing = want.filter((p) => !have.has(p));
     expect(missing, `rerun node scripts/third-party-notices.mjs: ${missing.join(', ')}`).toEqual([]);
-  });
+  }, 120_000);
 });
