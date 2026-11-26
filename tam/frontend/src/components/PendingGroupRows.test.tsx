@@ -24,6 +24,24 @@ function show(row: PendingChange) {
   return onDiscard;
 }
 
+// The journal holds catalog ids, which mean nothing to a reader (#605).
+it("names the releases and components an edit sets", () => {
+  const row: PendingChange = { ...edit, field: "components", beforeVal: "10000", afterVal: "10000, 10001" };
+  const catalog = { versions: [], components: [
+    { id: 10000, project: "PLAT", name: "Auth", description: "", leadName: "", leadDisplayName: "", assigneeType: "", draft: false },
+    { id: 10001, project: "PLAT", name: "Board", description: "", leadName: "", leadDisplayName: "", assigneeType: "", draft: false },
+  ] };
+  render(
+    <DialogProvider>
+      <table>
+        <PendingGroupRows group={groupPending([row])[0]} project="PLAT" heldReasons={[]} unpushableIds={new Set()} busy={false} onDiscard={vi.fn()} catalog={catalog} />
+      </table>
+    </DialogProvider>,
+  );
+  expect(screen.getByRole("cell", { name: "Auth" })).toHaveClass("pending-before");
+  expect(screen.getByText("Auth, Board")).toHaveClass("pending-after");
+});
+
 describe("discarding a pending row (#535)", () => {
   it("asks before throwing away a draft issue, and keeps it on Cancel", async () => {
     const user = userEvent.setup();

@@ -20,6 +20,8 @@ var editFieldLabels = map[string]string{
 	"storyPoints": "Story points",
 	"assignee":    "Assignee",
 	"parentKey":   "Epic",
+	"components":  "Components",
+	"fixVersions": "Fix versions",
 }
 
 // EditableFields is the part of TAM's own editable set that this issue's edit
@@ -59,6 +61,8 @@ func editableNames(meta corejira.MetaFields, ids fieldIDs) []string {
 		"priority":    "priority",
 		"labels":      "labels",
 		"assignee":    "assignee",
+		"components":  "components",
+		"fixVersions": "fixVersions",
 	}
 	if ids.Points != "" {
 		names[ids.Points] = "storyPoints"

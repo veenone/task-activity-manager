@@ -9,6 +9,7 @@ import { CommitBanner } from "./CommitBanner";
 import { CommitProgress } from "./CommitProgress";
 import { ConflictCard } from "./ConflictCard";
 import { PendingGroupRows } from "./PendingGroupRows";
+import { useComponents, useVersions } from "../queries/catalog";
 
 export { sprintChangeLine, sprintDraftLine } from "./pendingWords";
 
@@ -73,6 +74,9 @@ export function PendingChangesModal({ onClose }: Props) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const pending = usePendingChanges(activeId);
   const unpushable = useUnpushableEdits(activeId);
+  const versions = useVersions(activeId);
+  const components = useComponents(activeId);
+  const catalog = { versions: versions.data ?? [], components: components.data ?? [] };
   const discardOne = useDiscardChange(activeId);
   const discardRow = useDiscardById(activeId);
   const discardAll = useDiscardAll(activeId);
@@ -180,6 +184,7 @@ export function PendingChangesModal({ onClose }: Props) {
                       heldReasons={heldByKey.get(g.key) ?? []}
                       unpushableIds={unpushableIds}
                       busy={busy}
+                      catalog={catalog}
                       onDiscard={(row) => discardOne.mutate(row, { onError: onDiscardError })}
                     />
                   ))}

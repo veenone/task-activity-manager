@@ -11,6 +11,7 @@ export function BacklogView() {
       label="Backlog"
       showCreate
       showImport
+      bulk
       emptyNote="No issues cached yet. Use Sync in the topbar to pull this project's issues."
     />
   );

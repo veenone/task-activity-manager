@@ -25,6 +25,9 @@ func TestAssertNoPlaceholdersTripsOnWhatRewritingMissed(t *testing.T) {
 		{"a draft board id as a string", map[string]any{"boardId": "-2"}, true},
 		{"a numeric draft board id", map[string]any{"boardId": -2}, true},
 		{"a real board id", map[string]any{"boardId": 5}, false},
+		{"a draft release among fix versions", map[string]any{"fixVersions": []int{10100, -1}}, true},
+		{"a draft component", map[string]any{"components": []int{-2}}, true},
+		{"real components", map[string]any{"components": []int{10000, 10001}}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := assertNoPlaceholders(tc.payload)

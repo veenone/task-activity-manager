@@ -255,7 +255,7 @@ panel and puts focus back on the row you opened it from.
 
 | Section | What it does |
 | --- | --- |
-| **Fields** | **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee** and **Epic** are editable. Everything else in the panel is read-only. |
+| **Fields** | **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee**, **Epic**, **Components** and **Fix versions** are editable. Everything else in the panel is read-only. |
 | **Comments** | Lists the issue's comments, with a note saying how old the cached copy is. |
 | **Links** | Lists the issue's links and adds one. A linked key opens that issue in the panel, or offers Jira when TAM has not synced it. **Check** confirms the key exists and shows its summary; **Add** queues the link. |
 | **Covered by tests** | The Xray tests covering this issue, for a project that uses XTM alongside TAM. |
@@ -272,6 +272,19 @@ after whatever your project calls a subtask. An issue created here and not yet
 committed is marked **Draft**, and a field with an uncommitted edit carries a
 pending mark.
 
+**Components** and **Fix versions** list the project's components and releases
+as the last sync found them; tick as many as apply. A released or archived
+release stays on the issues that have it but can't be added to another. Setting
+a fix version also needs Jira's **Resolve Issues** permission, and without it
+the field is turned off with the reason. An issue from another project shows
+both read-only.
+
+To set a release or components on several issues at once, check their rows in
+the Backlog. A bar appears with **Set release**, **Set components** and
+**Clear**. Each action asks for the values and whether to add them to what each
+issue has or replace it, and queues one pending change per issue. Issues from
+another project are skipped and named on the bar.
+
 The **Attachments** section lists the files Jira holds for the issue, with
 size, author and date, and **Save** downloads one. **Attach files** picks one
 file or several and queues each as a pending change; they are uploaded on
@@ -283,8 +296,8 @@ an attachment already in Jira is done in Jira.
 ### Creating, importing, exporting
 
 **+ New** opens the create dialog. **Type** and **Summary** are required;
-Description, Priority, Labels, Story points, Assignee, Epic, Parent and Sprint
-are optional. TAM checks which fields your project requires and says so. The
+Description, Priority, Labels, Components, Fix versions, Story points,
+Assignee, Epic, Parent and Sprint are optional. TAM checks which fields your project requires and says so. The
 issue appears in the grid with a temporary key and a **Draft** mark; Commit
 creates it in Jira and the real key replaces the temporary one.
 

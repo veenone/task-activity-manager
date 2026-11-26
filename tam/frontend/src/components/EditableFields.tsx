@@ -11,6 +11,8 @@ import { PriorityPicker } from "./PriorityPicker";
 import { PERM_ASSIGN_ISSUES, PERM_EDIT_ISSUES } from "../api/permissions";
 import { useDenial } from "../queries/permissions";
 import { markUnsavedEdit } from "../lib/unsavedEdit";
+import { idsText } from "../lib/catalog";
+import { CatalogField } from "./CatalogField";
 
 // The syntax the user picked for one issue's description, keyed by profile,
 // key and field so two issues never share a choice. It is module level and
@@ -76,6 +78,8 @@ function valuesOf(issue: Issue, description: string): Values {
     storyPoints: issue.storyPoints === null || issue.storyPoints === undefined ? "" : String(issue.storyPoints),
     assignee: issue.assignee,
     parentKey: issue.parentKey,
+    components: idsText(issue.components ?? []),
+    fixVersions: idsText(issue.fixVersions ?? []),
   };
 }
 
@@ -331,6 +335,19 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
                 ))}
               </select>
             )
+          ) : f.id === "components" || f.id === "fixVersions" ? (
+            <CatalogField
+              profileId={profileId}
+              issueKey={issue.key}
+              project={issue.project}
+              field={f.id}
+              id={`edit-${f.id}`}
+              label={f.label}
+              value={values[f.id]}
+              onChange={(v) => set(f.id, v)}
+              describedBy={describedBy}
+              disabled={busy || shut}
+            />
           ) : (
             <input
               id={`edit-${f.id}`}

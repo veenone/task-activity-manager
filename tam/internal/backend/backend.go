@@ -131,6 +131,11 @@ type IssueDraft struct {
 	Assignee    string   `json:"assignee"`
 	StoryPoints *float64 `json:"storyPoints"`
 
+	// Components and FixVersions are catalog ids, as on Issue. A draft
+	// written before they existed decodes them as nil, which sends neither.
+	Components  []int `json:"components"`
+	FixVersions []int `json:"fixVersions"`
+
 	// ParentKey is the epic (or parent) the draft belongs under. The Jira
 	// backend sends it through the Epic Link field when it exists.
 	ParentKey string `json:"parentKey"`

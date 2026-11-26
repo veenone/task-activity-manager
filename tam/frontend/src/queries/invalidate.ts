@@ -42,6 +42,8 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     // A sync is the only thing that rereads what the token may do.
     keys.permissions(profileId),
     keys.dependencies(profileId),
+    keys.versions(profileId),
+    keys.components(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }

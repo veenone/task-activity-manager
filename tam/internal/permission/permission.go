@@ -23,6 +23,7 @@ const (
 	LinkIssues        = "LINK_ISSUES"
 	WorkOnIssues      = "WORK_ON_ISSUES"
 	CreateAttachments = "CREATE_ATTACHMENTS"
+	ResolveIssues     = "RESOLVE_ISSUES"
 )
 
 // Names is each gated permission under the name Jira's permission scheme
@@ -37,6 +38,7 @@ var Names = map[string]string{
 	LinkIssues:        "Link Issues",
 	WorkOnIssues:      "Work On Issues",
 	CreateAttachments: "Create Attachments",
+	ResolveIssues:     "Resolve Issues",
 }
 
 // Set is what Jira answered, by project key and then permission key. A

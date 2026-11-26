@@ -90,7 +90,8 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	// the requests it always made, which is what a long import notices.
 	screen := createScreen{}
 	if len(d.Extra) > 0 || d.StoryPoints != nil || d.Type == backend.TypeEpic ||
-		(d.ParentKey != "" && d.Type != backend.TypeSubtask) {
+		(d.ParentKey != "" && d.Type != backend.TypeSubtask) ||
+		len(d.Components) > 0 || len(d.FixVersions) > 0 {
 		screen.meta, screen.err = b.createMeta(ctx, projectKey, d.Type)
 	}
 	leftOut := b.applyOwnFields(ctx, d, ids, pointsID, screen, fields)

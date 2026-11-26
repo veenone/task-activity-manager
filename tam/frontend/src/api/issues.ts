@@ -66,6 +66,11 @@ export interface Issue {
   reporter: string;
   priority: string;
   labels: string[];
+  // Catalog ids of the issue's components and fix versions (schema 28);
+  // names come from GetComponents and GetVersions. Optional so fixtures
+  // written before them still type-check; the backend always sends both.
+  components?: number[];
+  fixVersions?: number[];
   sprintId: string;
   sprintName: string;
   parentKey: string;

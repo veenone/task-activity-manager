@@ -88,6 +88,9 @@ export const keys = {
   worklogWeeks: (profileId: string) => [profileId, "worklogWeek"] as const,
   // What the last sync learned the token may do, per project.
   permissions: (profileId: string) => [profileId, "permissions"] as const,
+  // The project's releases and components, which only a sync rewrites.
+  versions: (profileId: string) => [profileId, "versions"] as const,
+  components: (profileId: string) => [profileId, "components"] as const,
   worklogWeek: (profileId: string, fromDay: string, toDay: string) =>
     [profileId, "worklogWeek", fromDay, toDay] as const,
   worklogDayHours: (profileId: string) => [profileId, "worklogDayHours"] as const,

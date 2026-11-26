@@ -38,7 +38,7 @@ The top of the panel carries the key, the type, the status, the sprint, the pare
 
 Below that are sections you can open and close:
 
-- **Fields** is where editing happens. **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee** and **Epic** are editable; the rest of the panel is read-only. An edit is saved to the cache as you make it and queued for commit, which the panel says in as many words. Until you press **Save edit**, a changed field lives only in the panel, so opening another issue, closing the panel, switching view or switching profile asks before throwing it away.
+- **Fields** is where editing happens. **Summary**, **Description**, **Priority**, **Labels**, **Story points**, **Assignee**, **Epic**, **Components** and **Fix versions** are editable; the rest of the panel is read-only. An edit is saved to the cache as you make it and queued for commit, which the panel says in as many words. Until you press **Save edit**, a changed field lives only in the panel, so opening another issue, closing the panel, switching view or switching profile asks before throwing it away.
 - **Comments** lists the issue's comments, with a note saying how old the cached copy is. They are read-only here; add one in Jira.
 - **Links** lists the issue's links and adds one. Click a linked key to open that issue in the panel; a key TAM has not synced says so and offers to open it in Jira. **Check** confirms the key you typed exists and shows its summary, and **Add** queues the link for the next commit.
 - **Covered by tests** lists the Xray tests that cover this issue, for a project that uses XTM alongside TAM.
@@ -51,6 +51,14 @@ Descriptions and comments are written in either Jira wiki markup or Markdown, an
 An issue that can hold subtasks has a button under its fields to draft one beneath it, named after whatever your project calls a subtask.
 
 An issue created here and not yet committed is marked **Draft**, and a field with an uncommitted edit carries a pending mark.
+
+### Components and fix versions
+
+**Components** and **Fix versions** each open a list of the project's components or releases, as the last sync found them. Tick as many as apply. A release that has been released or archived stays ticked on the issues that have it, but it can't be ticked on another one. Jira only lets you set a fix version if you also hold the **Resolve Issues** permission, so without it the field is turned off and the panel says why. An issue from another project shows both fields read-only, because the list belongs to your profile's project.
+
+![Fix versions open in the detail panel, with v1.0 and v1.1 greyed out](images/backlog-03-fix-versions.png)
+
+The Pending changes dialog shows the names of the components and releases you set.
 
 ### Attachments
 
@@ -66,9 +74,19 @@ Removing an attachment that is already in Jira is done in Jira.
 
 ## Create an issue
 
-**+ New** opens the dialog. **Type** and **Summary** are required; **Description**, **Priority**, **Labels** (a comma list), **Story points**, **Assignee**, **Epic**, **Parent** and **Sprint** are optional. TAM checks which fields your Jira project requires and says so while the dialog is open.
+**+ New** opens the dialog. **Type** and **Summary** are required; **Description**, **Priority**, **Labels** (a comma list), **Components**, **Fix versions**, **Story points**, **Assignee**, **Epic**, **Parent** and **Sprint** are optional. TAM checks which fields your Jira project requires and says so while the dialog is open. If your project requires components, the dialog won't create the draft until you pick one.
 
 The new issue appears in the grid straight away, marked **Draft**, with a temporary key. Commit creates it in Jira and the real key replaces the temporary one.
+
+## Set a release or components on several issues
+
+Each Backlog row has a checkbox in its key cell. Check rows and a bar appears above the grid with the count, **Set release**, **Set components** and **Clear**. The checks stay as you page and filter.
+
+![Three rows checked and the bar above the grid](images/backlog-04-selection-bar.png)
+
+**Set release** and **Set components** each open a dialog. Pick the values, then choose **Add to what each issue has** (the default) or **Replace what each issue has**, and press **Set on N issues**. Each issue gets its own pending change, so you can discard one without the others. An issue that already has what you picked gets no change. Issues from another project are skipped, and the bar names them.
+
+![The Set release dialog with its release list open](images/backlog-05-set-release.png)
 
 ## Import from a spreadsheet
 

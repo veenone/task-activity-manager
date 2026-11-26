@@ -11,6 +11,9 @@ import type { FieldSpec } from "../api";
 // under the one the dialog already has.
 export const FORM_OWNED_FIELDS = new Set([
   "project", "issuetype", "summary", "description", "priority", "labels", "assignee", "reporter", "parent",
+  // The dialog draws these two from the cached catalog (#605). The Go side
+  // still offers them, so the dialog can read whether the screen requires them.
+  "components", "fixVersions",
 ]);
 
 // splitMetaFields drops the form's own fields and splits the rest into what

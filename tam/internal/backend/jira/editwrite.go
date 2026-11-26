@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strconv"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -48,6 +49,12 @@ func jiraFields(fields map[string]string, ids fieldIDs, pointsID string, screen 
 			out["assignee"] = nameOrNull(v)
 		case "labels":
 			out["labels"] = backend.SplitLabels(v)
+		case "components", "fixVersions":
+			ids, err := backend.ParseIDs(v)
+			if err != nil {
+				return nil, err
+			}
+			out[name] = idRefs(ids)
 		case "storyPoints":
 			p, err := backend.ParsePoints(v)
 			if err != nil {
@@ -72,6 +79,16 @@ func jiraFields(fields map[string]string, ids fieldIDs, pointsID string, screen 
 		}
 	}
 	return out, nil
+}
+
+// idRefs is a list of catalog ids as Jira takes components and fix
+// versions: [{"id": "10000"}]. An empty list clears the field.
+func idRefs(ids []int) []map[string]string {
+	refs := make([]map[string]string, len(ids))
+	for i, id := range ids {
+		refs[i] = map[string]string{"id": strconv.Itoa(id)}
+	}
+	return refs
 }
 
 func nameOrNull(v string) any {
@@ -107,9 +124,14 @@ func (b *Backend) UpdateIssue(ctx context.Context, key string, fields map[string
 	// field. An edit of those five keeps the behaviour it had before this
 	// guard existed, with Jira's own refusal as the backstop.
 	var screen map[string]bool
+	//
+	// Components and fix versions join them: both are optional on a screen,
+	// and a project that never uses releases often leaves Fix Version/s off.
 	_, editsPoints := fields["storyPoints"]
 	_, editsParent := fields["parentKey"]
-	if editsPoints || editsParent {
+	_, editsComponents := fields["components"]
+	_, editsFixVersions := fields["fixVersions"]
+	if editsPoints || editsParent || editsComponents || editsFixVersions {
 		screen = b.editScreen(ctx, key)
 	}
 	jf, err := jiraFields(fields, ids, pointsID, screen)

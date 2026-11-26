@@ -101,6 +101,8 @@ export function GetBoard(arg1:string,arg2:number,arg3:string,arg4:string):Promis
 
 export function GetCachedIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 
+export function GetComponents(arg1:string):Promise<Array<backend.Component>>;
+
 export function GetConfluenceConfig(arg1:string):Promise<profile.ConfluenceConfig>;
 
 export function GetCreateFields(arg1:string,arg2:string):Promise<backend.CreateFieldSet>;
@@ -128,6 +130,8 @@ export function GetSprintReport(arg1:string,arg2:number,arg3:number,arg4:boolean
 export function GetSubtaskTypeName(arg1:string):Promise<string>;
 
 export function GetSyncState(arg1:string):Promise<issuerepo.SyncState>;
+
+export function GetVersions(arg1:string):Promise<Array<backend.Version>>;
 
 export function Health():Promise<main.HealthInfo>;
 
@@ -232,6 +236,8 @@ export function SetConfluenceConfig(arg1:string,arg2:profile.ConfluenceConfig,ar
 export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetDoneAgreementTick(arg1:string,arg2:number,arg3:string,arg4:string,arg5:boolean):Promise<void>;
+
+export function SetIssuesCatalog(arg1:string,arg2:Array<string>,arg3:string,arg4:Array<number>,arg5:boolean):Promise<issuerepo.CatalogSetResult>;
 
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
 

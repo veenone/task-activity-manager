@@ -143,3 +143,21 @@ describe("IssueTable", () => {
     expect(row.querySelector(".progress-bar-unestimated")).toBeNull();
   });
 });
+
+// #605: the Backlog checks rows for its selection bar. A check is its own
+// gesture and does not open the issue.
+describe("IssueTable checkboxes", () => {
+  it("checks a row without selecting it, and only when asked to draw them", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const onSelect = vi.fn();
+    const onCheck = vi.fn();
+    const { rerender } = render(<IssueTable issues={[LONER]} selectedKey="" onSelect={onSelect} sort="" desc={false} onSort={vi.fn()} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    rerender(<IssueTable issues={[LONER]} selectedKey="" onSelect={onSelect} sort="" desc={false} onSort={vi.fn()} checked={new Set(["PLAT-409"])} onCheck={onCheck} />);
+    const box = screen.getByRole("checkbox", { name: "Check PLAT-409" });
+    expect(box).toBeChecked();
+    await userEvent.setup().click(box);
+    expect(onCheck).toHaveBeenCalledWith("PLAT-409");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});

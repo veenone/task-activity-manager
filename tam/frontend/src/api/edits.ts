@@ -8,7 +8,7 @@ import type { DraftType, Issue, Link, ProjectType, Worklog } from "./issues";
 // not yet committed. It matches issuerepo.DraftPrefix.
 export const DRAFT_PREFIX = "TAM-NEW-";
 
-export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee" | "parentKey";
+export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee" | "parentKey" | "components" | "fixVersions";
 
 export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "summary", label: "Summary" },
@@ -18,6 +18,8 @@ export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "storyPoints", label: "Story points" },
   { id: "assignee", label: "Assignee" },
   { id: "parentKey", label: "Epic" },
+  { id: "components", label: "Components" },
+  { id: "fixVersions", label: "Fix versions" },
 ];
 
 export interface IssueDraft {
@@ -33,6 +35,10 @@ export interface IssueDraft {
   labels: string[];
   assignee: string;
   storyPoints: number | null;
+  // Catalog ids, as on Issue. Optional for the importer's drafts, which
+  // carry neither.
+  components?: number[];
+  fixVersions?: number[];
   // The epic the draft is created under, "" for none and always "" for an
   // epic. The Go draft has carried this since Phase 2 and both the Jira
   // backend and the repository validate it; only the form was missing it, so
