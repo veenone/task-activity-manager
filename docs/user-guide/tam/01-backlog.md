@@ -56,6 +56,8 @@ An issue created here and not yet committed is marked **Draft**, and a field wit
 
 **Components** and **Fix versions** each open a list of the project's components or releases, as the last sync found them. Tick as many as apply. A release that has been released or archived stays ticked on the issues that have it, but it can't be ticked on another one. Jira only lets you set a fix version if you also hold the **Resolve Issues** permission, so without it the field is turned off and the panel says why. An issue from another project shows both fields read-only, because the list belongs to your profile's project.
 
+![Fix versions open in the detail panel, with v1.0 and v1.1 greyed out](images/backlog-03-fix-versions.png)
+
 The Pending changes dialog shows the names of the components and releases you set.
 
 ### Attachments
@@ -80,7 +82,11 @@ The new issue appears in the grid straight away, marked **Draft**, with a tempor
 
 Each Backlog row has a checkbox in its key cell. Check rows and a bar appears above the grid with the count, **Set release**, **Set components** and **Clear**. The checks stay as you page and filter.
 
+![Three rows checked and the bar above the grid](images/backlog-04-selection-bar.png)
+
 **Set release** and **Set components** each open a dialog. Pick the values, then choose **Add to what each issue has** (the default) or **Replace what each issue has**, and press **Set on N issues**. Each issue gets its own pending change, so you can discard one without the others. An issue that already has what you picked gets no change. Issues from another project are skipped, and the bar names them.
+
+![The Set release dialog with its release list open](images/backlog-05-set-release.png)
 
 ## Import from a spreadsheet
 
