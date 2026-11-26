@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MultiSelect } from "./MultiSelect";
+import { Modal } from "./Modal";
 
 const TYPES = [
   { value: "task", label: "Task" },
@@ -89,6 +90,22 @@ describe("MultiSelect", () => {
     expect(screen.queryByRole("checkbox", { name: "Task" })).toBeNull();
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(trigger).toHaveFocus();
+  });
+
+  // The Backlog's Set release dialog holds this control, and one Escape
+  // must shut the panel, not the dialog under it.
+  it("closes only its panel on Escape inside a dialog", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <Modal onClose={onClose} label="Set release">
+        <MultiSelect options={TYPES} selected={[]} onChange={vi.fn()} allLabel="None" />
+      </Modal>,
+    );
+    await user.click(screen.getByRole("button", { name: /None/ }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("checkbox", { name: "Task" })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   // A placeholder is not a label: it goes as soon as the user types.

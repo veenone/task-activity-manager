@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
 import { useFocusWhen } from "./useFocusWhen";
 
 export interface MultiOption {
@@ -57,8 +56,22 @@ export function MultiSelect({
     const onDoc = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    // Escape shuts the panel and hands focus back to the trigger, so a
+    // keyboard user is not left on a checkbox that just disappeared. It is
+    // caught on the way down, so a dialog holding the control does not also
+    // close on the same key.
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || !ref.current?.contains(document.activeElement)) return;
+      e.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey, true);
+    };
   }, [open]);
 
   // Reset the filter each time the panel closes so it reopens showing everything.
@@ -70,15 +83,6 @@ export function MultiSelect({
   const shown = q
     ? options.filter((o) => o.label.toLowerCase().includes(q))
     : options;
-
-  // Escape shuts the panel and hands focus back to the trigger, so a
-  // keyboard user is not left on a checkbox that just disappeared.
-  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Escape" || !open) return;
-    e.stopPropagation();
-    setOpen(false);
-    triggerRef.current?.focus();
-  }
 
   const sel = new Set(selected);
   function toggle(v: string) {
@@ -96,7 +100,7 @@ export function MultiSelect({
         : `${selected.length} selected`;
 
   return (
-    <div className="multiselect" ref={ref} onKeyDown={onKeyDown}>
+    <div className="multiselect" ref={ref}>
       <button
         type="button"
         className="multiselect-btn"
