@@ -77,6 +77,11 @@ func TestBindingsRefuseAnActionWhosePermissionIsDenied(t *testing.T) {
 		{"RetypeLink", permission.LinkIssues, func() error { return a.RetypeLink(id, "PLAT-1", backend.Link{ID: "1"}, "Relates") }},
 		{"LogWork", permission.WorkOnIssues, func() error { return a.LogWork(id, "PLAT-1", "1h", "", "") }},
 		{"AttachFiles", permission.CreateAttachments, func() error { return a.AttachFiles(id, "PLAT-1", []string{file}) }},
+		{"CreateVersion", permission.AdministerProjects, func() error { _, err := a.CreateVersion(id, "v9", "", "", ""); return err }},
+		{"EditVersion", permission.AdministerProjects, func() error { return a.EditVersion(id, 7, "v9", "", "", "") }},
+		{"ReleaseVersion", permission.AdministerProjects, func() error { return a.ReleaseVersion(id, 7, "2026-12-15", 0, nil) }},
+		{"ArchiveVersion", permission.AdministerProjects, func() error { return a.ArchiveVersion(id, 7, true) }},
+		{"DeleteVersion", permission.AdministerProjects, func() error { return a.DeleteVersion(id, 7, 0) }},
 	}
 	for _, c := range cases {
 		err := c.call()

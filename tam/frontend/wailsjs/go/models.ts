@@ -1103,6 +1103,7 @@ export namespace committer {
 	    created: Created[];
 	    createdSprints: CreatedSprint[];
 	    sprintsChanged: string[];
+	    versionsChanged: string[];
 	    linked: Linked[];
 	    logged: Logged[];
 	    attached: Attached[];
@@ -1122,6 +1123,7 @@ export namespace committer {
 	        this.created = this.convertValues(source["created"], Created);
 	        this.createdSprints = this.convertValues(source["createdSprints"], CreatedSprint);
 	        this.sprintsChanged = source["sprintsChanged"];
+	        this.versionsChanged = source["versionsChanged"];
 	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.logged = this.convertValues(source["logged"], Logged);
 	        this.attached = this.convertValues(source["attached"], Attached);
@@ -1619,6 +1621,20 @@ export namespace issuerepo {
 	        this.linkType = source["linkType"];
 	    }
 	}
+	export class ReleaseMove {
+	    key: string;
+	    to: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReleaseMove(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.to = source["to"];
+	    }
+	}
 	export class SprintRef {
 	    id: string;
 	    name: string;
@@ -1958,6 +1974,38 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class VersionSummary {
+	    id: number;
+	    project: string;
+	    name: string;
+	    description: string;
+	    startDate: string;
+	    releaseDate: string;
+	    released: boolean;
+	    archived: boolean;
+	    draft: boolean;
+	    done: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new VersionSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project = source["project"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.startDate = source["startDate"];
+	        this.releaseDate = source["releaseDate"];
+	        this.released = source["released"];
+	        this.archived = source["archived"];
+	        this.draft = source["draft"];
+	        this.done = source["done"];
+	        this.total = source["total"];
+	    }
 	}
 
 }

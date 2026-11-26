@@ -14,6 +14,10 @@ export function AddLink(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddLink'](arg1, arg2, arg3);
 }
 
+export function ArchiveVersion(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ArchiveVersion'](arg1, arg2, arg3);
+}
+
 export function AttachFiles(arg1, arg2, arg3) {
   return window['go']['main']['App']['AttachFiles'](arg1, arg2, arg3);
 }
@@ -86,6 +90,10 @@ export function CreateSprint(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateSprint'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+export function CreateVersion(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateVersion'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function DeleteDashboard(arg1, arg2) {
   return window['go']['main']['App']['DeleteDashboard'](arg1, arg2);
 }
@@ -100,6 +108,10 @@ export function DeleteRitualDocument(arg1, arg2, arg3, arg4) {
 
 export function DeleteSprint(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeleteSprint'](arg1, arg2, arg3);
+}
+
+export function DeleteVersion(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteVersion'](arg1, arg2, arg3);
 }
 
 export function DiscardAllPendingChanges(arg1) {
@@ -120,6 +132,10 @@ export function EditIssue(arg1, arg2, arg3, arg4) {
 
 export function EditSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['EditSprint'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function EditVersion(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['EditVersion'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function EnsureSprintRituals(arg1, arg2, arg3) {
@@ -326,6 +342,10 @@ export function ListUnpushableEdits(arg1) {
   return window['go']['main']['App']['ListUnpushableEdits'](arg1);
 }
 
+export function ListVersionSummaries(arg1) {
+  return window['go']['main']['App']['ListVersionSummaries'](arg1);
+}
+
 export function ListWorklogs(arg1, arg2) {
   return window['go']['main']['App']['ListWorklogs'](arg1, arg2);
 }
@@ -376,6 +396,10 @@ export function RefreshDashboard(arg1, arg2) {
 
 export function RefreshDetails(arg1) {
   return window['go']['main']['App']['RefreshDetails'](arg1);
+}
+
+export function ReleaseVersion(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ReleaseVersion'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function RemoveLink(arg1, arg2, arg3) {
@@ -496,6 +520,10 @@ export function TestProfileConnection(arg1, arg2, arg3, arg4) {
 
 export function UpdateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['UpdateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function VersionIssues(arg1, arg2) {
+  return window['go']['main']['App']['VersionIssues'](arg1, arg2);
 }
 
 export function WorklogWeek(arg1, arg2, arg3) {
