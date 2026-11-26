@@ -29,3 +29,4 @@ export * from "./api/attachments";
 export * from "./api/permissions";
 export * from "./api/dependencies";
 export * from "./api/catalog";
+export * from "./api/releases";

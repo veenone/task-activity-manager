@@ -71,4 +71,7 @@ export function invalidateWrites(qc: QueryClient, profileId: string, key?: strin
   qc.invalidateQueries({ queryKey: keys.worklogWeeks(profileId) });
   // A link edit, or any edit to an issue the graph draws (#612).
   qc.invalidateQueries({ queryKey: keys.dependencies(profileId) });
+  // A fix version edit moves an issue between releases, which the Releases
+  // view counts and lists (#605).
+  qc.invalidateQueries({ queryKey: keys.versions(profileId) });
 }
