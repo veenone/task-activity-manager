@@ -75,6 +75,10 @@ type Backend struct {
 	// conflict on the curated story is, so a demo profile can show a Commit
 	// holding the drafts that wait on a refused create.
 	refusedEpic bool
+	// versions is the project's fix versions with this run's writes on
+	// them, nil until a read or a write first copies the dataset's (#605).
+	versions      []backend.Version
+	nextVersionID int
 }
 
 // New returns a demo backend for the project key. An empty key uses the
