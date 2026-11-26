@@ -460,6 +460,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* A row whose control is an editor stacks. A 96px label beside a tabbed
    editor leaves the editor about 214px wide in the default panel. */
 .edit-row-stacked { grid-template-columns: 1fr; }
+/* A multi-select in a form row sits by its label and opens under itself
+   (#605); core anchors the panel right, which put it at the row's far end. */
+.edit-row .multiselect { justify-self: start; }
+.edit-row .multiselect-panel { left: 0; right: auto; }
+/* The Set release dialog is two rows tall, so its picker spills over the
+   footer instead of scrolling inside a body too short to show it. */
+.set-catalog-modal, .set-catalog-modal .bulk-body { overflow: visible; }
 /* A row whose hint sits beside the control uses a real <label> for the name
    rather than a wrapping one, so the hint does not become part of the field's
    label text. It has to line up with the wrapping rows either way. */

@@ -108,7 +108,7 @@ function SetCatalogDialog({ profileId, field, keys, onClose, onDone }: DialogPro
   }
 
   return (
-    <Modal onClose={onClose} className="modal pending-modal" labelledBy={titleId} closeOnOverlayClick={false} closeOnEsc={!saving}>
+    <Modal onClose={onClose} className="modal pending-modal set-catalog-modal" labelledBy={titleId} closeOnOverlayClick={false} closeOnEsc={!saving}>
       <div className="pending-head">
         <h2 id={titleId}>{title}</h2>
         <p className="muted small">{`One pending edit per issue, on ${plural(keys.length, "issue", "issues")}. Commit sends them to Jira.`}</p>
