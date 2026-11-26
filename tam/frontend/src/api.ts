@@ -28,3 +28,4 @@ export * from "./api/worklog";
 export * from "./api/attachments";
 export * from "./api/permissions";
 export * from "./api/dependencies";
+export * from "./api/catalog";

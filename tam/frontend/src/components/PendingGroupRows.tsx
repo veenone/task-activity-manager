@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useConfirm } from "@agile-suite/core";
 import { fieldLabel } from "../api";
-import type { PendingChange } from "../api";
+import type { Component, PendingChange, Version } from "../api";
+import { catalogNames } from "../lib/catalog";
 import type { PendingGroup } from "../queries/pending";
 import { moveWords } from "../lib/moveValue";
 import { worklogEntryLine } from "./WorkLogSection";
@@ -15,6 +16,13 @@ interface Props {
   unpushableIds: Set<number>;
   busy: boolean;
   onDiscard: (row: PendingChange) => void;
+  // The cached releases and components, to name the ids a field edit holds.
+  catalog?: Catalog;
+}
+
+interface Catalog {
+  versions: Version[];
+  components: Component[];
 }
 
 // A Line is one row of the table: what changed, from what, to what, the
@@ -37,8 +45,8 @@ const note = (text: string, className = "muted small") => <p key={text} classNam
 // table: a row group labelled with its name, whose first cell spans every
 // row and carries the name and its chips. The columns are XTM's: Field,
 // Before struck through, After marked, and the row's Discard.
-export function PendingGroupRows({ group: g, project, heldReasons, unpushableIds, busy, onDiscard }: Props) {
-  const { name, chips, lines } = describe(g, project, heldReasons, unpushableIds);
+export function PendingGroupRows({ group: g, project, heldReasons, unpushableIds, busy, onDiscard, catalog }: Props) {
+  const { name, chips, lines } = describe(g, project, heldReasons, unpushableIds, catalog);
   const { confirm } = useConfirm();
   async function discard(l: Line) {
     if (l.lost) {
@@ -74,7 +82,15 @@ export function PendingGroupRows({ group: g, project, heldReasons, unpushableIds
   );
 }
 
-function describe(g: PendingGroup, project: string, heldReasons: string[], unpushableIds: Set<number>) {
+// editValue is a field edit's value as the table shows it: components and
+// fix versions by name, everything else as journaled.
+function editValue(field: string, value: string, catalog?: Catalog): string {
+  if (catalog && field === "components") return catalogNames(catalog.components, value);
+  if (catalog && field === "fixVersions") return catalogNames(catalog.versions, value);
+  return value;
+}
+
+function describe(g: PendingGroup, project: string, heldReasons: string[], unpushableIds: Set<number>, catalog?: Catalog) {
   const sprintLines = (rows: PendingChange[], name: string): Line[] =>
     rows.map((row) => ({
       row, field: "Sprint", before: "", after: sprintChangeLine(row),
@@ -152,7 +168,7 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
       return { row, field: label, before: from, after: to, discardLabel: `Discard the ${label.toLowerCase()} move on ${row.entityKey}` };
     }),
     ...g.edits.map((row) => ({
-      row, field: fieldLabel(row.field), before: row.beforeVal || "(none)", after: row.afterVal || "(none)",
+      row, field: fieldLabel(row.field), before: editValue(row.field, row.beforeVal, catalog) || "(none)", after: editValue(row.field, row.afterVal, catalog) || "(none)",
       notes: unpushableIds.has(row.id)
         ? [note(`Jira will not take ${fieldLabel(row.field)} on ${g.key}: the field is not on that issue's edit screen. The change is kept here until you discard it.`, "small pending-unpushable")]
         : undefined,

@@ -1932,6 +1932,10 @@
   color: var(--text);
   cursor: pointer;
 }
+.multiselect-btn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
 .multiselect-summary {
   overflow: hidden;
   text-overflow: ellipsis;

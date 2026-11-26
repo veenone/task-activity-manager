@@ -8,7 +8,7 @@ import type { DraftType, Issue, Link, ProjectType, Worklog } from "./issues";
 // not yet committed. It matches issuerepo.DraftPrefix.
 export const DRAFT_PREFIX = "TAM-NEW-";
 
-export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee" | "parentKey";
+export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee" | "parentKey" | "components" | "fixVersions";
 
 export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "summary", label: "Summary" },
@@ -18,6 +18,8 @@ export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "storyPoints", label: "Story points" },
   { id: "assignee", label: "Assignee" },
   { id: "parentKey", label: "Epic" },
+  { id: "components", label: "Components" },
+  { id: "fixVersions", label: "Fix versions" },
 ];
 
 export interface IssueDraft {
