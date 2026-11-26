@@ -338,7 +338,8 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
           ) : f.id === "components" || f.id === "fixVersions" ? (
             <CatalogField
               profileId={profileId}
-              issue={issue}
+              issueKey={issue.key}
+              project={issue.project}
               field={f.id}
               id={`edit-${f.id}`}
               label={f.label}

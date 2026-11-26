@@ -1,5 +1,5 @@
 import { MultiSelect } from "@agile-suite/core";
-import type { CatalogField as Field, Issue } from "../api";
+import type { CatalogField as Field } from "../api";
 import { PERM_RESOLVE_ISSUES } from "../api/permissions";
 import { useComponents, useVersions } from "../queries/catalog";
 import { useDenial, usePermissions } from "../queries/permissions";
@@ -7,7 +7,10 @@ import { catalogOptions, idsText, parseIds } from "../lib/catalog";
 
 interface Props {
   profileId: string;
-  issue: Issue;
+  // issueKey and project are the issue's, and both "" in New issue, where
+  // the draft belongs to the profile's own project.
+  issueKey: string;
+  project: string;
   field: Field;
   id: string;
   label: string;
@@ -27,16 +30,16 @@ interface Props {
 // nothing here can list. A fix version also needs Resolve Issues, which Jira
 // checks apart from Edit Issues, so it is turned off with the reason when
 // the token lacks it.
-export function CatalogField({ profileId, issue, field, id, label, value, onChange, disabled, describedBy }: Props) {
+export function CatalogField({ profileId, issueKey, project, field, id, label, value, onChange, disabled, describedBy }: Props) {
   const versions = useVersions(profileId);
   const components = useComponents(profileId);
   const home = usePermissions(profileId).data?.project ?? "";
-  const resolveDenied = useDenial(profileId)(PERM_RESOLVE_ISSUES, issue.key);
+  const resolveDenied = useDenial(profileId)(PERM_RESOLVE_ISSUES, issueKey || undefined);
   const rows = (field === "fixVersions" ? versions.data : components.data) ?? [];
   const selected = parseIds(value);
-  const foreign = home !== "" && issue.project !== "" && issue.project !== home;
+  const foreign = home !== "" && project !== "" && project !== home;
   const denied = field === "fixVersions" ? resolveDenied : "";
-  const reason = foreign ? `${issue.project} is not this profile's project, so its ${label.toLowerCase()} are set in Jira.` : denied;
+  const reason = foreign ? `${project} is not this profile's project, so its ${label.toLowerCase()} are set in Jira.` : denied;
   const noteId = `${id}-why`;
   return (
     <>

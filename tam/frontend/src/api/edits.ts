@@ -35,6 +35,10 @@ export interface IssueDraft {
   labels: string[];
   assignee: string;
   storyPoints: number | null;
+  // Catalog ids, as on Issue. Optional for the importer's drafts, which
+  // carry neither.
+  components?: number[];
+  fixVersions?: number[];
   // The epic the draft is created under, "" for none and always "" for an
   // epic. The Go draft has carried this since Phase 2 and both the Jira
   // backend and the repository validate it; only the form was missing it, so

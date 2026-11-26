@@ -14,6 +14,15 @@ import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { invalidateWrites } from "../queries/invalidate";
 import { duplicateNameIds, sprintOptionLabel } from "../lib/sprintOptions";
+import { parseIds } from "../lib/catalog";
+import { CatalogField } from "./CatalogField";
+import type { CatalogField as CatalogFieldName } from "../api";
+
+// The two catalog fields, in the order the issue panel shows them.
+const CATALOG_FIELDS: { id: CatalogFieldName; label: string }[] = [
+  { id: "components", label: "Components" },
+  { id: "fixVersions", label: "Fix versions" },
+];
 
 interface Props {
   onClose: () => void;
@@ -141,6 +150,8 @@ export function NewIssueModal({
   const [descriptionFormat, setDescriptionFormat] = useState<RichFormat | "auto">("auto");
   const [priority, setPriority] = useState("");
   const [labels, setLabels] = useState("");
+  // Catalog ids in the journal's comma form, as the issue panel keeps them.
+  const [catalog, setCatalog] = useState<Record<CatalogFieldName, string>>({ components: "", fixVersions: "" });
   const [assignee, setAssignee] = useState("");
   const [points, setPoints] = useState("");
   const [parentKey, setParentKey] = useState(fixedParent || initialEpic);
@@ -214,6 +225,8 @@ export function NewIssueModal({
     description !== "" ||
     priority !== "" ||
     labels !== "" ||
+    catalog.components !== "" ||
+    catalog.fixVersions !== "" ||
     assignee !== "" ||
     points !== "" ||
     Object.values(extra).some((v) => v !== "");
@@ -274,6 +287,14 @@ export function NewIssueModal({
       fail("Story points must be a number.", "new-points");
       return;
     }
+    // The form draws these two itself, so create-meta's word on whether the
+    // screen requires them is checked here rather than under More fields.
+    for (const f of CATALOG_FIELDS) {
+      if (catalog[f.id] === "" && (meta.data?.fields ?? []).some((s) => s.id === f.id && s.required)) {
+        fail(`${f.label} is required.`, `new-${f.id}`);
+        return;
+      }
+    }
     for (const s of specs) {
       const v = (extra[s.id] ?? "").trim();
       if (s.required && !v) {
@@ -308,6 +329,8 @@ export function NewIssueModal({
       // create screen did not carry without asking Jira again. A failed read
       // offered nothing, which is what an empty list says.
       screenFields: meta.isSuccess ? specs.map((s) => s.id) : [],
+      components: parseIds(catalog.components),
+      fixVersions: parseIds(catalog.fixVersions),
     };
     setError("");
     setInvalidField("");
@@ -493,6 +516,15 @@ export function NewIssueModal({
             <span className="muted small">A comma list.</span>
           </span>
         </div>
+        {CATALOG_FIELDS.map((f) => (
+          <div className="edit-row" key={f.id}>
+            <label className="muted small" htmlFor={`new-${f.id}`}>{f.label}</label>
+            <CatalogField
+              profileId={activeId} issueKey="" project="" field={f.id} id={`new-${f.id}`} label={f.label}
+              value={catalog[f.id]} onChange={(v) => setCatalog((cur) => ({ ...cur, [f.id]: v }))} disabled={saving}
+            />
+          </div>
+        ))}
         <div className="edit-row">
           <label className="muted small" htmlFor="new-assignee">Assignee</label>
           <AssigneePicker

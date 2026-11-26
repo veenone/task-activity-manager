@@ -24,6 +24,8 @@ vi.mock("../api", async () => {
     GetSubtaskTypeName: vi.fn(),
     ListProjectTypes: vi.fn(),
     CreateIssue: vi.fn(),
+    GetVersions: vi.fn(),
+    GetComponents: vi.fn(),
   };
 });
 
@@ -80,7 +82,7 @@ const epic = (key: string, summary: string): api.Issue => ({
 const baseDraft = {
   type: "task", summary: "", description: "", priority: "", labels: [] as string[],
   assignee: "", storyPoints: null as number | null, parentKey: "", sprintId: "", sprintName: "", extra: {},
-  screenFields: [] as string[],
+  screenFields: [] as string[], components: [] as number[], fixVersions: [] as number[],
 };
 
 beforeEach(() => {
@@ -119,6 +121,12 @@ beforeEach(() => {
     { id: "19", name: "Technical task", subtask: true, logical: "subtask" },
   ]);
   vi.mocked(api.CreateIssue).mockResolvedValue("TAM-NEW-1");
+  vi.mocked(api.GetVersions).mockResolvedValue([
+    { id: 10100, project: "PLAT", name: "v1.2", description: "", startDate: "", releaseDate: "", released: false, archived: false, draft: false },
+  ]);
+  vi.mocked(api.GetComponents).mockResolvedValue([
+    { id: 10000, project: "PLAT", name: "Auth", description: "", leadName: "", leadDisplayName: "", assigneeType: "", draft: false },
+  ]);
 });
 
 // pickEpic waits for an epic to actually be on the select before choosing it.
@@ -158,6 +166,40 @@ describe("NewIssueModal", () => {
     }));
     expect(onCreated).toHaveBeenCalledWith("TAM-NEW-1");
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // #605: a draft can be filed under components and a release from the start.
+  it("carries the picked components and release on the draft", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    await user.type(within(dialog).getByLabelText("Summary *"), "Lock out after five tries");
+    await user.click(await within(dialog).findByRole("button", { name: "Components: None" }));
+    await user.click(await within(dialog).findByRole("checkbox", { name: "Auth" }));
+    await user.click(within(dialog).getByRole("button", { name: "Fix versions: None" }));
+    await user.click(await within(dialog).findByRole("checkbox", { name: "v1.2" }));
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalledWith("p1", {
+      ...baseDraft, summary: "Lock out after five tries", components: [10000], fixVersions: [10100],
+    }));
+  });
+
+  // Jira's create screen can require components; the dialog's own field
+  // says so and holds the draft until one is picked.
+  it("requires components when the create screen does", async () => {
+    vi.mocked(api.GetCreateFields).mockResolvedValue({
+      screenKnown: true,
+      fields: [{ id: "components", name: "Component/s", type: "array", required: true, allowedValues: [{ id: "10000", value: "Auth" }] }],
+    });
+    const user = userEvent.setup();
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    await user.type(within(dialog).getByLabelText("Summary *"), "Lock out after five tries");
+    await user.click(await submitButton(dialog));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Components is required.");
+    expect(api.CreateIssue).not.toHaveBeenCalled();
+    // Not also drawn a second time under More fields.
+    expect(within(dialog).queryByText("Component/s")).toBeNull();
   });
 
   // The title used to say "New issue" whichever button opened the dialog, so
@@ -402,7 +444,7 @@ describe("NewIssueModal", () => {
   it("takes more than one value for an array field", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
-      { id: "components", name: "Components", type: "array", required: true, allowedValues: [
+      { id: "customfield_10071", name: "Teams", type: "array", required: true, allowedValues: [
         { id: "10", value: "Frontend" }, { id: "11", value: "Backend" }, { id: "12", value: "API" },
       ] },
     ] });
@@ -411,9 +453,9 @@ describe("NewIssueModal", () => {
     // A field taking several values is a listbox, not a native multi-select
     // (issue #65 item 3), so the values are picked one at a time and stay
     // named outside the list.
-    const components = await within(dialog).findByLabelText("Components *");
-    await user.click(components);
-    const options = within(dialog).getByRole("listbox", { name: "Components" });
+    const teams = await within(dialog).findByLabelText("Teams *");
+    await user.click(teams);
+    const options = within(dialog).getByRole("listbox", { name: "Teams" });
     await user.click(within(options).getByRole("option", { name: "Frontend" }));
     await user.click(within(options).getByRole("option", { name: "API" }));
     expect(within(dialog).getByRole("button", { name: "Remove Frontend" })).toBeInTheDocument();
@@ -422,7 +464,7 @@ describe("NewIssueModal", () => {
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
     // Joined with a comma, which is what the Jira backend splits into the
     // array Jira wants.
-    expect(vi.mocked(api.CreateIssue).mock.calls[0][1].extra).toEqual({ components: "10,12" });
+    expect(vi.mocked(api.CreateIssue).mock.calls[0][1].extra).toEqual({ customfield_10071: "10,12" });
   });
 
   it("checks a required number field the same way it checks story points", async () => {
