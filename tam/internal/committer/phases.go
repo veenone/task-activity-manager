@@ -39,12 +39,17 @@ type phase struct {
 //  2. sprint changes: the edits, starts, completions and deletes, after the
 //     creates so a draft sprint can be started in the same Commit, and in a
 //     phase of their own so they read the ids the creates rewrote;
+//     then releases: draft releases created, then release edits, so the
+//     drafts and edits below name real release ids (#605);
 //  3. epics, so a story's Epic Link names a real key;
 //  4. every other creatable type, so a sub-task's parent does;
 //  5. sub-tasks;
 //  6. edits, then the board moves (sprint moves, transitions, ranks), then
 //     links, exactly as before phases existed;
-//  7. worklogs, last because an entry names one issue and waits on nothing
+//  7. closing: releases, archives and deletes of releases, after every
+//     issue write so the carry-overs and descopes a release queued have
+//     landed first (#605);
+//  8. worklogs, last because an entry names one issue and waits on nothing
 //     else, so it has no reason to run before a phase that other rows depend
 //     on and every reason to run after the creates that give it its key.
 //     Attachments run just before them for the same reason: a file names one
@@ -55,12 +60,14 @@ func phases() []phase {
 		{name: "board adds", run: func(ctx context.Context, r *commitRun) { r.pushBoardAdds(ctx) }},
 		{name: "sprints", run: func(ctx context.Context, r *commitRun) { r.createSprints(ctx) }},
 		{name: "sprint changes", run: func(ctx context.Context, r *commitRun) { r.pushSprintWrites(ctx) }},
+		{name: "releases", run: func(ctx context.Context, r *commitRun) { r.pushVersionChanges(ctx) }},
 		{name: "epics", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelEpic) }},
 		{name: "issues", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelIssue) }},
 		{name: "sub-tasks", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelSubtask) }},
 		{name: "edits", run: func(ctx context.Context, r *commitRun) { r.pushEdits(ctx) }},
 		{name: "board moves", run: func(ctx context.Context, r *commitRun) { r.e.commitBoardMoves(ctx, r.profileID, r.res, r.deps) }},
 		{name: "links", run: func(ctx context.Context, r *commitRun) { r.e.commitLinks(ctx, r.profileID, r.res, r.deps) }},
+		{name: "closing", run: func(ctx context.Context, r *commitRun) { r.closeVersions(ctx) }},
 		{name: "attachments", run: func(ctx context.Context, r *commitRun) { r.pushAttachments(ctx) }},
 		{name: "worklogs", run: func(ctx context.Context, r *commitRun) { r.pushWorklogs(ctx) }},
 	}
@@ -74,6 +81,9 @@ type commitRun struct {
 	res        *Result
 	deps       *dependencies
 	prog       *progress
+	// versions is Jira's copy of the project's releases, read once when a
+	// release change first needs it (versions.go).
+	versions map[int]backend.Version
 	// rows is the journal as the last phase left it, oldest first.
 	rows []journal.PendingChange
 }
@@ -286,6 +296,9 @@ func (r *commitRun) createDrafts(ctx context.Context, level draftLevel) {
 			r.deps.block(key, key, "which could not be sent")
 			continue
 		}
+		if r.heldOnDraftVersion(key, issuerepo.EntityIssueCreate, t.row.ID, t.draft.FixVersions...) {
+			continue
+		}
 		if sprintNotRenamed(r.rows, t.draft.SprintID) {
 			r.res.Failures = append(r.res.Failures, failure(key, issuerepo.EntityIssueCreate, errSprintNotRenamed.Error(), false))
 			r.deps.block(key, key, "which could not be sent")
@@ -320,9 +333,13 @@ func (r *commitRun) pushEdits(ctx context.Context) {
 		// parentKey is the one edited field that references another issue;
 		// every other value is free text a placeholder check must not read.
 		parent := ""
+		var releases []int
 		for _, p := range rows {
 			if p.Field == "parentKey" {
 				parent = p.AfterVal
+			}
+			if p.Field == "fixVersions" {
+				releases, _ = backend.ParseIDs(p.AfterVal)
 			}
 		}
 		// Every edit of the issue waits together, the way a conflict holds
@@ -334,6 +351,11 @@ func (r *commitRun) pushEdits(ctx context.Context) {
 		}
 		if isDraftKey(parent) {
 			r.res.Failures = append(r.res.Failures, failure(key, issuerepo.EntityIssue, fmt.Sprintf("its parent %s is not a draft this Commit could create; set the parent again", parent), false))
+			continue
+		}
+		// A fix version still negative after the releases phase is a draft
+		// release whose create failed, and the issue's edits wait with it.
+		if r.heldOnDraftVersion(key, issuerepo.EntityIssue, 0, releases...) {
 			continue
 		}
 		r.e.commitEdit(ctx, r.profileID, key, rows, r.res)

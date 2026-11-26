@@ -26,8 +26,9 @@ func TestCommitPushesFixVersions(t *testing.T) {
 	}
 }
 
-// Until drafted releases get a create phase (PR 3 of #605), an edit naming
-// one must stop at the firewall rather than reach Jira as id -1.
+// A negative release id with no version_create row behind it is a draft
+// nothing will create, so the edit fails rather than reach Jira as id -1
+// (#605; a draft with its create row is created first, versions_test.go).
 func TestCommitRefusesADraftReleaseID(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
@@ -44,7 +45,7 @@ func TestCommitRefusesADraftReleaseID(t *testing.T) {
 	if len(h.jira.updates) != 0 {
 		t.Fatalf("sent to Jira: %v", h.jira.updates)
 	}
-	if len(res.Failures) != 1 || !strings.Contains(res.Failures[0].Error, "placeholder") {
-		t.Fatalf("failures %+v, want one naming the placeholder", res.Failures)
+	if len(res.Failures) != 1 || !strings.Contains(res.Failures[0].Error, "not a draft this Commit could create") {
+		t.Fatalf("failures %+v, want one saying the draft release will not be created", res.Failures)
 	}
 }

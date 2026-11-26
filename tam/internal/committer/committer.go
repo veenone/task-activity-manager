@@ -103,14 +103,17 @@ type Result struct {
 	Created        []Created       `json:"created"`
 	CreatedSprints []CreatedSprint `json:"createdSprints"`
 	SprintsChanged []string        `json:"sprintsChanged"`
-	Linked         []Linked        `json:"linked"`
-	Logged         []Logged        `json:"logged"`
-	Attached       []Attached      `json:"attached"`
-	Moved          []Moved         `json:"moved"`
-	Conflicts      []Conflict      `json:"conflicts"`
-	Failures       []Failure       `json:"failures"`
-	Held           []Held          `json:"held"`
-	Remaining      int             `json:"remaining"`
+	// VersionsChanged names each pushed release change: "v2.4 created",
+	// "v2.4 released" (#605).
+	VersionsChanged []string   `json:"versionsChanged"`
+	Linked          []Linked   `json:"linked"`
+	Logged          []Logged   `json:"logged"`
+	Attached        []Attached `json:"attached"`
+	Moved           []Moved    `json:"moved"`
+	Conflicts       []Conflict `json:"conflicts"`
+	Failures        []Failure  `json:"failures"`
+	Held            []Held     `json:"held"`
+	Remaining       int        `json:"remaining"`
 }
 
 // Engine runs commits for one backend and repository pair. order is the
@@ -142,7 +145,7 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository, order BoardOrder) *
 // rows left that cannot be read keeps the last count that could.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
 	res := Result{
-		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, Linked: []Linked{}, Logged: []Logged{}, Attached: []Attached{},
+		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, VersionsChanged: []string{}, Linked: []Linked{}, Logged: []Logged{}, Attached: []Attached{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
 	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), prog: &progress{emit: e.Progress}}
@@ -285,8 +288,8 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 		refs["parentKey"] = parent
 	}
 	// Components and fix versions name catalog ids, where a draft is a
-	// negative number. Nothing creates those drafts yet, so one here is
-	// refused, not held.
+	// negative number. pushEdits has held or failed an edit naming a draft
+	// release, so one here is a rewriting bug and is refused, not held.
 	for _, name := range []string{"components", "fixVersions"} {
 		if v, edited := fields[name]; edited {
 			ids, err := backend.ParseIDs(v)
