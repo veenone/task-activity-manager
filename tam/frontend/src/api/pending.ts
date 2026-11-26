@@ -232,6 +232,9 @@ export interface CommitResult {
   // sprintsChanged names each pushed sprint edit, start, completion or
   // delete, "Sprint 12 edited"; optional for the same reason.
   sprintsChanged?: string[];
+  // versionsChanged names each pushed release change, "v2.4 released"
+  // (#605); optional for the same reason.
+  versionsChanged?: string[];
   linked: { key: string; toKey: string; type: string }[];
   // logged names each worklog entry pushed; optional for the reason
   // createdSprints is, since fixtures written before it do not carry it.
