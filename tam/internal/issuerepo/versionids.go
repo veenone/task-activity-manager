@@ -163,8 +163,50 @@ func rewriteVersionEdits(ctx context.Context, tx *sql.Tx, profileID string, from
 	return nil
 }
 
-// rewriteVersionTargets is a hook for the release changes that name another
-// release (a release's carry-over target, a delete's move target).
+// rewriteVersionTargets repoints the release changes that name another
+// release as where issues go: a release's carry-over and a delete's move
+// target. A to of 0 clears the target and its name.
 func rewriteVersionTargets(ctx context.Context, tx *sql.Tx, profileID string, from, to int) error {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id, after_val FROM pending_change WHERE profile_id = ? AND entity_type IN (?, ?)`,
+		profileID, EntityVersionRelease, EntityVersionDelete)
+	if err != nil {
+		return fmt.Errorf("release changes naming %d: %w", from, err)
+	}
+	updates := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var raw string
+		if err := rows.Scan(&id, &raw); err != nil {
+			rows.Close()
+			return err
+		}
+		var payload map[string]any
+		if json.Unmarshal([]byte(raw), &payload) != nil {
+			continue
+		}
+		if n, ok := payload["moveTo"].(float64); !ok || int(n) != from {
+			continue
+		}
+		payload["moveTo"] = to
+		if to == 0 {
+			payload["moveToName"] = ""
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			rows.Close()
+			return err
+		}
+		updates[id] = string(encoded)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for id, value := range updates {
+		if _, err := tx.ExecContext(ctx, `UPDATE pending_change SET after_val = ? WHERE profile_id = ? AND id = ?`, value, profileID, id); err != nil {
+			return fmt.Errorf("repoint release change %d: %w", id, err)
+		}
+	}
 	return nil
 }
