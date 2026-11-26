@@ -24,21 +24,25 @@ const (
 	WorkOnIssues      = "WORK_ON_ISSUES"
 	CreateAttachments = "CREATE_ATTACHMENTS"
 	ResolveIssues     = "RESOLVE_ISSUES"
+	// AdministerProjects is what Jira asks of anyone creating, editing,
+	// releasing, archiving or deleting a fix version (#605).
+	AdministerProjects = "ADMINISTER_PROJECTS"
 )
 
 // Names is each gated permission under the name Jira's permission scheme
 // page shows, which is what a user asks an administrator for.
 var Names = map[string]string{
-	ManageSprints:     "Manage Sprints",
-	ScheduleIssues:    "Schedule Issues",
-	CreateIssues:      "Create Issues",
-	EditIssues:        "Edit Issues",
-	TransitionIssues:  "Transition Issues",
-	AssignIssues:      "Assign Issues",
-	LinkIssues:        "Link Issues",
-	WorkOnIssues:      "Work On Issues",
-	CreateAttachments: "Create Attachments",
-	ResolveIssues:     "Resolve Issues",
+	ManageSprints:      "Manage Sprints",
+	ScheduleIssues:     "Schedule Issues",
+	CreateIssues:       "Create Issues",
+	EditIssues:         "Edit Issues",
+	TransitionIssues:   "Transition Issues",
+	AssignIssues:       "Assign Issues",
+	LinkIssues:         "Link Issues",
+	WorkOnIssues:       "Work On Issues",
+	CreateAttachments:  "Create Attachments",
+	ResolveIssues:      "Resolve Issues",
+	AdministerProjects: "Administer Projects",
 }
 
 // Set is what Jira answered, by project key and then permission key. A
