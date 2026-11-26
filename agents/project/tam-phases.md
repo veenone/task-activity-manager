@@ -2611,6 +2611,65 @@ whose permission Jira denied are disabled. Call flow: `Engine.Sync` ->
   off screen, and returns `toDataURL({ mode: "overall" })`, so the user's
   view does not move. `DecodePNG` refuses anything that isn't a PNG data URL.
 
+## Releases (#605)
+
+A release is a Jira fix version; the UI says release, the code says version.
+PR 1 cached `project_version` and `project_component` (schema 28) and the two
+issue fields, PR 2 made the fields pending edits, PR 3 added the Releases
+view and the release lifecycle. Components (PR 4) are not here yet.
+
+- **Journal.** `issuerepo/versiondrafts.go`, `versionqueue.go`: five entity
+  types, keyed by the release id as text, one field each. `version_create`
+  (a draft under a negative id from `draft_version_seq`, the sprint scheme,
+  with a `project_version` row, `draft = 1`), `version_edit` (before and after
+  `VersionFields`; the cached row changes at once; an edit back to the base
+  drops the row), `version_release` (`VersionRelease{name, releaseDate,
+  moveTo, moveToName}`), `version_archive` (`archived` true or false),
+  `version_delete` (`moveTo`). Release, archive and delete change nothing
+  locally until Commit. Refusals: release or archive of a draft, release of a
+  released or archived release, a second release, delete while a release or
+  archive waits, edit while a delete waits. A delete supersedes an edit.
+- **Release dialog's choices** are ordinary `fixVersions` issue edits,
+  journaled with the `version_release` row in one transaction
+  (`moveOutOfVersion` over `journalFieldEdit`, which `SetCatalog` shares).
+  Descope is `swapID(ids, id, 0)`: the closing release goes, nothing else.
+- **Ids.** `rewriteVersionID(from, to)` repoints the issue rows' JSON column,
+  both halves of pending `fixVersions` edits (dropping one left equal on both
+  sides), draft issue JSON, and release/delete `moveTo`. `to = 0` is the
+  discard of a draft; `RekeyVersion` is the create. `ReplaceVersions` keeps the
+  cached row of a release with a pending edit.
+- **Commit.** Phase `releases` after `sprint changes`: creates (blocked under
+  `version:<id>` in `dependencies`, so a draft release -1 and a draft sprint -1
+  never collide), then edits, each checked against Jira's copy
+  (`CatalogBackend.ProjectVersions`, read once per Commit) and failed, not
+  sent, when Jira moved it. Phase `closing` after `links`, before attachments
+  and worklogs: releases, archives, deletes. A release is held while any
+  `fixVersions` edit taking an issue out of it is still in the journal, and
+  just before releasing `VersionBackend.UnresolvedInVersion` asks Jira for
+  `fixVersion = id AND statusCategory != Done`: those go with
+  `moveUnfixedIssuesTo` set to the Set all release, or the release is held
+  naming them. Edits and draft issues naming a draft release whose create
+  failed are held (`heldOnDraftVersion`). `ApplyVersionCommitted` does the
+  cache work in the transaction that clears the row. `Result.VersionsChanged`
+  feeds the Commit line.
+- **Conflicts** do not use the conflict card, which is built around issue
+  keys and their two resolutions: a release Jira changed since TAM read it is
+  a non-retryable failure naming base, yours and Jira's value per field.
+  Discard and sync takes Jira's copy.
+- **Progress** is `backend.Finished` (status category done, else the status
+  name), not `donerule`, which needs a board's columns and a release has none.
+  `lib/releases.ts` `unfinishedIssues` is the same rule in the frontend.
+- **Permissions.** `permission.AdministerProjects` gates every release write
+  in `app_releases.go` except a draft's edit and delete; `ReleaseVersion` also
+  checks Edit Issues and Resolve Issues on each moved issue.
+- **Frontend.** `ReleasesView` (after Sprints, `gated`, no menu accelerator:
+  `viewAccelerator("")` answers nil), `ReleaseList`, `ReleaseFormModal`,
+  `ReleaseDialog`, `DeleteReleaseModal`, `queries/releases.ts`. Both reads sit
+  under `keys.versions`, so a sync, a release write and an issue edit all
+  refresh them. Pending changes groups release rows under kind `release`
+  (`releaseWords.ts`).
+- **Demo** keeps version writes in memory (`backend/demo/versions.go`).
+
 ## Commands
 
     wails dev                      # run with hot reload

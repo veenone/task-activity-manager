@@ -36,7 +36,7 @@ in one app is already set up in the other.
   is labelled with the count of its own side. See [Epics](#9-epics).
 - **Dashboards says who wrote each filter.** The **Saved filter** picker groups
   what you have starred in Jira under **Your filters** and **Shared with you**.
-  See [Dashboards](#13-dashboards).
+  See [Dashboards](#14-dashboards).
 - **One dropdown for the issue type filter**, where a project with five types
   used to spend five controls and push the action buttons onto a second row.
 - **A failed sync says what to change.** The status bar becomes a red ribbon
@@ -60,14 +60,15 @@ See [`CHANGELOG.md`](../../../tam/CHANGELOG.md) for the full history.
 9. [Epics](#9-epics)
 10. [Boards](#10-boards)
 11. [Sprints](#11-sprints)
-12. [Reports](#12-reports)
-13. [Dashboards](#13-dashboards)
-14. [Rituals](#14-rituals)
-15. [Dependencies](#15-dependencies)
-16. [Syncing](#16-syncing)
-17. [Settings and profile management](#17-settings-and-profile-management)
-18. [Diagnostics and troubleshooting](#18-diagnostics-and-troubleshooting)
-19. [Glossary](#19-glossary)
+12. [Releases](#12-releases)
+13. [Reports](#13-reports)
+14. [Dashboards](#14-dashboards)
+15. [Rituals](#15-rituals)
+16. [Dependencies](#16-dependencies)
+17. [Syncing](#17-syncing)
+18. [Settings and profile management](#18-settings-and-profile-management)
+19. [Diagnostics and troubleshooting](#19-diagnostics-and-troubleshooting)
+20. [Glossary](#20-glossary)
 
 ---
 
@@ -118,7 +119,7 @@ The rest are optional:
   details cached until you press **Refresh**, which is what to set if you work
   with no connection.
 - **Confluence Rituals** and **Reports root page** are for the
-  [Rituals](#14-rituals) and [Reports](#12-reports) views, and can be added
+  [Rituals](#15-rituals) and [Reports](#13-reports) views, and can be added
   later.
 
 **Test connection** checks the URL and the token. **Create profile** saves it.
@@ -142,7 +143,7 @@ nobody minds you breaking.
 | Part | What is in it |
 | --- | --- |
 | Top bar | The app name, the DEMO chip, the profile picker, **Manage**, the pending count, **Refresh**, **More** and **Sync**. **More** holds Full sync, the tours, Diagnostics, About and the theme. |
-| Tab band | The eight views. |
+| Tab band | The eleven views. |
 | Navigation rail | An optional list of the same views down the left, toggled with **Ctrl+\\**. |
 | Main area | The active view. |
 | Status bar | Whether the local store is ready, the cached issue count, when the last sync finished, and sync progress while one runs. A failed sync takes the whole bar as a red ribbon. |
@@ -152,11 +153,11 @@ The native menu bar carries the same things:
 | Menu | Items |
 | --- | --- |
 | **File** | Profiles…, Settings…, Sync (**Ctrl+R**), Full Sync (**Ctrl+Shift+R**), Quit (**Ctrl+Q**) |
-| **View** | The ten views (**Ctrl+1** to **Ctrl+9** and **Ctrl+0**, ignored while a dialog is open), and Navigation Rail (**Ctrl+\\**) |
+| **View** | The eleven views (**Ctrl+1** to **Ctrl+9** and **Ctrl+0** for ten of them; Releases has no shortcut; ignored while a dialog is open), and Navigation Rail (**Ctrl+\\**) |
 | **Help** | Diagnostics…, About |
 
 The views, in menu order: Backlog, Assigned to me, Worklog, Epics, Boards, Sprints,
-Reports, Dashboards, Rituals.
+Releases, Reports, Dashboards, Rituals, Dependencies.
 
 A status bar reading `38 of 2,943 issues` means the scope JQL, or an issue type
 TAM does not sync, keeps the rest of the project out of the cache.
@@ -165,14 +166,16 @@ TAM does not sync, keeps the rest of the project out of the cache.
 
 Nothing you do in TAM reaches Jira on its own. Editing a field, dragging a
 card, filling a sprint, drafting one, starting one, completing one, deleting
-one: each writes to the local cache and queues a pending change.
+one, drafting or releasing a release: each writes to the local cache and
+queues a pending change.
 
 When there is uncommitted work, a **N pending** button appears in the top bar.
 
 1. Press it to open **Pending changes (N)**. Rows are grouped by issue, and
    each shows the field, the value before and the value after. A drafted
-   sprint, a moved card and a sprint waiting to be completed each appear as
-   rows of their own.
+   sprint, a moved card, a sprint waiting to be completed and a release
+   waiting to be created, edited, released, archived or deleted each appear
+   as rows of their own.
 2. **Discard** on a row throws that one change away. Jira is not touched. A
    draft issue, sprint or board asks first, because discarding it loses
    everything typed into it.
@@ -486,7 +489,34 @@ from.
 Where TAM cannot be sure of a sprint's size it says "at least" rather than
 quoting a number that might be low.
 
-## 12. Reports
+## 12. Releases
+
+A release is a Jira fix version of the profile's project. The view lists the
+releases with their status, dates and progress, filtered by **Show** to
+**Unreleased** (the default), **Released**, **Archived** or **All**. Progress
+counts the synced issues that carry the release and how many are done, by
+Jira's status category. Picking a row shows the release's issues in the usual
+issue table and panel.
+
+**New release** drafts one: pickers offer it at once, and Commit creates it
+before the issue changes that name it. **Edit** rewrites a draft, or queues an
+edit of a release Jira holds. **More** holds **Archive** or **Unarchive** and
+**Delete…**; a delete can move the release's issues to another release.
+
+**Release…** lists the release's unfinished issues. Each is carried over to
+another unreleased release (the next one by date to start with) or descoped,
+which takes this release off the issue and changes nothing else. **Set all**
+sets every row, and **New release** appears when no other release is open.
+Commit sends those issue changes first and the release last. It holds the
+release while any of them has not reached Jira, and asks Jira just before
+releasing for unfinished issues the dialog never saw: they go to the **Set
+all** release, or with **Descope** there the release waits and says which.
+
+Every one of these needs Jira's **Administer Projects**; without it the buttons
+are off and say why. A draft's edit and delete stay open. See
+[Releases](11-releases.md) for the details.
+
+## 13. Reports
 
 What a sprint review starts with, rebuilt from Jira's own history rather than
 read from a chart endpoint.
@@ -529,7 +559,7 @@ Three buttons take the report off the screen, all rendering the same document:
 spreadsheet** and **Export a deck**. Exports go to the folder in **File →
 Settings…**. None of them touches Jira.
 
-## 13. Dashboards
+## 14. Dashboards
 
 A dashboard is one of your saved Jira filters, counted and kept.
 
@@ -564,7 +594,7 @@ takes the panel off the view and leaves the Jira filter alone. A failed read
 of the saved dashboards shows the error and a **Retry** button, not the empty
 list.
 
-## 14. Rituals
+## 15. Rituals
 
 The Confluence pages a team keeps around its ceremonies, per sprint. It needs
 the **Confluence Rituals** settings on the profile; without them the view says
@@ -601,7 +631,7 @@ Confluence**, with **Recreate on next Sync** and **Remove local copy**.
 Every ritual page lives under a root page set in the profile. Changing the root
 re-syncs straight afterwards.
 
-## 15. Dependencies
+## 16. Dependencies
 
 A graph of how the project's issues wait on each other: each issue is a box and
 each link an arrow from the issue that blocks to the one it holds up, laid out
@@ -621,7 +651,7 @@ for Commit is drawn dashed and labelled **pending** or **removal pending**.
 type, whatever the filters. Each workbook has an Issues sheet, a Links sheet and
 a picture of the graph. See [Dependencies](10-dependencies.md) for the details.
 
-## 16. Syncing
+## 17. Syncing
 
 **Sync** at the right of the top bar pulls what changed since the last sync in
 one click. Also **File → Sync** or **Ctrl+R**.
@@ -652,7 +682,7 @@ in demo mode, and for a card from another project, everything stays enabled
 and Jira decides at commit. Sync again after an administrator changes your
 permissions. Column limits and creating a board are not covered.
 
-## 17. Settings and profile management
+## 18. Settings and profile management
 
 **File → Settings…** holds the **Report export folder**, where spreadsheets and
 decks are written.
@@ -669,7 +699,7 @@ Switching profiles is blocked while a sync or a commit is running.
 **More → Take the tour** walks through the view you are on; **Take the
 first-run tour** walks through the whole loop.
 
-## 18. Diagnostics and troubleshooting
+## 19. Diagnostics and troubleshooting
 
 **Help → Diagnostics** shows the database paths, the build and the recent log.
 It is the first thing to collect when something misbehaves.
@@ -684,7 +714,7 @@ It is the first thing to collect when something misbehaves.
 | Sync, Commit or Refresh is disabled | Another of them, a report rebuild or a ritual sync holds the profile's lock. |
 | The Rituals view says it cannot sync | Add the Confluence settings to the profile. |
 
-## 19. Glossary
+## 20. Glossary
 
 | Term | What it means |
 | --- | --- |
@@ -692,7 +722,9 @@ It is the first thing to collect when something misbehaves.
 | **Pending change** | A local edit queued in TAM, not yet in Jira. |
 | **Commit** | Push pending changes to Jira. |
 | **Sync** | Pull the latest from Jira into the local cache. |
-| **Draft** | An issue, sprint or board that exists only in TAM until Commit creates it. |
+| **Draft** | An issue, sprint, board or release that exists only in TAM until Commit creates it. |
+| **Release** | A Jira fix version of the profile's project. |
+| **Descope** | Take the release being closed off an unfinished issue, and change nothing else about it. |
 | **Carried over** | Work a sprint did not finish, counted in its report. |
 | **Committed** (report) | What the sprint held when it started, counted as a minimum. |
 | **Swimlane** | A horizontal split of a board, by assignee or by epic. |

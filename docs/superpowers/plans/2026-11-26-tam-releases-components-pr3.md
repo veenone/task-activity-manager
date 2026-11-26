@@ -54,6 +54,9 @@ journal types, no Components view.
   time go with `moveUnfixedIssuesTo` set to the dialog's set-all target; with
   no target the release is held and the reason names them.
 - **Version picker sort.** Release date, then name, the store's order.
+- **Where closing runs.** After links and before attachments and worklogs,
+  which wait on nothing, so worklogs stay the last phase and every issue
+  write still lands before a release.
 
 ## Tasks
 
