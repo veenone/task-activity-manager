@@ -31,6 +31,8 @@ export function summaryLine(groups: PendingGroup[], rowCount: number): string {
   if (changedCount > 0) others.push(plural(changedCount, "sprint change", "sprint changes"));
   const releases = groups.reduce((n, g) => n + g.releaseChanges.length, 0);
   if (releases > 0) others.push(plural(releases, "release change", "release changes"));
+  const components = groups.reduce((n, g) => n + g.componentChanges.length, 0);
+  if (components > 0) others.push(plural(components, "component change", "component changes"));
   if (issues.length === 0) return `${changes}: ${others.join(", ")}`;
   const drafts = issues.filter((g) => g.createRow).length;
   let line = `${changes} on ${plural(issues.length, "issue", "issues")}`;
