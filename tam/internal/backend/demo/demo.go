@@ -79,6 +79,9 @@ type Backend struct {
 	// them, nil until a read or a write first copies the dataset's (#605).
 	versions      []backend.Version
 	nextVersionID int
+	// components is versions' twin for the project's components.
+	components      []backend.Component
+	nextComponentID int
 }
 
 // New returns a demo backend for the project key. An empty key uses the

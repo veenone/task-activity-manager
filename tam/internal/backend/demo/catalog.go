@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"agile-suite/tam/internal/backend"
-	"agile-suite/tam/internal/demo"
 )
 
 var _ backend.CatalogBackend = (*Backend)(nil)
@@ -19,7 +18,9 @@ func (b *Backend) ProjectVersions(context.Context, string) ([]backend.Version, e
 }
 
 // ProjectComponents answers the dataset's components under the profile's
-// project key.
+// project key, with this run's component writes on them.
 func (b *Backend) ProjectComponents(context.Context, string) ([]backend.Component, error) {
-	return demo.Components(b.project), nil
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.componentList()), nil
 }
