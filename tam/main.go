@@ -71,8 +71,8 @@ func main() {
 // frontend/core/src/instruction-gate.test.ts now. The accelerator is the
 // view's place in this list, so a view inserted in the middle renumbers
 // the ones after it; a shortcut that matches the tab it belongs to is
-// worth more than one that never moves. Releases came after the ten
-// numbers were taken and has none (#605).
+// worth more than one that never moves. Releases and Components came after
+// the ten numbers were taken and have none (#605).
 var menuViews = []struct{ id, label, accelerator string }{
 	{"backlog", "Backlog", "1"},
 	{"assigned", "Assigned to me", "2"},
@@ -81,6 +81,7 @@ var menuViews = []struct{ id, label, accelerator string }{
 	{"boards", "Boards", "5"},
 	{"sprints", "Sprints", "6"},
 	{"releases", "Releases", ""},
+	{"components", "Components", ""},
 	{"reports", "Reports", "7"},
 	{"dashboards", "Dashboards", "8"},
 	{"rituals", "Rituals", "9"},
