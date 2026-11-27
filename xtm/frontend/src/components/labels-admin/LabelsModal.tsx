@@ -110,7 +110,7 @@ export function LabelsModal({ onChanged, onClose }: Props) {
         </p>
         <div className="labels-admin-head">
           <input
-            className="labels-admin-search"
+            className="components-search"
             value={filter}
             placeholder="Filter labels…"
             aria-label="Filter labels"

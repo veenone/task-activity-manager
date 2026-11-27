@@ -1,5 +1,6 @@
 // ASSIGNEE_TYPES are the default assignee values Jira takes for a component,
-// with the wording the form and the import template use for each.
+// with the wording the form and the import template use for each. Both apps'
+// component forms read them from here (#605).
 export const ASSIGNEE_TYPES = [
   { value: "PROJECT_DEFAULT", label: "Project default" },
   { value: "COMPONENT_LEAD", label: "Component lead" },

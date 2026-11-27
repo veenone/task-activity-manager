@@ -84,3 +84,4 @@ export type { RichFormat, Block, Inline } from "./richtext/ast";
 // Types only: the canvas itself is imported lazily by path,
 // "@agile-suite/core/src/g6/G6Canvas", so G6 stays out of an app's first chunk.
 export type { CanvasApi, CanvasCombo, CanvasEdge, CanvasLayout, CanvasNode } from "./g6/G6Canvas";
+export { ASSIGNEE_TYPES, assigneeLabel } from "./lib/assigneeTypes";

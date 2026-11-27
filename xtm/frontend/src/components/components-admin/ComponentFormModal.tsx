@@ -1,10 +1,9 @@
 import { useId, useState } from "react";
-import { Modal } from "@agile-suite/core";
+import { ASSIGNEE_TYPES, Modal } from "@agile-suite/core";
 import { useProfile } from "../../contexts/ProfileContext";
 import { useUserSearch } from "../../queries/components";
 import type { ComponentInput, ProjectComponent } from "../../api";
 import { errMsg } from "../../api";
-import { ASSIGNEE_TYPES } from "./assigneeTypes";
 
 interface Props {
   initial?: ProjectComponent;
