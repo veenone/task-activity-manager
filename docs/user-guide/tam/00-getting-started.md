@@ -6,7 +6,7 @@ This guide covers what every other guide assumes: connecting TAM to a Jira proje
 
 Jira is the source of truth. TAM keeps a local copy of your project's issues, boards, sprints and reports, and reads from that copy, which is why the backlog and the board open instantly on a project of thousands of issues.
 
-Nothing you do reaches Jira on its own. Editing a field, dragging a card, filling a sprint, drafting one, starting one, completing one, deleting one: each writes to the local cache and queues a pending change. Commit is what sends them.
+Nothing you do reaches Jira on its own. Editing a field, dragging a card, filling a sprint, drafting one, starting one, completing one, deleting one, drafting or releasing a release: each writes to the local cache and queues a pending change. Commit is what sends them.
 
 A sync goes the other way, pulling what changed in Jira into the cache. Run one when you start work, and whenever someone else may have changed the project.
 
@@ -72,7 +72,7 @@ Column limits and creating a board are not covered: Jira does not report board a
 
 When you have uncommitted work, a **N pending** button appears in the top bar.
 
-1. Press it to open **Pending changes (N)**. Rows are grouped by issue, and each shows the field, the value before and the value after. A sprint drafted here, a card moved between columns and a sprint waiting to be completed all appear as rows of their own.
+1. Press it to open **Pending changes (N)**. Rows are grouped by issue, and each shows the field, the value before and the value after. A sprint drafted here, a card moved between columns, a sprint waiting to be completed and a release waiting to be created, edited, released, archived or deleted all appear as rows of their own.
 
    ![The Pending changes dialog over the board, holding one status move](images/getting-started-01-pending.png)
 2. **Discard** on a row throws that one change away. Nothing in Jira is touched. A draft issue, sprint or board asks first, because discarding it loses everything typed into it.

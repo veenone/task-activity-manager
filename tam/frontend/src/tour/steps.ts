@@ -94,6 +94,10 @@ const VIEW_WORDS: Record<string, { purpose: string; body: string }> = {
     purpose: "A board's sprints: what is in each one, and the dialogs that start, complete and edit them.",
     body: "Each sprint lists the work it carries. A sprint you draft here is created in Jira on Commit.",
   },
+  releases: {
+    purpose: "The project's releases (Jira fix versions) with their dates and progress, and the issues in the one you pick.",
+    body: "New release, Edit, Release and Delete are saved locally. Commit sends them to Jira, the issue changes a release asks for first.",
+  },
   reports: {
     purpose: "A sprint reconstructed from its own history: the burndown, the outcome figures and the board's velocity.",
     body: "The charts and the figures are built from Jira's changelog, and can be published to Confluence or exported.",

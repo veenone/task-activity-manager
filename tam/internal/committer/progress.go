@@ -94,6 +94,10 @@ func ownerPhase(r journal.PendingChange) string {
 		return "sprints"
 	case issuerepo.EntitySprintEdit, issuerepo.EntitySprintDelete, issuerepo.EntitySprintStart, issuerepo.EntitySprintComplete:
 		return "sprint changes"
+	case issuerepo.EntityVersionCreate, issuerepo.EntityVersionEdit:
+		return "releases"
+	case issuerepo.EntityVersionRelease, issuerepo.EntityVersionArchive, issuerepo.EntityVersionDelete:
+		return "closing"
 	case issuerepo.EntityIssueCreate:
 		// createDrafts reports a draft that will not decode with the
 		// ordinary issues, so it is counted there too.

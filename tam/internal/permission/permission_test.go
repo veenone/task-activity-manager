@@ -45,6 +45,19 @@ func TestGatedKeepsOnlyTheKeysTAMActsOn(t *testing.T) {
 	}
 }
 
+// Releases are managed under Administer Projects (#605), so a sync must keep
+// Jira's answer for it and a refusal must name it as the scheme page does.
+func TestGatedKeepsAdministerProjects(t *testing.T) {
+	got := Gated(map[string]bool{"ADMINISTER_PROJECTS": false})
+	if have, ok := got["ADMINISTER_PROJECTS"]; !ok || have {
+		t.Fatalf("Gated = %v, want ADMINISTER_PROJECTS kept as denied", got)
+	}
+	err := Set{"PLAT": got}.Check("PLAT", "ADMINISTER_PROJECTS")
+	if err == nil || !strings.Contains(err.Error(), `"Administer Projects"`) {
+		t.Errorf("Check = %v, want it to name Administer Projects", err)
+	}
+}
+
 func TestProjectOfReadsTheKeyPrefix(t *testing.T) {
 	for key, want := range map[string]string{"PLAT-431": "PLAT", "A-B-7": "A-B", "PLAT": "", "": "", "-3": ""} {
 		if got := ProjectOf(key); got != want {

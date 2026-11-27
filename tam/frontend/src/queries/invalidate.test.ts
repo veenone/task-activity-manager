@@ -35,3 +35,19 @@ describe("the dependency graph", () => {
     }
   });
 });
+
+// A fix version edit moves an issue between releases, so the Releases
+// view's counts and issue lists have to refresh with it, as they do on a
+// sync (#605).
+describe("the releases", () => {
+  it("are refreshed by a sync and by a local write", async () => {
+    const { invalidateWrites } = await import("./invalidate");
+    const { keys } = await import("./keys");
+    for (const run of [(qc: QueryClient) => invalidateProfileData(qc, "p1"), (qc: QueryClient) => invalidateWrites(qc, "p1", "PLAT-1")]) {
+      const qc = new QueryClient();
+      qc.setQueryData(keys.versionSummaries("p1"), []);
+      run(qc);
+      expect(qc.getQueryState(keys.versionSummaries("p1"))?.isInvalidated).toBe(true);
+    }
+  });
+});

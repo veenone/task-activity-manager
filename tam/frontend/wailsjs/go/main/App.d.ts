@@ -27,6 +27,8 @@ export function AddIssuesToBoard(arg1:string,arg2:Array<string>,arg3:number,arg4
 
 export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<void>;
 
+export function ArchiveVersion(arg1:string,arg2:number,arg3:boolean):Promise<void>;
+
 export function AttachFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
@@ -63,6 +65,8 @@ export function CreateRitualRoot(arg1:string,arg2:number,arg3:string,arg4:boolea
 
 export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.SprintCreated>;
 
+export function CreateVersion(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<backend.Version>;
+
 export function DeleteDashboard(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -70,6 +74,8 @@ export function DeleteProfile(arg1:string):Promise<void>;
 export function DeleteRitualDocument(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
 export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function DeleteVersion(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 
@@ -80,6 +86,8 @@ export function DoneAgreementTicks(arg1:string,arg2:number,arg3:Array<string>):P
 export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<void>;
+
+export function EditVersion(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
 
 export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
 
@@ -183,6 +191,8 @@ export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
 
 export function ListUnpushableEdits(arg1:string):Promise<Array<issuerepo.UnpushableEdit>>;
 
+export function ListVersionSummaries(arg1:string):Promise<Array<main.VersionSummary>>;
+
 export function ListWorklogs(arg1:string,arg2:string):Promise<Array<backend.Worklog>>;
 
 export function LogWork(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
@@ -208,6 +218,8 @@ export function ReadLog():Promise<string>;
 export function RefreshDashboard(arg1:string,arg2:string):Promise<dashboardrepo.Dashboard>;
 
 export function RefreshDetails(arg1:string):Promise<void>;
+
+export function ReleaseVersion(arg1:string,arg2:number,arg3:string,arg4:number,arg5:Array<issuerepo.ReleaseMove>):Promise<void>;
 
 export function RemoveLink(arg1:string,arg2:string,arg3:backend.Link):Promise<void>;
 
@@ -268,5 +280,7 @@ export function TestConnection(arg1:string,arg2:string,arg3:string,arg4:boolean)
 export function TestProfileConnection(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
 
 export function UpdateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<profile.Profile>;
+
+export function VersionIssues(arg1:string,arg2:number):Promise<Array<backend.Issue>>;
 
 export function WorklogWeek(arg1:string,arg2:string,arg3:string):Promise<worklogweek.View>;

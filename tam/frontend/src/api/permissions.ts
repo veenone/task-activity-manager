@@ -12,6 +12,7 @@ export const PERM_LINK_ISSUES = "LINK_ISSUES";
 export const PERM_WORK_ON_ISSUES = "WORK_ON_ISSUES";
 export const PERM_CREATE_ATTACHMENTS = "CREATE_ATTACHMENTS";
 export const PERM_RESOLVE_ISSUES = "RESOLVE_ISSUES";
+export const PERM_ADMINISTER_PROJECTS = "ADMINISTER_PROJECTS";
 
 // PermissionView is what the last sync learned about the token: the
 // profile's own project, Jira's answer per project and permission key, and

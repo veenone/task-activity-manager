@@ -15,6 +15,7 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 | [Epics](03-epics.md) | The epic to story to task tree, and what hangs off an epic |
 | [Boards](04-boards.md) | Columns, cards, moving work, swimlanes, column limits, sprint ceremonies |
 | [Sprints](05-sprints.md) | Every sprint a board has, what is in each, and creating, starting and completing them |
+| [Releases](11-releases.md) | The project's fix versions, their progress and issues, and creating, releasing, archiving and deleting them |
 | [Reports](06-reports.md) | Sprint figures, charts, velocity, people, and publishing to Confluence |
 | [Dashboards](07-dashboards.md) | Saved Jira filters, counted and kept so they read offline |
 | [Rituals](08-rituals.md) | Sprint ritual pages in Confluence, and the done agreement |
@@ -22,7 +23,7 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 
 ## Switching views
 
-Each view has a tab in the band under the top bar. The **View** menu lists the same ten with the shortcuts Ctrl+1 to Ctrl+9 and Ctrl+0:
+Each view has a tab in the band under the top bar. The **View** menu lists the same eleven. Ten have the shortcuts Ctrl+1 to Ctrl+9 and Ctrl+0; Releases came after the numbers ran out and has none:
 
 | Shortcut | View | Shortcut | View |
 |---|---|---|---|
@@ -38,11 +39,11 @@ The shortcuts do nothing while a dialog is open.
 
 ## Nothing reaches Jira until you commit
 
-TAM writes nothing to Jira until you press Commit. Editing a field, dragging a card, filling a sprint, starting one, completing one, even deleting one: each is written to the local cache and queued as a pending change. The count sits in the top bar, and the dialog behind it is where changes are reviewed, discarded and sent.
+TAM writes nothing to Jira until you press Commit. Editing a field, dragging a card, filling a sprint, starting one, completing one, releasing a release, even deleting one: each is written to the local cache and queued as a pending change. The count sits in the top bar, and the dialog behind it is where changes are reviewed, discarded and sent.
 
 Everything else in these guides assumes that loop. [Getting started](00-getting-started.md) walks through it.
 
-## One document instead of eleven
+## One document instead of twelve
 
 [USER_GUIDE.md](USER_GUIDE.md) is the same material as one numbered document, which is what the PDF is built from. The pages here are the ones to read on screen and the ones to edit; the single file carries the same content for distribution.
 

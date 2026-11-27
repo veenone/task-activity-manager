@@ -88,8 +88,12 @@ export const keys = {
   worklogWeeks: (profileId: string) => [profileId, "worklogWeek"] as const,
   // What the last sync learned the token may do, per project.
   permissions: (profileId: string) => [profileId, "permissions"] as const,
-  // The project's releases and components, which only a sync rewrites.
+  // The project's releases and components, which a sync rewrites and, for
+  // releases, the Releases view's writes. The view's two reads sit under
+  // versions so invalidating it refreshes all three.
   versions: (profileId: string) => [profileId, "versions"] as const,
+  versionSummaries: (profileId: string) => [profileId, "versions", "summaries"] as const,
+  versionIssues: (profileId: string, id: number) => [profileId, "versions", "issues", id] as const,
   components: (profileId: string) => [profileId, "components"] as const,
   worklogWeek: (profileId: string, fromDay: string, toDay: string) =>
     [profileId, "worklogWeek", fromDay, toDay] as const,

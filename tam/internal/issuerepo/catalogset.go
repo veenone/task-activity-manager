@@ -69,18 +69,7 @@ func (r *Repository) SetCatalog(ctx context.Context, profileID, project string, 
 		if err := checkCatalogIDs(ctx, tx, profileID, field, current, value); err != nil {
 			return res, fmt.Errorf("%s: %w", key, err)
 		}
-		if err := writeField(ctx, tx, profileID, key, field, value); err != nil {
-			return res, err
-		}
-		if strings.HasPrefix(key, DraftPrefix) {
-			err = updateDraftJSON(ctx, tx, profileID, key, field, value)
-		} else {
-			err = journal.Upsert(tx, profileID, EntityIssue, key, field, current, value, updated)
-		}
-		if err != nil {
-			return res, err
-		}
-		if err := journal.Audit(tx, profileID, EntityIssue, key, "edit", field, current, value, ""); err != nil {
+		if err := journalFieldEdit(ctx, tx, profileID, key, field, current, value, updated, ""); err != nil {
 			return res, err
 		}
 		res.Changed = append(res.Changed, key)
@@ -89,4 +78,23 @@ func (r *Repository) SetCatalog(ctx context.Context, profileID, project string, 
 		return res, err
 	}
 	return res, nil
+}
+
+// journalFieldEdit writes a checked value on the row and journals it: a
+// draft's create JSON is rewritten, any other issue gets an edit row. note
+// is what the audit records.
+func journalFieldEdit(ctx context.Context, tx *sql.Tx, profileID, key, field, current, value, updated, note string) error {
+	if err := writeField(ctx, tx, profileID, key, field, value); err != nil {
+		return err
+	}
+	var err error
+	if strings.HasPrefix(key, DraftPrefix) {
+		err = updateDraftJSON(ctx, tx, profileID, key, field, value)
+	} else {
+		err = journal.Upsert(tx, profileID, EntityIssue, key, field, current, value, updated)
+	}
+	if err != nil {
+		return err
+	}
+	return journal.Audit(tx, profileID, EntityIssue, key, "edit", field, current, value, note)
 }

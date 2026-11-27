@@ -71,7 +71,8 @@ func main() {
 // frontend/core/src/instruction-gate.test.ts now. The accelerator is the
 // view's place in this list, so a view inserted in the middle renumbers
 // the ones after it; a shortcut that matches the tab it belongs to is
-// worth more than one that never moves.
+// worth more than one that never moves. Releases came after the ten
+// numbers were taken and has none (#605).
 var menuViews = []struct{ id, label, accelerator string }{
 	{"backlog", "Backlog", "1"},
 	{"assigned", "Assigned to me", "2"},
@@ -79,6 +80,7 @@ var menuViews = []struct{ id, label, accelerator string }{
 	{"epics", "Epics", "4"},
 	{"boards", "Boards", "5"},
 	{"sprints", "Sprints", "6"},
+	{"releases", "Releases", ""},
 	{"reports", "Reports", "7"},
 	{"dashboards", "Dashboards", "8"},
 	{"rituals", "Rituals", "9"},
@@ -114,7 +116,7 @@ func appMenu(app *App) *menu.Menu {
 
 	view := m.AddSubmenu("View")
 	for _, v := range menuViews {
-		view.AddText(v.label, keys.CmdOrCtrl(v.accelerator), emit("menu:view", v.id))
+		view.AddText(v.label, viewAccelerator(v.accelerator), emit("menu:view", v.id))
 	}
 	view.AddSeparator()
 	// The checkbox owns the rail's state: Wails renders the tick from the
@@ -130,4 +132,13 @@ func appMenu(app *App) *menu.Menu {
 	help.AddText("Diagnostics…", nil, emit("menu:diagnostics"))
 	help.AddText("About Task Activity Manager", nil, emit("menu:about"))
 	return m
+}
+
+// viewAccelerator is a view's View menu shortcut, or none for a view that
+// has no number of its own.
+func viewAccelerator(n string) *keys.Accelerator {
+	if n == "" {
+		return nil
+	}
+	return keys.CmdOrCtrl(n)
 }

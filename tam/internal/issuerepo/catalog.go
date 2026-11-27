@@ -12,19 +12,23 @@ import (
 // synced row of the profile goes, whatever its project, so a profile moved
 // to another project stops listing the old one's releases; drafts stay. An
 // empty vs is an answer, the project has none, and empties the synced rows.
+// A release with a pending edit keeps its cached row, which carries the
+// edit, until Commit sends it (#605).
 func (r *Repository) ReplaceVersions(ctx context.Context, profileID, project string, vs []backend.Version) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM project_version WHERE profile_id = ? AND draft = 0`, profileID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM project_version WHERE profile_id = ? AND draft = 0
+		AND CAST(id AS TEXT) NOT IN (SELECT entity_key FROM pending_change WHERE profile_id = ? AND entity_type = ?)`,
+		profileID, profileID, EntityVersionEdit); err != nil {
 		return fmt.Errorf("clear the versions of %s: %w", profileID, err)
 	}
 	for _, v := range vs {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO project_version
 			(profile_id, project, id, name, description, start_date, release_date, released, archived, draft)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0) ON CONFLICT (profile_id, id) DO NOTHING`,
 			profileID, project, v.ID, v.Name, v.Description, v.StartDate, v.ReleaseDate, v.Released, v.Archived); err != nil {
 			return fmt.Errorf("store version %s for %s: %w", v.Name, profileID, err)
 		}

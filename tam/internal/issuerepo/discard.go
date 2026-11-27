@@ -107,6 +107,17 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		}
 	case p.EntityType == EntitySprintDelete, p.EntityType == EntitySprintStart, p.EntityType == EntitySprintComplete:
 		// Nothing local changed when these were queued.
+	case p.EntityType == EntityVersionCreate:
+		if err := discardDraftVersion(ctx, tx, profileID, p.EntityKey); err != nil {
+			return err
+		}
+	case p.EntityType == EntityVersionEdit:
+		if err := discardVersionEdit(ctx, tx, profileID, p); err != nil {
+			return err
+		}
+	case p.EntityType == EntityVersionRelease, p.EntityType == EntityVersionArchive, p.EntityType == EntityVersionDelete:
+		// Nor when a release's release, archive or delete was queued; the
+		// issue edits a release queued are rows of their own.
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
 	case p.EntityType == EntityWorklog:
