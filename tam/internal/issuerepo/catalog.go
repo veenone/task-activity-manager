@@ -36,20 +36,23 @@ func (r *Repository) ReplaceVersions(ctx context.Context, profileID, project str
 	return tx.Commit()
 }
 
-// ReplaceComponents is ReplaceVersions for the project's components.
+// ReplaceComponents is ReplaceVersions for the project's components; a
+// component with a pending edit keeps its cached row too.
 func (r *Repository) ReplaceComponents(ctx context.Context, profileID, project string, cs []backend.Component) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM project_component WHERE profile_id = ? AND draft = 0`, profileID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM project_component WHERE profile_id = ? AND draft = 0
+		AND CAST(id AS TEXT) NOT IN (SELECT entity_key FROM pending_change WHERE profile_id = ? AND entity_type = ?)`,
+		profileID, profileID, EntityComponentEdit); err != nil {
 		return fmt.Errorf("clear the components of %s: %w", profileID, err)
 	}
 	for _, c := range cs {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO project_component
 			(profile_id, project, id, name, description, lead_name, lead_display_name, assignee_type, draft)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0) ON CONFLICT (profile_id, id) DO NOTHING`,
 			profileID, project, c.ID, c.Name, c.Description, c.LeadName, c.LeadDisplayName, c.AssigneeType); err != nil {
 			return fmt.Errorf("store component %s for %s: %w", c.Name, profileID, err)
 		}

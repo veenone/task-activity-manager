@@ -34,6 +34,14 @@ var versionKind = catalogKind{
 	targets: []string{EntityVersionRelease, EntityVersionDelete},
 }
 
+var componentKind = catalogKind{
+	noun:    "component",
+	column:  "components",
+	field:   "components",
+	drafted: func(d *backend.IssueDraft) *[]int { return &d.Components },
+	targets: []string{EntityComponentDelete},
+}
+
 // swapID replaces from with to in ids, keeping the order and dropping
 // repeats. A to of 0 removes from instead. changed says whether from was
 // there at all.
