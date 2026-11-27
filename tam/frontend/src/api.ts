@@ -30,3 +30,4 @@ export * from "./api/permissions";
 export * from "./api/dependencies";
 export * from "./api/catalog";
 export * from "./api/releases";
+export * from "./api/components";
