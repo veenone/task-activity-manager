@@ -5,10 +5,10 @@ import {backend} from '../models';
 import {importer} from '../models';
 import {reports} from '../models';
 import {committer} from '../models';
+import {main} from '../models';
 import {ritualrepo} from '../models';
 import {profile} from '../models';
 import {ritualsync} from '../models';
-import {main} from '../models';
 import {issuerepo} from '../models';
 import {issueexport} from '../models';
 import {reportout} from '../models';
@@ -47,6 +47,10 @@ export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
+export function ComponentIssues(arg1:string,arg2:number):Promise<Array<backend.Issue>>;
+
+export function CreateComponent(arg1:string,arg2:main.ComponentForm):Promise<backend.Component>;
+
 export function CreateDashboard(arg1:string,arg2:string,arg3:string,arg4:string):Promise<dashboardrepo.Dashboard>;
 
 export function CreateDoneAgreement(arg1:string,arg2:number,arg3:number):Promise<ritualrepo.Document>;
@@ -67,6 +71,8 @@ export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg
 
 export function CreateVersion(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<backend.Version>;
 
+export function DeleteComponent(arg1:string,arg2:number,arg3:number):Promise<void>;
+
 export function DeleteDashboard(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -82,6 +88,8 @@ export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
 export function DoneAgreementTicks(arg1:string,arg2:number,arg3:Array<string>):Promise<Record<string, Array<string>>>;
+
+export function EditComponent(arg1:string,arg2:number,arg3:main.ComponentForm):Promise<void>;
 
 export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
@@ -160,6 +168,8 @@ export function ListBoardSprintDetails(arg1:string,arg2:number):Promise<Array<bo
 export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrepo.Sprint>>;
 
 export function ListBoards(arg1:string):Promise<Array<boardrepo.Board>>;
+
+export function ListComponentSummaries(arg1:string):Promise<Array<main.ComponentSummary>>;
 
 export function ListDashboards(arg1:string):Promise<Array<dashboardrepo.Dashboard>>;
 

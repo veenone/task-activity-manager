@@ -105,15 +105,18 @@ type Result struct {
 	SprintsChanged []string        `json:"sprintsChanged"`
 	// VersionsChanged names each pushed release change: "v2.4 created",
 	// "v2.4 released" (#605).
-	VersionsChanged []string   `json:"versionsChanged"`
-	Linked          []Linked   `json:"linked"`
-	Logged          []Logged   `json:"logged"`
-	Attached        []Attached `json:"attached"`
-	Moved           []Moved    `json:"moved"`
-	Conflicts       []Conflict `json:"conflicts"`
-	Failures        []Failure  `json:"failures"`
-	Held            []Held     `json:"held"`
-	Remaining       int        `json:"remaining"`
+	VersionsChanged []string `json:"versionsChanged"`
+	// ComponentsChanged names each pushed component change: "Reports
+	// created", "Auth deleted" (#605).
+	ComponentsChanged []string   `json:"componentsChanged"`
+	Linked            []Linked   `json:"linked"`
+	Logged            []Logged   `json:"logged"`
+	Attached          []Attached `json:"attached"`
+	Moved             []Moved    `json:"moved"`
+	Conflicts         []Conflict `json:"conflicts"`
+	Failures          []Failure  `json:"failures"`
+	Held              []Held     `json:"held"`
+	Remaining         int        `json:"remaining"`
 }
 
 // Engine runs commits for one backend and repository pair. order is the
@@ -145,7 +148,7 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository, order BoardOrder) *
 // rows left that cannot be read keeps the last count that could.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
 	res := Result{
-		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, VersionsChanged: []string{}, Linked: []Linked{}, Logged: []Logged{}, Attached: []Attached{},
+		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, VersionsChanged: []string{}, ComponentsChanged: []string{}, Linked: []Linked{}, Logged: []Logged{}, Attached: []Attached{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
 	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), prog: &progress{emit: e.Progress}}

@@ -8,7 +8,9 @@ interface Props {
   profileId: string;
   // The username the form holds, "" for unassigned.
   value: string;
-  onChange: (username: string) => void;
+  // displayName comes with a pick from the list, so a caller that stores
+  // the person (the component lead) can show the name without a lookup.
+  onChange: (username: string, displayName?: string) => void;
   id: string;
   // What to show when the picker has a username it has not resolved to a
   // person yet, e.g. the display name a sync left on the issue.
@@ -65,7 +67,7 @@ export function AssigneePicker({ profileId, value, onChange, id, fallbackLabel, 
   }, [search, open]);
 
   function choose(username: string, display: string) {
-    onChange(username);
+    onChange(username, display);
     setQuery(display);
     setOpen(false);
   }

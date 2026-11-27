@@ -16,6 +16,7 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 | [Boards](04-boards.md) | Columns, cards, moving work, swimlanes, column limits, sprint ceremonies |
 | [Sprints](05-sprints.md) | Every sprint a board has, what is in each, and creating, starting and completing them |
 | [Releases](11-releases.md) | The project's fix versions, their progress and issues, and creating, releasing, archiving and deleting them |
+| [Components](12-components.md) | The project's components, their lead and issues, and creating, editing and deleting them |
 | [Reports](06-reports.md) | Sprint figures, charts, velocity, people, and publishing to Confluence |
 | [Dashboards](07-dashboards.md) | Saved Jira filters, counted and kept so they read offline |
 | [Rituals](08-rituals.md) | Sprint ritual pages in Confluence, and the done agreement |
@@ -23,7 +24,7 @@ There is one guide for each entry in the **View** menu. Start with Getting start
 
 ## Switching views
 
-Each view has a tab in the band under the top bar. The **View** menu lists the same eleven. Ten have the shortcuts Ctrl+1 to Ctrl+9 and Ctrl+0; Releases came after the numbers ran out and has none:
+Each view has a tab in the band under the top bar. The **View** menu lists the same twelve. Ten have the shortcuts Ctrl+1 to Ctrl+9 and Ctrl+0; Releases and Components came after the numbers ran out and have none:
 
 | Shortcut | View | Shortcut | View |
 |---|---|---|---|

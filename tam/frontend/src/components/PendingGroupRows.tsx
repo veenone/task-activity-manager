@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useConfirm } from "@agile-suite/core";
-import { ENTITY_VERSION_CREATE, fieldLabel } from "../api";
+import { ENTITY_COMPONENT_CREATE, ENTITY_VERSION_CREATE, fieldLabel } from "../api";
 import type { Component, PendingChange, Version } from "../api";
 import { catalogNames } from "../lib/catalog";
 import type { PendingGroup } from "../queries/pending";
@@ -9,6 +9,7 @@ import { worklogEntryLine } from "./WorkLogSection";
 import { attachmentLine } from "./AttachmentsSection";
 import { boardDraftLine, draftLine, sprintChangeLine, sprintChangeName, sprintChangeNote, sprintDraftLine } from "./pendingWords";
 import { releaseChangeLine, releaseChangeName, releaseChangeNote } from "./releaseWords";
+import { componentChangeLine, componentChangeName, componentChangeNote } from "./componentWords";
 
 interface Props {
   group: PendingGroup;
@@ -108,6 +109,22 @@ function describeRelease(rows: PendingChange[], project: string) {
   };
 }
 
+// describeComponent is describeRelease for a component's rows.
+function describeComponent(rows: PendingChange[], project: string) {
+  const name = componentChangeName(rows[0]);
+  const draft = rows.some((r) => r.entityType === ENTITY_COMPONENT_CREATE);
+  return {
+    name,
+    chips: draft ? <span className="chip chip-draft">Draft component</span> : null,
+    lines: rows.map((row): Line => ({
+      row, field: "Component", before: "", after: componentChangeLine(row, project),
+      notes: [note(componentChangeNote(row))],
+      discardLabel: row.entityType === ENTITY_COMPONENT_CREATE ? `Discard ${name}` : `Discard the change to ${name}`,
+      lost: row.entityType === ENTITY_COMPONENT_CREATE ? "This draft component" : undefined,
+    })),
+  };
+}
+
 function describe(g: PendingGroup, project: string, heldReasons: string[], unpushableIds: Set<number>, catalog?: Catalog) {
   const sprintLines = (rows: PendingChange[], name: string): Line[] =>
     rows.map((row) => ({
@@ -143,6 +160,7 @@ function describe(g: PendingGroup, project: string, heldReasons: string[], unpus
     return { name, chips: null, lines: sprintLines(g.sprintChanges, name) };
   }
   if (g.releaseChanges.length > 0) return describeRelease(g.releaseChanges, project);
+  if (g.componentChanges.length > 0) return describeComponent(g.componentChanges, project);
 
   const held = heldReasons.map((r) => note(`${r.charAt(0).toUpperCase()}${r.slice(1)}.`, "small pending-held"));
   const chips = (

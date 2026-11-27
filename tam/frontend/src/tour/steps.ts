@@ -98,6 +98,10 @@ const VIEW_WORDS: Record<string, { purpose: string; body: string }> = {
     purpose: "The project's releases (Jira fix versions) with their dates and progress, and the issues in the one you pick.",
     body: "New release, Edit, Release and Delete are saved locally. Commit sends them to Jira, the issue changes a release asks for first.",
   },
+  components: {
+    purpose: "The project's components with their lead and issue count, and the issues filed under the one you pick.",
+    body: "New component, Edit and Delete are saved locally. Commit sends them to Jira.",
+  },
   reports: {
     purpose: "A sprint reconstructed from its own history: the burndown, the outcome figures and the board's velocity.",
     body: "The charts and the figures are built from Jira's changelog, and can be published to Confluence or exported.",

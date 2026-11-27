@@ -194,15 +194,21 @@ func (r *commitRun) landVersion(ctx context.Context, p journal.PendingChange, na
 // is still a draft's: held when that draft's create failed this Commit,
 // failed when nothing in the journal will create it.
 func (r *commitRun) heldOnDraftVersion(key, entityType string, rowID int64, ids ...int) bool {
+	return r.heldOnDraft("release", versionKey, key, entityType, rowID, ids...)
+}
+
+// heldOnDraft is heldOnDraftVersion for either catalog: noun names the
+// kind in the failure, depKey is how its drafts are named to dependencies.
+func (r *commitRun) heldOnDraft(noun string, depKey func(int) string, key, entityType string, rowID int64, ids ...int) bool {
 	for _, id := range ids {
 		if id >= 0 {
 			continue
 		}
-		if waits, held := r.deps.blockedBy(versionKey(id)); held {
+		if waits, held := r.deps.blockedBy(depKey(id)); held {
 			r.deps.hold(r.res, key, entityType, rowID, waits)
 			return true
 		}
-		r.res.Failures = append(r.res.Failures, Failure{Key: key, EntityType: entityType, RowID: rowID, Error: fmt.Sprintf("it names release %d, which is not a draft this Commit could create; set the release again", id), Reachable: []string{}})
+		r.res.Failures = append(r.res.Failures, Failure{Key: key, EntityType: entityType, RowID: rowID, Error: fmt.Sprintf("it names %s %d, which is not a draft this Commit could create; set the %s again", noun, id, noun), Reachable: []string{}})
 		return true
 	}
 	return false

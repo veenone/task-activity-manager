@@ -54,6 +54,14 @@ export function CompleteSprint(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CompleteSprint'](arg1, arg2, arg3, arg4);
 }
 
+export function ComponentIssues(arg1, arg2) {
+  return window['go']['main']['App']['ComponentIssues'](arg1, arg2);
+}
+
+export function CreateComponent(arg1, arg2) {
+  return window['go']['main']['App']['CreateComponent'](arg1, arg2);
+}
+
 export function CreateDashboard(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateDashboard'](arg1, arg2, arg3, arg4);
 }
@@ -94,6 +102,10 @@ export function CreateVersion(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateVersion'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function DeleteComponent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteComponent'](arg1, arg2, arg3);
+}
+
 export function DeleteDashboard(arg1, arg2) {
   return window['go']['main']['App']['DeleteDashboard'](arg1, arg2);
 }
@@ -124,6 +136,10 @@ export function DiscardPendingChange(arg1, arg2) {
 
 export function DoneAgreementTicks(arg1, arg2, arg3) {
   return window['go']['main']['App']['DoneAgreementTicks'](arg1, arg2, arg3);
+}
+
+export function EditComponent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EditComponent'](arg1, arg2, arg3);
 }
 
 export function EditIssue(arg1, arg2, arg3, arg4) {
@@ -280,6 +296,10 @@ export function ListBoardSprints(arg1, arg2) {
 
 export function ListBoards(arg1) {
   return window['go']['main']['App']['ListBoards'](arg1);
+}
+
+export function ListComponentSummaries(arg1) {
+  return window['go']['main']['App']['ListComponentSummaries'](arg1);
 }
 
 export function ListDashboards(arg1) {

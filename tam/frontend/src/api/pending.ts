@@ -235,6 +235,9 @@ export interface CommitResult {
   // versionsChanged names each pushed release change, "v2.4 released"
   // (#605); optional for the same reason.
   versionsChanged?: string[];
+  // componentsChanged names each pushed component change, "Reports
+  // created"; optional for the same reason.
+  componentsChanged?: string[];
   linked: { key: string; toKey: string; type: string }[];
   // logged names each worklog entry pushed; optional for the reason
   // createdSprints is, since fixtures written before it do not carry it.

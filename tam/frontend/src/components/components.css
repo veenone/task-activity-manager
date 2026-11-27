@@ -1,0 +1,6 @@
+/* The Components view (#605). The list and detail rules are XTM's, shared
+   from frontend/core's primitives.css; these are TAM's additions: the issue
+   table in the detail pane and the chip on a component waiting for Commit. */
+.components-issues { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.components-sort { padding: 4px 6px; }
+.components-item-chip { margin-left: 6px; }

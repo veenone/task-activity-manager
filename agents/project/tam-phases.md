@@ -2616,7 +2616,7 @@ whose permission Jira denied are disabled. Call flow: `Engine.Sync` ->
 A release is a Jira fix version; the UI says release, the code says version.
 PR 1 cached `project_version` and `project_component` (schema 28) and the two
 issue fields, PR 2 made the fields pending edits, PR 3 added the Releases
-view and the release lifecycle. Components (PR 4) are not here yet.
+view and the release lifecycle, PR 4 the Components view (next section).
 
 - **Journal.** `issuerepo/versiondrafts.go`, `versionqueue.go`: five entity
   types, keyed by the release id as text, one field each. `version_create`
@@ -2633,12 +2633,13 @@ view and the release lifecycle. Components (PR 4) are not here yet.
   journaled with the `version_release` row in one transaction
   (`moveOutOfVersion` over `journalFieldEdit`, which `SetCatalog` shares).
   Descope is `swapID(ids, id, 0)`: the closing release goes, nothing else.
-- **Ids.** `rewriteVersionID(from, to)` repoints the issue rows' JSON column,
+- **Ids.** `versionKind.rewriteID(from, to)` (`issuerepo/catalogids.go`, a
+  `catalogKind` components share) repoints the issue rows' JSON column,
   both halves of pending `fixVersions` edits (dropping one left equal on both
   sides), draft issue JSON, and release/delete `moveTo`. `to = 0` is the
   discard of a draft; `RekeyVersion` is the create. `ReplaceVersions` keeps the
   cached row of a release with a pending edit.
-- **Commit.** Phase `releases` after `sprint changes`: creates (blocked under
+- **Commit.** Phase `releases and components` after `sprint changes`: creates (blocked under
   `version:<id>` in `dependencies`, so a draft release -1 and a draft sprint -1
   never collide), then edits, each checked against Jira's copy
   (`CatalogBackend.ProjectVersions`, read once per Commit) and failed, not
@@ -2669,6 +2670,48 @@ view and the release lifecycle. Components (PR 4) are not here yet.
   refresh them. Pending changes groups release rows under kind `release`
   (`releaseWords.ts`).
 - **Demo** keeps version writes in memory (`backend/demo/versions.go`).
+
+## Components (#605, PR 4)
+
+Components follow the release pattern, sharing its helpers rather than
+copying them.
+
+- **Journal.** `issuerepo/componentdrafts.go`, `componentqueue.go`: three
+  entity types keyed by the component id. `component_create` (a draft under a
+  negative id from `draft_component_seq`, with a `project_component` row,
+  `draft = 1`), `component_edit` (before and after `ComponentFields{name,
+  description, leadName, leadDisplayName, assigneeType}`; the cached row
+  changes at once; an edit back to Jira's drops the row; the lead's display
+  name and an empty assignee type do not count as differences), and
+  `component_delete` (`ComponentDelete{name, moveTo, moveToName}`, nothing
+  local until Commit). A delete supersedes an edit; an edit or second delete
+  is refused while a delete waits. Refusals share `refuseCatalogQueued` with
+  releases.
+- **Ids.** `componentKind.rewriteID` covers the `components` column, pending
+  `components` edits, draft issue JSON and a delete's `moveTo`.
+  `RekeyComponent` is the create, `ApplyComponentCommitted` moves the cached
+  issues after a pushed delete. `ReplaceComponents` keeps a row with a
+  pending edit.
+- **Commit.** Creates and edits run in `releases and components` after the
+  release ones (`committer/components.go`), drafts blocked under
+  `component:<id>`; deletes run at the end of `closing`. `pushEdits` and
+  `createDrafts` hold an edit or draft naming a draft component
+  (`heldOnDraftComponent`, over the shared `heldOnDraft`). Edits are checked
+  against `CatalogBackend.ProjectComponents`, read once per Commit.
+  `backend.ComponentBackend` is the optional write interface; the Jira
+  backend uses core/jira's component client, the demo keeps writes in memory
+  (`backend/demo/components.go`). `Result.ComponentsChanged` feeds the Commit
+  line.
+- **Bindings.** `app_components.go` reuses `lockedRelease`: the `release`
+  lock and Administer Projects for any write to a component Jira holds.
+- **Frontend.** `ComponentsView` (after Releases, `gated`, no accelerator) is
+  XTM's layout; its list and detail CSS and `ASSIGNEE_TYPES` moved from XTM
+  into `frontend/core` (`primitives.css`, `lib/assigneeTypes.ts`), and XTM
+  reads them from there. `ComponentFormModal` picks the lead with
+  `AssigneePicker`, which now passes the display name with the username.
+  `DeleteComponentModal` counts from the cache. Reads sit under
+  `keys.components`. Pending changes groups component rows under kind
+  `component` (`componentWords.ts`).
 
 ## Commands
 

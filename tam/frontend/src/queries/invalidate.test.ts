@@ -51,3 +51,18 @@ describe("the releases", () => {
     }
   });
 });
+
+// A components edit moves an issue between components, so the Components
+// view's counts and issue lists refresh with it, as they do on a sync.
+describe("the components", () => {
+  it("are refreshed by a sync and by a local write", async () => {
+    const { invalidateWrites } = await import("./invalidate");
+    const { keys } = await import("./keys");
+    for (const run of [(qc: QueryClient) => invalidateProfileData(qc, "p1"), (qc: QueryClient) => invalidateWrites(qc, "p1", "PLAT-1")]) {
+      const qc = new QueryClient();
+      qc.setQueryData(keys.componentSummaries("p1"), []);
+      run(qc);
+      expect(qc.getQueryState(keys.componentSummaries("p1"))?.isInvalidated).toBe(true);
+    }
+  });
+});

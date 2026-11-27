@@ -241,11 +241,17 @@ func editDraftVersion(ctx context.Context, tx *sql.Tx, profileID, key string, id
 // refuseVersionQueued refuses a write while one of the given changes of the
 // release waits for Commit.
 func refuseVersionQueued(ctx context.Context, tx *sql.Tx, profileID, key, verb string, types ...string) error {
+	return refuseCatalogQueued(ctx, tx, profileID, key, "release", verb, versionChangeWord, types...)
+}
+
+// refuseCatalogQueued refuses a write to a release or component while one of the
+// given changes of it waits for Commit; words names each change.
+func refuseCatalogQueued(ctx context.Context, tx *sql.Tx, profileID, key, noun, verb string, words map[string]string, types ...string) error {
 	for _, t := range types {
 		if _, ok, err := pendingSprintRow(ctx, tx, profileID, t, key); err != nil {
 			return err
 		} else if ok {
-			return fmt.Errorf("this release has a %s waiting for Commit, so it cannot be %s; discard that change first", versionChangeWord[t], verb)
+			return fmt.Errorf("this %s has a %s waiting for Commit, so it cannot be %s; discard that change first", noun, words[t], verb)
 		}
 	}
 	return nil
@@ -282,7 +288,7 @@ func discardDraftVersion(ctx context.Context, tx *sql.Tx, profileID, key string)
 	if err != nil {
 		return fmt.Errorf("draft release id %q: %w", key, err)
 	}
-	if err := rewriteVersionID(ctx, tx, profileID, id, 0); err != nil {
+	if err := versionKind.rewriteID(ctx, tx, profileID, id, 0); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM project_version WHERE profile_id = ? AND id = ? AND draft = 1`, profileID, id); err != nil {

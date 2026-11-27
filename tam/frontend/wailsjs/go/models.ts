@@ -1104,6 +1104,7 @@ export namespace committer {
 	    createdSprints: CreatedSprint[];
 	    sprintsChanged: string[];
 	    versionsChanged: string[];
+	    componentsChanged: string[];
 	    linked: Linked[];
 	    logged: Logged[];
 	    attached: Attached[];
@@ -1124,6 +1125,7 @@ export namespace committer {
 	        this.createdSprints = this.convertValues(source["createdSprints"], CreatedSprint);
 	        this.sprintsChanged = source["sprintsChanged"];
 	        this.versionsChanged = source["versionsChanged"];
+	        this.componentsChanged = source["componentsChanged"];
 	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.logged = this.convertValues(source["logged"], Logged);
 	        this.attached = this.convertValues(source["attached"], Attached);
@@ -1809,6 +1811,54 @@ export namespace journal {
 
 export namespace main {
 	
+	export class ComponentForm {
+	    name: string;
+	    description: string;
+	    leadName: string;
+	    leadDisplayName: string;
+	    assigneeType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComponentForm(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.leadName = source["leadName"];
+	        this.leadDisplayName = source["leadDisplayName"];
+	        this.assigneeType = source["assigneeType"];
+	    }
+	}
+	export class ComponentSummary {
+	    id: number;
+	    project: string;
+	    name: string;
+	    description: string;
+	    leadName: string;
+	    leadDisplayName: string;
+	    assigneeType: string;
+	    draft: boolean;
+	    issues: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComponentSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project = source["project"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.leadName = source["leadName"];
+	        this.leadDisplayName = source["leadDisplayName"];
+	        this.assigneeType = source["assigneeType"];
+	        this.draft = source["draft"];
+	        this.issues = source["issues"];
+	    }
+	}
 	export class Diagnostics {
 	    version: string;
 	    dbPath: string;

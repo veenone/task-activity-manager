@@ -14,6 +14,7 @@ import { EpicsView } from "./components/EpicsView";
 import { BoardsView } from "./components/BoardsView";
 import { SprintsView } from "./components/SprintsView";
 import { ReleasesView } from "./components/ReleasesView";
+import { ComponentsView } from "./components/ComponentsView";
 import { ReportsView } from "./components/ReportsView";
 import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
@@ -275,6 +276,8 @@ export default function App() {
               <SprintsView />
             ) : current.id === "releases" ? (
               <ReleasesView />
+            ) : current.id === "components" ? (
+              <ComponentsView />
             ) : current.id === "reports" ? (
               <ReportsView onOpenBoards={() => setView("boards")} />
             ) : current.id === "dashboards" ? (

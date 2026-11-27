@@ -94,9 +94,9 @@ func ownerPhase(r journal.PendingChange) string {
 		return "sprints"
 	case issuerepo.EntitySprintEdit, issuerepo.EntitySprintDelete, issuerepo.EntitySprintStart, issuerepo.EntitySprintComplete:
 		return "sprint changes"
-	case issuerepo.EntityVersionCreate, issuerepo.EntityVersionEdit:
-		return "releases"
-	case issuerepo.EntityVersionRelease, issuerepo.EntityVersionArchive, issuerepo.EntityVersionDelete:
+	case issuerepo.EntityVersionCreate, issuerepo.EntityVersionEdit, issuerepo.EntityComponentCreate, issuerepo.EntityComponentEdit:
+		return "releases and components"
+	case issuerepo.EntityVersionRelease, issuerepo.EntityVersionArchive, issuerepo.EntityVersionDelete, issuerepo.EntityComponentDelete:
 		return "closing"
 	case issuerepo.EntityIssueCreate:
 		// createDrafts reports a draft that will not decode with the

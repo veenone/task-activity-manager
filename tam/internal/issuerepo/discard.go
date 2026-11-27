@@ -118,6 +118,16 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 	case p.EntityType == EntityVersionRelease, p.EntityType == EntityVersionArchive, p.EntityType == EntityVersionDelete:
 		// Nor when a release's release, archive or delete was queued; the
 		// issue edits a release queued are rows of their own.
+	case p.EntityType == EntityComponentCreate:
+		if err := discardDraftComponent(ctx, tx, profileID, p.EntityKey); err != nil {
+			return err
+		}
+	case p.EntityType == EntityComponentEdit:
+		if err := discardComponentEdit(ctx, tx, profileID, p); err != nil {
+			return err
+		}
+	case p.EntityType == EntityComponentDelete:
+		// Nor when a component's delete was queued.
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
 	case p.EntityType == EntityWorklog:

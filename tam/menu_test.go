@@ -22,3 +22,17 @@ func TestViewAcceleratorSkipsAViewWithoutANumber(t *testing.T) {
 		seen[v.accelerator] = v.id
 	}
 }
+
+// Components follows Releases in the View menu, with no number either (#605).
+func TestComponentsFollowsReleasesInTheViewMenu(t *testing.T) {
+	for i, v := range menuViews {
+		if v.id != "releases" {
+			continue
+		}
+		if i+1 >= len(menuViews) || menuViews[i+1].id != "components" || menuViews[i+1].accelerator != "" {
+			t.Fatalf("after releases: %+v", menuViews[i+1:])
+		}
+		return
+	}
+	t.Fatal("no releases view in the menu")
+}

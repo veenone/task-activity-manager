@@ -15,7 +15,7 @@ import {
   ListPendingChanges,
   ListUnpushableEdits,
 } from "../api";
-import { ENTITY_BOARD_CREATE, ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, SPRINT_ENTITIES, VERSION_ENTITIES, isMoveEntity } from "../api";
+import { ENTITY_BOARD_CREATE, ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, SPRINT_ENTITIES, VERSION_ENTITIES, COMPONENT_ENTITIES, isMoveEntity } from "../api";
 import { ENTITY_ATTACHMENT, ENTITY_WORKLOG } from "../api";
 import type { AttachmentDraft, DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange, Worklog } from "../api";
 import { keys } from "./keys";
@@ -193,7 +193,7 @@ export function useDiscardById(profileId: string) {
 export interface PendingGroup {
   id: string;
   key: string;
-  kind: "board" | "sprint" | "release" | "issue";
+  kind: "board" | "sprint" | "release" | "component" | "issue";
   draft: IssueDraft | null;
   createRow: PendingChange | null;
   sprint: DraftSprint | null;
@@ -201,6 +201,8 @@ export interface PendingGroup {
   sprintChanges: PendingChange[];
   // releaseChanges are a release's rows, its create among them (#605).
   releaseChanges: PendingChange[];
+  // componentChanges are a component's rows, the same way.
+  componentChanges: PendingChange[];
   board: DraftBoard | null;
   boardRow: PendingChange | null;
   edits: PendingChange[];
@@ -215,6 +217,7 @@ function groupKind(entityType: string): PendingGroup["kind"] {
   if (SPRINT_ENTITIES.includes(entityType)) return "sprint";
   if (entityType === ENTITY_BOARD_CREATE) return "board";
   if (VERSION_ENTITIES.includes(entityType)) return "release";
+  if (COMPONENT_ENTITIES.includes(entityType)) return "component";
   return "issue";
 }
 
@@ -235,7 +238,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     const id = pendingGroupId(row);
     let g = byKey.get(id);
     if (!g) {
-      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], releaseChanges: [], board: null, boardRow: null, edits: [], links: [], worklogs: [], attachments: [], moves: [] };
+      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], releaseChanges: [], componentChanges: [], board: null, boardRow: null, edits: [], links: [], worklogs: [], attachments: [], moves: [] };
       byKey.set(id, g);
     }
     if (row.entityType === "issue_create") {
@@ -261,6 +264,8 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
       }
     } else if (VERSION_ENTITIES.includes(row.entityType)) {
       g.releaseChanges.push(row);
+    } else if (COMPONENT_ENTITIES.includes(row.entityType)) {
+      g.componentChanges.push(row);
     } else if (SPRINT_ENTITIES.includes(row.entityType)) {
       g.sprintChanges.push(row);
     } else if (isMoveEntity(row.entityType)) {
@@ -293,6 +298,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     ...groups.filter((g) => g.kind === "sprint" && g.sprintRow),
     ...groups.filter((g) => g.kind === "sprint" && !g.sprintRow),
     ...groups.filter((g) => g.kind === "release"),
+    ...groups.filter((g) => g.kind === "component"),
     ...groups.filter((g) => g.kind === "issue" && g.createRow),
     ...groups.filter((g) => g.kind === "issue" && !g.createRow),
   ];

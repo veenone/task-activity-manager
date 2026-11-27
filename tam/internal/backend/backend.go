@@ -59,15 +59,15 @@ type Issue struct {
 	Labels         []string `json:"labels"`
 	// Components and FixVersions hold catalog ids (see catalog.go), so a
 	// rename in Jira never touches the issue rows.
-	Components  []int  `json:"components"`
-	FixVersions []int  `json:"fixVersions"`
-	SprintID    string `json:"sprintId"`
-	SprintName     string   `json:"sprintName"`
-	ParentKey      string   `json:"parentKey"`
-	StoryPoints    *float64 `json:"storyPoints"`
-	Rank           string   `json:"rank"`
-	Created        string   `json:"created"`
-	Updated        string   `json:"updated"`
+	Components  []int    `json:"components"`
+	FixVersions []int    `json:"fixVersions"`
+	SprintID    string   `json:"sprintId"`
+	SprintName  string   `json:"sprintName"`
+	ParentKey   string   `json:"parentKey"`
+	StoryPoints *float64 `json:"storyPoints"`
+	Rank        string   `json:"rank"`
+	Created     string   `json:"created"`
+	Updated     string   `json:"updated"`
 
 	// Jira's time tracking on this issue, in seconds, nil when the issue
 	// carries none. A pointer rather than a plain int because an issue

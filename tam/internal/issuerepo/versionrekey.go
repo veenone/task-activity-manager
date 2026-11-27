@@ -27,7 +27,7 @@ func (r *Repository) RekeyVersion(ctx context.Context, profileID string, draftID
 		if !ok {
 			return ErrDraftVersionGone
 		}
-		if err := rewriteVersionID(ctx, tx, profileID, draftID, made.ID); err != nil {
+		if err := versionKind.rewriteID(ctx, tx, profileID, draftID, made.ID); err != nil {
 			return err
 		}
 		// A sync that ran while Commit did may have cached Jira's copy
@@ -83,7 +83,7 @@ func (r *Repository) ApplyVersionCommitted(ctx context.Context, profileID string
 			if err := json.Unmarshal([]byte(p.AfterVal), &v); err != nil {
 				return fmt.Errorf("decode the delete of %s: %w", p.EntityKey, err)
 			}
-			if err := rewriteIssueVersions(ctx, tx, profileID, id, v.MoveTo); err != nil {
+			if err := versionKind.rewriteIssues(ctx, tx, profileID, id, v.MoveTo); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM project_version WHERE profile_id = ? AND id = ?`, profileID, id); err != nil {

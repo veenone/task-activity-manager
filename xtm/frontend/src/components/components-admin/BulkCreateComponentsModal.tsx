@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import type { ChangeEvent } from "react";
-import { Modal } from "@agile-suite/core";
+import { Modal, assigneeLabel } from "@agile-suite/core";
 import { useProfile } from "../../contexts/ProfileContext";
 import {
   CheckComponents,
@@ -15,7 +15,6 @@ import type {
   ComponentInput,
 } from "../../api";
 import { fileToBase64 } from "../../files";
-import { assigneeLabel } from "./assigneeTypes";
 
 interface Props {
   // Called once a batch has run, whatever it created, so the list reloads.
