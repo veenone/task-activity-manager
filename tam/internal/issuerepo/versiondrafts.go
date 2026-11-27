@@ -282,7 +282,7 @@ func discardDraftVersion(ctx context.Context, tx *sql.Tx, profileID, key string)
 	if err != nil {
 		return fmt.Errorf("draft release id %q: %w", key, err)
 	}
-	if err := rewriteVersionID(ctx, tx, profileID, id, 0); err != nil {
+	if err := versionKind.rewriteID(ctx, tx, profileID, id, 0); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM project_version WHERE profile_id = ? AND id = ? AND draft = 1`, profileID, id); err != nil {
